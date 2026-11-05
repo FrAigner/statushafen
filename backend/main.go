@@ -732,16 +732,18 @@ func staticFileFor(root, urlPath string) (string, bool) {
 	// führendem "/" jedes ".." auf (TestStaticFileFor, ../-Varianten in
 	// TestStatic_GibtKeineGeheimnisseOderVerzeichnisseHeraus).
 	full := filepath.Join(root, filepath.FromSlash(clean))
-	info, err := os.Stat(full)
+	// Erst Links auflösen und prüfen, dann die Datei anfassen: Ein Link im
+	// Build-Ordner darf nicht auf Dateien außerhalb zeigen. Links innerhalb des
+	// Ordners bleiben erlaubt. EvalSymlinks schlägt bei einer fehlenden Datei fehl.
+	real, err := filepath.EvalSymlinks(full)
+	if err != nil || !withinRoot(root, real) {
+		return "", false
+	}
+	info, err := os.Stat(real)
 	if err != nil || !info.Mode().IsRegular() {
 		return "", false
 	}
-	// os.Stat folgt Links: Ein Link im Build-Ordner darf nicht auf Dateien
-	// außerhalb zeigen. Links innerhalb des Ordners bleiben erlaubt.
-	if !withinRoot(root, full) {
-		return "", false
-	}
-	return full, true
+	return real, true
 }
 
 // withinRoot sagt, ob path nach Auflösung aller Links unter root liegt.
