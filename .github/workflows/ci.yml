@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Coverage- und Mutations-Gate vergleichen gegen den
           # Merge-Base mit dem Ziel-Branch, dafür braucht es die Historie.
@@ -36,12 +36,12 @@ jobs:
           # Das Token soll nicht in .git/config bleiben; die Schritte brauchen es nicht.
           persist-credentials: false
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           check-latest: true
       - name: Setup Go
-        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           # Version aus go.mod statt fester '1.25' (go.mod verlangt 1.26.x, sonst
           # lädt GOTOOLCHAIN die passende Toolchain bei jedem Lauf nach).
@@ -70,7 +70,7 @@ jobs:
       - name: Lint Frontend
         run: cd frontend && npm run lint
       - name: Lint Backend
-        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           working-directory: backend
           args: --config .golangci.yml
@@ -132,11 +132,11 @@ jobs:
     timeout-minutes: 75
     steps:
       - name: Checkout Code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Setup Go
-        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/go.mod
       - name: Go-Tests mit -race
