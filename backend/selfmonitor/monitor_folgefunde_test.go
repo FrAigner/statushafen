@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fraigner/statushafen/models"
+	"github.com/fraigner/statushafen/testutils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -235,4 +236,31 @@ func TestMonitor_ErholungFehlerlogNenntVorfallID(t *testing.T) {
 	f.res = &Result{OK: true}
 	f.run(1)
 	assert.Contains(t, buf.String(), "incident=1 ")
+}
+
+// Die Kennung kommt aus einer Marke in der Datenbank. Eine Zahl außerhalb des
+// uint-Bereichs (auf 32-Bit-Systemen ab 2^32) wird verworfen, statt beim
+// Umwandeln abgeschnitten zu werden und einen anderen Vorfall zu treffen.
+// Auf 64-Bit-Systemen ist das Verhalten gleich geblieben; der Test beschreibt es.
+func TestResolveIncident_KennungAusserhalbDesBereichsSchliesstNichts(t *testing.T) {
+	db := testutils.SetupTestDB()
+	page := models.StatusPage{Name: "Sys", Slug: "sys-kennung"}
+	require.NoError(t, db.Create(&page).Error)
+	inc := models.Incident{StatusPageID: page.ID, Title: "offen", Status: "investigating"}
+	require.NoError(t, db.Create(&inc).Error)
+	now := time.Now()
+
+	for _, raw := range []string{"18446744073709551616", "99999999999999999999", "-1", "abc", ""} {
+		closed, err := resolveIncident(db, page.ID, now, raw, "x")
+		require.NoError(t, err, raw)
+		assert.False(t, closed, raw)
+	}
+	var after models.Incident
+	require.NoError(t, db.First(&after, inc.ID).Error)
+	assert.Equal(t, "investigating", after.Status, "der offene Vorfall bleibt unberührt")
+
+	// Gegenprobe: die richtige Kennung schließt.
+	closed, err := resolveIncident(db, page.ID, now, strconv.FormatUint(uint64(inc.ID), 10), "behoben")
+	require.NoError(t, err)
+	assert.True(t, closed)
 }

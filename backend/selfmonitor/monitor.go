@@ -562,7 +562,9 @@ func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 // nur Vorfälle der Systemseite (pageID). Der Rückgabewert sagt, ob
 // dieser Aufruf den Vorfall wirklich geschlossen hat.
 func resolveIncident(tx *gorm.DB, pageID uint, now time.Time, rawID, reason string) (bool, error) {
-	id, err := strconv.ParseUint(rawID, 10, 64)
+	// Bitgröße 0 = Größe von uint: Werte, die nicht in uint passen, werden hier
+	// abgelehnt, statt bei uint(id) unten abgeschnitten zu werden (32-Bit).
+	id, err := strconv.ParseUint(rawID, 10, 0)
 	if err != nil {
 		return false, nil //nolint:nilerr // ungültige Kennung: nichts zu schließen, Marke wird entfernt
 	}

@@ -165,3 +165,66 @@ func TestStatic_JedeDateiAusFrontendPublicWirdAusgeliefert(t *testing.T) {
 		}
 	}
 }
+
+// Ein Link im Build-Ordner, der aus dem Ordner herauszeigt, darf nichts
+// ausliefern: os.Stat folgt Links, und path.Clean sieht sie nicht.
+func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "dist")
+	outside := filepath.Join(base, "aussen")
+	for _, d := range []string{root, outside, filepath.Join(root, "fonts")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	secret := filepath.Join(outside, "geheim.txt")
+	if err := os.WriteFile(secret, []byte("GEHEIM"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "echt.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	links := map[string]string{
+		"datei.txt":    secret,                          // Link auf eine Datei außerhalb
+		"fonts/aussen": outside,                         // Link auf einen Ordner außerhalb
+		"alias.txt":    filepath.Join(root, "echt.txt"), // Link innerhalb: erlaubt
+	}
+	for name, target := range links {
+		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(name))); err != nil {
+			t.Skipf("Symlinks nicht möglich: %v", err)
+		}
+	}
+
+	for _, url := range []string{"/datei.txt", "/fonts/aussen/geheim.txt"} {
+		if got, ok := staticFileFor(root, url); ok {
+			t.Errorf("staticFileFor(%q) liefert %q aus dem Ordner heraus aus", url, got)
+		}
+	}
+	// Gegenprobe: normale Datei und Link innerhalb des Ordners funktionieren.
+	for _, url := range []string{"/echt.txt", "/alias.txt"} {
+		if _, ok := staticFileFor(root, url); !ok {
+			t.Errorf("staticFileFor(%q) lehnt eine Datei im Ordner ab", url)
+		}
+	}
+}
+
+// Fehlerpfade: ein nicht auflösbarer Ordner oder Pfad gilt als außerhalb.
+func TestWithinRoot_NichtAufloesbareGelten_AlsAusserhalb(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "a.txt")
+	if err := os.WriteFile(file, []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !withinRoot(root, file) {
+		t.Error("Datei im Ordner muss innerhalb liegen")
+	}
+	if withinRoot(filepath.Join(root, "fehlt"), file) {
+		t.Error("nicht auflösbarer Ordner darf nichts freigeben")
+	}
+	if withinRoot(root, filepath.Join(root, "fehlt.txt")) {
+		t.Error("nicht auflösbarer Pfad darf nicht innerhalb liegen")
+	}
+	if withinRoot(filepath.Join(root, "a.txt"), root) {
+		t.Error("übergeordneter Ordner liegt nicht innerhalb einer Datei darunter")
+	}
+}

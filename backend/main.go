@@ -736,7 +736,26 @@ func staticFileFor(root, urlPath string) (string, bool) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", false
 	}
+	// os.Stat folgt Links: Ein Link im Build-Ordner darf nicht auf Dateien
+	// außerhalb zeigen. Links innerhalb des Ordners bleiben erlaubt.
+	if !withinRoot(root, full) {
+		return "", false
+	}
 	return full, true
+}
+
+// withinRoot sagt, ob path nach Auflösung aller Links unter root liegt.
+func withinRoot(root, path string) bool {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false
+	}
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(realRoot, realPath)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // serverTimeouts bündelt die Zeitgrenzen des HTTP-Servers.
