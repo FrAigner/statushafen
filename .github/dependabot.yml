@@ -1,0 +1,59 @@
+# Hält Abhängigkeiten laufend aktuell (zusätzlich zu den Security Updates, die
+# nur Pakete mit bekannter Schwachstelle melden). Wöchentlich und gruppiert,
+# damit keine PR-Flut entsteht. Jeder Vorschlag läuft durch die normale CI
+# (Tests, Lint, Coverage-Gate); nichts wird automatisch gemergt.
+# Der Test dependabot_config_test.go stellt sicher, dass jedes Manifest im
+# Repo einen Eintrag hat.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  # Basis-Images im Dockerfile (Tag und Digest). Die Node-Hauptversion hängt
+  # an .nvmrc und der CI und wird dort bewusst gemeinsam angehoben.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker-images:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      compose-images:
+        patterns: ["*"]
+
+  # Fremde Actions sind auf Commit-SHA gepinnt; Dependabot hebt die SHA an
+  # und behält den Versionskommentar.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]

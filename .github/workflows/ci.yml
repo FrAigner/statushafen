@@ -1,0 +1,145 @@
+# CI für Statushafen. Alle Jobs laufen auf GitHub-gehosteten Runnern: Code aus
+# Pull Requests läuft nie auf einer eigenen Maschine (backend/workflowlint
+# erzwingt das).
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+# Ein neuer Stand eines Pull Requests bricht den noch laufenden oder wartenden Lauf des alten Stands ab: Der alte
+# Stand ist dann ohnehin überholt.
+# Nur Pull Requests haben eine gemeinsame Gruppe. Pushes auf main und manuelle Läufe bekommen je eine eigene
+# (run_id), damit nie ein Lauf auf main abgebrochen oder verdrängt wird.
+# Das GITHUB_TOKEN darf nur lesen (backend/workflowlint erzwingt ausdrückliche permissions).
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Coverage- und Mutations-Gate vergleichen gegen den
+          # Merge-Base mit dem Ziel-Branch, dafür braucht es die Historie.
+          fetch-depth: 0
+          # Das Token soll nicht in .git/config bleiben; die Schritte brauchen es nicht.
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          check-latest: true
+      - name: Setup Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          # Version aus go.mod statt fester '1.25' (go.mod verlangt 1.26.x, sonst
+          # lädt GOTOOLCHAIN die passende Toolchain bei jedem Lauf nach).
+          go-version-file: backend/go.mod
+      - name: Install Dependencies
+        run: |
+          # Frontend
+          cd frontend
+          npm ci
+          # Backend
+          cd ../backend
+          go mod download
+      # Kein self-hosted Runner bei pull_request, alle Actions per Commit-SHA
+      # gepinnt (backend/workflowlint).
+      - name: Workflow-Lint
+        run: cd backend && go run ./cmd/workflowlint ../.github/workflows
+      # Start-Skripte der lokalen Entwicklung prüfen
+      - name: Entwicklungsskripte
+        run: |
+          bash scripts/local_translate_test.sh
+          bash scripts/start_args_test.sh
+          bash scripts/start_npm_test.sh
+          bash scripts/start_nvm_test.sh
+          bash scripts/dev_jwt_secret_test.sh
+          bash scripts/repo_artefakte_test.sh
+      - name: Lint Frontend
+        run: cd frontend && npm run lint
+      - name: Lint Backend
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+        with:
+          working-directory: backend
+          args: --config .golangci.yml
+      - name: Run Tests
+        env:
+          # Migrationen auf leerer Postgres-DB, zweimal hintereinander
+          # (database/migration_postgres_test.go, embedded-postgres, kein Docker
+          # nötig). Läuft im Coverage-Lauf, damit InitDB() im Profil steht; ein
+          # Fehler macht diesen Schritt und damit den PR rot.
+          MIGRATION_PG_TEST: "1"
+        run: |
+          # Frontend: direkt mit Coverage, der Report speist den Gate.
+          cd frontend && npm run test:coverage
+          # Backend: -coverpkg=./... damit auch Pakete ohne eigene Tests mit
+          # allen Statements im Profil stehen.
+          # -timeout 30m: großzügige Grenze, damit langsame Runner nicht an Gos
+          # Standardgrenze von 10 min scheitern.
+          cd ../backend && go test ./... -timeout 30m -coverpkg=./... -coverprofile=coverage.out
+      # Jede im PR geänderte Zeile muss ausgeführt und jeder Zweig
+      # darauf durchlaufen sein; die Gesamtquoten dürfen nicht unter
+      # coverage-baseline.json fallen. Frontend mit 1,5 Punkten Toleranz:
+      # v8 misst auf identischem Code bis ca. 1,2 Punkte verschieden.
+      - name: Coverage-Gate (geänderter Code)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git diff -U0 --no-color "origin/${BASE_REF}...HEAD" > "$RUNNER_TEMP/pr.diff"
+          cd backend
+          go run ./cmd/coveragegate check -diff "$RUNNER_TEMP/pr.diff" \
+            -go-profile coverage.out -lcov ../frontend/coverage/lcov.info \
+            -baseline ../coverage-baseline.json \
+            -frontend-tolerance 1.5
+      # Nach dem Merge (Push auf main) gibt es keinen Diff: Hier werden nur die Gesamtquoten gegen
+      # die Baseline geprüft, damit eine gesunkene Quote nicht unbemerkt bleibt.
+      - name: Gesamtquoten-Check
+        if: github.event_name == 'push'
+        run: |
+          cd backend
+          go run ./cmd/coveragegate baseline-check -go-profile coverage.out \
+            -lcov ../frontend/coverage/lcov.info -baseline ../coverage-baseline.json \
+            -frontend-tolerance 1.5
+      # Die Mutationstests (gremlins, StrykerJS) laufen nachts: mutation-nachts.yml.
+      # Der Build bleibt als Prüfschritt; das Ergebnis wird bewusst nicht als
+      # Artifact hochgeladen (frontend/dist würde sonst bei jedem Lauf den
+      # Artifact-Speicher füllen).
+      - name: Generate Artifacts
+        run: cd frontend && npm run build --production
+      - name: Set Up Security
+        run: cd backend && mkdir -p /tmp/security-checks
+        # Add security checks here if needed
+
+  # Go-Tests mit Race-Detector. Eigener Job statt -race im Coverage-Lauf des build-Jobs: handlers braucht
+  # mit -race rund 6,7-mal so lange (17 s -> 112 s); das verlängerte sonst jeden PR-Lauf. Parallel zum
+  # build-Job und ohne Coverage-Profil (das braucht der Gate nur einmal). -race verlangt cgo und damit
+  # einen C-Compiler; der SQLite-Treiber der Tests (glebarez/sqlite, modernc) ist reines Go.
+  race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          go-version-file: backend/go.mod
+      - name: Go-Tests mit -race
+        env:
+          CGO_ENABLED: "1"
+        run: cd backend && go test -race ./... -timeout 60m

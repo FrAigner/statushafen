@@ -1,0 +1,69 @@
+name: Code Quality & Security
+
+# Läuft auf GitHub-gehosteten Runnern. Tests und Coverage laufen im CI-Workflow (ci.yml).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Das GITHUB_TOKEN darf nur lesen (backend/workflowlint erzwingt ausdrückliche permissions).
+permissions:
+  contents: read
+
+jobs:
+  vulnscan:
+    name: Schwachstellen-Scan
+    # Die Werkzeuge hier brauchen weder Docker noch ein Token.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          # Dieselbe Go-Version wie das Projekt, sonst meldet govulncheck Lücken der Standardbibliothek falsch.
+          go-version-file: backend/go.mod
+
+      - name: Go-Abhängigkeiten und Standardbibliothek (govulncheck)
+        # Meldet nur Lücken, die der Code wirklich aufruft. Seit Go 1.26.10 (GO-2026-6809, crypto/x509)
+        # ist der Scan sauber und blockiert jetzt: eine aufgerufene Schwachstelle macht den Job rot.
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          cd backend
+          "$(go env GOPATH)/bin/govulncheck" ./...
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          check-latest: true
+
+      - name: Frontend-Abhängigkeiten (npm audit)
+        # Nur Laufzeit-Abhängigkeiten, ab Stufe "high" rot.
+        run: cd frontend && npm audit --audit-level=high --omit=dev
+
+  secretscan:
+    name: Geheimnis-Scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: backend/go.mod
+
+      - name: gitleaks installieren
+        # Feste Version über den Go-Proxy statt einer fremden Action: nichts, was nur per Tag gepinnt wäre.
+        # Das Modul heißt in go.mod der Version noch zricethezav/gitleaks.
+        run: go install github.com/zricethezav/gitleaks/v8@v8.30.1
+
+      - name: Allowlist prüfen
+        # Ein echtes Geheimnis neben einem erlaubten Namen muss weiter gemeldet werden.
+        run: GITLEAKS="$(go env GOPATH)/bin/gitleaks" bash scripts/gitleaks_allowlist_test.sh
+
+      - name: Arbeitsbaum nach Geheimnissen durchsuchen
+        # Aufruf wie in .gitleaks.toml beschrieben; Funde werden geschwärzt ausgegeben.
+        run: '"$(go env GOPATH)/bin/gitleaks" dir . --no-banner --redact -c .gitleaks.toml'

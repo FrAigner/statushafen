@@ -1,0 +1,10 @@
+version: 2
+secret:
+  # Diese Testdateien setzen absichtlich SMTP_HOST/SMTP_USER/SMTP_PASSWORD
+  # bzw. Basic-Auth-Credentials mit offensichtlich fiktiven Platzhaltern, um
+  # die Konfigurationslogik zu testen. GitGuardians generischer
+  # SMTP-Credential-Detektor erkennt dieses Muster strukturell (Host+User+
+  # Passwort in Testnähe) unabhängig vom konkreten Platzhalterwert.
+  ignored-paths:
+    - "backend/handlers/smtp_test.go"
+    - "backend/handlers/metrics_test.go"

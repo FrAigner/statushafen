@@ -1,0 +1,19 @@
+# Konfiguration für gitleaks (https://github.com/gitleaks/gitleaks).
+# Aufruf: gitleaks dir . --no-banner --redact
+title = "Statushafen"
+
+[extend]
+useDefault = true
+
+# Die Muster gelten für das gefundene Geheimnis selbst (regexTarget = "secret") und sind an
+# beiden Enden verankert: Es wird nur der bekannte Fehlalarm unterdrückt, nicht die Zeile, in der
+# er steht. Ein echtes Geheimnis in derselben Zeile wird weiter gemeldet.
+# backend/gitleaks_config_test.go prüft das; scripts/gitleaks_allowlist_test.sh prüft es mit gitleaks.
+[allowlist]
+description = "Bekannte Fehlalarme: Spaltennamen der Monitoring-Ansicht und erfundene Test-Werte"
+regexTarget = "secret"
+regexes = [
+  '''^(avg|min|max|p[0-9]{2})_latency_ms$''',
+  '''^whk-secret-123$''',
+  '''^konto-fremd797$''',
+]
