@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 350
     steps:
       - name: Checkout Code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
@@ -58,12 +58,12 @@ jobs:
           fi
       - name: Setup Node.js
         if: steps.basis.outputs.neu == 'true'
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
       - name: Setup Go
         if: steps.basis.outputs.neu == 'true'
-        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           # Version aus go.mod statt fester '1.25' (go.mod verlangt 1.26.x, sonst
           # lädt GOTOOLCHAIN die passende Toolchain bei jedem Lauf nach).
