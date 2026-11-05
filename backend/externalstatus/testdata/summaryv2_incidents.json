@@ -1,0 +1,1019 @@
+{
+  "page": {
+    "id": "fx0000000001",
+    "name": "Example Cloud",
+    "url": "https://status.example.com",
+    "time_zone": "Europe/Berlin",
+    "updated_at": "2026-10-29T21:40:02.900+01:00"
+  },
+  "incidents": [
+    {
+      "id": "fx0000000019",
+      "name": "Unexpectedly long maintenance duration for database instances",
+      "status": "resolved",
+      "created_at": "2026-10-27T20:20:32.596+01:00",
+      "updated_at": "2026-10-27T22:39:21.011+01:00",
+      "monitoring_at": null,
+      "resolved_at": "2026-10-27T22:39:20.987+01:00",
+      "impact": "major",
+      "shortlink": "https://short.example.com/fx0000000020",
+      "started_at": "2026-10-27T20:20:32.574+01:00",
+      "page_id": "fx0000000001",
+      "incident_updates": [
+        {
+          "id": "fx0000000021",
+          "status": "resolved",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 1 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000019",
+          "created_at": "2026-10-27T22:39:20.987+01:00",
+          "updated_at": "2026-10-27T22:39:20.987+01:00",
+          "display_at": "2026-10-27T22:39:20.987+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "x2rnysx9grn9",
+              "name": "EU01-Network - DNS",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "19vdmvb3qtv0",
+              "name": "EU01-Security & Identity - Secrets Manager",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "bpdw8xfz7d5k",
+              "name": "EU01-Compute - Server Backup Management",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "dm08l6v1b7nk",
+              "name": "EU01-Compute - Server Update Management",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000022",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 2 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000019",
+          "created_at": "2026-10-27T21:36:06.121+01:00",
+          "updated_at": "2026-10-27T21:36:06.121+01:00",
+          "display_at": "2026-10-27T21:36:06.121+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "x2rnysx9grn9",
+              "name": "EU01-Network - DNS",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "19vdmvb3qtv0",
+              "name": "EU01-Security & Identity - Secrets Manager",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "bpdw8xfz7d5k",
+              "name": "EU01-Compute - Server Backup Management",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "dm08l6v1b7nk",
+              "name": "EU01-Compute - Server Update Management",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000023",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 3 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000019",
+          "created_at": "2026-10-27T20:31:14.506+01:00",
+          "updated_at": "2026-10-27T20:31:14.506+01:00",
+          "display_at": "2026-10-27T20:31:14.506+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "x2rnysx9grn9",
+              "name": "EU01-Network - DNS",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "19vdmvb3qtv0",
+              "name": "EU01-Security & Identity - Secrets Manager",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "bpdw8xfz7d5k",
+              "name": "EU01-Compute - Server Backup Management",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "dm08l6v1b7nk",
+              "name": "EU01-Compute - Server Update Management",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000024",
+          "status": "identified",
+          "body": "Synthetic test text 4. The issue was identified and a fix is being rolled out.",
+          "incident_id": "fx0000000019",
+          "created_at": "2026-10-27T20:21:54.048+01:00",
+          "updated_at": "2026-10-27T20:21:54.048+01:00",
+          "display_at": "2026-10-27T20:21:54.048+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "x2rnysx9grn9",
+              "name": "EU01-Network - DNS",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "19vdmvb3qtv0",
+              "name": "EU01-Security & Identity - Secrets Manager",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "bpdw8xfz7d5k",
+              "name": "EU01-Compute - Server Backup Management",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "dm08l6v1b7nk",
+              "name": "EU01-Compute - Server Update Management",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            }
+          ],
+          "deliver_notifications": false
+        },
+        {
+          "id": "fx0000000025",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 5 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000019",
+          "created_at": "2026-10-27T20:20:32.802+01:00",
+          "updated_at": "2026-10-27T20:20:32.802+01:00",
+          "display_at": "2026-10-27T20:20:32.802+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "under_maintenance",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "19vdmvb3qtv0",
+              "name": "EU01-Security & Identity - Secrets Manager",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "bpdw8xfz7d5k",
+              "name": "EU01-Compute - Server Backup Management",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "dm08l6v1b7nk",
+              "name": "EU01-Compute - Server Update Management",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            }
+          ],
+          "deliver_notifications": true
+        }
+      ],
+      "components": [
+        {
+          "id": "fx0000000026",
+          "name": "Service 15",
+          "status": "operational",
+          "created_at": "2021-10-05T09:10:07.275+02:00",
+          "updated_at": "2026-10-27T20:31:14.366+01:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2021-10-05",
+          "group_id": "fx0000000027",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000009",
+          "name": "Service 05",
+          "status": "operational",
+          "created_at": "2023-02-14T16:59:05.997+01:00",
+          "updated_at": "2026-10-27T20:31:14.395+01:00",
+          "position": 3,
+          "description": null,
+          "showcase": false,
+          "start_date": "2022-03-01",
+          "group_id": "fx0000000003",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000028",
+          "name": "Service 16",
+          "status": "operational",
+          "created_at": "2023-03-31T14:32:34.279+02:00",
+          "updated_at": "2026-10-27T20:31:14.419+01:00",
+          "position": 3,
+          "description": null,
+          "showcase": false,
+          "start_date": "2023-03-31",
+          "group_id": "fx0000000029",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000011",
+          "name": "Service 07",
+          "status": "operational",
+          "created_at": "2023-02-14T16:59:53.251+01:00",
+          "updated_at": "2026-10-27T20:31:14.441+01:00",
+          "position": 4,
+          "description": null,
+          "showcase": false,
+          "start_date": "2023-02-14",
+          "group_id": "fx0000000003",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000030",
+          "name": "Service 17",
+          "status": "operational",
+          "created_at": "2022-09-14T15:00:58.905+02:00",
+          "updated_at": "2026-10-27T20:31:14.465+01:00",
+          "position": 5,
+          "description": null,
+          "showcase": false,
+          "start_date": "2022-09-14",
+          "group_id": "fx0000000031",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000015",
+          "name": "Service 11",
+          "status": "operational",
+          "created_at": "2022-07-07T13:47:19.887+02:00",
+          "updated_at": "2026-10-27T22:39:20.939+01:00",
+          "position": 7,
+          "description": null,
+          "showcase": false,
+          "start_date": "2022-07-07",
+          "group_id": "fx0000000008",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        }
+      ]
+    },
+    {
+      "id": "fx0000000032",
+      "name": "Several services impaired (e.g. storage, application platform)",
+      "status": "postmortem",
+      "created_at": "2026-07-09T04:17:58.324+02:00",
+      "updated_at": "2026-07-14T21:58:58.813+02:00",
+      "monitoring_at": "2026-07-09T19:17:04.863+02:00",
+      "resolved_at": "2026-07-09T19:52:37.429+02:00",
+      "impact": "major",
+      "shortlink": "https://short.example.com/fx0000000033",
+      "started_at": "2026-07-09T04:17:58.315+02:00",
+      "page_id": "fx0000000001",
+      "incident_updates": [
+        {
+          "id": "fx0000000034",
+          "status": "postmortem",
+          "body": "## Incident Description Summary\n\nThis is a synthetic test text 6. A fictional platform component was impaired for about 30 minutes.\n\n## Root Cause\n\nA configuration change in a made-up service.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-14T19:55:54.778+02:00",
+          "updated_at": "2026-07-14T20:33:02.654+02:00",
+          "display_at": null,
+          "affected_components": null,
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000035",
+          "status": "resolved",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 7 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T19:52:37.429+02:00",
+          "updated_at": "2026-07-09T19:52:37.429+02:00",
+          "display_at": "2026-07-09T19:52:37.429+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000036",
+          "status": "monitoring",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 8 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T19:17:04.863+02:00",
+          "updated_at": "2026-07-09T19:17:04.863+02:00",
+          "display_at": "2026-07-09T19:17:04.863+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "operational"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000037",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 9 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T15:49:20.662+02:00",
+          "updated_at": "2026-07-09T15:49:20.662+02:00",
+          "display_at": "2026-07-09T15:49:20.662+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "operational"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000038",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 10 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T12:11:21.691+02:00",
+          "updated_at": "2026-07-09T12:11:21.691+02:00",
+          "display_at": "2026-07-09T12:11:21.691+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "operational"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "partial_outage",
+              "new_status": "operational"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000039",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 11 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T11:04:44.430+02:00",
+          "updated_at": "2026-07-09T11:05:31.316+02:00",
+          "display_at": "2026-07-09T11:04:44.000+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "partial_outage",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000040",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 12 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T09:33:57.851+02:00",
+          "updated_at": "2026-07-09T09:33:57.851+02:00",
+          "display_at": "2026-07-09T09:33:57.851+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "degraded_performance",
+              "new_status": "operational"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "degraded_performance",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "partial_outage",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "degraded_performance",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000041",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 13 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T08:45:55.486+02:00",
+          "updated_at": "2026-07-09T08:45:55.486+02:00",
+          "display_at": "2026-07-09T08:45:55.486+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "partial_outage"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000042",
+          "status": "identified",
+          "body": "Synthetic test text 14. The issue was identified and a fix is being rolled out.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T08:06:08.243+02:00",
+          "updated_at": "2026-07-09T08:06:08.243+02:00",
+          "display_at": "2026-07-09T08:06:08.243+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "x0427p2f23pb",
+              "name": "EU01-Logging & Monitoring - Observability",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": false
+        },
+        {
+          "id": "fx0000000043",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 15 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T07:25:50.729+02:00",
+          "updated_at": "2026-07-09T07:25:50.729+02:00",
+          "display_at": "2026-07-09T07:25:50.729+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "tw3q6vfts9hd",
+              "name": "EU01-Network - Network",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "126jfdt1bkf0",
+              "name": "EU01-Compute - Virtual Machine",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000044",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 16 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T06:43:19.134+02:00",
+          "updated_at": "2026-07-09T06:43:19.134+02:00",
+          "display_at": "2026-07-09T06:43:19.134+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000045",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 17 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T05:23:39.923+02:00",
+          "updated_at": "2026-07-09T05:23:39.923+02:00",
+          "display_at": "2026-07-09T05:23:39.923+02:00",
+          "affected_components": [
+            {
+              "code": "vm7b3t23h95p",
+              "name": "EU01-Runtimes - Cloud Foundry",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "w0yfxk5bkjyb",
+              "name": "EU01-Runtimes - Kubernetes Engine",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            },
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000046",
+          "status": "identified",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 18 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T04:30:20.230+02:00",
+          "updated_at": "2026-07-09T04:30:20.230+02:00",
+          "display_at": "2026-07-09T04:30:20.230+02:00",
+          "affected_components": [
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "degraded_performance",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000047",
+          "status": "investigating",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 19 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000032",
+          "created_at": "2026-07-09T04:17:58.392+02:00",
+          "updated_at": "2026-07-09T04:17:58.392+02:00",
+          "display_at": "2026-07-09T04:17:58.392+02:00",
+          "affected_components": [
+            {
+              "code": "blp7dhr9p7j7",
+              "name": "EU01-Storage - Object Storage",
+              "old_status": "operational",
+              "new_status": "degraded_performance"
+            }
+          ],
+          "deliver_notifications": false
+        }
+      ],
+      "components": [
+        {
+          "id": "fx0000000048",
+          "name": "Service 18",
+          "status": "operational",
+          "created_at": "2020-10-09T10:52:19.273+02:00",
+          "updated_at": "2026-08-24T16:48:02.161+02:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2020-10-09",
+          "group_id": "fx0000000029",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000026",
+          "name": "Service 15",
+          "status": "operational",
+          "created_at": "2021-10-05T09:10:07.275+02:00",
+          "updated_at": "2026-10-27T20:31:14.366+01:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2021-10-05",
+          "group_id": "fx0000000027",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000049",
+          "name": "Service 19",
+          "status": "operational",
+          "created_at": "2021-12-09T12:26:36.049+01:00",
+          "updated_at": "2026-08-19T12:50:06.968+02:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2021-12-09",
+          "group_id": "fx0000000050",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000006",
+          "name": "Service 03",
+          "status": "operational",
+          "created_at": "2020-10-09T10:47:56.604+02:00",
+          "updated_at": "2026-10-21T12:00:07.763+02:00",
+          "position": 2,
+          "description": null,
+          "showcase": false,
+          "start_date": "2020-10-09",
+          "group_id": "fx0000000003",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000051",
+          "name": "Service 20",
+          "status": "operational",
+          "created_at": "2020-10-09T10:46:38.400+02:00",
+          "updated_at": "2026-07-16T18:39:32.645+02:00",
+          "position": 3,
+          "description": null,
+          "showcase": false,
+          "start_date": "2020-10-09",
+          "group_id": "fx0000000052",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000053",
+          "name": "Service 02",
+          "status": "operational",
+          "created_at": "2020-10-09T10:58:43.274+02:00",
+          "updated_at": "2026-10-01T12:33:39.966+02:00",
+          "position": 5,
+          "description": null,
+          "showcase": false,
+          "start_date": "2020-10-09",
+          "group_id": "fx0000000050",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        }
+      ]
+    },
+    {
+      "id": "fx0000000054",
+      "name": "Region B infrastructure API errors",
+      "status": "resolved",
+      "created_at": "2026-10-29T11:00:00.000+01:00",
+      "updated_at": "2026-10-29T12:09:33.033+01:00",
+      "monitoring_at": null,
+      "resolved_at": "2026-10-29T11:00:00.000+01:00",
+      "impact": "none",
+      "shortlink": "https://short.example.com/fx0000000055",
+      "started_at": "2026-10-29T12:09:32.962+01:00",
+      "page_id": "fx0000000001",
+      "incident_updates": [
+        {
+          "id": "fx0000000056",
+          "status": "resolved",
+          "body": "<br>\n<b>Deutsch</b>\nDies ist ein erfundener Testtext 20 für eine Störungsmeldung. Die Ursache wurde eingegrenzt &amp; behoben.\n\nWeitere Informationen folgen im nächsten Update.",
+          "incident_id": "fx0000000054",
+          "created_at": "2026-10-29T12:09:33.023+01:00",
+          "updated_at": "2026-10-29T12:09:33.023+01:00",
+          "display_at": "2026-10-29T11:00:00.000+01:00",
+          "affected_components": null,
+          "deliver_notifications": false
+        }
+      ],
+      "components": []
+    }
+  ]
+}

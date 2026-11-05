@@ -1,0 +1,216 @@
+/* =============================================================================
+   Einstiegsseiten (Redesign Stufe 4e): Login, Bestellung,
+   Bestätigungs- und Abmeldeseiten.
+
+   Vorher trug jede dieser Views dieselben ~100 Zeilen Karte, Formularfeld und
+   Knopf selbst (mit Indigo-Verlauf und festen rgba-Werten). Jetzt eine Quelle,
+   nur Tokens aus tokens.css, keine Hex-Werte.
+
+   Die alten Klassen (.btn-login, .login-alert, .btn-confirm, …) bleiben als
+   Test-Haken an den Elementen (e2e-Specs anderer Bereiche melden sich darüber
+   an); das Aussehen kommt von den entry-*-Klassen. Formularfelder sind bewusst
+   als Block "Label + Eingabe + Hinweis" gebaut (.entry-field), damit der
+   spätere Wechsel auf die FormField-Komponente (Stufe 3) nur das Markup tauscht.
+   ============================================================================ */
+
+.entry-page {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6) var(--sp-4);
+}
+
+.entry-card {
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6) var(--sp-5);
+  box-shadow: var(--shadow-2);
+}
+.entry-card--wide { max-width: 460px; }
+.entry-card--center { text-align: center; }
+
+.entry-head {
+  text-align: center;
+  margin-bottom: var(--sp-5);
+}
+
+.entry-logo {
+  display: flex;
+  justify-content: center;
+  color: var(--primary);
+  margin-bottom: var(--sp-3);
+}
+
+.entry-title {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  margin: 0 0 var(--sp-2);
+  text-align: center;
+}
+
+.entry-subtitle {
+  font-size: var(--fs-base);
+  color: var(--text-2);
+  margin: 0 0 var(--sp-5);
+  text-align: center;
+}
+.entry-head .entry-subtitle { margin-bottom: 0; }
+
+/* Symbol über der Überschrift (Bestätigungsseiten) */
+.entry-icon {
+  display: flex;
+  justify-content: center;
+  color: var(--primary-text);
+  margin-bottom: var(--sp-2);
+}
+.entry-icon--danger { color: var(--major-text); }
+
+/* Fehlermeldung: Form + Farbe + Text, nie nur Farbe (Rahmen, Fläche, Schrift). */
+.entry-alert {
+  background: var(--major-soft);
+  border: 1px solid var(--major);
+  color: var(--major-text);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-base);
+  margin-bottom: var(--sp-4);
+}
+.entry-alert p { margin: 0; color: inherit; }
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.entry-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.entry-field label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.entry-field input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text);
+  font-size: var(--fs-md);
+  font-family: inherit;
+}
+.entry-field input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-color: var(--focus);
+}
+
+.entry-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.entry-password {
+  position: relative;
+  display: flex;
+}
+.entry-password input { padding-right: 44px; }
+.entry-toggle {
+  position: absolute;
+  right: var(--sp-1);
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 32px;
+  min-height: 32px;
+  background: none;
+  border: none;
+  padding: var(--sp-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: var(--r-md);
+}
+.entry-toggle:hover { background: var(--surface-2); color: var(--text); }
+.entry-toggle:focus-visible { outline: 2px solid var(--focus); }
+
+/* Knöpfe: Primär (auch als Link) und Sekundär (SSO). */
+.entry-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--primary);
+  color: var(--on-primary);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.entry-btn:hover { background: var(--primary-hover); }
+.entry-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.entry-btn:disabled { opacity: 0.7; cursor: default; }
+
+.entry-btn--secondary {
+  justify-content: flex-start;
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  font-weight: 500;
+}
+.entry-btn--secondary:hover { background: var(--surface-2); border-color: var(--primary); }
+
+.entry-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+.entry-card--center .entry-btn { margin-top: var(--sp-4); }
+
+.entry-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin: 0 0 var(--sp-4);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+.entry-divider::before,
+.entry-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* Für Bots sichtbar, für Menschen nicht (Honeypot der Bestellung). */
+.entry-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}

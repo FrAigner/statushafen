@@ -1,0 +1,29 @@
+*.log
+.pids
+backend/backend.log
+backend/gin.log
+backend/statushafen
+frontend/playwright-report/
+frontend/test-results/
+frontend/debug_admin_users.png
+frontend/debug_private_page.png
+backend/.env
+backend/.jwt-secret.local
+frontend/.env
+.DS_Store
+
+# Coverage-Profil für den Coverage-Gate
+backend/coverage*.out
+
+# go build in cmd/<name>/ legt dort ein Binary namens <name> ab
+# (war versehentlich eingecheckt). Nur die Datei, nicht der Ordner.
+/backend/cmd/*/*
+!/backend/cmd/*/*.*
+!/backend/cmd/*/*/
+
+# Artefakte von sed -i -E (macOS), Merge-/Editor-Resten
+*-E
+*.orig
+*.rej
+*.bak
+*~

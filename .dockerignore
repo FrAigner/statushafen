@@ -1,0 +1,22 @@
+**/.git
+**/.gitignore
+**/node_modules
+**/dist
+**/*.log
+.pids
+README.md
+docker-compose.yml
+start.sh
+stop.sh
+# Zugangsdaten und Schlüssel gehören nicht in den Build-Kontext (nur .env.example bleibt)
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+# Prüfberichte und Beweisdateien im Wurzelverzeichnis
+security-*
+frontend/test-results
+frontend/playwright-report
+frontend/e2e
+**/.DS_Store

@@ -1,0 +1,189 @@
+{
+  "page": {
+    "id": "fx0000000001",
+    "name": "Example Cloud",
+    "url": "https://status.example.com",
+    "time_zone": "Europe/Berlin",
+    "updated_at": "2026-10-29T21:40:02.900+01:00"
+  },
+  "scheduled_maintenances": [
+    {
+      "id": "fx0000000057",
+      "name": "Planned maintenance code hosting - 2026-11-09",
+      "status": "scheduled",
+      "created_at": "2026-10-27T12:34:12.466+01:00",
+      "updated_at": "2026-10-27T12:34:12.564+01:00",
+      "monitoring_at": null,
+      "resolved_at": null,
+      "impact": "maintenance",
+      "shortlink": "https://short.example.com/fx0000000058",
+      "started_at": "2026-10-27T12:34:12.457+01:00",
+      "page_id": "fx0000000001",
+      "incident_updates": [
+        {
+          "id": "fx0000000059",
+          "status": "scheduled",
+          "body": "<br>\n<h6>Deutsch</h6>\nDies ist ein erfundener Testtext 21 für ein Wartungsfenster. Am 09.11.2026 gibt es von 21:00 bis 00:00 Uhr kurze Unterbrechungen.\n\nBitte planen Sie das ein.",
+          "incident_id": "fx0000000057",
+          "created_at": "2026-10-27T12:34:12.561+01:00",
+          "updated_at": "2026-10-27T12:34:12.561+01:00",
+          "display_at": "2026-10-27T12:34:12.561+01:00",
+          "affected_components": [
+            {
+              "code": "ln9m00pnr70h",
+              "name": "EU01-Developer Platform - Git",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        }
+      ],
+      "components": [
+        {
+          "id": "fx0000000060",
+          "name": "Service 21",
+          "status": "operational",
+          "created_at": "2025-03-21T15:17:59.093+01:00",
+          "updated_at": "2026-10-27T21:00:07.795+01:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2025-03-21",
+          "group_id": "fx0000000061",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        }
+      ],
+      "scheduled_for": "2026-11-09T21:00:00.000+01:00",
+      "scheduled_until": "2026-11-10T00:00:00.000+01:00"
+    },
+    {
+      "id": "fx0000000062",
+      "name": "Database maintenance - 2026-10-27",
+      "status": "completed",
+      "created_at": "2026-10-15T15:26:11.607+02:00",
+      "updated_at": "2026-10-27T23:09:07.319+01:00",
+      "monitoring_at": null,
+      "resolved_at": "2026-10-27T23:09:07.276+01:00",
+      "impact": "maintenance",
+      "shortlink": "https://short.example.com/fx0000000063",
+      "started_at": "2026-10-15T15:26:11.593+02:00",
+      "page_id": "fx0000000001",
+      "incident_updates": [
+        {
+          "id": "fx0000000064",
+          "status": "completed",
+          "body": "The scheduled maintenance has been completed.",
+          "incident_id": "fx0000000062",
+          "created_at": "2026-10-27T23:09:07.276+01:00",
+          "updated_at": "2026-10-27T23:09:07.276+01:00",
+          "display_at": "2026-10-27T23:09:07.276+01:00",
+          "affected_components": [
+            {
+              "code": "vkvxrttvqlh5",
+              "name": "EU02-Databases - PostgreSQL Flex",
+              "old_status": "under_maintenance",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000065",
+          "status": "in_progress",
+          "body": "Scheduled maintenance is currently in progress. We will provide updates as necessary.",
+          "incident_id": "fx0000000062",
+          "created_at": "2026-10-27T20:00:07.504+01:00",
+          "updated_at": "2026-10-27T20:00:07.504+01:00",
+          "display_at": "2026-10-27T20:00:07.504+01:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "operational",
+              "new_status": "under_maintenance"
+            },
+            {
+              "code": "vkvxrttvqlh5",
+              "name": "EU02-Databases - PostgreSQL Flex",
+              "old_status": "operational",
+              "new_status": "under_maintenance"
+            }
+          ],
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000066",
+          "status": "scheduled",
+          "body": "Maintenance will begin as scheduled in 60 minutes.",
+          "incident_id": "fx0000000062",
+          "created_at": "2026-10-27T19:00:21.053+01:00",
+          "updated_at": "2026-10-27T19:00:21.053+01:00",
+          "display_at": "2026-10-27T19:00:21.053+01:00",
+          "affected_components": null,
+          "deliver_notifications": true
+        },
+        {
+          "id": "fx0000000067",
+          "status": "scheduled",
+          "body": "<br>\n<h6>Deutsch</h6>\nDies ist ein erfundener Testtext 22 für ein Wartungsfenster. Am 09.11.2026 gibt es von 21:00 bis 00:00 Uhr kurze Unterbrechungen.\n\nBitte planen Sie das ein.",
+          "incident_id": "fx0000000062",
+          "created_at": "2026-10-15T15:26:11.713+02:00",
+          "updated_at": "2026-10-15T15:26:11.713+02:00",
+          "display_at": "2026-10-15T15:26:11.713+02:00",
+          "affected_components": [
+            {
+              "code": "d5rqjg4fjwr5",
+              "name": "EU01-Databases - PostgreSQL Flex",
+              "old_status": "operational",
+              "new_status": "operational"
+            },
+            {
+              "code": "vkvxrttvqlh5",
+              "name": "EU02-Databases - PostgreSQL Flex",
+              "old_status": "operational",
+              "new_status": "operational"
+            }
+          ],
+          "deliver_notifications": true
+        }
+      ],
+      "components": [
+        {
+          "id": "fx0000000068",
+          "name": "Service 11",
+          "status": "operational",
+          "created_at": "2026-08-19T14:05:05.980+02:00",
+          "updated_at": "2026-10-27T23:09:07.203+01:00",
+          "position": 1,
+          "description": null,
+          "showcase": false,
+          "start_date": "2026-08-19",
+          "group_id": "fx0000000069",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        },
+        {
+          "id": "fx0000000015",
+          "name": "Service 11",
+          "status": "operational",
+          "created_at": "2022-07-07T13:47:19.887+02:00",
+          "updated_at": "2026-10-27T22:39:20.939+01:00",
+          "position": 7,
+          "description": null,
+          "showcase": false,
+          "start_date": "2022-07-07",
+          "group_id": "fx0000000008",
+          "page_id": "fx0000000001",
+          "group": false,
+          "only_show_if_degraded": false
+        }
+      ],
+      "scheduled_for": "2026-10-27T20:00:00.000+01:00",
+      "scheduled_until": "2026-10-27T23:00:00.000+01:00"
+    }
+  ]
+}

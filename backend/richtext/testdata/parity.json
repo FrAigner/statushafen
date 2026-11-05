@@ -1,0 +1,12 @@
+{
+  "_comment": "gemeinsame Fälle für backend/richtext und frontend/src/utils/richText.js. Text = prefix + unit * count. formatted=true: beide Renderer geben Markup aus, false: beide geben den Text unformatiert aus (Limit für Gesamtlänge/Block). MaxRenderLen/MaxBlockLen müssen in beiden Renderern gleich sein.",
+  "limits": { "maxRenderLen": 8000, "maxBlockLen": 5000 },
+  "cases": [
+    { "name": "Liste ohne Leerzeile bis zur erlaubten Länge", "unit": "- Punkt\n", "count": 600, "formatted": true },
+    { "name": "Liste ohne Leerzeile über dem Blocklimit", "unit": "- Punkt\n", "count": 800, "formatted": false },
+    { "name": "viele kurze Absätze unter dem Gesamtlimit", "unit": "**a**\n\n", "count": 1000, "formatted": true },
+    { "name": "viele kurze Absätze über dem Gesamtlimit", "unit": "**a**\n\n", "count": 1300, "formatted": false },
+    { "name": "zwei Blöcke je knapp unter dem Blocklimit", "unit": "*a* b\n", "count": 800, "formatted": true },
+    { "name": "Emoji zählen als ein Zeichen", "unit": "**😀** ", "count": 800, "formatted": true }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "project": {
+    "type": "module"
+  },
+  "compileOptions": {
+    "target": "es2020",
+    "module": "esnext",
+    "lib": ["esnext", "dom", "es2020"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue"]
+}

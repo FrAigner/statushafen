@@ -1,0 +1,141 @@
+# Mutationstests laufen nicht bei jedem PR (25 bis 90 Minuten), sondern einmal pro Nacht auf main: Backend
+# mit gremlins, Frontend mit StrykerJS, jeweils auf den Zeilen, die seit dem letzten geprüften Stand (Tag
+# mutation-nachts-ok) dazugekommen sind. Beim allerersten Lauf wird nur dieser Ausgangsstand gesetzt.
+# Überlebende oder nicht abgedeckte Mutanten legen ein Issue an.
+name: Mutationstests nachts
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-nachts
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # nur für das Marken-Tag mutation-nachts-ok (letzter geprüfter Stand)
+  issues: write
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    # GitHub-gehostete Jobs enden spätestens nach 360 Minuten.
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          fetch-depth: 0
+          # Das Token bleibt nicht in .git/config; push_tag übergibt es nur für den einen Push.
+          persist-credentials: false
+      - name: Basis bestimmen (letzter geprüfter Stand)
+        id: basis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          push_tag() {
+            git -c "http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push "$@"
+          }
+          if git rev-parse -q --verify refs/tags/mutation-nachts-ok >/dev/null; then
+            base=refs/tags/mutation-nachts-ok
+          else
+            # Erstlauf: den aktuellen Stand als geprüft markieren, geprüft wird ab dem nächsten Commit.
+            git tag mutation-nachts-ok HEAD
+            push_tag origin refs/tags/mutation-nachts-ok
+            echo "Erstlauf: Ausgangsstand mutation-nachts-ok gesetzt, nichts zu tun."
+            echo "neu=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          git diff -U0 --no-color "$base...HEAD" > "$RUNNER_TEMP/pr.diff"
+          if [ -s "$RUNNER_TEMP/pr.diff" ]; then
+            echo "neu=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Seit $base keine Änderung – nichts zu tun."
+            echo "neu=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Node.js
+        if: steps.basis.outputs.neu == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Setup Go
+        if: steps.basis.outputs.neu == 'true'
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          # Version aus go.mod statt fester '1.25' (go.mod verlangt 1.26.x, sonst
+          # lädt GOTOOLCHAIN die passende Toolchain bei jedem Lauf nach).
+          go-version-file: backend/go.mod
+      - name: Install Dependencies
+        if: steps.basis.outputs.neu == 'true'
+        run: |
+          cd frontend && npm ci --ignore-scripts
+          cd ../backend && go mod download
+      - name: Mutationstests Backend (gremlins)
+        id: backend
+        if: steps.basis.outputs.neu == 'true'
+        env:
+          BASE: ${{ steps.basis.outputs.base }}
+          # Ohne Test-Cache misst gremlins echte Laufzeiten (Timeout-Basis).
+          # -timeout=30m: gilt für den Coverage-Lauf von gremlins.
+          GOFLAGS: -count=1 -timeout=30m
+        run: |
+          cd backend
+          if git diff --quiet "${BASE}...HEAD" -- '*.go' ':!*_test.go'; then
+            echo "Kein geänderter Go-Code, Mutationstest entfällt."
+            exit 0
+          fi
+          go install github.com/go-gremlins/gremlins/cmd/gremlins@v0.5.1
+          # gremlins liest den Diff ab der Git-Wurzel (backend/...), benennt
+          # Dateien aber relativ zum Modul. diff.relative gleicht das an,
+          # diff.context=0 macht die Zeilenbereiche exakt.
+          GIT_CONFIG_COUNT=2 \
+            GIT_CONFIG_KEY_0=diff.relative GIT_CONFIG_VALUE_0=true \
+            GIT_CONFIG_KEY_1=diff.context GIT_CONFIG_VALUE_1=0 \
+            "$(go env GOPATH)/bin/gremlins" unleash --diff "$BASE" \
+            -o "$RUNNER_TEMP/gremlins.json" .
+          go run ./cmd/coveragegate mutation-report -gremlins "$RUNNER_TEMP/gremlins.json"
+      - name: Mutationstests Frontend (StrykerJS)
+        id: frontend
+        if: always() && steps.basis.outputs.neu == 'true'
+        run: |
+          RANGES=$(cd backend && go run ./cmd/coveragegate mutate-ranges -diff "$RUNNER_TEMP/pr.diff")
+          if [ -z "$RANGES" ]; then
+            echo "Kein geänderter Frontend-Code, Mutationstest entfällt."
+            exit 0
+          fi
+          cd frontend && npx stryker run --mutate "$RANGES"
+      # Artefakte gibt es bewusst keine: der Speicher des Kontos war schon einmal voll (siehe ci.yml);
+      # die Mutanten stehen im Lauf-Log.
+      - name: Issue anlegen (überlebende Mutanten)
+        id: issue
+        if: always() && (steps.backend.outcome == 'failure' || steps.frontend.outcome == 'failure')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ steps.basis.outputs.base }}
+          BACKEND: ${{ steps.backend.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+        run: |
+          TEIL=""
+          [ "$BACKEND" = failure ] && TEIL="Backend (gremlins) "
+          [ "$FRONTEND" = failure ] && TEIL="${TEIL}Frontend (Stryker)"
+          # Die REST-API per curl statt gh. TEIL, BASE und die SHA enthalten keine JSON-Sonderzeichen.
+          TITEL="Mutationstests nachts: überlebende Mutanten ($(date +%F))"
+          TEXT="Der nächtliche Mutationstest auf main ist rot: ${TEIL} (Basis: ${BASE}, Stand: $(git rev-parse --short HEAD)). Mutanten im Lauf-Log: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. Fehlende Tests ergänzen, bis kein Mutant überlebt."
+          printf '{"title":"%s","body":"%s"}' "$TITEL" "$TEXT" > "$RUNNER_TEMP/issue.json"
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -d @"$RUNNER_TEMP/issue.json" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/issues"
+      # Stand merken: bei grünem Lauf, oder wenn das Issue den Befund festhält (sonst käme er jede Nacht neu)
+      - name: Geprüften Stand merken
+        if: always() && steps.basis.outputs.neu == 'true' && (steps.issue.outcome == 'success' || (steps.backend.outcome == 'success' && steps.frontend.outcome == 'success'))
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -f mutation-nachts-ok HEAD
+          git -c "http.${GITHUB_SERVER_URL}/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" \
+            push -f origin refs/tags/mutation-nachts-ok

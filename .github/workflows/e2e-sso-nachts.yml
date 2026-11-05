@@ -1,0 +1,127 @@
+# Der Playwright-Spec frontend/e2e/sso-oidc.spec.js (OIDC-Anmeldung je Statusseite)
+# spielt Verknüpfen und Anmelden gegen den Mock-OIDC-Dienst durch. Lokal braucht er docker compose (Profil
+# "sso", siehe README "Lokale SSO-Tests mit Mock-OIDC"). Deshalb läuft er einmal pro Nacht auf einem
+# GitHub-gehosteten Runner, nicht bei Pull Requests; ein Lauf braucht rund 10 Minuten.
+# Im selben Job läuft frontend/e2e/sso-saml.spec.js gegen den Mock-SAML-IdP aus dem Repo
+# (backend/cmd/mocksamlidp). Er wird wie das Backend auf dem Runner gebaut und gestartet, weil er die ACS-URL
+# des Backends (localhost:8080) aus Browser-Sicht kennen muss; ein eigener Job hätte Postgres, Backend und
+# Playwright-Installation ein zweites Mal gekostet.
+# Hinweis: Zeitpläne laufen nur aus dem Standard-Branch (main), ein manueller Lauf prüft den gewählten Branch.
+name: E2E SSO nachts
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-sso-nachts
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: statushafen
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: localpassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      # Gleiche Einstellungen wie mock-oidc in docker-compose.yml. Der Mock baut den Issuer aus dem Host-Header;
+      # Browser und Backend laufen beide auf dem Runner und erreichen ihn als localhost:8090, der Issuer ist also
+      # für beide http://localhost:8090/statushafen.
+      mock-oidc:
+        image: ghcr.io/navikt/mock-oauth2-server:6.1.3
+        env:
+          SERVER_PORT: "8090"
+          JSON_CONFIG: '{"interactiveLogin": true, "httpServer": "NettyWrapper"}'
+        ports:
+          - 8090:8090
+    env:
+      # Ohne die Variable überspringt sich der Spec, wenn der Mock fehlt; hier wäre das ein grüner Lauf ohne
+      # jede Prüfung (frontend/src/test-support/ssoMockGate.js).
+      E2E_REQUIRE_SSO_MOCK: "1"
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+      - name: Setup Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
+        with:
+          go-version-file: backend/go.mod
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install Dependencies
+        run: |
+          cd frontend && npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+      - name: Mock-OIDC abwarten
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8090/statushafen/.well-known/openid-configuration >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Mock-OIDC antwortet nicht unter localhost:8090" >&2
+          exit 1
+      - name: Backend bauen und starten
+        env:
+          DB_DSN: host=localhost user=postgres password=localpassword dbname=statushafen port=5432 sslmode=disable TimeZone=UTC
+          APP_ENV: test
+          SEED_DB: "true"
+          OIDC_DEV_INSECURE_ISSUERS: http://localhost:8090/statushafen
+        run: |
+          cd backend
+          go build -o "$RUNNER_TEMP/statushafen-backend" .
+          # Wegwerf-Secret je Lauf: Die Datenbank lebt nur so lange wie der Job.
+          JWT_SECRET=$(openssl rand -hex 32)
+          export JWT_SECRET
+          nohup "$RUNNER_TEMP/statushafen-backend" > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend antwortet nicht unter localhost:8080/healthz" >&2
+          exit 1
+      - name: Mock-SAML bauen und starten
+        run: |
+          cd backend
+          go build -o "$RUNNER_TEMP/mock-saml" ./cmd/mocksamlidp
+          nohup "$RUNNER_TEMP/mock-saml" > "$RUNNER_TEMP/mock-saml.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8091/metadata >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Mock-SAML antwortet nicht unter localhost:8091" >&2
+          exit 1
+      # Das Frontend (Vite-Dev-Server auf 5173, /api an 8080) startet Playwright selbst (playwright.config.js,
+      # webServer). Kein HTML-Report als Artifact: Der Artifact-Speicher war schon einmal voll (siehe ci.yml).
+      - name: Playwright sso-oidc und sso-saml
+        run: cd frontend && npx playwright test sso-oidc sso-saml --reporter=list
+      - name: Backend-Log
+        if: always()
+        run: cat "$RUNNER_TEMP/backend.log" || true
+      - name: Mock-SAML-Log
+        if: always()
+        run: cat "$RUNNER_TEMP/mock-saml.log" || true

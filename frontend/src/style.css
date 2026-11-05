@@ -1,0 +1,1328 @@
+/* ============================================================
+   Enterprise Design System – Statushafen
+   Flat, data-dense
+   ============================================================ */
+
+/* Design-Tokens (Farben, Schriften, Abstände, Radien, sit-onyx-Variablen)
+   stehen seit der Umstellung ausschließlich in assets/tokens.css. Diese Datei
+   enthält nur Komponenten-Regeln. */
+
+/* ── Reset ──
+   The `app-reset` layer is pre-registered (lower priority than onyx's own
+   layers) in tokens.css, which loads before sit-onyx/style.css — see the
+   comment there for why. */
+@layer app-reset {
+  * *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* Links in --primary-text statt --primary: die Schriftvariante hält
+   auf der Fläche der Ebene 4,5:1 (admin dunkel: #7eaeff statt #2a64d6 = 3,4:1). */
+a { color: var(--primary-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Typography ── */
+h1 { font-size: 1.5rem;  font-weight: 700; }
+h2 { font-size: 1.25rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+h4 { font-size: 0.95rem; font-weight: 600; }
+
+/* ============================================================
+   Admin Shell – Kopfzeile / Bereichs-Reiter / Content
+   Redesign Stufe 2, Richtung C „Lagebild“: dunkle Kopfzeile,
+   darunter die Bereiche als Reiter, darunter die Einträge des aktiven Bereichs.
+   Farben nur aus den Tokens der Ebene .theme-admin (--top-*, --nav-*).
+   ============================================================ */
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  /* Höhe der ersten Kopfzeile auf Mobil: Burger (36) + je 6 px Rand. Darunter
+     fährt das Menü aus. */
+  --admin-mobile-head-h: 48px;
+  /* clip statt hidden (2026-10-29): hidden macht .admin-shell zum
+     Scroll-Container, dann klebt die Kopfzeile (sticky) an ihm statt am
+     Fenster und scrollt mit dem Inhalt weg. clip schneidet das auf Mobile
+     ausgefahrene Menü genauso ab, ohne Scroll-Container. */
+  overflow-x: clip;
+}
+
+/* Kopfzeile + Reiter + Eintragszeile: ein sticky Block */
+.admin-topbar {
+  background: var(--top-bg);
+  color: var(--top-text);
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+
+.topbar-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 var(--space-md);
+}
+
+/* Fokusring auf dunklem Grund: --top-text hat dort genug Kontrast, --focus nicht. */
+.topbar-main :focus-visible,
+.area-tabs :focus-visible {
+  outline: 2px solid var(--top-text);
+  outline-offset: 2px;
+}
+.area-tabs :focus-visible { outline-offset: -2px; }
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--top-text);
+  white-space: nowrap;
+}
+/* Logo statt Punkt: dekorativ (alt leer), der Name steht daneben im h1. */
+.topbar-brand .brand-logo {
+  width: 24px; height: 24px;
+  flex-shrink: 0;
+}
+.topbar-brand .brand-sub { font-weight: 400; color: var(--nav-text); margin-left: -2px; }
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Steuerelemente in der dunklen Kopfzeile */
+.icon-btn,
+.admin-topbar select.language-switcher,
+.tenant-select {
+  height: var(--ctl-h);
+  background: color-mix(in srgb, var(--top-text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--top-text) 24%, transparent);
+  border-radius: var(--r-md);
+  color: var(--top-text);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.icon-btn {
+  width: var(--ctl-h);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.icon-btn:hover,
+.tenant-select:hover,
+.admin-topbar select.language-switcher:hover {
+  background: color-mix(in srgb, var(--top-text) 16%, transparent);
+}
+/* Sprachwähler wie die Nachbarn (Theme-Knopf 36 px, Avatar): gleiche
+   Höhe --ctl-h, gleicher Rand und Hintergrund (Gruppenregel oben), eigener
+   Pfeil statt des Browser-Standards. Der Pfeil ist ein Chevron aus zwei
+   Verlaufs-Diagonalen in currentColor (ein select kennt kein ::after und
+   Farbwerte im Bild wären feste Hex-Werte). Der Fokusring kommt von
+   .topbar-main :focus-visible (oben). Der Seitenwähler (.tenant-select) teilt
+   die Regel, damit beide Auswahlfelder gleich aussehen. */
+.admin-topbar select.language-switcher,
+.admin-topbar select.tenant-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 28px 0 var(--sp-3);
+  line-height: 1;
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px)),
+    linear-gradient(to bottom right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px));
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+  background-position: right 15px center, right 10px center;
+}
+.admin-topbar select.language-switcher option,
+.tenant-select option { background: var(--surface); color: var(--text); }
+
+/* Burger-Icon-Wechsel (Hamburger <-> X) mit Fade statt hartem Umschalten */
+.burger-icon-fade-enter-active, .burger-icon-fade-leave-active { transition: opacity 0.2s ease; }
+.burger-icon-fade-enter-from, .burger-icon-fade-leave-to { opacity: 0; }
+.burger-btn { display: none; }
+
+/* Mandanten-Umschalter: kompakt, das Label bleibt für Screenreader */
+.tenant-switch { display: flex; align-items: center; min-width: 0; }
+.tenant-select-label {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.tenant-select { max-width: 240px; font-weight: 600; text-overflow: ellipsis; }
+.tenant-status { font-size: 0.8rem; color: var(--nav-text); }
+
+/* Benutzermenü */
+.user-menu { position: relative; }
+.user-menu-button {
+  display: flex; align-items: center; justify-content: center;
+  width: var(--ctl-h); height: var(--ctl-h);
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.user-avatar {
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.user-menu-button:hover .user-avatar { box-shadow: 0 0 0 2px color-mix(in srgb, var(--top-text) 45%, transparent); }
+
+.user-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 400;
+  min-width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+.user-menu-info { padding: 6px 8px 10px; font-size: 0.82rem; line-height: 1.3; overflow-wrap: anywhere; }
+.user-menu-info strong { display: block; font-weight: 600; }
+.user-menu-info small { display: block; color: var(--text-3); }
+/* Schalter „Hilfe-Tooltips anzeigen“ im Benutzermenü. */
+.user-menu-toggle { padding: 8px; font-size: 0.82rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.user-menu-actions { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
+.user-menu-link {
+  display: flex; align-items: center;
+  min-height: var(--ctl-h);
+  padding: 0 10px;
+  background: none;
+  border: 0;
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.user-menu-link:hover { background: var(--surface-2); text-decoration: none; }
+.user-menu-link:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.user-menu-link.is-danger { color: var(--major-text); }
+.user-menu-panel :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.profile-help-toggle {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Bereichs-Reiter (dunkel) */
+.area-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 36px;
+  margin: 0;
+  padding: 0 var(--space-md);
+  list-style: none;
+  background: var(--nav-bg);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.area-tab {
+  display: inline-flex; align-items: center;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: var(--r-md) var(--r-md) 0 0;
+  color: var(--nav-text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.area-tab:hover { color: var(--top-text); background: color-mix(in srgb, var(--top-text) 10%, transparent); text-decoration: none; }
+/* Der aktive Reiter hat die Farbe der Eintragszeile darunter und wächst mit ihr zusammen. */
+.area-tab.active { background: var(--nav-active-bg); color: var(--nav-active-text); font-weight: 600; }
+
+/* Einträge des aktiven Bereichs */
+.area-items-row { background: var(--nav-active-bg); border-bottom: 1px solid var(--border); }
+.area-items { display: none; }
+.area-items.is-shown { display: block; }
+.area-items-label { display: none; }
+.area-items ul {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0 var(--space-md);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.area-items a {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.area-items a:hover { color: var(--text); text-decoration: none; }
+.area-items a:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.area-items a.active { color: var(--text); font-weight: 600; border-bottom-color: var(--primary); }
+
+/* Body wrapper */
+.admin-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Meldungen („gespeichert“, Fehler) kleben oben im Scrollbereich und bleiben sichtbar, auch wenn man
+   weit unten im Formular ist; Erfolgsmeldungen blendet useAutoDismissAlerts nach einigen Sekunden aus. */
+.admin-content .alert {
+  position: sticky;
+  top: var(--space-sm);
+  z-index: 50;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--text) 20%, transparent);
+}
+
+/* Content area */
+.admin-content {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  overflow: auto;
+  /* Volle Breite nutzen: kein max-width, sonst bleibt rechts auf großen Schirmen
+     ein leerer Streifen und Tabellen samt Seitenformular werden gequetscht. */
+  min-width: 0;
+}
+
+/* ============================================================
+   Page structure inside content
+   ============================================================ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.page-header h2 { font-size: 1.2rem; }
+
+/* ============================================================
+   Cards / Panels (flat, no blur)
+   ============================================================ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-1);
+}
+
+.card + .card { margin-top: 16px; }
+
+/* ============================================================
+   Data Tables
+   ============================================================ */
+.data-table-wrapper {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  /* waagerecht scrollen statt abschneiden (Aktionsknöpfe bleiben erreichbar),
+     senkrecht für die runden Ecken beschneiden */
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-shadow: var(--shadow-1);
+}
+
+/* Stufe 3: Tabellenstil. Kopf ruhig (12 px, keine Versalien),
+   Zeilen 52 px, Zahlen mit tabular-nums. Die Klassen .data-table und
+   .data-table-wrapper bleiben, die e2e-Specs und alle Views suchen danach.
+   (Die doppelte Definition in admin.css ist entfernt; sie überschrieb diese.) */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-base);
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table thead th {
+  background: var(--surface-2);
+  padding: 10px 16px;
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+.data-table tbody tr:last-child { border-bottom: none; }
+.data-table tbody tr:hover { background: var(--surface-2); }
+
+.data-table td {
+  height: var(--row-h);
+  padding: 8px 16px;
+  color: var(--text);
+  vertical-align: middle;
+  /* Ein Titel ohne Leerzeichen (etwa eine lange URL) bricht um; "anywhere"
+     senkt anders als "break-word" auch die Mindestbreite der Zelle, sonst
+     weitete er die ganze Tabelle. */
+  overflow-wrap: anywhere;
+  max-inline-size: 36rem;
+}
+
+.data-table td.actions-col { max-inline-size: none; }
+
+.data-table .actions-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Zahlen rechtsbündig (Spalte { numeric: true } in ResponsiveTable). */
+.data-table .is-numeric { text-align: right; }
+
+/* Gruppenzeile (Item { isGroup: true }). */
+/* Gruppen setzen sich deutlich von ihren Komponenten ab (getönte
+   Fläche aus den Tokens, Akzentstreifen vorn); Komponentenzeilen bleiben ohne Hintergrund. */
+.data-table tbody tr.data-table__group { background: var(--primary-soft); }
+.data-table tbody tr.data-table__group:hover { background: var(--primary-soft); }
+.data-table tbody tr.data-table__group > :first-child { box-shadow: inset 3px 0 0 var(--primary); }
+.group-icon { flex: none; align-self: center; color: var(--primary-text); }
+.data-table .data-table__group th {
+  padding: 8px 16px;
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* Unter 860 px werden Zeilen zu Karten; die Zellen tragen data-label
+   (ResponsiveTable mit dataTable). Der Kopf bleibt für Screenreader. */
+@media (max-width: 859px) {
+  .data-table--cards thead {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .data-table--cards,
+  .data-table--cards tbody,
+  .data-table--cards tr,
+  .data-table--cards td { display: block; }
+  .data-table--cards tbody tr { padding: var(--sp-2) 0; }
+  .data-table--cards td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sp-4);
+    height: auto;
+    padding: 6px 16px;
+    text-align: right;
+  }
+  .data-table--cards td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-2);
+    text-align: left;
+  }
+  .data-table--cards td.actions-col { width: auto; justify-content: flex-end; }
+  .data-table--cards td.actions-col::before { content: none; }
+  .data-table--cards .data-table__group th { display: block; }
+}
+
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.table-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   Badges / Tags
+   ============================================================ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+/* .status-badge: same pill as .badge, used where the base class is named for its content (page status) */
+.status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.badge-warning { background: var(--deg-soft); color: var(--deg-text); }
+.badge-success { background: var(--ok-soft); color: var(--ok-text); }
+.badge-info    { background: var(--primary-soft); color: var(--primary-text); }
+
+.meta-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   Buttons (custom, supplement sit-onyx)
+   ============================================================ */
+/* Stufe 3: Varianten primary / secondary / ghost / danger,
+   36 px hoch (--ctl-h), Fokusring 2 px --focus mit 2 px Abstand. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl-h);
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--fs-base);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.btn:disabled,
+.btn[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+.btn-primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); }
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+  border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--major-text);
+  border-color: var(--major);
+}
+.btn-danger:hover:not(:disabled) { background: var(--major-soft); }
+
+/* Small action buttons in table rows. Auch als Link (<a>, z. B. „Übersetzungen“)
+   verwendet: box-sizing, line-height und text-decoration stehen deshalb fest,
+   damit Link und <button> gleich groß sind (Browser-Standards weichen ab). */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  line-height: 1.2;
+  text-decoration: none;
+  padding: var(--space-sm) var(--space-md);
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.action-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-soft); }
+.action-btn.danger:hover,
+.action-btn.delete-btn:hover { border-color: var(--major); color: var(--major); background: var(--major-soft); }
+
+/* Alert dismiss buttons */
+.alert-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  float: right;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+.alert-close:hover { color: var(--text); }
+
+/* ============================================================
+   Forms
+   ============================================================ */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* :not([type=checkbox|radio]) + :not(.onyx-component / .onyx-component *): ohne diese
+   Ausnahmen gewinnt diese unlayered Regel gegen die gelayerten sit-onyx-Defaults (z.B.
+   .onyx-select-option__checkbox) und drückt sie auf width:100% - sieht man z.B. an der
+   "Private Statusseite"-Checkbox oder am leeren Komponenten-Dropdown bei Vorfällen. */
+.form-group input:not([type="checkbox"]):not([type="radio"]):not(.onyx-component):not(.onyx-component *),
+.form-group select:not(.onyx-component):not(.onyx-component *),
+.form-group textarea:not(.onyx-component):not(.onyx-component *),
+.form-input,
+.form-select,
+.form-textarea {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 16px;
+  font-family: var(--font-sans);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  outline: none;
+  width: 100%;
+  min-height: 44px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 15%, transparent);
+}
+
+.form-group textarea,
+.form-textarea { min-height: 80px; resize: vertical; }
+
+.form-select option { background: var(--surface); color: var(--text); }
+
+.inline-select {
+  padding: 3px 6px;
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+}
+.inline-select:focus { border-color: var(--focus); }
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+/* Edit card (slide-in form panel) */
+.edit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-1);
+}
+
+/* Stufe 4b: unter der Seiten-h1 ist der Kartentitel eine h2 (.edit-card__title). */
+.edit-card h3,
+.edit-card .edit-card__title {
+  font-size: 1rem;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.edit-form { display: flex; flex-direction: column; }
+
+/* ============================================================
+   Alerts
+   ============================================================ */
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  border: 1px solid transparent;
+}
+
+.alert button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: inherit;
+  opacity: .7;
+  flex-shrink: 0;
+}
+.alert button:hover { opacity: 1; }
+
+/* Töne aus den Status-Tokens statt fester Hex-Werte; die Dunkel-
+   Varianten ergeben sich aus den Tokens (vorher eigene [data-theme]-Regeln). */
+.alert-warning { background: var(--deg-soft);     border-color: color-mix(in srgb, var(--deg) 35%, var(--surface));     color: var(--deg-text); }
+.alert-error   { background: var(--major-soft);   border-color: color-mix(in srgb, var(--major) 35%, var(--surface));   color: var(--major-text); }
+.alert-success { background: var(--ok-soft);      border-color: color-mix(in srgb, var(--ok) 35%, var(--surface));      color: var(--ok-text); }
+.alert-info    { background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 35%, var(--surface)); color: var(--primary-text); }
+
+/* Ausfall-Banner für externe Quellen (AdminLayout). */
+.outage-banner__list { margin: var(--sp-1) 0 0; padding-inline-start: var(--sp-4); }
+.outage-banner__list li { overflow-wrap: anywhere; }
+.outage-banner__link { flex-shrink: 0; color: inherit; font-weight: 600; text-decoration: underline; }
+
+/* ============================================================
+   Incident cards (public view)
+   ============================================================ */
+.incident-card {
+  border-left: 3px solid var(--border);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+}
+.incident-card + .incident-card { margin-top: 10px; }
+.incident-card.investigating { border-left-color: var(--major); }
+.incident-card.identified    { border-left-color: var(--deg); }
+.incident-card.monitoring    { border-left-color: var(--primary); }
+.incident-card.resolved      { border-left-color: var(--ok); }
+
+/* ============================================================
+   Filter bar
+   ============================================================ */
+.filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.filter-tag {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  transition: all 0.12s;
+}
+.filter-tag:hover  { border-color: var(--primary); color: var(--primary); }
+.filter-tag.active { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+.filter-bar .search-wrapper { flex: 1 1 100%; min-width: 0; }
+
+/* Region-/Status-Zeile als Raster, Chips beider Zeilen starten
+   in derselben Spalte. */
+.filter-bar { --filter-label-width: 5.5rem; }
+.tag-group {
+  display: grid;
+  grid-template-columns: var(--filter-label-width) 1fr;
+  align-items: start;
+  column-gap: 12px;
+  flex: 1 1 100%;
+}
+.tag-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tag-more {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-family: var(--font-sans);
+}
+.tag-more:hover { text-decoration: underline; }
+.tag-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.tag-label {
+  padding-top: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.search-input {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  outline: none;
+  flex: 1;
+  min-width: 180px;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: var(--focus); }
+.search-input::placeholder { color: var(--text-3); }
+
+/* ── Mobile (<768px): Reiter werden zum Burger-Menü ──
+   Kopfzeile in zwei Zeilen: Burger, Marke und Knöpfe oben, der
+   Mandanten-Umschalter darunter über die volle Breite (die Marke
+   wurde vorher auf „Ad“ abgeschnitten). Die Bereiche stehen im Menü
+   untereinander, das unter der ersten Kopfzeile ausfährt. */
+@media (max-width: 768px) {
+  .burger-btn { display: flex; }
+
+  .topbar-main { flex-wrap: wrap; align-content: flex-start; min-height: 0; gap: 0 8px; padding: 0 12px; }
+  .topbar-main > .burger-btn { margin: 6px 0; }
+  .topbar-brand { min-width: 0; }
+  .tenant-switch { order: 5; flex: 1 0 100%; padding-bottom: 8px; }
+  .tenant-select { width: 100%; max-width: none; }
+
+  .topbar-brand .brand-logo { width: 20px; height: 20px; }
+  .topbar-right { gap: 4px; }
+  .admin-topbar select.language-switcher,
+  .admin-topbar select.tenant-select { padding: 0 24px 0 var(--sp-2); }
+
+  .area-tabs { display: none; }
+
+  .area-items-row { display: none; }
+  .admin-nav.is-open .area-items-row {
+    display: block;
+    position: fixed;
+    top: var(--admin-mobile-head-h);
+    left: 0;
+    bottom: 0;
+    z-index: 300;
+    width: min(320px, 85%);
+    overflow-y: auto;
+    padding-bottom: 16px;
+    background: var(--surface);
+    border-right: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-pop);
+    animation: nav-slide-in 0.2s ease;
+  }
+  .area-items,
+  .area-items.is-shown { display: none; }
+  .admin-nav.is-open .area-items,
+  .admin-nav.is-open .area-items.is-shown { display: block; }
+  .area-items-label {
+    display: block;
+    padding: 14px 16px 4px;
+    color: var(--text-3);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .area-items ul { display: block; padding: 0 8px; overflow: visible; }
+  .area-items a {
+    display: flex;
+    height: auto;
+    min-height: 44px;
+    padding: 0 12px;
+    border-bottom: 0;
+    border-radius: var(--r-md);
+  }
+  .area-items a.active { background: var(--primary-soft); color: var(--primary-text); }
+
+  @keyframes nav-slide-in {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
+  }
+
+  .mobile-overlay {
+    position: fixed;
+    inset: 0;
+    top: var(--admin-mobile-head-h);
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 299;
+  }
+}
+
+/* Übergänge der Admin-Kopfzeile unter reduzierter Bewegung aus. */
+@media (prefers-reduced-motion: reduce) {
+  .admin-nav.is-open .area-items-row { animation: none; }
+  .icon-btn,
+  .burger-icon-fade-enter-active,
+  .burger-icon-fade-leave-active { transition: none; }
+}
+
+.section-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+/* ============================================================
+   App container (public pages)
+   ============================================================ */
+.app-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+/* ============================================================
+   Animations (minimal)
+   ============================================================ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.2s ease-out; }
+
+/* ============================================================
+   Misc utilities
+   ============================================================ */
+.text-muted   { color: var(--text-3); }
+
+.mb-16        { margin-bottom: 16px; }
+
+/* Karten-/KPI-/Pill-Hilfsklassen der Enterprise-Views (zuvor in
+   tokens.css; dort stehen jetzt nur noch Tokens). */
+.ent-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.ent-mono      { font-family: var(--font-mono); }
+
+.ent-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+}
+.ent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Stufe 4d: gemeinsame Kleinteile der Verwaltungs-Views. Ersetzen
+   die Inline-Styles (style="…") in den Verwaltungs-Views (Statusseiten,
+   Benutzer, Rollen, Tags, SSO, Systemeinstellungen, Audit-Log); nur Tokens,
+   keine Hex-Werte. */
+.adm-hint {
+  display: block;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.adm-subhead {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.adm-section {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+.adm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.adm-row--grow > :first-child { flex: 1; min-inline-size: 0; }
+.adm-cell-note {
+  max-inline-size: 300px;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+.adm-actions-spaced { margin-top: var(--sp-5); }
+/* ============================================================
+   Stufe 4c: Liste + Formular nebeneinander, Feldstil für
+   FormField, Zeilen-Hilfsklassen (ersetzen Inline-Styles in den
+   „Statusseite verwalten“-Views).
+   ============================================================ */
+
+/* Ohne offenes Formular nimmt die Liste die ganze Breite; mit Formular
+   (.split--open) steht es rechts daneben und klebt beim Scrollen. Unter
+   860 px (wie die Kartentabelle) liegt es darunter. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+/* Betreiber-Wunsch 31.10.: Liste : Formular etwa 2 : 1 (vorher war das Formular auf 400 px begrenzt
+   und bei 1900 px Breite nur ~385 px schmal). minmax(0, …) lässt Tabellen schrumpfen statt überlaufen,
+   die Mindestbreite hält das Formular nutzbar. */
+.split--open { grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr); }
+.split__main { display: flex; flex-direction: column; gap: var(--sp-4); min-inline-size: 0; }
+.form-panel {
+  position: sticky;
+  /* Bezug ist der Scrollbereich (main.admin-content), der erst unter
+     der Admin-Topbar beginnt. Die frühere Topbar-Höhe (122 px) kam obendrauf und
+     schob das Formular schon ohne Scrollen ~150 px unter die Oberkante der Liste.
+     Mit --sp-4 fluchtet es mit der Karte und klebt beim Scrollen 16 px unter dem Rand. */
+  inset-block-start: var(--sp-4);
+  margin-bottom: 0;
+  min-inline-size: 0;
+}
+.form-panel h3 { font-size: var(--fs-md); }
+/* Formular ohne Recht zum Ändern. Das fieldset sperrt alle Felder
+   (disabled), trägt aber selbst keinen Rahmen. */
+.form-lock { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
+.form-lock-hint {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.85rem;
+}
+@media (max-width: 859px) {
+  .split--open { grid-template-columns: minmax(0, 1fr); }
+  .form-panel { position: static; }
+}
+
+/* Native Felder in FormField (die Onyx-Felder bringen ihren Stil mit). */
+/* type=color ausgenommen: Die Farbfläche (z. B. Primärfarbe der Statusseite) behält ihre feste, kleine
+   Breite und drängt das Hex-Feld daneben nicht aus dem Panel. */
+.form-field__control input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.form-field__control select,
+.form-field__control textarea {
+  inline-size: 100%;
+  min-block-size: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-base);
+}
+.form-field__control textarea { padding: var(--sp-2) var(--sp-3); min-block-size: 80px; resize: vertical; }
+/* eigener Chevron statt des Browser-Pfeils (wie der Sprachwähler). */
+.form-field__control select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 32px;
+  text-overflow: ellipsis;
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px)),
+    linear-gradient(to bottom right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px));
+  background-repeat: no-repeat;
+  background-size: 6px 6px, 6px 6px;
+  background-position: right 18px center, right 12px center;
+}
+.form-field__control input:focus-visible,
+.form-field__control select:focus-visible,
+.form-field__control textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.form-field__control input:disabled,
+.form-field__control select:disabled,
+.form-field__control textarea:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Zeilenaktionen und Zellen. */
+.cell-sub { display: block; font-size: var(--fs-sm); color: var(--text-2); }
+
+.cell-truncate { display: block; max-inline-size: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+
+.inline-badge { margin-inline-start: var(--sp-2); }
+.checkbox-row { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-base); }
+.checkbox-row--sub { font-size: var(--fs-sm); }
+.stack-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.stack-list__row { display: flex; align-items: center; gap: var(--sp-3); }
+.panel-lead { margin: 0 0 var(--sp-3); color: var(--text-2); }
+.preview-box {
+  padding: var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+}
+.preview-box--mono { padding: var(--sp-2); font-family: var(--font-mono); }
+.admin-section-gap { margin-top: var(--sp-5); }
+.col-id { inline-size: 50px; }
+.data-table .data-table__group th strong { font-size: var(--fs-base); color: var(--text); }
+/* Einrückung der Unterkomponenten nach Tiefe (Klassen statt Inline-Style). */
+.depth-1 { margin-inline-start: 1.5rem; }
+.depth-2 { margin-inline-start: 3rem; }
+.depth-3 { margin-inline-start: 4.5rem; }
+.depth-4 { margin-inline-start: 6rem; }
+.depth-5 { margin-inline-start: 7.5rem; }
+.depth-6 { margin-inline-start: 9rem; }
+
+/* ============================================================
+   Komponentenseite nach Richtung C: Karte „Alle Komponenten“ mit
+   Suche im Kopf, einklappbare Gruppenzeilen, Tag-Pillen, Formular-Kopf.
+   ============================================================ */
+.comp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.comp-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+}
+.comp-card__title { margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.comp-search { position: relative; flex: 0 1 280px; min-inline-size: 0; }
+.comp-search__icon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: var(--sp-3);
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.comp-search__input {
+  inline-size: 100%;
+  min-block-size: var(--ctl-h);
+  padding: 0 var(--sp-3) 0 calc(var(--sp-3) + 16px + var(--sp-2));
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-base);
+}
+.comp-search__input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Die Tabelle sitzt bündig in der Karte (Rand und Schatten hat die Karte). */
+.comp-card .data-table-wrapper {
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.comp-card .data-table thead th { font-size: var(--fs-xs); letter-spacing: .06em; text-transform: uppercase; }
+.th-hint { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-3); }
+.data-table .cell-changed { white-space: nowrap; color: var(--text-2); font-size: var(--fs-sm); }
+
+/* Name fett, Beschreibung dezent daneben; Gruppenzeile mit Umschalter und Anzahl. */
+.component-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
+.component-name__title { font-weight: 600; color: var(--text); }
+.data-table .component-name__title { max-inline-size: 100%; overflow-wrap: anywhere; }
+.component-name__desc { font-size: var(--fs-sm); color: var(--text-2); }
+/* Kennung der Komponente, Monospace, wie die Beschreibung zurückhaltend. */
+.component-name__slug { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-2); }
+.input-mono { font-family: var(--font-mono); }
+.data-table .data-table__group .component-name__title { font-size: var(--fs-base); }
+.group-toggle {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  margin-inline-start: calc(var(--sp-1) * -1);
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.group-toggle:hover { background: var(--border); color: var(--text); }
+.group-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.group-count { font-size: var(--fs-sm); font-weight: 400; color: var(--text-2); }
+
+.tag-pills { display: inline-flex; flex-wrap: wrap; gap: var(--sp-1); }
+.tag-pill {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+/* Formularkopf: Titel und Hinweis links, Schließen rechts. */
+.form-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.form-panel__head h3 { margin: 0; padding: 0; border: 0; font-size: var(--fs-md); }
+.form-panel__hint { margin: var(--sp-1) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
+.form-panel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  inline-size: 44px;
+  block-size: 44px;
+  margin: calc(var(--sp-2) * -1) calc(var(--sp-2) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.form-panel__close:hover { background: var(--surface-2); color: var(--text); }
+.form-panel__close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sp-3); }
+.form-grid--single { grid-template-columns: minmax(0, 1fr); }
+.form-grid > .form-field { min-inline-size: 0; }
+/* Eigene Feldgruppen (Tags, Status) neben FormField: dessen Regeln sind scoped. */
+.form-field--manual { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); min-inline-size: 0; }
+.form-field--manual .form-field__labelrow { display: flex; align-items: baseline; gap: var(--sp-1); }
+.form-field--manual .form-field__label { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.form-field--manual .form-field__optional { font-size: var(--fs-xs); color: var(--text-3); }
+fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-inline-size: 0; }
+.form-field--set > legend { padding: 0; margin-bottom: var(--sp-1); }
+.form-field--set > legend .form-field__label { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.form-field--set > legend .form-field__required { margin-inline-start: var(--sp-1); font-size: var(--fs-sm); font-weight: 600; color: var(--major-text); }
+@media (max-width: 859px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ============================================================
+   Richtung C, alle Admin-Seiten: gemeinsame Bausteine ListCard,
+   FormPanel, SearchBox, SegmentControl. Zusätze zu den .comp-card-/
+   .form-panel-Regeln der Komponentenseite oben; jede Klasse steht nur hier.
+   ============================================================ */
+.list-card { min-inline-size: 0; }
+.list-card + .list-card { margin-top: var(--sp-4); }
+.list-card__body { padding: var(--sp-2) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); }
+.comp-card--visible { overflow: visible; }
+/* Werkzeuge im Kartenkopf (ListCard-Slot "tools"): Filter, Umschalter, Suche. */
+.comp-card__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); flex: 1 1 auto; min-inline-size: 0; }
+.comp-card__tools .comp-search { flex: 0 1 240px; }
+.comp-filter {
+  min-block-size: var(--ctl-h);
+  max-inline-size: 100%;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-base);
+}
+.comp-filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Hohe Formulare (viele Abschnitte) scrollen in der klebenden Karte statt unten abgeschnitten zu werden. */
+@media (min-width: 860px) {
+  .form-panel--scroll { max-block-size: calc(100dvh - 2 * var(--sp-4)); overflow-y: auto; }
+}
+/* Zeilenhinweise in Tabellenzellen. */
+.tag-pill--accent { border-color: transparent; background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
+.cell-contact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+/* Segment-Umschalter (SegmentControl). */
+.segment { display: inline-flex; max-inline-size: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
+.segment__item {
+  min-block-size: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-inline-start: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.segment__item:first-child { border-inline-start: 0; }
+.segment__item:hover { background: var(--surface-2); color: var(--text); }
+.segment__item:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.segment__item--on { background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
+.segment__item--on:hover { background: var(--primary-soft); color: var(--primary-text); }
+
+/* Checkbox mit Beschriftung (Abo-Assistent, Abo-Verwaltung):
+   Kästchen neben dem Text, 44 px Zielhöhe, sichtbarer Fokus. */
+.perm-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--text);
+}
+.perm-checkbox input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.perm-checkbox:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+/* Bezugspunkt für das Nachrichten-Panel auf schmalen Bildschirmen
+   (AdminNotificationBell.vue hängt es dort an die Kopfzeile). */
+.admin-topbar .topbar-main { position: relative; }

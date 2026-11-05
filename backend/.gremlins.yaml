@@ -1,0 +1,19 @@
+# Mutationstests für geänderten Go-Code (Aufruf siehe CONTRIBUTING.md).
+# Keine threshold-Werte: gremlins v0.5.1 prüft "efficacy <= threshold", 100 %
+# könnte nie bestehen. Ausgewertet wird stattdessen der JSON-Report mit
+# coveragegate mutation-report.
+unleash:
+  # Der Runner teilt sich die Maschine mit den Diensten, daher gedrosselt.
+  workers: 2
+  # Faktor auf die gemessene Testlaufzeit. Nur mit GOFLAGS=-count=1 sinnvoll,
+  # sonst misst gremlins gecachte Läufe und jeder Mutant läuft in den Timeout.
+  timeout-coefficient: 5
+  # gremlins ordnet Dateien in package main unterhalb von cmd/ dem
+  # Wurzelpaket zu und führt dann dessen Tests aus: Mutanten "überleben"
+  # scheinbar. cmd/ bleibt daher dünn (Logik in eigene Pakete) und wird nicht
+  # mutiert; der Coverage-Gate gilt dort trotzdem.
+  exclude-files:
+    - "^cmd/"
+    # testutils ist Test-Infrastruktur ohne eigene Tests: gremlins rechnet nur mit den Tests im selben Paket und meldet
+    # deshalb jede Zeile als NOT COVERED, obwohl sie in jedem Test der anderen Pakete laeuft. Mutanten darin sind sinnlos.
+    - "^testutils/"

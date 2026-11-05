@@ -1,0 +1,26 @@
+/*
+ * admin.css – Legacy overrides
+ * All admin layout styles have been moved to style.css (Enterprise redesign).
+ * This file is kept as an import stub to avoid removing it from main.js.
+ */
+
+/* Neutralise old glassmorphism content classes. */
+.content-area   { backdrop-filter: none; border-radius: 0; }
+.content-header { border-bottom: none; }
+
+/* Legacy edit-card used in AdminRoles, AdminUsers, AdminStatusPages */
+.edit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-1);
+}
+.edit-card h3 {
+  font-size: 1rem;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.edit-form { display: flex; flex-direction: column; }

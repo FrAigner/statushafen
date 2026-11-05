@@ -1,0 +1,402 @@
+/* Registers our reset layer as lower-priority than sit-onyx's internal
+   layers (onyx.reset/utility/component/density/override). A cascade layer
+   only gets its priority fixed relative to layers it's declared alongside
+   the FIRST time it's seen in the document, so this bare statement must
+   load before `sit-onyx/style.css` (which declares its own onyx.* layers)
+   for style.css's `@layer app-reset { ... }` reset to lose to onyx's
+   component styles instead of nuking them (e.g. every OnyxButton's
+   padding). */
+@layer app-reset;
+
+/* selbst gehostete Schriften. Nach CSS-Regel darf vor @import nur
+   eine @layer-Anweisung stehen; Vite bündelt den Import. */
+@import './fonts.css';
+
+/* =============================================================================
+   Statushafen – EINE Token-Quelle (Redesign Stufe 1)
+
+   Vorher gab es zwei konkurrierende Sätze (hier und in style.css) mit gleichen
+   Namen und anderen Werten (--font-sans, --radius-sm, --status-degraded, …);
+   style.css lud später und gewann. Jetzt steht alles hier, style.css enthält
+   nur noch Komponenten-Regeln. Einbinden EINMALIG in main.js vor allen anderen
+   Styles. Die Ebenen heißen a = Leitstand (öffentlich) und c = Lagebild (Admin).
+
+   Aufbau
+     1. Basis (:root): Schriften, Abstände, Radien, Typo-Skala, Statusformen.
+        Gilt für beide Ebenen und für alles ohne Ebene (z. B. Login).
+     2. Ebene `.theme-public` (Richtung A „Leitstand“): öffentliche Statusseiten
+        und Startseite. Zugleich der Standard auf :root. Die Kundenmarke der
+        Statusseite (--primary/--primary-hover/--text-secondary als Inline-Style
+        auf .content-area, StatusPage.vue) überschreibt diese Ebene.
+     3. Ebene `.theme-admin` (Richtung C „Lagebild“): Admin-Bereich.
+        Jede Ebene hell (Standard) und dunkel (html[data-theme="dark"], setzt
+        useTheme.js) – Reihenfolge wichtig: die Dunkel-Regeln stehen nach den
+        Hell-Regeln und haben höhere Spezifität.
+     4. Abgeleitete Tokens (Marken-Hook --text-secondary, sit-onyx-Variablen) in einem
+        Block für :root UND beide Ebenen. Das ist nötig, weil var() am Element
+        aufgelöst wird, das die Eigenschaft deklariert: stünde ein Alias nur auf
+        :root, bekäme .theme-admin die Werte von :root geerbt statt seine eigenen.
+
+   Die Klassen .theme-public/.theme-admin setzen PublicLayout.vue bzw.
+   AdminLayout.vue am Wurzelelement, sonst ändert sich dort nichts.
+   Die Hex-Werte hier sind von der Sperre in src/hexColors.test.js ausgenommen
+   (dies ist die Token-Datei); anderswo sollen Farben aus Tokens kommen.
+   Kontrast aller Paare: src/tokenContrast.test.js (WCAG AA, hell und dunkel).
+   ============================================================================ */
+
+/* ── 1. Basis ───────────────────────────────────────────────────────────── */
+:root {
+  /* Schriften: Inter für die Oberfläche, IBM Plex Mono für Kennungen/Zahlen.
+     IBM Plex Sans bleibt für die Admin-Ebene (Lagebild) und die Startseite. */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* sit-onyx setzt in seinen Komponenten (z. B. .onyx-button)
+     font-family: var(--onyx-font-family-paragraph) OHNE generischen Fallback.
+     Der Wert ist "Source Sans 3 Variable", eine Schrift, die onyx nicht
+     mitliefert und die wir nicht laden (nur Inter/IBM Plex). Der
+     Browser fiel deshalb auf seine Standardschrift zurück, also eine Serife.
+     Hier bekommen alle onyx-Schrift-Tokens unsere Schriften; :root schlägt
+     onyx' :where(:root) und gilt für jede onyx-Komponente der App.
+     (.theme-admin wiederholt die Zeilen unten, weil dort --font-sans wechselt.)
+     Nicht wegräumen: src/onyxFonts.test.js prüft genau diesen Block. */
+  --onyx-font-family-paragraph: var(--font-sans);
+  --onyx-font-family-data:      var(--font-sans);
+  --onyx-font-family-h1:        var(--font-sans);
+  --onyx-font-family-h2:        var(--font-sans);
+  --onyx-font-family-h3:        var(--font-sans);
+  --onyx-font-family-h4:        var(--font-sans);
+  --onyx-font-family-mono:      var(--font-mono);
+
+  /* Typo-Skala (Richtung A) */
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-2xl: 24px;
+  --fs-xl: 26px;
+  --fs-3xl: clamp(34px, 5.2vw, 54px);
+
+  /* 4-px-Raster */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 40px;
+  --sp-7: 80px;
+
+  /* Startseite (Richtung A): Inhaltsbreite und grobe Segmentbalken der Beispielkarte */
+  --lp-max: 1160px;
+  --bar-gap: 2px;
+  --bar-h: 28px;
+  --bar-r: 2px;
+
+  /* Responsive Abstände (von ResponsiveTable und style.css genutzt) */
+  --space-sm: clamp(12px, 3vw, 16px);
+  --space-md: clamp(16px, 4vw, 24px);
+  --gap-sm: clamp(12px, 3vw, 16px);
+
+  /* Breakpoints (nur Dokumentation: var() geht nicht in @media) */
+  --bp-sm: 480px;
+  --bp-md: 768px;
+  --bp-lg: 900px;
+  --bp-xl: 1200px;
+
+  /* Radien 4/6/10 (Richtung A) */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius: var(--r-lg);
+
+  /* Steuerelemente und Layout */
+  --ctl-h: 36px;
+  --row-h: 52px;
+  --row-pad: 13px 16px;
+}
+
+/* ── 2. Ebene „public“ = Richtung A „Leitstand“ (hell) ──────────────────── */
+:root,
+.theme-public {
+  --bg: #f7f7f8;
+  --surface: #ffffff;
+  --surface-2: #f3f3f5;
+  --sunken: #efeff2;
+  --border: #e4e4e9;
+  --border-strong: #cfcfd7;
+  --text: #17171c;
+  --text-2: #4f4f5a;
+  --text-3: #666673;
+
+  --primary: #4b44d6;
+  --primary-hover: #3f38c2;
+  --on-primary: #ffffff;
+  --primary-text: #443dc9;
+  --primary-soft: #eeedfc;
+  --focus: #4b44d6;
+
+  --nav-bg: #fbfbfc;
+  --nav-text: #3d3d47;
+  --nav-active-bg: #ececf8;
+  --nav-active-text: #2f2a9e;
+  --top-bg: #ffffff;
+  --top-text: var(--text);
+
+  --ok: #1c8a4a;
+  --ok-text: #16703c;
+  --ok-soft: #e9f6ee;
+  --deg: #a87900;
+  --deg-text: #875f00;
+  --deg-soft: #fbf3dc;
+  --part: #e0601c;
+  --part-text: #b3460c;
+  --part-soft: #fdeee4;
+  --major: #d42f2f;
+  --major-text: #b01f22;
+  --major-soft: #fcebeb;
+  --maint: #2f6fe0;
+  --maint-text: #2158c0;
+  --maint-soft: #e8f0fd;
+  --icon-on: #ffffff;
+
+  --shadow-1: 0 1px 2px rgba(20, 20, 30, 0.04);
+  --shadow-2: 0 12px 32px -12px rgba(20, 20, 30, 0.18);
+  --shadow-pop: 0 12px 32px -8px rgba(20, 20, 30, 0.22), 0 0 0 1px var(--border);
+  --overlay: rgb(0 0 0 / 0.55);
+
+  /* sit-onyx-Markenskala (Indigo A); 500/600 = --primary/--primary-hover.
+     Custom Properties sind nicht gelayert, die Ladereihenfolge ist egal. */
+  --onyx-color-onyx-100:  #eeedfc;
+  --onyx-color-onyx-200:  #dddbfa;
+  --onyx-color-onyx-300:  #bcb8f4;
+  --onyx-color-onyx-400:  #8f88ec;
+  --onyx-color-onyx-500:  #4b44d6;
+  --onyx-color-onyx-600:  #3f38c2;
+  --onyx-color-onyx-700:  #352fa6;
+  --onyx-color-onyx-800:  #2b2687;
+  --onyx-color-onyx-900:  #221e6a;
+  --onyx-color-onyx-1000: #19164f;
+  --onyx-color-onyx-1100: #120f39;
+  --onyx-color-onyx-1200: #0b0a25;
+}
+
+/* ── 2b. Ebene „public“ dunkel ──────────────────────────────────────────── */
+html[data-theme="dark"],
+html[data-theme="dark"] .theme-public {
+  --bg: #0c0c0f;
+  --surface: #141418;
+  --surface-2: #1b1b21;
+  --sunken: #101013;
+  --border: #2a2a32;
+  --border-strong: #3b3b45;
+  --text: #ededf1;
+  --text-2: #b0b0ba;
+  --text-3: #93939f;
+
+  --primary: #5a53e6;
+  --primary-hover: #4f48d9;
+  --primary-text: #a9a5ff;
+  --primary-soft: #22213d;
+  --focus: #8f8aff;
+
+  --nav-bg: #111115;
+  --nav-text: #c4c4cc;
+  --nav-active-bg: #23223a;
+  --nav-active-text: #c9c6ff;
+  --top-bg: #111115;
+  --top-text: var(--text);
+
+  --ok: #34b46a;
+  --ok-text: #5fd08e;
+  --ok-soft: #132a1e;
+  --deg: #d9a520;
+  --deg-text: #f0c552;
+  --deg-soft: #2c2410;
+  --part: #ef7a3a;
+  --part-text: #ff9d66;
+  --part-soft: #311c10;
+  --major: #ec4b4b;
+  --major-text: #ff8080;
+  --major-soft: #341617;
+  --maint: #4d8cf0;
+  --maint-text: #8cb6ff;
+  --maint-soft: #14223a;
+  --icon-on: #0c0c0f;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+  --overlay: rgb(0 0 0 / 0.7);
+}
+
+/* ── 3. Ebene „admin“ = Richtung C „Lagebild“ (hell) ────────────────────── */
+.theme-admin {
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --onyx-font-family-paragraph: var(--font-sans);
+  --onyx-font-family-data:      var(--font-sans);
+  --onyx-font-family-h1:        var(--font-sans);
+  --onyx-font-family-h2:        var(--font-sans);
+  --onyx-font-family-h3:        var(--font-sans);
+  --onyx-font-family-h4:        var(--font-sans);
+
+  --bg: #eceff3;
+  --surface: #ffffff;
+  --surface-2: #f5f7f9;
+  --sunken: #e4e8ed;
+  --border: #d6dbe2;
+  --border-strong: #bcc4ce;
+  --text: #0e1621;
+  --text-2: #384556;
+  --text-3: #525f70;
+
+  --primary: #1f5bcc;
+  --primary-hover: #184cb0;
+  --on-primary: #ffffff;
+  --primary-text: #1a52bb;
+  --primary-soft: #e6eefb;
+  --focus: #1f5bcc;
+
+  --nav-bg: #121a24;
+  --nav-text: #c3ccd8;
+  --nav-active-bg: #ffffff;
+  --nav-active-text: #0e1621;
+  --top-bg: #121a24;
+  --top-text: #ffffff;
+
+  --ok: #14864a;
+  --ok-text: #0f6e3c;
+  --ok-soft: #e3f4ea;
+  --deg: #a37600;
+  --deg-text: #7d5d00;
+  --deg-soft: #faf1d4;
+  --part: #cf5f0c;
+  --part-text: #a94a06;
+  --part-soft: #fdeadb;
+  --major: #d4303a;
+  --major-text: #ae1f28;
+  --major-soft: #fbe5e6;
+  --maint: #7350d8;
+  --maint-text: #5a39bd;
+  --maint-soft: #efeafc;
+  --icon-on: #ffffff;
+
+  --shadow-1: none;
+  --shadow-2: 0 8px 24px -10px rgba(0, 0, 0, 0.25);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--border-strong);
+  --overlay: rgb(0 0 0 / 0.55);
+
+  /* sit-onyx-Markenskala (Blau C); 500/600 = --primary/--primary-hover. */
+  --onyx-color-onyx-100:  #e9effa;
+  --onyx-color-onyx-200:  #d4dff5;
+  --onyx-color-onyx-300:  #aac1ec;
+  --onyx-color-onyx-400:  #7097df;
+  --onyx-color-onyx-500:  #1f5bcc;
+  --onyx-color-onyx-600:  #184cb0;
+  --onyx-color-onyx-700:  #18479e;
+  --onyx-color-onyx-800:  #143981;
+  --onyx-color-onyx-900:  #0f2d65;
+  --onyx-color-onyx-1000: #0b224b;
+  --onyx-color-onyx-1100: #081836;
+  --onyx-color-onyx-1200: #051023;
+}
+
+/* ── 3b. Ebene „admin“ dunkel ───────────────────────────────────────────── */
+html[data-theme="dark"] .theme-admin {
+  --bg: #090c11;
+  --surface: #10151c;
+  --surface-2: #161d26;
+  --sunken: #0c1016;
+  --border: #232d3a;
+  --border-strong: #33404f;
+  --text: #e5eaf0;
+  --text-2: #aab4c1;
+  --text-3: #8b97a6;
+
+  --primary: #2a64d6;
+  --primary-hover: #2459c4;
+  --primary-text: #7eaeff;
+  --primary-soft: #14233d;
+  --focus: #7eaeff;
+
+  --nav-bg: #06080c;
+  --nav-text: #aab4c1;
+  --nav-active-bg: #10151c;
+  --nav-active-text: #ffffff;
+  --top-bg: #06080c;
+  --top-text: #e5eaf0;
+
+  --ok: #2fb36a;
+  --ok-text: #5fd391;
+  --ok-soft: #0f2a1c;
+  --deg: #e2b324;
+  --deg-text: #f0cb55;
+  --deg-soft: #2a230c;
+  --part: #f08a3a;
+  --part-text: #ffab6b;
+  --part-soft: #2e1c0e;
+  --major: #ef5560;
+  --major-text: #ff8b92;
+  --major-soft: #33161a;
+  --maint: #9278f5;
+  --maint-text: #bba9ff;
+  --maint-soft: #1f1838;
+  --icon-on: #090c11;
+
+  --shadow-2: 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-strong);
+  --overlay: rgb(0 0 0 / 0.7);
+}
+
+/* ── 4. Abgeleitete Tokens (je Ebene neu aufgelöst, siehe Kopfkommentar) ── */
+:root,
+.theme-public,
+.theme-admin {
+  /* Einziger verbliebener Alias: --text-secondary ist der
+     Einhängepunkt der Kundenmarke. StatusPage.vue überschreibt ihn als
+     Inline-Style auf .content-area; alles, was die Markenfarbe der Statusseite
+     tragen soll, nutzt var(--text-secondary), die übrigen Stellen --text-2.
+     Alle anderen alten Namen (--bg-panel, --text-primary, --color-*, …) sind
+     entfernt, src/designAufraeumen.test.js verhindert ihre Rückkehr. */
+  --text-secondary: var(--text-2);
+
+  /* sit-onyx: Flächen, Text, Rahmen und Radien auf unsere Tokens. onyx nutzt
+     light-dark(); unsere Tokens wechseln schon per data-theme, ein Zweig
+     genügt. Die Markenskala steht oben je Ebene. */
+  --onyx-color-primary: var(--primary);
+  /* Text/Rand der Umrissknöpfe und Links; ohne diese Zeile gilt der
+     Hell-Wert von :root (#4b44d6) auch im dunklen Admin (2,4:1 auf --surface). */
+  --onyx-color-text-icons-primary-intense: var(--primary-text);
+  --onyx-color-danger:  var(--major);
+  --onyx-color-success: var(--ok);
+  --onyx-color-warning: var(--deg);
+
+  --onyx-color-base-background-blank:  var(--surface);
+  --onyx-color-base-background-tinted: var(--surface-2);
+  --onyx-color-text-icons-neutral-intense: var(--text);
+  --onyx-color-text-icons-neutral-medium:  var(--text-2);
+  --onyx-color-text-icons-neutral-soft:    var(--text-3);
+  --onyx-color-text-icons-danger-intense:  var(--major-text);
+  --onyx-color-component-border-neutral:       var(--border-strong);
+  --onyx-color-component-border-neutral-hover: var(--text-3);
+
+  --onyx-radius-sm: var(--r-sm);
+  --onyx-radius-md: var(--r-md);
+  --onyx-radius-lg: var(--r-lg);
+  --onyx-radius-component-input:  var(--r-md);
+  --onyx-radius-component-button: var(--r-md);
+}
+
+/* Grundfläche, -farbe und -schrift der Admin-Ebene. Body und :root tragen die
+   Werte der Ebene „public“ (A); das Admin-Wurzelelement (.admin-shell füllt
+   die Seite) zeigt seine eigenen. Die öffentliche Ebene braucht das nicht,
+   weil sie dem :root-Standard entspricht (und .app-container nur 960 px breit
+   ist, eine Fläche darauf würde als Streifen sichtbar). */
+.theme-admin {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
