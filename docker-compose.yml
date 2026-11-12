@@ -5,7 +5,7 @@ version: '3.8'
 # backend/compose_ports_test.go hält das fest.
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: statushafen_db
     environment:
       POSTGRES_DB: statushafen
@@ -33,7 +33,7 @@ services:
   # läuft dafür wie gewohnt direkt auf dem Host (start.sh). Anleitung: README,
   # Abschnitt "Lokale SSO-Tests mit Mock-OIDC".
   mock-oidc:
-    image: ghcr.io/navikt/mock-oauth2-server:6.1.3
+    image: ghcr.io/navikt/mock-oauth2-server:6.1.5
     container_name: statushafen_mock_oidc
     profiles: ["sso"]
     environment:
@@ -55,7 +55,7 @@ services:
   # Dockerfile; der Quellcode wird nur gelesen. Anleitung: README, Abschnitt
   # "Lokale SSO-Tests mit Mock-SAML".
   mock-saml:
-    image: golang:1.26.10-alpine
+    image: golang:1.27.0-alpine
     container_name: statushafen_mock_saml
     profiles: ["sso"]
     working_dir: /src
