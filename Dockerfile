@@ -15,7 +15,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- Stage 2: Backend (Go) bauen ----
-FROM golang:1.26.10-alpine@sha256:a2012b4a1d1f9f7e9f44e0d39b805a901e856b1dd80b4e6ee4338db547050308 AS backend-builder
+FROM golang:1.27.0-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS backend-builder
 WORKDIR /app/backend
 
 COPY backend/go.mod backend/go.sum ./
@@ -25,7 +25,7 @@ COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/server .
 
 # ---- Stage 3: Minimales Laufzeit-Image ----
-FROM alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 WORKDIR /app
 
 # ca-certificates: nötig für ausgehende HTTPS-Aufrufe (Google/GitHub OAuth-Endpunkte)
