@@ -1128,7 +1128,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createIncidentTranslation
       summary: Übersetzungsentwurf für einen Vorfall anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: incidents:create|maintenance:create
       requestBody:
         required: true
@@ -1369,7 +1374,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createComponentTranslation
       summary: Übersetzungsentwurf für eine Komponente anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: components:create
       requestBody:
         required: true
@@ -1439,7 +1449,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createNoticeTranslation
       summary: Übersetzungsentwurf für einen Hinweis anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: notices:create
       requestBody:
         required: true

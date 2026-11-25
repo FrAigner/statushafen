@@ -95,6 +95,7 @@ func TestCreateComponentTranslationHandler_Success(t *testing.T) {
 	r.POST("/api/components/:component_id/translations", h.CreateComponentTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	component := newTestComponent(db, page.ID)
 	cid := strconv.Itoa(int(component.ID))
 
@@ -130,6 +131,7 @@ func TestCreateComponentTranslationHandler_DuplicateLanguageReturns409(t *testin
 	r.POST("/api/components/:component_id/translations", h.CreateComponentTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	component := newTestComponent(db, page.ID)
 
 	db.Create(newComponentTranslation(component.ID, "de", "draft"))

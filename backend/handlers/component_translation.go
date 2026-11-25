@@ -124,6 +124,12 @@ func (h *Handler) CreateComponentTranslationHandler(c *gin.Context) {
 		return
 	}
 
+	// Only an additional language the page offers, as for the save per language.
+	req.LanguageCode = strings.ToLower(strings.TrimSpace(req.LanguageCode))
+	if !h.requireAdditionalLanguage(c, component.StatusPageID, req.LanguageCode) {
+		return
+	}
+
 	// Check if translation already exists for this language.
 	var existing models.ComponentTranslation
 	result := h.DB.Where("component_id = ? AND language_code = ?", componentID, req.LanguageCode).

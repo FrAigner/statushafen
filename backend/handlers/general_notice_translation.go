@@ -116,6 +116,12 @@ func (h *Handler) CreateGeneralNoticeTranslationHandler(c *gin.Context) {
 		return
 	}
 
+	// Only an additional language the page offers, as for the save per language.
+	req.LanguageCode = strings.ToLower(strings.TrimSpace(req.LanguageCode))
+	if !h.requireAdditionalLanguage(c, notice.StatusPageID, req.LanguageCode) {
+		return
+	}
+
 	// Check if translation already exists for this language.
 	var existing models.GeneralNoticeTranslation
 	result := h.DB.Where("general_notice_id = ? AND language_code = ?", noticeID, req.LanguageCode).

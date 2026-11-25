@@ -101,6 +101,7 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 
 	page := models.StatusPage{Name: "P", Slug: "abd-p"}
 	require.NoError(t, db.Create(&page).Error)
+	offerLanguages(db, page.ID)
 	pid := strconv.Itoa(int(page.ID))
 	comp := models.Component{StatusPageID: page.ID, Name: "K", Status: "operational"}
 	require.NoError(t, db.Create(&comp).Error)

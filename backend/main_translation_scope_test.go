@@ -40,7 +40,7 @@ func translationRouteCases() []translationRouteCase {
 		{
 			name: "incident", permission: "incidents:write",
 			createPath: "/api/incidents/%d/translations",
-			createBody: `{"language_code":"fr","title":"T","message":"M","source":"manual"}`,
+			createBody: `{"language_code":"en","title":"T","message":"M","source":"manual"}`,
 			adminPath:  "/api/incident-translations/",
 			seed: func(db *gorm.DB, pageID uint, lang string) (uint, uint) {
 				inc := models.Incident{StatusPageID: pageID, Title: "I", Message: "m", Status: "investigating"}
@@ -61,7 +61,7 @@ func translationRouteCases() []translationRouteCase {
 		{
 			name: "component", permission: "components:write",
 			createPath: "/api/components/%d/translations",
-			createBody: `{"language_code":"fr","title":"T","description":"D","source":"manual"}`,
+			createBody: `{"language_code":"en","title":"T","description":"D","source":"manual"}`,
 			adminPath:  "/api/component-translations/",
 			seed: func(db *gorm.DB, pageID uint, lang string) (uint, uint) {
 				comp := models.Component{StatusPageID: pageID, Name: "C"}
@@ -82,7 +82,7 @@ func translationRouteCases() []translationRouteCase {
 		{
 			name: "notice", permission: "notices:write",
 			createPath: "/api/notices/%d/translations",
-			createBody: `{"language_code":"fr","title":"T","message":"M","source":"manual"}`,
+			createBody: `{"language_code":"en","title":"T","message":"M","source":"manual"}`,
 			adminPath:  "/api/notice-translations/",
 			seed: func(db *gorm.DB, pageID uint, lang string) (uint, uint) {
 				n := models.GeneralNotice{StatusPageID: pageID, Title: "N", Message: "m", Level: "info", IsActive: true}
@@ -116,6 +116,9 @@ func TestRouter_TranslationWritesAreScopedToResourcePage(t *testing.T) {
 			foreign := models.StatusPage{Name: "Fremde", Slug: "fremde-" + tc.name}
 			db.Create(&own)
 			db.Create(&foreign)
+			// Creating needs an additional language the page offers.
+			db.Create(&models.StatusPageLanguage{StatusPageID: own.ID, LanguageCode: "de", IsDefault: true})
+			db.Create(&models.StatusPageLanguage{StatusPageID: own.ID, LanguageCode: "en"})
 			writer := models.Role{Name: "Writer " + tc.name, Permissions: tc.permission}
 			reader := models.Role{Name: "Reader " + tc.name, Permissions: "incidents:read"}
 			db.Create(&writer)

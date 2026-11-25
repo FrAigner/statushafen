@@ -96,6 +96,7 @@ func TestCreateGeneralNoticeTranslationHandler_Success(t *testing.T) {
 	r.POST("/api/notices/:notice_id/translations", h.CreateGeneralNoticeTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	notice := newTestGeneralNotice(db, page.ID)
 	nid := strconv.Itoa(int(notice.ID))
 
@@ -131,6 +132,7 @@ func TestCreateGeneralNoticeTranslationHandler_DuplicateLanguageReturns409(t *te
 	r.POST("/api/notices/:notice_id/translations", h.CreateGeneralNoticeTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	notice := newTestGeneralNotice(db, page.ID)
 
 	db.Create(newGeneralNoticeTranslation(notice.ID, "de", "draft"))
