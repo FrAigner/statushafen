@@ -1,0 +1,38 @@
+// Browser code in src/. New files are TypeScript (.ts, <script setup lang="ts">) and are checked with
+// strict. Existing JavaScript is compiled along (allowJs) but not yet checked (checkJs: false); it is
+// migrated step by step.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    // Vite's default build target (baseline-widely-available: Safari 16.4, Chrome 111, Firefox 114)
+    // supports ES2023 built-ins such as Array.prototype.toSorted and findLast.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    // Vite transpiles each file on its own: type-only imports must say so (import type).
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "allowJs": true,
+    "checkJs": false,
+
+    "strict": true,
+    // An index lookup (array[i], record[key]) may be undefined. Cheap to have from the start; turning it
+    // on later would mean revisiting every file that has already been migrated.
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // vite/client: import.meta.env, import.meta.hot, asset imports (*.css, *.svg). No Node types here,
+    // so that process or Buffer in browser code is a type error. Env variables: env.d.ts.
+    "types": ["vite/client"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["env.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.vue"],
+  "exclude": ["src/**/*.test.*", "src/**/*.spec.*", "src/test-support/**"]
+}
