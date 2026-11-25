@@ -1177,6 +1177,24 @@ describe('AdminLayout', () => {
         })
       }
 
+      it('nimmt die erste Seite, wenn die gespeicherte aktive Seite nicht in der Liste steht', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }, { ID: 8, Name: 'Beta', Slug: 'beta', Permissions: '' }])
+        useTenant().setActiveTenant(99)
+        const { router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/status/acme')
+      })
+
+      it('behandelt eine leere Antwort (null) wie keine Mitgliedschaft', async () => {
+        useAuth().setAuth('jwt-1', { email: 'user@x.de', is_global_admin: false, permissions: '' })
+        useTenant().setMyPages([])
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => null })
+        const { wrapper, router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/admin/components')
+        expect(wrapper.find('.forbidden__text').text()).toContain('noch keine Rolle')
+      })
+
       it('lässt das eigene Profil erreichbar', async () => {
         asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }])
         const { router } = await mountLayout({ initialPath: '/admin/profile' })

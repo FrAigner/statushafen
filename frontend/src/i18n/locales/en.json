@@ -1071,7 +1071,6 @@
     "summary": {
       "all": "All permissions",
       "more": "+{n}",
-      "none": "No permissions",
       "pageOnly": "Status page only"
     },
     "cardTitle": "All roles",

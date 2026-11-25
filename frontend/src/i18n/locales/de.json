@@ -1071,7 +1071,6 @@
     "summary": {
       "all": "Alle Rechte",
       "more": "+{n}",
-      "none": "Keine Rechte",
       "pageOnly": "Nur Statusseite"
     },
     "cardTitle": "Alle Rollen",
