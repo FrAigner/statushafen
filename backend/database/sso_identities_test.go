@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRemoveOrphanedPageSSOIdentities: Verknüpfungen, deren
-// Mitgliedschaft nach dem Verknüpfen weich entfernt wurde, werden beim Start
-// gelöscht. Bewusste Verknüpfungen ohne Rolle (nie Mitglied oder nach dem
-// Entfernen neu verknüpft), aktive Mitglieder und andere Seiten bleiben. Der
-// zweite Lauf ändert nichts.
+// TestRemoveOrphanedPageSSOIdentities: links whose
+// membership was softly removed after linking are deleted on startup.
+// Deliberate links without a role (never a member or re-linked after
+// removal), active members and other pages stay. The
+// second run changes nothing.
 func TestRemoveOrphanedPageSSOIdentities(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.UserSSOIdentity{}))
@@ -43,19 +43,19 @@ func TestRemoveOrphanedPageSSOIdentities(t *testing.T) {
 	}
 	removedLater := t0.Add(time.Hour)
 
-	orphan := user("orphan@x.example") // verknüpft, danach entfernt -> weg
+	orphan := user("orphan@x.example") // linked, removed afterwards -> gone
 	ident(orphan, pageA, t0)
 	membership(orphan, pageA, &removedLater)
-	ident(orphan, pageB, t0) // andere Seite ohne Beleg -> bleibt
+	ident(orphan, pageB, t0) // other page without evidence -> stays
 
-	relinked := user("relinked@x.example") // entfernt, danach neu verknüpft -> bleibt
+	relinked := user("relinked@x.example") // removed, linked again afterwards -> stays
 	membership(relinked, pageA, &removedLater)
 	ident(relinked, pageA, removedLater.Add(time.Hour))
 
-	noRole := user("norole@x.example") // nie Mitglied (Selbstverknüpfung) -> bleibt
+	noRole := user("norole@x.example") // never a member (self-link) -> stays
 	ident(noRole, pageA, t0)
 
-	active := user("active@x.example") // alte entfernte Zeile, aber wieder Mitglied -> bleibt
+	active := user("active@x.example") // old removed row, but a member again -> stays
 	ident(active, pageA, t0)
 	membership(active, pageA, &removedLater)
 	membership(active, pageA, nil)
@@ -79,8 +79,8 @@ func TestRemoveOrphanedPageSSOIdentities(t *testing.T) {
 	assert.EqualValues(t, 3, markers, "soft-gelöschte Mitgliedszeilen (Merker) bleiben unverändert")
 }
 
-// TestRemoveOrphanedPageSSOIdentities_ErrorIsNotFatal: Fehlt die Tabelle,
-// bricht die Bereinigung nur ab (Warnung), der Start läuft weiter.
+// TestRemoveOrphanedPageSSOIdentities_ErrorIsNotFatal: if the table is missing,
+// the cleanup only aborts (warning), startup continues.
 func TestRemoveOrphanedPageSSOIdentities_ErrorIsNotFatal(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	assert.NotPanics(t, func() { removeOrphanedPageSSOIdentities(db) })

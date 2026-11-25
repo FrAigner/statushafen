@@ -119,11 +119,11 @@ func setupTagMigrationTestDB(t *testing.T) *gorm.DB {
 	)
 	require.NoError(t, err)
 
-	// Component.Country/Incident.Country/User.AllowedCountries wurden aus den
-	// Go-Structs entfernt, AutoMigrate legt ihre Spalten deshalb
-	// nicht mehr an. Diese Tests decken aber genau die Migration DIESER
-	// (früher physisch vorhandenen) Spalten ab - sie hier manuell nachbilden,
-	// damit setLegacyCountry/setLegacyAllowedCountries unten funktionieren.
+	// Component.Country/Incident.Country/User.AllowedCountries were removed from the
+	// Go structs, so AutoMigrate no longer creates their columns.
+	// These tests, however, cover exactly the migration of THESE
+	// (formerly physically present) columns - recreate them manually here,
+	// so that setLegacyCountry/setLegacyAllowedCountries below work.
 	require.NoError(t, db.Exec(`ALTER TABLE components ADD COLUMN country TEXT`).Error)
 	require.NoError(t, db.Exec(`ALTER TABLE incidents ADD COLUMN country TEXT`).Error)
 	require.NoError(t, db.Exec(`ALTER TABLE users ADD COLUMN allowed_countries TEXT`).Error)
@@ -131,11 +131,11 @@ func setupTagMigrationTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// setLegacyCountry/setLegacyAllowedCountries schreiben direkt in die
-// nachgebildeten Legacy-Spalten (siehe setupTagMigrationTestDB) - Ersatz für
-// die entfernten Go-Felder Component.Country/Incident.Country/
-// User.AllowedCountries, die migrateTagsFromCountryStrings testweise
-// weiterhin lesen können muss.
+// setLegacyCountry/setLegacyAllowedCountries write directly into the
+// recreated legacy columns (see setupTagMigrationTestDB) - a substitute for
+// the removed Go fields Component.Country/Incident.Country/
+// User.AllowedCountries, which migrateTagsFromCountryStrings must
+// still be able to read for test purposes.
 func setLegacyCountry(t *testing.T, db *gorm.DB, table string, id uint, country string) {
 	t.Helper()
 	require.NoError(t, db.Exec(`UPDATE `+table+` SET country = ? WHERE id = ?`, country, id).Error)
@@ -204,7 +204,7 @@ func TestMigrateTagsFromCountryStrings_ComponentsAndIncidents(t *testing.T) {
 	CreateSoftDeleteUniqueIndexes(db)
 	migrateTagsFromCountryStrings(db)
 
-	// "global" components/incidents get no tag row (item 1 of the Verifikation
+	// "global" components/incidents get no tag row (item 1 of the verification
 	// spec: only non-"global" values are migrated in this step).
 	assert.Empty(t, tagNamesFor(t, db, "component_tags", "component_id", compGlobal.ID))
 	assert.Empty(t, tagNamesFor(t, db, "incident_tags", "incident_id", incGlobal.ID))
@@ -257,8 +257,8 @@ func TestMigrateTagsFromCountryStrings_Users(t *testing.T) {
 	migrateTagsFromCountryStrings(db)
 
 	// Resulting tag assignment per user must exactly match the previous
-	// comma-separated AllowedCountries access set (Verifikation:
-	// Vorher/Nachher-Vergleich), including "global" for users.
+	// comma-separated AllowedCountries access set (verification:
+	// before/after comparison), including "global" for users.
 	assert.Equal(t, splitCountries("global"), tagNamesFor(t, db, "user_tags", "user_id", userGlobal.ID))
 	assert.Equal(t, splitCountries("DE"), tagNamesFor(t, db, "user_tags", "user_id", userSingle.ID))
 	assert.Equal(t, splitCountries("DE, AT, CH"), tagNamesFor(t, db, "user_tags", "user_id", userMulti.ID))
@@ -402,8 +402,8 @@ func TestCreateTagUniqueIndexes(t *testing.T) {
 }
 
 // setupJoinTableTestDB spins up an isolated SQLite DB with the four
-// soft-delete-fähigen many-to-many-Join-Tabellen und ihren
-// Eltern-Modellen migriert.
+// soft-delete-capable many-to-many join tables and their
+// parent models migrated.
 func setupJoinTableTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -423,18 +423,18 @@ func setupJoinTableTestDB(t *testing.T) *gorm.DB {
 		&models.IncidentTag{},
 		&models.UserTag{},
 		&models.StatusPageLanguage{},
-		// ebenfalls in createJoinTableUniqueIndexes.
+		// likewise in createJoinTableUniqueIndexes.
 		&models.IncidentUpdate{},
 		&models.IncidentUpdateTranslation{},
-		// ebenfalls in createJoinTableUniqueIndexes.
+		// likewise in createJoinTableUniqueIndexes.
 		&models.ExternalSource{},
 		&models.ExternalComponent{},
 		&models.ExternalComponentLink{},
-		// ebenfalls in createJoinTableUniqueIndexes.
+		// likewise in createJoinTableUniqueIndexes.
 		&models.ExternalIncident{},
 		&models.ExternalIncidentUpdate{},
 		&models.ExternalIncidentComponent{},
-		// Admin-Nachrichtencenter.
+		// admin message center.
 		&models.AdminNotification{},
 		&models.NotificationRead{},
 		&models.ComponentStatusChange{},
@@ -465,18 +465,18 @@ func TestCreateJoinTableUniqueIndexes(t *testing.T) {
 		link1 := models.IncidentComponent{IncidentID: incident.ID, ComponentID: comp1.ID}
 		require.NoError(t, db.Create(&link1).Error)
 
-		// Echtes Duplikat auf denselben (aktiven) (incident_id, component_id):
-		// abgelehnt.
+		// Real duplicate on the same (active) (incident_id, component_id):
+		// rejected.
 		dup := models.IncidentComponent{IncidentID: incident.ID, ComponentID: comp1.ID}
 		assert.Error(t, db.Create(&dup).Error)
 
-		// Zwei verschiedene Components am selben Incident: erlaubt.
+		// Two different components on the same incident: allowed.
 		link2 := models.IncidentComponent{IncidentID: incident.ID, ComponentID: comp2.ID}
 		require.NoError(t, db.Create(&link2).Error)
 
-		// Soft-Delete gefolgt vom Recreate desselben Paares (wie es
-		// replaceIncidentComponents bei einem "Update mit unveränderten
-		// ComponentIDs" tut) muss ein No-Op sein, keine Unique-Verletzung.
+		// Soft delete followed by re-creating the same pair (as
+		// replaceIncidentComponents does on an "update with unchanged
+		// ComponentIDs") must be a no-op, not a unique violation.
 		require.NoError(t, db.Delete(&link1).Error)
 		recreated := models.IncidentComponent{IncidentID: incident.ID, ComponentID: comp1.ID}
 		require.NoError(t, db.Create(&recreated).Error)
@@ -508,8 +508,8 @@ func TestCreateJoinTableUniqueIndexes(t *testing.T) {
 	})
 }
 
-// je (Update, Sprache) höchstens eine aktive Übersetzung; nach
-// Soft-Delete ist die Sprache wieder frei, ein anderes Update ist unabhängig.
+// per (update, language) at most one active translation; after
+// soft delete the language is free again, another update is independent.
 func TestCreateJoinTableUniqueIndexes_IncidentUpdateTranslation(t *testing.T) {
 	db := setupJoinTableTestDB(t)
 	createJoinTableUniqueIndexes(db)
@@ -533,8 +533,8 @@ func TestCreateJoinTableUniqueIndexes_IncidentUpdateTranslation(t *testing.T) {
 	require.NoError(t, db.Create(&models.IncidentUpdateTranslation{UpdateID: u1.ID, LanguageCode: "en", Message: "again"}).Error)
 }
 
-// Wird das Update gelöscht, verschwinden seine Übersetzungen (FK mit
-// OnDelete:CASCADE). SQLite erzwingt Fremdschlüssel nur mit PRAGMA.
+// If the update is deleted, its translations disappear (FK with
+// OnDelete:CASCADE). SQLite enforces foreign keys only with PRAGMA.
 func TestIncidentUpdateTranslation_CascadeBeimLoeschenDesUpdates(t *testing.T) {
 	db := setupJoinTableTestDB(t)
 	sqlDB, err := db.DB()
@@ -557,8 +557,8 @@ func TestIncidentUpdateTranslation_CascadeBeimLoeschenDesUpdates(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// PageLayout kommt rein additiv per AutoMigrate. Bestehende Seiten
-// (Tabelle ohne die Spalte) müssen danach "standard" haben, neue ebenso.
+// PageLayout arrives purely additively via AutoMigrate. Existing pages
+// (table without the column) must then have "standard", new ones as well.
 func TestMigratePageLayout_ExistingPagesGetStandard(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "legacy.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -573,9 +573,9 @@ func TestMigratePageLayout_ExistingPagesGetStandard(t *testing.T) {
 	assert.Equal(t, []string{"standard", "standard"}, layouts)
 }
 
-// Eine Custom Domain gehört höchstens einer Seite, sobald sie verifiziert oder
-// aktiv ist (ohne Beachtung der Schreibweise); unbewiesene Eintragungen dürfen
-// sich überschneiden, gelöschte Seiten geben die Domain frei.
+// A custom domain belongs to at most one page once it is verified or
+// active (case-insensitive); unproven entries may
+// overlap, deleted pages release the domain.
 func TestCreateCustomDomainLiveUniqueIndex(t *testing.T) {
 	db := setupTagMigrationTestDB(t)
 	CreateSoftDeleteUniqueIndexes(db)
@@ -598,9 +598,9 @@ func TestCreateCustomDomainLiveUniqueIndex(t *testing.T) {
 	require.NoError(t, insert("status.acme.example", "active"), "gelöschte Seite gibt die Domain frei")
 }
 
-// token_version kommt rein additiv per AutoMigrate. Bestehende Konten
-// (Tabelle ohne die Spalte) starten mit 0, ein zweiter Lauf ändert nichts,
-// und eine zwischenzeitlich erhöhte Version bleibt erhalten.
+// token_version arrives purely additively via AutoMigrate. Existing accounts
+// (table without the column) start with 0, a second run changes nothing,
+// and a version raised in the meantime is preserved.
 func TestMigrateUserTokenVersion_ExistingUsersStartAtZeroAndRerunKeepsValue(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "legacy.db")), &gorm.Config{})
 	require.NoError(t, err)

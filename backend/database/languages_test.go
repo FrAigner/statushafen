@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// setupLanguageTestDB baut eine Minimal-DB nur mit den für den Sprachkatalog
-// nötigen Modellen auf - analog zu setupJoinTableTestDB.
+// setupLanguageTestDB builds a minimal DB with only the models needed for the
+// language catalog - analogous to setupJoinTableTestDB.
 func setupLanguageTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	dbName := filepath.Join(t.TempDir(), "language.db")
@@ -36,8 +36,8 @@ func TestSeedLanguageCatalog_IdempotentAndPreservesEdits(t *testing.T) {
 		t.Fatalf("expected %d seeded languages, got %d", len(defaultLanguages), count)
 	}
 
-	// Ein Admin benennt "en" um - ein zweiter seedLanguageCatalog-Lauf (wie
-	// bei jedem InitDB()) darf das nicht überschreiben.
+	// An admin renames "en" - a second seedLanguageCatalog run (as
+	// on every InitDB()) must not overwrite that.
 	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "en").Update("name", "Custom English Name").Error)
 	seedLanguageCatalog(db)
 
@@ -70,7 +70,7 @@ func TestSeedLanguageCatalog_OnlyGermanAndEnglish(t *testing.T) {
 	require.True(t, langs[1].IsActive)
 }
 
-// Eine vom Admin abgeschaltete Sprache wird beim Start nicht wieder eingeschaltet.
+// A language switched off by the admin is not switched on again at startup.
 func TestSeedLanguageCatalog_KeepsDisabledLanguageDisabled(t *testing.T) {
 	db := setupLanguageTestDB(t)
 	seedLanguageCatalog(db)
@@ -105,9 +105,9 @@ func TestBackfillStatusPageLanguages(t *testing.T) {
 		}
 	}
 
-	// Ein zweiter Lauf darf eine bereits konfigurierte Seite nicht anfassen -
-	// sonst würde ein Admin, der die Sprachauswahl inzwischen manuell
-	// geändert hat, bei jedem Serverstart zurückgesetzt.
+	// A second run must not touch an already configured page -
+	// otherwise an admin who has meanwhile changed the language selection manually
+	// would be reset on every server start.
 	require.NoError(t, db.Where("status_page_id = ? AND language_code = ?", page.ID, "en").Delete(&models.StatusPageLanguage{}).Error)
 	backfillStatusPageLanguages(db)
 	var afterCount int64
@@ -131,8 +131,8 @@ func TestSeedDefaultStatusPageLanguages(t *testing.T) {
 	}
 }
 
-// Eine vom Admin gelöschte (soft-gelöschte) Sprache darf der Seed beim nächsten
-// Start nicht wieder anlegen.
+// A language deleted by the admin (soft-deleted) must not be created again by the seed
+// on the next start.
 func TestSeedLanguageCatalog_BringtGeloeschteSpracheNichtZurueck(t *testing.T) {
 	db := setupLanguageTestDB(t)
 	seedLanguageCatalog(db)

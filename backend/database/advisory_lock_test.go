@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// SQLite kennt keine Advisory Locks und läuft in einem Prozess -
-// TryLock ist dort neutral (immer true), Unlock ein No-Op. Der Postgres-Pfad
-// steckt in pruefeAdvisoryLock (MIGRATION_PG_TEST=1).
+// SQLite has no advisory locks and runs in one process -
+// TryLock is neutral there (always true), Unlock a no-op. The Postgres path
+// lives in pruefeAdvisoryLock (MIGRATION_PG_TEST=1).
 func TestAdvisoryLock_SQLiteNeutral(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "lock.db")), &gorm.Config{})
 	require.NoError(t, err)

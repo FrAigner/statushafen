@@ -6,16 +6,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// legacyExternalProviderStatuspage ist der frühere Anbieter-Schlüssel der
-// externen Statusquellen. Er heißt jetzt "summaryv2" (Summary-API v2).
+// legacyExternalProviderStatuspage is the former provider key of the
+// external status sources. It is now called "summaryv2" (Summary API v2).
 const legacyExternalProviderStatuspage = "statuspage"
 
-// migrateExternalSourceProvider stellt Quellen mit dem früheren Schlüssel
-// "statuspage" auf "summaryv2" um. Idempotent: nach dem ersten Lauf gibt es
-// keine Zeile mit dem Altwert mehr. Gelöschte Zeilen (Unscoped) werden mit
-// umgestellt, damit der Altwert nirgends überlebt; UpdateColumn lässt
-// updated_at unberührt. Ein Fehler wird nur geloggt, der Start soll nicht daran
-// scheitern.
+// migrateExternalSourceProvider switches sources with the former key
+// "statuspage" to "summaryv2". Idempotent: after the first run there is
+// no row with the legacy value anymore. Deleted rows (Unscoped) are
+// switched too, so the legacy value survives nowhere; UpdateColumn leaves
+// updated_at untouched. An error is only logged, startup is not supposed to fail
+// because of it.
 func migrateExternalSourceProvider(db *gorm.DB) {
 	res := db.Unscoped().Table("external_sources").
 		Where("provider = ?", legacyExternalProviderStatuspage).

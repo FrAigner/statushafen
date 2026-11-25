@@ -12,15 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// runInitDBWithSeed legt eine Datenbank mit einem Bestandskonto an und startet
-// InitDB danach mit SEED_DB=true und dem gegebenen APP_ENV. Das Ergebnis sagt,
-// ob das Bestandskonto noch existiert und ob die Demokonten angelegt wurden.
+// runInitDBWithSeed creates a database with an existing account and then starts
+// InitDB with SEED_DB=true and the given APP_ENV. The result says
+// whether the existing account still exists and whether the demo accounts were created.
 func runInitDBWithSeed(t *testing.T, appEnv string) (sentinelKept, demoSeeded bool, logOut string) {
 	t.Helper()
 	return runInitDBWithSeedFlag(t, appEnv, "true")
 }
 
-// runInitDBWithSeedFlag wie runInitDBWithSeed, mit frei wählbarem Wert von SEED_DB.
+// runInitDBWithSeedFlag like runInitDBWithSeed, with a freely selectable value of SEED_DB.
 func runInitDBWithSeedFlag(t *testing.T, appEnv, seedFlag string) (sentinelKept, demoSeeded bool, logOut string) {
 	t.Helper()
 	prevDialector, prevDB := openDialector, DB
@@ -43,8 +43,8 @@ func runInitDBWithSeedFlag(t *testing.T, appEnv, seedFlag string) (sentinelKept,
 	return kept == 1, demo == 1, out.String()
 }
 
-// Seed und Reset (Tabellen löschen!) laufen nur in einer ausdrücklich
-// benannten Entwicklungsumgebung.
+// Seed and reset (deleting tables!) run only in an explicitly
+// named development environment.
 func TestInitDB_SeedOnlyInDevelopmentEnvironments(t *testing.T) {
 	for _, env := range []string{"development", "dev", "test", "local", "Development", " LOCAL "} {
 		t.Run("erlaubt: "+env, func(t *testing.T) {
@@ -55,9 +55,9 @@ func TestInitDB_SeedOnlyInDevelopmentEnvironments(t *testing.T) {
 	}
 }
 
-// Auch in der Entwicklungsumgebung löscht und füllt nur der ausdrückliche
-// Wunsch SEED_DB=true die Datenbank; ohne die Variable oder mit einem anderen
-// Wert bleiben die Bestandsdaten unberührt.
+// Even in the development environment only the explicit
+// wish SEED_DB=true deletes and fills the database; without the variable or with another
+// value the existing data stays untouched.
 func TestInitDB_NoSeedWithoutExplicitFlag(t *testing.T) {
 	for _, flag := range []string{"", "false", "1", "TRUE", "yes"} {
 		t.Run("SEED_DB="+flag, func(t *testing.T) {
@@ -80,8 +80,8 @@ func TestInitDB_SeedBlockedWithoutExplicitDevelopmentEnvironment(t *testing.T) {
 	}
 }
 
-// Scheitert das Hashen der Demo-Passwörter, legt der Seed keine Konten ohne
-// Passwort an, sondern bricht ab.
+// If hashing the demo passwords fails, the seed creates no accounts without
+// a password, but aborts.
 func TestSeedData_AbortsWhenHashingFails(t *testing.T) {
 	prevDialector, prevDB, prevHash := openDialector, DB, seedHashPassword
 	t.Cleanup(func() { openDialector, DB, seedHashPassword = prevDialector, prevDB, prevHash })

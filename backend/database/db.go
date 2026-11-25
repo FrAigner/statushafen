@@ -21,23 +21,23 @@ import (
 
 var DB *gorm.DB
 
-// openDialector baut den Datenbanktreiber für InitDB. Als Variable, damit ein
-// Test InitDB komplett gegen SQLite laufen lassen kann (neue
-// Tabellen in der AutoMigrate-Liste sollen vom Coverage-Gate geprüft werden,
-// ohne Postgres in der Testumgebung).
+// openDialector builds the database driver for InitDB. A variable so that a
+// test can run InitDB entirely against SQLite (new
+// tables in the AutoMigrate list should be checked by the coverage gate,
+// without Postgres in the test environment).
 var openDialector = postgres.Open
 
-// MaxPasswordBytes ist die Obergrenze, bis zu der bcrypt ein Passwort
-// verarbeitet; längere Eingaben lehnt es ab. Die Handler weisen sie vorher mit
-// password_too_long ab.
+// MaxPasswordBytes is the upper limit up to which bcrypt processes a password;
+// longer input is rejected. The handlers reject it beforehand with
+// password_too_long.
 const MaxPasswordBytes = 72
 
-// ErrPasswordTooLong: das Passwort ist länger als MaxPasswordBytes Byte.
+// ErrPasswordTooLong: the password is longer than MaxPasswordBytes bytes.
 var ErrPasswordTooLong = bcrypt.ErrPasswordTooLong
 
-// HashPassword liefert den bcrypt-Hash des Passworts. Bei einem Fehler ist der
-// Hash leer und der Fehler gesetzt: Aufrufer müssen abbrechen, statt einen
-// leeren Hash zu speichern (ein Konto ohne Passwort gälte sonst als gesetzt).
+// HashPassword returns the bcrypt hash of the password. On error the
+// hash is empty and the error is set: callers must abort instead of storing
+// an empty hash (an account without a password would otherwise count as set).
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	if err != nil {
@@ -52,14 +52,14 @@ func CheckPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
-// dummyPasswordHash ist ein fester bcrypt-Hash (Kosten wie HashPassword) eines
-// Textes, der kein Konto-Passwort ist. Er dient nur dem Zeitausgleich.
+// dummyPasswordHash is a fixed bcrypt hash (same cost as HashPassword) of a
+// text that is not an account password. It serves only for timing equalization.
 const dummyPasswordHash = "$2a$10$miYhj4I6m./0VB7F8cfQw.oIcHxUOsrrHwFuONPi2/YDCsX4T3Iy."
 
-// CheckPasswordConstantTime prüft wie CheckPasswordHash, rechnet bei leerem
-// Hash (unbekanntes Konto, Konto ohne Passwort) aber einen vollen
-// bcrypt-Vergleich gegen den Dummy-Hash und liefert false. So unterscheidet
-// sich die Laufzeit des Logins nicht danach, ob die Adresse ein Konto hat.
+// CheckPasswordConstantTime checks like CheckPasswordHash, but on an empty
+// hash (unknown account, account without password) it runs a full
+// bcrypt comparison against the dummy hash and returns false. This way
+// the login runtime does not depend on whether the address has an account.
 func CheckPasswordConstantTime(password, hash string) bool {
 	if hash == "" {
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(password))
@@ -68,9 +68,9 @@ func CheckPasswordConstantTime(password, hash string) bool {
 	return CheckPasswordHash(password, hash)
 }
 
-// buildDSN liefert DB_DSN, falls gesetzt, sonst eine aus einzelnen Env-Vars
-// (oder Defaults für lokale Entwicklung) zusammengesetzte Postgres-DSN.
-// Ausgelagert aus InitDB(), damit sie ohne echte DB-Verbindung testbar ist.
+// buildDSN returns DB_DSN if set, otherwise a Postgres DSN assembled from individual env vars
+// (or defaults for local development).
+// Extracted from InitDB() so it is testable without a real DB connection.
 func buildDSN() string {
 	if dsn := os.Getenv("DB_DSN"); dsn != "" {
 		return dsn
@@ -84,24 +84,24 @@ func buildDSN() string {
 	return "host=" + dbHost + " user=" + dbUser + " password=" + dbPass + " dbname=" + dbName + " port=" + dbPort + " sslmode=" + dbSSL + " TimeZone=UTC"
 }
 
-// developmentAppEnvs sind die APP_ENV-Werte, in denen Seed und Reset erlaubt
-// sind. Bewusst eine Allowlist: Ein leerer, falsch geschriebener oder
-// unbekannter Wert (prod, live, staging) sperrt, statt auf einem
-// Produktivsystem mit vergessener Variable die Tabellen zu löschen und
-// Standardkonten anzulegen.
+// developmentAppEnvs are the APP_ENV values in which seed and reset
+// are allowed. Deliberately an allowlist: an empty, misspelled or
+// unknown value (prod, live, staging) blocks them, instead of dropping the tables on a
+// production system with a forgotten variable and
+// creating default accounts.
 var developmentAppEnvs = []string{"development", "dev", "test", "local"}
 
-// IsDevelopmentAppEnv meldet, ob APP_ENV ausdrücklich eine Entwicklungsumgebung
-// benennt. Alle Entwicklungsausnahmen (Seed, unsichere OIDC-Aussteller, interner
-// Domain-Check ohne Token) hängen daran und sind sonst aus: Ein leerer oder
-// falsch geschriebener Wert gilt als Produktion (fail closed). Vergleiche mit
-// "production" sind dafür ungeeignet, sie öffnen bei jedem anderen Wert.
+// IsDevelopmentAppEnv reports whether APP_ENV explicitly names a development environment.
+// All development exceptions (seed, insecure OIDC issuers, internal
+// domain check without token) depend on it and are off otherwise: an empty or
+// misspelled value counts as production (fail closed). Comparisons with
+// "production" are unsuitable for this, they open up for any other value.
 func IsDevelopmentAppEnv() bool {
 	return slices.Contains(developmentAppEnvs, strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))))
 }
 
-// seedAllowed entscheidet über SEED_DB=true: nur mit Entwicklungs-APP_ENV
-// wirksam. Andernfalls wird SEED_DB ignoriert und das im Log gesagt.
+// seedAllowed decides on SEED_DB=true: only effective with a development APP_ENV.
+// Otherwise SEED_DB is ignored and that is said in the log.
 func seedAllowed() bool {
 	if os.Getenv("SEED_DB") != "true" {
 		return false
@@ -136,10 +136,10 @@ func InitDB() {
 	if seed {
 		slog.Info("SEED_DB is true. Dropping tables for a clean seed...")
 		if err := DB.Migrator().DropTable(
-			// Nachrichtencenter, Lesestatus vor Nachricht (FK).
+			// message center, read status before message (FK).
 			&models.NotificationRead{},
 			&models.AdminNotification{},
-			// externe Statusseiten, Kinder vor Eltern (FKs).
+			// external status pages, children before parents (FKs).
 			&models.ExternalIncidentComponent{},
 			&models.ExternalIncidentUpdate{},
 			&models.ExternalIncident{},
@@ -161,7 +161,7 @@ func InitDB() {
 			&models.GeneralNotice{},
 			&models.ActionItem{},
 			&models.PostMortem{},
-			&models.IncidentUpdateTranslation{}, // vor dem Update (FK)
+			&models.IncidentUpdateTranslation{}, // before the update (FK)
 			&models.IncidentUpdate{},
 			&models.IncidentComponent{},
 			&models.Incident{},
@@ -170,21 +170,21 @@ func InitDB() {
 			&models.Component{},
 			&models.User{},
 			&models.Role{},
-			// StatusPageLanguage referenziert StatusPage per FK (OnDelete:CASCADE) -
-			// muss vor StatusPage gedroppt werden, sonst bleiben beim Reset
-			// verwaiste Zeilen liegen und die anschliessende AutoMigrate-FK-
-			// Migration schlaegt mit "violates foreign key constraint" fehl
-			// (beobachtet als Crash-Loop auf Staging ab 2026-07-24, RestartCount
-			// > 4600). Language (globaler Katalog) bewusst NICHT hier drin - der
-			// soll Seeds ueberleben, s. seedLanguageCatalog.
+			// StatusPageLanguage references StatusPage via FK (OnDelete:CASCADE) -
+			// must be dropped before StatusPage, otherwise orphaned rows remain on reset
+			// and the subsequent AutoMigrate FK
+			// migration fails with "violates foreign key constraint"
+			// (observed as a crash loop on staging since 2026-07-24, RestartCount
+			// > 4600). Language (global catalog) is deliberately NOT included here - it
+			// is meant to survive seeds, see seedLanguageCatalog.
 			&models.StatusPageLanguage{},
-			// UiTranslationOverride referenziert StatusPage ebenfalls per FK
-			// (OnDelete:CASCADE) - aus demselben Grund vor StatusPage droppen.
+			// UiTranslationOverride also references StatusPage via FK
+			// (OnDelete:CASCADE) - drop before StatusPage for the same reason.
 			&models.UiTranslationOverride{},
 			&models.StatusPage{},
 			&models.AuditLog{},
 			&models.PageOrder{},
-			// globale Systemeinstellungen (Key/Value).
+			// global system settings (key/value).
 			&models.SystemSetting{},
 		); err != nil {
 			slog.Error("Failed to drop tables for seed", "error", err)
@@ -222,25 +222,25 @@ func InitDB() {
 		&models.StatusPageLanguage{},
 		&models.PageOrder{},
 		&models.UiTranslationOverride{},
-		// OIDC-Login je Statusseite.
+		// OIDC login per status page.
 		&models.OIDCLoginState{},
 		&models.UserSSOIdentity{},
-		// globale Systemeinstellungen (Key/Value).
+		// global system settings (key/value).
 		&models.SystemSetting{},
-		// externe Statusseiten (Quelle, Komponenten, Kopplung).
+		// external status pages (source, components, coupling).
 		&models.ExternalSource{},
 		&models.ExternalComponent{},
 		&models.ExternalComponentLink{},
-		// gespiegelte Vorfälle und Wartungen.
+		// mirrored incidents and maintenances.
 		&models.ExternalIncident{},
 		&models.ExternalIncidentUpdate{},
 		&models.ExternalIncidentComponent{},
-		// Admin-Nachrichtencenter (Glocke).
+		// admin message center (bell).
 		&models.AdminNotification{},
 		&models.NotificationRead{},
-		// Statushistorie der Komponenten.
+		// status history of the components.
 		&models.ComponentStatusChange{},
-		// Einladungen auf Statusseiten.
+		// invitations to status pages.
 		&models.PageInvitation{},
 	)
 	if err != nil {
@@ -249,96 +249,96 @@ func InitDB() {
 
 	migrateIncidentComponents(DB)
 	dropLegacySSOIdentityIndex(DB)
-	// Bestandsabos vor dem Double-Opt-in gelten als bestätigt.
+	// Existing subscriptions from before double opt-in count as confirmed.
 	backfillSubscriberStatus(DB)
 	// Memberships from before joined_via count as legacy (custom domain login).
 	backfillMembershipOrigin(DB)
-	// Altwert "completed" bei Vorfällen/Wartungen auf "resolved".
+	// Legacy value "completed" on incidents/maintenances becomes "resolved".
 	migrateCompletedIncidentStatus(DB)
 	migrateExternalSourceProvider(DB)
-	// Webhook- und Bestell-Token liegen nur noch als Hash vor.
+	// Webhook and order tokens are now stored only as hashes.
 	migrateLegacyTokens(DB)
 
 	createJoinTableUniqueIndexes(DB)
-	// erst Kennungen für Bestandskomponenten, dann der Unique-Index.
+	// first identifiers for existing components, then the unique index.
 	BackfillComponentSlugs(DB)
 	CreateSoftDeleteUniqueIndexes(DB)
 	removeOrphanedUserStatusPageRoles(DB)
 	removeOrphanedRoleAndUserReferences(DB)
-	// vor dem Seed, damit die frisch angelegte Rolle unberührt bleibt.
+	// before the seed, so the freshly created role stays untouched.
 	migrateRolePermissionsToCRUD(DB)
 	seedPageOwnerRole(DB)
 	migrateTagsFromCountryStrings(DB)
 	createLanguageUniqueIndexes(DB)
-	// eine Rolle je (Konto, Seite).
+	// one role per (account, page).
 	CreateUserStatusPageRoleUniqueIndex(DB)
-	// nach dem Dedupe, damit nur aktive Mitgliedschaften zählen.
+	// after the dedupe, so only active memberships count.
 	removeOrphanedPageSSOIdentities(DB)
 	CreateAdminNotificationIndexes(DB)
-	// Review F3: eine Einladungszeile je (Seite, Adresse).
+	// Review F3: one invitation row per (page, address).
 	CreatePageInvitationUniqueIndex(DB)
 	seedLanguageCatalog(DB)
 	// Content languages are only de and en: switch off the rest of the catalog.
 	deactivateUnsupportedLanguages(DB)
-	// Die System-Statusseite muss vor dem Sprach-Backfill entstehen,
-	// sonst bekommt sie auf einer frischen Datenbank erst beim zweiten Start ihre
-	// Sprachen (vom Postgres-Migrationstest gefunden).
+	// The system status page must be created before the language backfill,
+	// otherwise on a fresh database it only gets its languages on the second start
+	// (found by the Postgres migration test).
 	SeedSystemStatusPage(DB)
 	backfillStatusPageLanguages(DB)
 	// After the backfill so every page has rows; pages with another default fall back to de.
 	fallbackUnsupportedDefaultLanguages(DB)
 	createUiOverrideUniqueIndexes(DB)
-	// leere Overrides blenden Texte aus, Altfälle entfernen.
+	// empty overrides hide texts, remove legacy cases.
 	removeEmptyUiOverrides(DB)
 
 	if seed {
 		SeedData()
 	}
-	// Bestandskomponenten ohne Historie (auch frisch geseedete und
-	// von SyncSystemCapabilities angelegte) bekommen ihren aktuellen Stand;
-	// zuletzt, damit alle Seeds davor erfasst sind. Idempotent.
+	// Existing components without history (including freshly seeded ones and
+	// ones created by SyncSystemCapabilities) get their current state;
+	// last, so all seeds before it are captured. Idempotent.
 	backfillStatusHistory(DB)
 }
 
-// backfillStatusHistory trägt die Statushistorie nach; ein Fehler
-// wird geloggt und verhindert den Start nicht (die Verfügbarkeit fällt dann
-// auf Vorfälle zurück, der nächste Start wiederholt den Nachtrag).
+// backfillStatusHistory backfills the status history; an error
+// is logged and does not prevent startup (availability then falls back
+// to incidents, the next start repeats the backfill).
 func backfillStatusHistory(db *gorm.DB) {
 	if err := statushistory.Backfill(db, time.Now()); err != nil {
 		slog.Error("Statushistorie: Nachtrag fehlgeschlagen", "error", err)
 	}
 }
 
-// SystemStatusPageSlug ist der reservierte Slug der Statusseite, die
-// den Zustand des eigenen SaaS-Systems selbst abbildet ("Dogfooding").
+// SystemStatusPageSlug is the reserved slug of the status page that
+// represents the state of the SaaS system itself ("dogfooding").
 const SystemStatusPageSlug = "system"
 
-// SeedSystemStatusPage legt einmalig die Statusseite des Systems
-// selbst an, exakt wie jeden anderen Kunden-Tenant: eine ganz normale
-// StatusPage mit ganz normalen Components, ohne jede Sonderlogik im
-// öffentlichen Handler-Pfad. Die normale Tenant-Isolation (Filterung nach
-// status_page_id) greift dadurch automatisch auch hier.
+// SeedSystemStatusPage creates the status page of the system
+// itself once, exactly like any other customer tenant: a completely normal
+// StatusPage with completely normal Components, without any special logic in the
+// public handler path. Normal tenant isolation (filtering by
+// status_page_id) therefore applies automatically here as well.
 //
-// Läuft bei jedem InitDB()-Aufruf, unabhängig von SEED_DB/APP_ENV, da es sich
-// nicht um Demo-Testdaten, sondern um eine reale, dauerhaft benötigte
-// Statusseite handelt. Idempotent: Existiert bereits eine StatusPage mit dem
-// reservierten Slug, ist die Funktion ein No-Op - weder die Seite noch ihre
-// Components werden erneut angelegt oder dupliziert.
+// Runs on every InitDB() call, independent of SEED_DB/APP_ENV, because it is
+// not demo test data but a real, permanently needed
+// status page. Idempotent: if a StatusPage with the
+// reserved slug already exists, the function is a no-op - neither the page nor its
+// Components are created again or duplicated.
 //
-// Die Prüfung läuft Unscoped, zählt also auch eine soft-gelöschte
-// Systemseite. Vorher sah der Count sie nicht, das Anlegen scheiterte am
-// Slug-Index und logging.Fatal brach den Backend-Start ab. Eine gelöschte
-// Systemseite (aus der Zeit vor der Löschsperre in DeleteStatusPageHandler)
-// bleibt gelöscht, statt bei jedem Start still neu zu entstehen: Der Seed
-// überschreibt keine Admin-Entscheidung.
+// The check runs Unscoped, so it also counts a soft-deleted
+// system page. Previously the count did not see it, creating failed on the
+// slug index and logging.Fatal aborted the backend start. A deleted
+// system page (from the time before the deletion lock in DeleteStatusPageHandler)
+// stays deleted instead of silently reappearing on every start: the seed
+// does not override an admin decision.
 //
-// Die Seite wird über StatusPage.IsSystem erkannt, nicht über den
-// Slug. Änderte ein Admin den Slug, fand der Seed früher keine Seite mit Slug
-// "system" und legte beim nächsten Start eine zweite, leere an. Bestandsdaten
-// ohne Kennzeichen: die Seite mit dem reservierten Slug erhält es einmalig
-// (Backfill, danach ist sie auch bei geändertem Slug eindeutig). Ein Backfill
-// ist nur möglich, solange der Slug unverändert ist; bei bereits umbenannten
-// Seiten kann der Seed die Systemseite nicht erraten (siehe Bericht).
+// The page is identified via StatusPage.IsSystem, not via the
+// slug. If an admin changed the slug, the seed used to find no page with slug
+// "system" and created a second, empty one on the next start. Existing data
+// without the marker: the page with the reserved slug receives it once
+// (backfill, afterwards it is unambiguous even with a changed slug). A backfill
+// is only possible while the slug is unchanged; for already renamed
+// pages the seed cannot guess the system page (see report).
 func SeedSystemStatusPage(db *gorm.DB) {
 	var count int64
 	if err := db.Unscoped().Model(&models.StatusPage{}).Where("is_system = ?", true).Count(&count).Error; err != nil {
@@ -347,7 +347,7 @@ func SeedSystemStatusPage(db *gorm.DB) {
 	if count > 0 {
 		var page models.StatusPage
 		if err := db.Where("is_system = ?", true).First(&page).Error; err == nil {
-			SyncSystemCapabilities(db, page.ID) // neue Funktionen nachtragen
+			SyncSystemCapabilities(db, page.ID) // add new capabilities
 		}
 		return
 	}
@@ -357,7 +357,7 @@ func SeedSystemStatusPage(db *gorm.DB) {
 		logging.Fatal("Failed to check for legacy system status page", "error", err)
 	}
 	if len(legacy) > 0 {
-		// Ältester Eintrag zuerst (Find ohne Order ist undefiniert), bevorzugt eine aktive Seite.
+		// Oldest entry first (Find without Order is undefined), preferring an active page.
 		chosen := legacy[0]
 		for _, p := range legacy {
 			if (!p.DeletedAt.Valid && chosen.DeletedAt.Valid) || (p.DeletedAt.Valid == chosen.DeletedAt.Valid && p.ID < chosen.ID) {
@@ -401,11 +401,11 @@ func SeedSystemStatusPage(db *gorm.DB) {
 	slog.Info("System status page seeding completed.")
 }
 
-// migrateIncidentComponents überträgt die frühere 1:1-FK
-// incidents.component_id in die neue Join-Tabelle incident_components und
-// entfernt die alte Spalte danach. Idempotent: prüft per Raw-SQL gegen
-// information_schema, ob die Spalte noch existiert - nach dem ersten
-// erfolgreichen Lauf ist die Funktion ein No-Op.
+// migrateIncidentComponents migrates the former 1:1 FK
+// incidents.component_id to the new join table incident_components and
+// then removes the old column. Idempotent: checks via raw SQL against
+// information_schema whether the column still exists - after the first
+// successful run the function is a no-op.
 func migrateIncidentComponents(db *gorm.DB) {
 	var columnExists int
 	db.Raw(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'incidents' AND column_name = 'component_id'`).Scan(&columnExists)
@@ -429,18 +429,18 @@ func migrateIncidentComponents(db *gorm.DB) {
 	slog.Info("incident_components migration completed.")
 }
 
-// createJoinTableUniqueIndexes legt für die vier soft-delete-
-// fähigen many-to-many-Join-Tabellen (IncidentComponent, ComponentTag,
-// IncidentTag, UserTag) partielle Unique-Indizes an, die nur nicht-gelöschte
-// Zeilen (deleted_at IS NULL) erfassen. Ohne diese Beschränkung kollidiert
-// ein "Replace"-Vorgang (Delete + Create derselben Zuordnung, z.B. erneutes
-// Speichern eines Formulars ohne inhaltliche Änderung) mit dem soft-gelöschten
-// Altdatensatz auf einem regulären Unique-Index und schlägt mit 500 fehl,
-// obwohl es ein idempotenter No-Op sein sollte. GORMs AutoMigrate kann keine
-// partiellen Indizes erzeugen (siehe CreateSoftDeleteUniqueIndexes), daher Raw-SQL.
-// Ein eventuell aus einer älteren AutoMigrate-Version stammender regulärer
-// Unique-Index gleichen Namens wird vorher entfernt. Idempotent per IF NOT
-// EXISTS, daher gefahrlos bei jedem InitDB-Lauf erneut ausführbar.
+// createJoinTableUniqueIndexes creates partial unique indexes for the four soft-delete-
+// capable many-to-many join tables (IncidentComponent, ComponentTag,
+// IncidentTag, UserTag) that cover only non-deleted
+// rows (deleted_at IS NULL). Without this restriction a "replace" operation
+// (delete + create of the same assignment, e.g. saving a form again
+// without content changes) collides with the soft-deleted
+// legacy record on a regular unique index and fails with 500,
+// although it should be an idempotent no-op. GORM's AutoMigrate cannot create
+// partial indexes (see CreateSoftDeleteUniqueIndexes), hence raw SQL.
+// A regular unique index of the same name possibly originating from an older AutoMigrate version
+// is removed beforehand. Idempotent via IF NOT
+// EXISTS, hence safe to run again on every InitDB run.
 func createJoinTableUniqueIndexes(db *gorm.DB) {
 	joinTables := []struct {
 		table       string
@@ -452,15 +452,15 @@ func createJoinTableUniqueIndexes(db *gorm.DB) {
 		{"component_tags", "idx_component_tag", "idx_component_tag_active", "component_id, tag_id"},
 		{"incident_tags", "idx_incident_tag", "idx_incident_tag_active", "incident_id, tag_id"},
 		{"user_tags", "idx_user_tag", "idx_user_tag_active", "user_id, tag_id"},
-		// eine Übersetzung je (Update, Sprache).
+		// one translation per (update, language).
 		{"incident_update_translations", "idx_incident_update_translation", "idx_incident_update_translation_active", "update_id, language_code"},
 		{"status_page_languages", "idx_statuspage_language", "idx_statuspage_language_active", "status_page_id, language_code"},
-		// Kopplung eigene ↔ externe Komponente und die externe
-		// Komponente selbst (eine Zeile je externer ID und Quelle). Keine
-		// Altindizes vorhanden, DROP IF EXISTS ist dann ein No-Op.
+		// Coupling of own and external component and the external
+		// component itself (one row per external ID and source). No
+		// legacy indexes exist, DROP IF EXISTS is then a no-op.
 		{"external_component_links", "idx_external_component_link", "idx_external_component_link_active", "component_id, external_component_id"},
 		{"external_components", "idx_external_component", "idx_external_component_active", "external_source_id, external_id"},
-		// gespiegelte Vorfälle/Wartungen, ihre Updates und betroffenen Komponenten.
+		// mirrored incidents/maintenances, their updates and affected components.
 		{"external_incidents", "idx_external_incident", "idx_external_incident_active", "external_source_id, external_id"},
 		{"external_incident_updates", "idx_external_incident_update", "idx_external_incident_update_active", "external_incident_id, external_id"},
 		{"external_incident_components", "idx_external_incident_component", "idx_external_incident_component_active", "external_incident_id, component_external_id"},
@@ -476,48 +476,48 @@ func createJoinTableUniqueIndexes(db *gorm.DB) {
 	}
 }
 
-// dropLegacySSOIdentityIndex entfernt den Unique-Index
-// idx_user_sso_identity auf (status_page_id, issuer, subject). AutoMigrate hat
-// zu diesem Zeitpunkt schon die Spalte protocol (Default "oidc", damit gelten
-// alle Bestandsverknüpfungen als OIDC) und den neuen Index
-// idx_user_sso_identity_protocol angelegt, löscht alte Indizes aber nie selbst.
-// Idempotent per IF EXISTS. Ein Fehler ist nicht fatal: Bleibt der alte Index
-// stehen, scheitert nur die seltene Verknüpfung, bei der OIDC-Issuer und
-// SAML-Entity-ID samt Subject übereinstimmen.
+// dropLegacySSOIdentityIndex removes the unique index
+// idx_user_sso_identity on (status_page_id, issuer, subject). At this point AutoMigrate has
+// already created the column protocol (default "oidc", so all
+// existing links count as OIDC) and the new index
+// idx_user_sso_identity_protocol, but never deletes old indexes itself.
+// Idempotent via IF EXISTS. An error is not fatal: if the old index
+// remains, only the rare linking fails in which the OIDC issuer and
+// SAML entity ID including subject match.
 //
-// Ebenso der Zwischenstand idx_user_sso_identity_protocol
-// (ohne NameID-Format); ersetzt durch idx_user_sso_identity_key. Bestandszeilen
-// behalten subject_format = ” (OIDC). Ein Backfill für SAML-Zeilen entfällt:
-// Deren Format war bisher nicht gespeichert, eine Annahme wäre geraten; die
-// wenigen Konten verknüpfen neu (SAML war noch nicht im Betrieb).
+// Likewise the intermediate state idx_user_sso_identity_protocol
+// (without NameID format); replaced by idx_user_sso_identity_key. Existing rows
+// keep subject_format = ” (OIDC). A backfill for SAML rows is omitted:
+// their format was not stored so far, an assumption would be a guess; the
+// few accounts link anew (SAML was not yet in operation).
 func dropLegacySSOIdentityIndex(db *gorm.DB) {
 	_ = db.Exec(`DROP INDEX IF EXISTS idx_user_sso_identity`).Error
 	_ = db.Exec(`DROP INDEX IF EXISTS idx_user_sso_identity_protocol`).Error
 }
 
-// softDeleteUniqueIndexes sind die partiellen Unique-Indizes für
-// Namen und Slugs soft-delete-fähiger Modelle. Sie erfassen nur aktive Zeilen
-// (deleted_at IS NULL): Ein gelöschter Tag oder eine gelöschte Statusseite
-// blockiert ihren Namen bzw. Slug sonst für immer, weil gorm.Model nur
-// deleted_at setzt und die Zeile in der Tabelle bleibt. Die Handler prüfen
-// Duplikate per GORM (das soft-gelöschte Zeilen ausblendet), der alte Index
-// sah sie aber noch: Ergebnis war ein 500 statt eines erfolgreichen Anlegens.
+// softDeleteUniqueIndexes are the partial unique indexes for
+// names and slugs of soft-delete-capable models. They cover only active rows
+// (deleted_at IS NULL): a deleted tag or a deleted status page
+// otherwise blocks its name or slug forever, because gorm.Model only sets
+// deleted_at and the row stays in the table. The handlers check
+// duplicates via GORM (which hides soft-deleted rows), but the old index
+// still saw them: the result was a 500 instead of a successful create.
 //
-// Tags: Ein normaler Unique-Index auf (name, status_page_id) würde
-// doppelte globale Tags (status_page_id IS NULL) nicht verhindern, da NULL in
-// Postgres paarweise verschieden ist. Deshalb zwei Indizes, fallunabhängig
-// per LOWER(name).
+// Tags: a normal unique index on (name, status_page_id) would not
+// prevent duplicate global tags (status_page_id IS NULL), since NULL in
+// Postgres is pairwise distinct. Hence two indexes, case-insensitive
+// via LOWER(name).
 //
-// Statusseiten: Der Slug hatte bisher das gorm-Tag uniqueIndex (Index
-// idx_status_pages_slug). AutoMigrate kann keine partiellen Indizes und
-// entfernt alte Indizes nie selbst, deshalb ist das Tag entfernt und der
-// Index wird hier ersetzt.
+// Status pages: the slug previously had the gorm tag uniqueIndex (index
+// idx_status_pages_slug). AutoMigrate cannot create partial indexes and
+// never removes old indexes itself, so the tag is removed and the
+// index is replaced here.
 //
-// legacyIndex ist der frühere, nicht-partielle Index gleichen Zwecks. Er wird
-// per DROP INDEX IF EXISTS entfernt, der neue unter eigenem Namen per IF NOT
-// EXISTS angelegt (Muster: createJoinTableUniqueIndexes). Beides ist ab dem
-// zweiten Lauf ein No-Op. Ein Wiederverwenden der alten Namen ginge nicht
-// idempotent: IF NOT EXISTS prüft nur den Namen, nicht die Definition.
+// legacyIndex is the earlier, non-partial index of the same purpose. It is
+// removed via DROP INDEX IF EXISTS, the new one is created under its own name via IF NOT
+// EXISTS (pattern: createJoinTableUniqueIndexes). Both are a no-op from the
+// second run on. Reusing the old names would not be
+// idempotent: IF NOT EXISTS only checks the name, not the definition.
 var softDeleteUniqueIndexes = []struct {
 	legacyIndex string
 	newIndex    string
@@ -526,41 +526,41 @@ var softDeleteUniqueIndexes = []struct {
 	{"idx_tags_global_name", "idx_tags_global_name_active", "tags (LOWER(name)) WHERE status_page_id IS NULL AND deleted_at IS NULL"},
 	{"idx_tags_scoped_name", "idx_tags_scoped_name_active", "tags (LOWER(name), status_page_id) WHERE status_page_id IS NOT NULL AND deleted_at IS NULL"},
 	{"idx_status_pages_slug", "idx_status_pages_slug_active", "status_pages (slug) WHERE deleted_at IS NULL"},
-	// höchstens eine aktive Systemseite. Kein Altindex.
+	// at most one active system page. No legacy index.
 	{"", "idx_status_pages_system_active", "status_pages (is_system) WHERE is_system = true AND deleted_at IS NULL"},
-	// Namen, E-Mails und Übersetzungen gelöschter Zeilen werden
-	// wieder frei. Die Altindizes stammen aus den früheren gorm-Tags
-	// (uniqueIndex bzw. index:...,unique). User.Email: eine gelöschte Adresse darf
-	// neu angelegt werden; die Adresse der gelöschten Zeile bleibt als Audit-Spur
-	// erhalten. Bewusst NICHT umgestellt: Language.Code und SystemSetting.Key
-	// (kein Soft-Delete im Betrieb, Sprachen werden deaktiviert; der Upsert der
-	// Einstellungen braucht per ON CONFLICT (key) einen vollständigen Index).
+	// Names, emails and translations of deleted rows become
+	// free again. The legacy indexes come from the earlier gorm tags
+	// (uniqueIndex or index:...,unique). User.Email: a deleted address may be
+	// created anew; the address of the deleted row is kept as an audit trail.
+	// Deliberately NOT switched: Language.Code and SystemSetting.Key
+	// (no soft delete in operation, languages are deactivated; the upsert of the
+	// settings needs a full index via ON CONFLICT (key)).
 	{"idx_roles_name", "idx_roles_name_active", "roles (name) WHERE deleted_at IS NULL"},
 	{"idx_users_email", "idx_users_email_active", "users (email) WHERE deleted_at IS NULL"},
 	{"idx_notification_template", "idx_notification_template_active", "notification_templates (status_page_id, kind, audience, language) WHERE deleted_at IS NULL"},
 	{"idx_incident_translation", "idx_incident_translation_active", "incident_translations (incident_id, language_code) WHERE deleted_at IS NULL"},
 	{"idx_incident_template_translation", "idx_incident_template_translation_active", "incident_template_translations (incident_template_id, language_code) WHERE deleted_at IS NULL"},
 	{"idx_component_translation", "idx_component_translation_active", "component_translations (component_id, language_code) WHERE deleted_at IS NULL"},
-	// Kennung der Komponente, je Statusseite unter aktiven Zeilen
-	// eindeutig. Leere Kennungen (Altzeilen vor dem Backfill) sind ausgenommen,
-	// der Backfill läuft deshalb VOR diesem Index (BackfillComponentSlugs).
+	// Identifier of the component, unique per status page among active rows.
+	// Empty identifiers (legacy rows before the backfill) are excluded,
+	// so the backfill runs BEFORE this index (BackfillComponentSlugs).
 	{"", "idx_components_slug_active", "components (status_page_id, slug) WHERE deleted_at IS NULL AND slug <> ''"},
-	// Eine Domain gehört höchstens einer Seite, sobald sie verifiziert ist;
-	// unbewiesene Eintragungen (pending) dürfen sich überschneiden. Kein Altindex.
+	// A domain belongs to at most one page once it is verified;
+	// unproven entries (pending) may overlap. No legacy index.
 	{"", "idx_status_pages_custom_domain_live", "status_pages (LOWER(custom_domain)) WHERE custom_domain_status IN ('verified','active') AND deleted_at IS NULL"},
 	{"idx_notice_translation", "idx_notice_translation_active", "general_notice_translations (general_notice_id, language_code) WHERE deleted_at IS NULL"},
 }
 
-// CreateSoftDeleteUniqueIndexes legt die Indizes aus softDeleteUniqueIndexes an
-// und ersetzt dabei die früheren, nicht-partiellen Indizes. Exportiert, damit
-// Handler-Tests auf SQLite dieselben Indizes wie die Produktion haben
-// (testutils.SetupTestDB kennt nur AutoMigrate).
+// CreateSoftDeleteUniqueIndexes creates the indexes from softDeleteUniqueIndexes
+// and replaces the earlier, non-partial indexes. Exported so
+// handler tests on SQLite have the same indexes as production
+// (testutils.SetupTestDB only knows AutoMigrate).
 //
-// Reihenfolge erst neuer Index, dann Altindex. Scheitert das
-// Anlegen (z. B. weil in einer abweichenden Bestandsdatenbank aktive Duplikate
-// liegen), bleibt der Altindex stehen und es gibt nur eine Warnung statt eines
-// Startabbruchs - der Altindex ist strenger und schützt weiter. Es wird nie
-// etwas gelöscht außer dem ersetzten Index.
+// Order: new index first, then legacy index. If creating
+// fails (e.g. because active duplicates exist in a deviating existing database),
+// the legacy index stays and there is only a warning instead of a
+// startup abort - the legacy index is stricter and keeps protecting. Nothing
+// is ever deleted except the replaced index.
 func CreateSoftDeleteUniqueIndexes(db *gorm.DB) {
 	for _, idx := range softDeleteUniqueIndexes {
 		if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ` + idx.newIndex + ` ON ` + idx.definition).Error; err != nil {
@@ -577,12 +577,12 @@ func CreateSoftDeleteUniqueIndexes(db *gorm.DB) {
 	}
 }
 
-// removeOrphanedUserStatusPageRoles räumt einmalig Zuordnungen
-// auf, deren Benutzer oder Rolle per Soft-Delete gelöscht wurde. Soft-Delete
-// löst das FK-OnDelete nie aus, die Handler räumen erst seit der Umstellung selbst auf.
-// Hard-Delete der Join-Zeilen wie in replaceUserPageRoles; die Zeilen waren
-// ohnehin wirkungslos (die Rolle bzw. der Benutzer ist nicht mehr ladbar).
-// Idempotent: nach dem ersten Lauf trifft das Statement nichts mehr.
+// removeOrphanedUserStatusPageRoles cleans up assignments once
+// whose user or role was deleted via soft delete. Soft delete
+// never triggers the FK OnDelete, the handlers only clean up themselves since the changeover.
+// Hard delete of the join rows as in replaceUserPageRoles; the rows were
+// ineffective anyway (the role or user is no longer loadable).
+// Idempotent: after the first run the statement matches nothing anymore.
 func removeOrphanedUserStatusPageRoles(db *gorm.DB) {
 	res := db.Exec(`DELETE FROM user_status_page_roles
 		WHERE user_id IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)
@@ -596,11 +596,11 @@ func removeOrphanedUserStatusPageRoles(db *gorm.DB) {
 	}
 }
 
-// removeOrphanedRoleAndUserReferences räumt einmalig Altlasten auf:
-// StatusPage.DefaultRoleID, die auf eine gelöschte Rolle zeigt, wird auf NULL
-// gesetzt; UserTag und UserSSOIdentity gelöschter Benutzer werden entfernt
-// (Hard-Delete der Join-Zeilen wie in me_delete). Die Handler räumen seit der Umstellung
-// selbst auf. Idempotent: nach dem ersten Lauf trifft kein Statement mehr.
+// removeOrphanedRoleAndUserReferences cleans up legacy leftovers once:
+// StatusPage.DefaultRoleID pointing to a deleted role is set to
+// NULL; UserTag and UserSSOIdentity of deleted users are removed
+// (hard delete of the join rows as in me_delete). The handlers clean up themselves since the changeover.
+// Idempotent: after the first run no statement matches anymore.
 func removeOrphanedRoleAndUserReferences(db *gorm.DB) {
 	stmts := []struct{ name, sql string }{
 		{"status_pages.default_role_id", `UPDATE status_pages SET default_role_id = NULL
@@ -621,38 +621,38 @@ func removeOrphanedRoleAndUserReferences(db *gorm.DB) {
 	}
 }
 
-// PageOwnerRoleName ist der Name der Standard-Seitenrolle mit pages:write
+// PageOwnerRoleName is the name of the default page role with pages:write
 // .
 const PageOwnerRoleName = "Page Owner"
 
-// pageOwnerSeededKey markiert (SystemSetting), dass die Rolle einmal angelegt wurde.
+// pageOwnerSeededKey marks (SystemSetting) that the role was created once.
 const pageOwnerSeededKey = "seed.page_owner_role"
 
-// PageOwnerPermissions sind die Rechte der Rolle "Page Owner": alle Rechte von
-// "Page Admin" plus pages:write (Benutzer der Seite, SSO, Domain, Mail-Templates,
-// Sprachen). "Page Admin" bleibt bewusst unverändert.
+// PageOwnerPermissions are the permissions of the role "Page Owner": all permissions of
+// "Page Admin" plus pages:write (users of the page, SSO, domain, mail templates,
+// languages). "Page Admin" deliberately stays unchanged.
 //
-// aus der alten Rechteliste abgeleitet (permissions.MigrateLegacy),
-// damit die Rolle exakt die Wirkung von früher behält - also create/read/update/
-// delete auf pages, Komponenten, Externe Quellen, Vorfälle, Wartung,
-// Vorfallvorlagen, Hinweise, Abonnenten, Mail-Templates, Sprachen, UI-Texte und SSO.
+// derived from the old permission list (permissions.MigrateLegacy),
+// so the role keeps exactly its former effect - i.e. create/read/update/
+// delete on pages, components, external sources, incidents, maintenance,
+// incident templates, notices, subscribers, mail templates, languages, UI texts and SSO.
 var PageOwnerPermissions = permissions.MigrateLegacy(pageAdminLegacyPermissions + ",pages:write")
 
-// pageAdminLegacyPermissions ist die Rechteliste der Rolle "Page Admin" vor der Umstellung.
+// pageAdminLegacyPermissions is the permission list of the role "Page Admin" before the changeover.
 const pageAdminLegacyPermissions = "components:write,incidents:write,notices:write,subscribers:write," + permissions.AdminDashboard
 
-// seedPageOwnerRole legt die Standardrolle "Page Owner" an. Seit der
-// Rechtereform ist "Global Admin" nicht mehr als Seitenrolle vergebbar und war im Seed
-// die einzige Rolle mit pages:write; wer einen Seiten-Admin mit
-// Benutzerverwaltung wollte, musste eine eigene Rolle bauen. Läuft bei jedem
-// Start, unabhängig von SEED_DB (die Rolle wird auch in Produktion gebraucht),
-// und ist idempotent und Admin-sicher: Die Prüfung läuft Unscoped, existiert
-// also schon eine Rolle gleichen Namens (auch eine vom Betreiber angepasste
-// oder bewusst gelöschte), wird nichts angelegt oder überschrieben.
+// seedPageOwnerRole creates the default role "Page Owner". Since the
+// permissions reform "Global Admin" can no longer be assigned as a page role and was the
+// only role in the seed with pages:write; anyone who wanted a page admin with
+// user management had to build their own role. Runs on every
+// start, independent of SEED_DB (the role is also needed in production),
+// and is idempotent and admin-safe: the check runs Unscoped, so if a role of the same name
+// already exists (even one adapted by the operator
+// or deliberately deleted), nothing is created or overwritten.
 func seedPageOwnerRole(db *gorm.DB) {
-	// Stabiles Merkmal statt Name: Ist der Seed einmal gelaufen,
-	// gilt er als erledigt - auch wenn der Betreiber die Rolle umbenennt oder
-	// löscht. Sonst entstünde nach jeder Umbenennung beim Start eine neue Rolle.
+	// Stable marker instead of name: once the seed has run,
+	// it counts as done - even if the operator renames or
+	// deletes the role. Otherwise a new role would be created on start after every rename.
 	var done int64
 	if err := db.Unscoped().Model(&models.SystemSetting{}).Where("key = ?", pageOwnerSeededKey).Count(&done).Error; err != nil {
 		slog.Warn("Seed-Merker der Rolle Page Owner konnte nicht gelesen werden", "error", err)
@@ -677,22 +677,22 @@ func seedPageOwnerRole(db *gorm.DB) {
 	}
 }
 
-// migrateTagsFromCountryStrings überträgt (Schritt 1/4 -
-// Country → Tags) die früheren Country-Strings additiv in das Tag-Datenmodell,
-// analog zu migrateIncidentComponents(): Raw-SQL-Check der Bestandsdaten +
-// Insert, sofern die Zuordnung noch nicht existiert.
+// migrateTagsFromCountryStrings migrates (step 1/4 -
+// Country → Tags) the former Country strings additively into the tag data model,
+// analogous to migrateIncidentComponents(): raw SQL check of the existing data +
+// insert, provided the assignment does not exist yet.
 //
-// Seit Schritt 4/4 existieren die Go-Felder Component.Country,
-// Incident.Country und User.AllowedCountries nicht mehr - AutoMigrate legt
-// ihre DB-Spalten (country/allowed_countries) deshalb auf KEINER neuen
-// Datenbank mehr an (Tests, frische Deployments). Auf bereits laufenden
-// Installationen (wo die Spalten aus einer früheren
-// Modell-Version noch physisch existieren, Zwei-Phasen-Cutover) bleibt diese Funktion wie gehabt wirksam. Statt eines
-// harten log.Fatalf bei fehlender Spalte (das den kompletten Serverstart auf
-// jeder neuen DB zum Absturz brächte) wird ein Query-Fehler hier als "nichts
-// zu migrieren" gewertet und die Funktion bricht den betroffenen Schritt
-// weich ab - die Migration ist ohnehin bereits für jede Bestandsinstallation
-// gelaufen, sobald sie einmal deployed wurde.
+// Since step 4/4 the Go fields Component.Country,
+// Incident.Country and User.AllowedCountries no longer exist - AutoMigrate therefore does
+// not create their DB columns (country/allowed_countries) on any new
+// database anymore (tests, fresh deployments). On already running
+// installations (where the columns from an earlier
+// model version still physically exist, two-phase cutover) this function stays effective as before. Instead of a
+// hard log.Fatalf on a missing column (which would crash the entire server start on
+// every new DB), a query error here is treated as "nothing
+// to migrate" and the function softly aborts the affected step
+// - the migration is in any case already done for every existing installation
+// once it was deployed.
 func migrateTagsFromCountryStrings(db *gorm.DB) {
 	slog.Info("Migrating country strings into tags (no-op if legacy columns are already gone)...")
 
@@ -702,8 +702,8 @@ func migrateTagsFromCountryStrings(db *gorm.DB) {
 		StatusPageID uint
 	}
 
-	// 1. Components: distinkte, nicht-"global"-Country-Werte je Statusseite
-	// werden zu je einem statusseiten-gebundenen Tag.
+	// 1. Components: distinct, non-"global" country values per status page
+	// become one status-page-bound tag each.
 	var components []entityCountry
 	if err := db.Raw(`SELECT id, country, status_page_id FROM components WHERE country IS NOT NULL AND country <> '' AND country <> 'global'`).Scan(&components).Error; err != nil {
 		slog.Info("Skipping component tag migration (legacy 'country' column likely absent)", "error", err)
@@ -715,7 +715,7 @@ func migrateTagsFromCountryStrings(db *gorm.DB) {
 		createComponentTagIfMissing(db, comp.ID, tag.ID)
 	}
 
-	// 2. Incidents: dasselbe Vorgehen wie für Components.
+	// 2. Incidents: same procedure as for components.
 	var incidents []entityCountry
 	if err := db.Raw(`SELECT id, country, status_page_id FROM incidents WHERE country IS NOT NULL AND country <> '' AND country <> 'global'`).Scan(&incidents).Error; err != nil {
 		slog.Info("Skipping incident tag migration (legacy 'country' column likely absent)", "error", err)
@@ -727,9 +727,9 @@ func migrateTagsFromCountryStrings(db *gorm.DB) {
 		createIncidentTagIfMissing(db, inc.ID, tag.ID)
 	}
 
-	// 3. Users: kommagetrennte allowed_countries (inkl. "global") werden zu
-	// globalen Tags (StatusPageID = nil), da AllowedCountries seitenübergreifend
-	// gilt.
+	// 3. Users: comma-separated allowed_countries (incl. "global") become
+	// global tags (StatusPageID = nil), since AllowedCountries applies
+	// across pages.
 	type userRow struct {
 		ID               uint
 		AllowedCountries string
@@ -753,9 +753,9 @@ func migrateTagsFromCountryStrings(db *gorm.DB) {
 	slog.Info("Tag migration from country strings completed.")
 }
 
-// findOrCreateTag findet einen bestehenden Tag per fallunabhängigem
-// Namensvergleich im angegebenen Scope (nil = global) oder legt ihn an -
-// konsistent mit den partiellen Unique-Indizes aus CreateSoftDeleteUniqueIndexes.
+// findOrCreateTag finds an existing tag via case-insensitive
+// name comparison in the given scope (nil = global) or creates it -
+// consistent with the partial unique indexes from CreateSoftDeleteUniqueIndexes.
 func findOrCreateTag(db *gorm.DB, name string, statusPageID *uint) models.Tag {
 	var tag models.Tag
 	query := db.Where("LOWER(name) = LOWER(?)", name)
@@ -827,8 +827,8 @@ const (
 	whereEmailEquals = "email = ?"
 )
 
-// seedHashPassword ist HashPassword; als Variable, damit ein Test den
-// Abbruch des Seeds bei einem Hash-Fehler auslösen kann.
+// seedHashPassword is HashPassword; a variable so a test can trigger
+// the abort of the seed on a hash error.
 var seedHashPassword = HashPassword
 
 func SeedData() {
@@ -836,7 +836,7 @@ func SeedData() {
 
 	// --- Roles ---
 	roles := []models.Role{
-		// aus den früheren Listen abgeleitet (gleiche Wirkung wie vorher).
+		// derived from the earlier lists (same effect as before).
 		{Name: "Global Admin", Permissions: permissions.FullAccess()},
 		{Name: "Page Admin", Permissions: permissions.MigrateLegacy(pageAdminLegacyPermissions)},
 		{Name: "Editor", Permissions: permissions.MigrateLegacy("components:read,incidents:write,notices:write")},
@@ -876,9 +876,9 @@ func SeedData() {
 	DB.Where(whereEmailEquals, "viewer@statushafen.local").First(&viewerUser)
 
 	// --- StatusPages ---
-	// Name bewusst ohne "Status"-Suffix: die H1 auf der öffentlichen Seite hängt
-	// "Status" selbst an ({{ pageInfo.Name }} Status) – mit "Acme Corp Status" als
-	// Name kam es sonst zu "Acme Corp Status Status".
+	// Name deliberately without "Status" suffix: the H1 on the public page appends
+	// "Status" itself ({{ pageInfo.Name }} Status) – with "Acme Corp Status" as
+	// name it would otherwise be "Acme Corp Status Status".
 	page1 := models.StatusPage{Name: "Acme Corp", Slug: "acme", Description: "Offizielle Statusseite der Acme Corporation", IsPublicIndexed: true}
 	page2 := models.StatusPage{Name: "TechStart GmbH", Slug: "techstart", Description: "Statusseite für TechStart GmbH Produkte", IsPublicIndexed: true}
 	DB.Create(&page1)
@@ -887,15 +887,15 @@ func SeedData() {
 	DB.Create(&models.UserStatusPageRole{UserID: adminUser.ID, StatusPageID: page1.ID, RoleID: globalAdminRole.ID})
 	DB.Create(&models.UserStatusPageRole{UserID: adminUser.ID, StatusPageID: page2.ID, RoleID: globalAdminRole.ID})
 	DB.Create(&models.UserStatusPageRole{UserID: editorUser.ID, StatusPageID: page1.ID, RoleID: editorRole.ID})
-	// Bewusst abweichend von der globalen Rolle: "viewer" ist global nur "Viewer",
-	// hat aber auf Acme Corp Status "Page Admin" – reproduziert den gemeldeten Bug,
-	// bei dem das UI weiterhin die globale (veraltete) Rolle statt der
-	// seitenbezogenen Rolle anzeigte.
+	// Deliberately deviating from the global role: "viewer" is only "Viewer" globally,
+	// but has "Page Admin" on Acme Corp Status – reproduces the reported bug,
+	// where the UI still showed the global (outdated) role instead of the
+	// page-related role.
 	DB.Create(&models.UserStatusPageRole{UserID: viewerUser.ID, StatusPageID: page1.ID, RoleID: pageAdminRole.ID})
 
-	// Google-Chat-Abo ohne Email, dem admin per CreatedByUserID zugeordnet – Fixture
-	// fürs e2e "Mein Abo bearbeiten" (deckt Abos ab, die sich nicht über den
-	// Email-String, sondern nur über den Account-Link wiederfinden lassen).
+	// Google Chat subscription without email, assigned to admin via CreatedByUserID – fixture
+	// for the e2e "Edit my subscription" (covers subscriptions that cannot be found via the
+	// email string, only via the account link).
 	DB.Create(&models.Subscriber{
 		StatusPageID:           page1.ID,
 		Channel:                "google_chat",
@@ -905,24 +905,24 @@ func SeedData() {
 	})
 
 	// ============================================================
-	// Acme Corp: Verschachtelte Komponentenstruktur (Ordner-Baum)
+	// Acme Corp: nested component structure (folder tree)
 	// ============================================================
 	//
 	// 📁 Core Infrastructure
 	//    📁 API Services
 	//       🟢 API Gateway (DE)
 	//       🟡 API Gateway (US)
-	//    📁 Datenbanken
+	//    📁 Databases
 	//       🟢 PostgreSQL Primary
 	//       🟢 Redis Cache
-	// 📁 Externe Dienste
+	// 📁 External services
 	//    🟢 Payment Processor (Stripe)
 	//    🟢 E-Mail Service (Mailgun)
 	// 📁 Frontend & CDN
 	//    🟠 Storage & CDN
 	//    🟢 Web Application
 
-	// Ebene 1: Root-Gruppen
+	// Level 1: root groups
 	grpInfra := models.Component{StatusPageID: page1.ID, Name: "Core Infrastructure", Description: "Kerninfrastruktur und Backend-Dienste", Status: "group", SortOrder: 1}
 	grpExternal := models.Component{StatusPageID: page1.ID, Name: "Externe Dienste", Description: "Drittanbieter-Integrationen", Status: "group", SortOrder: 2}
 	grpFrontend := models.Component{StatusPageID: page1.ID, Name: "Frontend & Delivery", Description: "Web-Applikation und Content Delivery", Status: "group", SortOrder: 3}
@@ -930,38 +930,38 @@ func SeedData() {
 	DB.Create(&grpExternal)
 	DB.Create(&grpFrontend)
 
-	// Ebene 2: Untergruppen
+	// Level 2: subgroups
 	grpAPI := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpInfra.ID), Name: "API Services", Description: "REST und GraphQL API Gateways", Status: "group", SortOrder: 1}
 	grpDB := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpInfra.ID), Name: "Datenbanken", Description: "Primäre und Cache-Datenbanken", Status: "group", SortOrder: 2}
 	DB.Create(&grpAPI)
 	DB.Create(&grpDB)
 
-	// Ebene 3: Echte Komponenten unter API Services
+	// Level 3: real components under API Services
 	apiDE := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpAPI.ID), Name: "API Gateway (DE)", Description: "Zentraler API-Knotenpunkt Frankfurt (EU-West)", Status: "operational", SortOrder: 1}
 	apiUS := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpAPI.ID), Name: "API Gateway (US)", Description: "Zentraler API-Knotenpunkt US East (Virginia)", Status: "degraded_performance", SortOrder: 2}
 	DB.Create(&apiDE)
 	DB.Create(&apiUS)
 
-	// Ebene 3: Echte Komponenten unter Datenbanken
+	// Level 3: real components under databases
 	pgPrimary := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpDB.ID), Name: "PostgreSQL Primary", Description: "Primäre relationale Datenbank", Status: "operational", SortOrder: 1}
 	redisCache := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpDB.ID), Name: "Redis Cache", Description: "In-Memory Cache & Session Store", Status: "operational", SortOrder: 2}
 	DB.Create(&pgPrimary)
 	DB.Create(&redisCache)
 
-	// Ebene 2: Einzelne externe Dienste (keine Untergruppe)
+	// Level 2: individual external services (no subgroup)
 	stripe := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpExternal.ID), Name: "Payment Processor (Stripe)", Description: "Externe Zahlungsabwicklung via Stripe", Status: "operational", SortOrder: 1}
 	mailgun := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpExternal.ID), Name: "E-Mail Service (Mailgun)", Description: "Transaktionale E-Mails und Newsletter", Status: "operational", SortOrder: 2}
 	DB.Create(&stripe)
 	DB.Create(&mailgun)
 
-	// Ebene 2: Frontend & CDN
+	// Level 2: Frontend & CDN
 	cdn := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpFrontend.ID), Name: "Storage & CDN", Description: "Globales Asset Delivery Network", Status: "partial_outage", SortOrder: 1}
 	webapp := models.Component{StatusPageID: page1.ID, ParentID: ptr(grpFrontend.ID), Name: "Web Application", Description: "Haupt-Webanwendung (Vue.js Frontend)", Status: "operational", SortOrder: 2}
 	DB.Create(&cdn)
 	DB.Create(&webapp)
 
-	// Incidents für Acme (Komponenten-Zuordnung jetzt über
-	// IncidentComponent statt direkter FK)
+	// Incidents for Acme (component assignment now via
+	// IncidentComponent instead of a direct FK)
 	acmeIncidents := []struct {
 		Incident     models.Incident
 		ComponentIDs []uint
@@ -977,7 +977,7 @@ func SeedData() {
 	}
 
 	// ============================================================
-	// TechStart GmbH: Einfachere, flachere Struktur
+	// TechStart GmbH: simpler, flatter structure
 	// ============================================================
 	grpProduct := models.Component{StatusPageID: page2.ID, Name: "Produkt", Description: "Kern-Produktkomponenten", Status: "group", SortOrder: 1}
 	grpInfra2 := models.Component{StatusPageID: page2.ID, Name: "Infrastruktur", Description: "Server und Datenbanken", Status: "group", SortOrder: 2}
@@ -996,22 +996,22 @@ func SeedData() {
 	DB.Create(&models.IncidentComponent{IncidentID: techDBIncident.ID, ComponentID: techDB.ID})
 
 	// --- Tags ---
-	// Ersetzt die früheren Country-Freitextwerte ("global"/"DE"/"US") der
-	// obigen Demo-Daten durch echte Tag-Zuordnungen - dieselbe Verteilung wie
-	// zuvor, nur über das neue Modell statt eines Strings. Nutzt bewusst
-	// dieselben Helper (findOrCreateTag/create*TagIfMissing), die auch
-	// migrateTagsFromCountryStrings verwendet.
+	// Replaces the earlier Country free-text values ("global"/"DE"/"US") of the
+	// demo data above with real tag assignments - the same distribution as
+	// before, only via the new model instead of a string. Deliberately uses
+	// the same helpers (findOrCreateTag/create*TagIfMissing) that
+	// migrateTagsFromCountryStrings uses.
 	globalTag := findOrCreateTag(DB, "global", nil)
 	page1DETag := findOrCreateTag(DB, "DE", &page1.ID)
 	page1USTag := findOrCreateTag(DB, "US", &page1.ID)
 	page2DETag := findOrCreateTag(DB, "DE", &page2.ID)
 
-	// Admin/Editor/Viewer: global (voller Zugriff, wie zuvor AllowedCountries="global")
+	// Admin/Editor/Viewer: global (full access, as AllowedCountries="global" before)
 	for _, u := range []models.User{adminUser, editorUser, viewerUser} {
 		createUserTagIfMissing(DB, u.ID, globalTag.ID)
 	}
 
-	// Acme Corp: global-Komponenten + die beiden regionalen API-Gateways
+	// Acme Corp: global components + the two regional API gateways
 	for _, compID := range []uint{grpInfra.ID, grpExternal.ID, grpFrontend.ID, grpAPI.ID, grpDB.ID, redisCache.ID, stripe.ID, mailgun.ID, cdn.ID, webapp.ID} {
 		createComponentTagIfMissing(DB, compID, globalTag.ID)
 	}
@@ -1019,10 +1019,10 @@ func SeedData() {
 	createComponentTagIfMissing(DB, pgPrimary.ID, page1DETag.ID)
 	createComponentTagIfMissing(DB, apiUS.ID, page1USTag.ID)
 
-	createIncidentTagIfMissing(DB, acmeIncidents[0].Incident.ID, page1USTag.ID) // US-Gateway-Latenz
-	createIncidentTagIfMissing(DB, acmeIncidents[1].Incident.ID, globalTag.ID)  // CDN-Bild-Assets
+	createIncidentTagIfMissing(DB, acmeIncidents[0].Incident.ID, page1USTag.ID) // US gateway latency
+	createIncidentTagIfMissing(DB, acmeIncidents[1].Incident.ID, globalTag.ID)  // CDN image assets
 
-	// TechStart GmbH: Produkt global, Infrastruktur DE
+	// TechStart GmbH: product global, infrastructure DE
 	for _, compID := range []uint{grpProduct.ID, techAPI.ID} {
 		createComponentTagIfMissing(DB, compID, globalTag.ID)
 	}

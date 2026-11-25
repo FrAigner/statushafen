@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Die Umstellung von "<ressource>:write" auf Create/Read/Update/
-// Delete läuft beim Start einmal über alle Rollen (auch benutzerdefinierte und
-// soft-gelöschte), ist Prod-sicher und idempotent.
+// The changeover from "<resource>:write" to create/read/update/
+// delete runs once at startup over all roles (also custom and
+// soft-deleted ones), is prod-safe and idempotent.
 
 func newPermMigrationDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -57,7 +57,7 @@ func TestMigrateRolePermissionsToCRUD(t *testing.T) {
 		assert.False(t, permissions.HasLegacyWrite(permsOf(t, db, id)), "kein write mehr in Rolle %d: %s", id, permsOf(t, db, id))
 	}
 
-	// Editor: Vorfälle wie bisher schreiben, dazu die gekoppelten Tabs; Komponenten nur lesen.
+	// Editor: write incidents as before, plus the coupled tabs; components read-only.
 	assert.True(t, has(editor.ID, "incidents:delete"))
 	assert.True(t, has(editor.ID, "maintenance:create"))
 	assert.True(t, has(editor.ID, "incident_templates:update"))
@@ -66,42 +66,42 @@ func TestMigrateRolePermissionsToCRUD(t *testing.T) {
 	assert.False(t, has(editor.ID, "components:update"))
 	assert.False(t, has(editor.ID, "subscribers:read"))
 
-	// Eigene Rolle mit components:write: Quellen wie bisher, Sonderrecht und Unbekanntes bleiben.
+	// Custom role with components:write: sources as before, special permission and unknowns stay.
 	assert.True(t, has(custom.ID, "external_sources:delete"))
 	assert.Contains(t, permsOf(t, db, custom.ID), "foo:bar")
 	assert.Contains(t, permsOf(t, db, custom.ID), "admin_dashboard")
 	assert.False(t, has(custom.ID, "incidents:read"))
 
-	// Viewer: lesen, inklusive Wartung und Quellen; Vorlagen verlangten write.
+	// Viewer: read, including maintenance and sources; templates required write.
 	assert.True(t, has(viewer.ID, "maintenance:read"))
 	assert.True(t, has(viewer.ID, "external_sources:read"))
 	assert.False(t, has(viewer.ID, "incident_templates:read"))
 	assert.False(t, has(viewer.ID, "incidents:create"))
 
-	// Page Owner: pages:write bringt die Inhalte-Tabs und SSO.
+	// Page Owner: pages:write brings the content tabs and SSO.
 	for _, res := range []string{"pages", "notification_templates", "languages", "ui_translations", "sso"} {
 		for _, act := range permissions.Actions {
 			assert.True(t, has(owner.ID, permissions.Perm(res, act)), res+":"+act)
 		}
 	}
 
-	// Global Admin: alles.
+	// Global Admin: everything.
 	for _, r := range permissions.Resources {
 		for _, act := range permissions.Actions {
 			assert.True(t, has(admin.ID, permissions.Perm(r.Key, act)), r.Key+":"+act)
 		}
 	}
 
-	// Soft-gelöschte Rolle wird mitmigriert (ein Wiederherstellen verliert nichts).
+	// Soft-deleted role is migrated too (a restore loses nothing).
 	assert.True(t, has(deleted.ID, "maintenance:delete"))
 	assert.Equal(t, "notices:create,notices:read", permsOf(t, db, untouched.ID), "bereits neue Rolle bleibt")
 
-	// updated_at bleibt, die Rollen erscheinen nicht als „gerade geändert“.
+	// updated_at stays, the roles do not appear as "just changed".
 	var r models.Role
 	require.NoError(t, db.First(&r, editor.ID).Error)
 	assert.True(t, r.UpdatedAt.Equal(old), "updated_at wurde verändert: %s", r.UpdatedAt)
 
-	// Backup der alten Strings für einen Rollback.
+	// Backup of the old strings for a rollback.
 	var backup models.SystemSetting
 	require.NoError(t, db.Where("key = ?", permissionsBackupKey).First(&backup).Error)
 	var saved map[string]string
@@ -110,8 +110,8 @@ func TestMigrateRolePermissionsToCRUD(t *testing.T) {
 	assert.NotContains(t, saved, strconv.Itoa(int(untouched.ID)), "unveränderte Rollen stehen nicht im Backup")
 }
 
-// Zweiter Lauf: nichts ändert sich, auch keine Rechte, die ein Admin
-// inzwischen bewusst entzogen hat (Marker statt erneutem Koppeln).
+// Second run: nothing changes, not even permissions that an admin has
+// deliberately revoked in the meantime (marker instead of coupling again).
 func TestMigrateRolePermissionsToCRUD_Idempotent(t *testing.T) {
 	db := newPermMigrationDB(t)
 	viewer := models.Role{Name: "Viewer", Permissions: "components:read,incidents:read"}
@@ -121,7 +121,7 @@ func TestMigrateRolePermissionsToCRUD_Idempotent(t *testing.T) {
 	first := permsOf(t, db, viewer.ID)
 	require.Contains(t, first, "external_sources:read")
 
-	// Der Admin entzieht die Quellen wieder.
+	// The admin revokes the sources again.
 	require.NoError(t, db.Model(&viewer).UpdateColumn("permissions", "components:read,incidents:read,maintenance:read").Error)
 	migrateRolePermissionsToCRUD(db)
 	assert.Equal(t, "components:read,incidents:read,maintenance:read", permsOf(t, db, viewer.ID), "Marker verhindert erneutes Koppeln")
@@ -131,7 +131,7 @@ func TestMigrateRolePermissionsToCRUD_Idempotent(t *testing.T) {
 	assert.EqualValues(t, 1, markers)
 }
 
-// Leere Datenbank (Neuinstallation): kein Fehler, Marker gesetzt.
+// Empty database (fresh install): no error, marker set.
 func TestMigrateRolePermissionsToCRUD_LeereDatenbank(t *testing.T) {
 	db := newPermMigrationDB(t)
 	migrateRolePermissionsToCRUD(db)
@@ -140,8 +140,8 @@ func TestMigrateRolePermissionsToCRUD_LeereDatenbank(t *testing.T) {
 	assert.EqualValues(t, 1, n)
 }
 
-// Fehlerfälle brechen den Start nicht ab (Warnung statt Abbruch) und setzen
-// keinen Marker, damit der nächste Start es erneut versucht.
+// Error cases do not abort the start (warning instead of abort) and set
+// no marker, so the next start tries again.
 func TestMigrateRolePermissionsToCRUD_FehlerSindNichtFatal(t *testing.T) {
 	t.Run("Marker nicht lesbar", func(t *testing.T) {
 		db := newPermMigrationDB(t)
@@ -156,7 +156,7 @@ func TestMigrateRolePermissionsToCRUD_FehlerSindNichtFatal(t *testing.T) {
 		require.NoError(t, db.Model(&models.SystemSetting{}).Where("key = ?", permissionsMigrationKey).Count(&n).Error)
 		assert.Zero(t, n)
 	})
-	// Schlägt ein Schritt der Transaktion fehl, bleibt alles unverändert (kein halbes Migrieren).
+	// If a step of the transaction fails, everything stays unchanged (no half migration).
 	for name, trigger := range map[string]string{
 		"Rolle nicht änderbar":     `CREATE TRIGGER blockiere AFTER UPDATE ON roles BEGIN SELECT RAISE(ABORT, 'gesperrt'); END`,
 		"Backup nicht speicherbar": `CREATE TRIGGER blockiere BEFORE INSERT ON system_settings WHEN NEW.key = 'permissions.crud_backup' BEGIN SELECT RAISE(ABORT, 'gesperrt'); END`,
@@ -176,7 +176,7 @@ func TestMigrateRolePermissionsToCRUD_FehlerSindNichtFatal(t *testing.T) {
 	}
 }
 
-// Seeds: gleiche Wirkung wie die früheren Listen, kein write mehr.
+// Seeds: same effect as the former lists, no write anymore.
 func TestSeedRollen_KeinWriteMehrUndGleicheWirkung(t *testing.T) {
 	assert.False(t, permissions.HasLegacyWrite(PageOwnerPermissions))
 	assert.True(t, permissions.Has(PageOwnerPermissions, "sso:delete"))
@@ -184,9 +184,9 @@ func TestSeedRollen_KeinWriteMehrUndGleicheWirkung(t *testing.T) {
 	assert.False(t, permissions.Has(PageOwnerPermissions, "users:read"), "Page Owner ist keine globale Rolle")
 }
 
-// Das Rollback-Backup entsteht nur einmal. Ein zweiter Lauf (Marker
-// gelöscht oder aus einem alten Dump zurückgespielt) darf den vollständigen
-// Ursprungsstand nicht durch die dann leere Sicherung ersetzen.
+// The rollback backup is created only once. A second run (marker
+// deleted or restored from an old dump) must not replace the complete
+// original state with the then empty backup.
 func TestMigrateRolePermissionsToCRUD_BackupWirdNichtUeberschrieben(t *testing.T) {
 	db := newPermMigrationDB(t)
 	editor := models.Role{Name: "Editor", Permissions: "incidents:write"}

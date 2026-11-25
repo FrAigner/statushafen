@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// newIntegrityTestDB legt die Tabellen für die Tests
-// an (ohne die Unique-Indizes - die kommen aus CreateSoftDeleteUniqueIndexes).
+// newIntegrityTestDB creates the tables for the tests
+// (without the unique indexes - those come from CreateSoftDeleteUniqueIndexes).
 func newIntegrityTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "integrity.db")), &gorm.Config{})
@@ -26,9 +26,9 @@ func newIntegrityTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// requireReusable prüft das Muster Anlegen → Duplikat scheitert → Löschen →
-// Neuanlegen gelingt. mk liefert jedes Mal eine frische Zeile mit identischem
-// fachlichem Schlüssel.
+// requireReusable checks the pattern create → duplicate fails → delete →
+// re-create succeeds. mk returns a fresh row each time with an identical
+// business key.
 func requireReusable(t *testing.T, db *gorm.DB, mk func() any) {
 	t.Helper()
 	first := mk()
@@ -39,9 +39,9 @@ func requireReusable(t *testing.T, db *gorm.DB, mk func() any) {
 }
 
 // TestSoftDeleteUniqueIndexes_NamesAndTranslationsReusable:
-// Rollenname, Benutzer-E-Mail, NotificationTemplate und die drei
-// Übersetzungstabellen waren nach dem Löschen nicht wiederverwendbar, weil ihre
-// Unique-Indizes auch soft-gelöschte Zeilen erfassten.
+// role name, user email, NotificationTemplate and the three
+// translation tables were not reusable after deletion, because their
+// unique indexes also covered soft-deleted rows.
 func TestSoftDeleteUniqueIndexes_NamesAndTranslationsReusable(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	CreateSoftDeleteUniqueIndexes(db)
@@ -82,8 +82,8 @@ func TestSoftDeleteUniqueIndexes_NamesAndTranslationsReusable(t *testing.T) {
 	}
 }
 
-// TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyNameIndexes: Bestands-
-// datenbank mit den alten Indizes (gorm-Tags) wird umgestellt, Daten bleiben.
+// TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyNameIndexes: an existing
+// database with the old indexes (gorm tags) is switched over, data stays.
 func TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyNameIndexes(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX idx_roles_name ON roles (name)`).Error)
@@ -104,15 +104,15 @@ func TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyNameIndexes(t *testing.T) {
 	assert.EqualValues(t, 1, n, "Bestandsdaten dürfen nicht verändert werden")
 }
 
-// TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure: Lässt
-// sich der neue Index nicht anlegen (aktive Duplikate in einer abweichenden
-// Bestandsdatenbank), bleibt der Altindex stehen, es wird nichts gelöscht und
-// der Start bricht nicht ab.
+// TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure: if
+// the new index cannot be created (active duplicates in a deviating
+// existing database), the legacy index stays, nothing is deleted and
+// startup does not abort.
 func TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	require.NoError(t, db.Create(&models.Role{Name: "Dup", Permissions: "x"}).Error)
 	require.NoError(t, db.Create(&models.Role{Name: "Dup", Permissions: "y"}).Error)
-	// Nicht-eindeutiger Altindex gleichen Namens: Er darf nicht entfernt werden.
+	// Non-unique legacy index of the same name: it must not be removed.
 	require.NoError(t, db.Exec(`CREATE INDEX idx_roles_name ON roles (name)`).Error)
 
 	assert.NotPanics(t, func() { CreateSoftDeleteUniqueIndexes(db) })
@@ -123,9 +123,9 @@ func TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure(t *testing.T) {
 	assert.EqualValues(t, 2, n, "es wird nie etwas gelöscht")
 }
 
-// TestRemoveOrphanedUserStatusPageRoles: Zuordnungen gelöschter
-// Benutzer oder Rollen werden einmalig entfernt, alle anderen bleiben; der
-// zweite Lauf ändert nichts.
+// TestRemoveOrphanedUserStatusPageRoles: assignments of deleted
+// users or roles are removed once, all others stay; the
+// second run changes nothing.
 func TestRemoveOrphanedUserStatusPageRoles(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	page := models.StatusPage{Name: "P", Slug: "p"}
@@ -163,9 +163,9 @@ func countSystemPages(t *testing.T, db *gorm.DB) (all, flagged int64) {
 	return all, flagged
 }
 
-// TestSeedSystemStatusPage_SlugChangeDoesNotCreateSecondPage: Die
-// Systemseite wird über das Kennzeichen gefunden; ein geänderter Slug lässt
-// beim nächsten Start keine zweite Seite entstehen.
+// TestSeedSystemStatusPage_SlugChangeDoesNotCreateSecondPage: the
+// system page is found via the marker; a changed slug does not
+// create a second page on the next start.
 func TestSeedSystemStatusPage_SlugChangeDoesNotCreateSecondPage(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	CreateSoftDeleteUniqueIndexes(db)
@@ -182,8 +182,8 @@ func TestSeedSystemStatusPage_SlugChangeDoesNotCreateSecondPage(t *testing.T) {
 	assert.EqualValues(t, capabilityComponentCount(), comps, "Komponenten dürfen nicht verdoppelt werden")
 }
 
-// TestSeedSystemStatusPage_BackfillsLegacyPage: Eine Bestands-
-// Systemseite ohne Kennzeichen bekommt es einmalig; nichts wird verdoppelt.
+// TestSeedSystemStatusPage_BackfillsLegacyPage: an existing
+// system page without marker gets it once; nothing is duplicated.
 func TestSeedSystemStatusPage_BackfillsLegacyPage(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	CreateSoftDeleteUniqueIndexes(db)
@@ -201,10 +201,10 @@ func TestSeedSystemStatusPage_BackfillsLegacyPage(t *testing.T) {
 	assert.Equal(t, legacy.ID, page.ID)
 }
 
-// TestSeedSystemStatusPage_BackfillPrefersActiveOldest: Gibt es mehrere Seiten
-// mit dem Slug (aktive und gelöschte), erhält die älteste aktive das Kennzeichen.
+// TestSeedSystemStatusPage_BackfillPrefersActiveOldest: if there are several pages
+// with the slug (active and deleted), the oldest active one receives the marker.
 func TestSeedSystemStatusPage_BackfillPrefersActiveOldest(t *testing.T) {
-	db := newIntegrityTestDB(t) // bewusst ohne partiellen Index: mehrere Seiten möglich
+	db := newIntegrityTestDB(t) // deliberately without a partial index: several pages possible
 	deleted := models.StatusPage{Name: "alt", Slug: SystemStatusPageSlug}
 	active := models.StatusPage{Name: "aktiv", Slug: SystemStatusPageSlug}
 	active2 := models.StatusPage{Name: "aktiv2", Slug: SystemStatusPageSlug}

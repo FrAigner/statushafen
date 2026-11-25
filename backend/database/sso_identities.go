@@ -6,32 +6,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// removeOrphanedPageSSOIdentities räumt Seiten-SSO-
-// Verknüpfungen (user_sso_identities) auf, die vor der Umstellung beim Entfernen
-// eines Mitglieds stehen geblieben sind. Sie blockieren sonst weiter die
-// SSO-Anmeldung und das Anhängen an andere Seiten (hasSSOIdentityOnOtherPage).
+// removeOrphanedPageSSOIdentities cleans up page SSO
+// links (user_sso_identities) that were left behind before the changeover when removing
+// a member. They otherwise continue to block
+// SSO login and attaching to other pages (hasSSOIdentityOnOtherPage).
 //
-// Nicht jede Verknüpfung ohne Rolle ist verwaist: Ein Konto ohne Rolle darf
-// sich selbst mit dem SSO einer Seite verknüpfen (ssoLinkUser,
-// linkablePageScope), und solche Entscheidungen müssen den Start überleben.
-// Gelöscht wird deshalb nur, wenn ein BELEG für das Ende der Mitgliedschaft
-// nach der Verknüpfung vorliegt:
-//   - keine aktive Zeile in user_status_page_roles für (Konto, Seite) und
-//   - eine soft-gelöschte Zeile für (Konto, Seite), gelöscht NACH dem Anlegen
-//     der Verknüpfung (das Entfernen auf der Seite löscht weich; die Zeile
-//     ist zugleich der Merker gegen erneutes Auto-Join und wird hier nur
-//     gelesen, nie verändert).
+// Not every link without a role is orphaned: an account without a role may
+// link itself with the SSO of a page (ssoLinkUser,
+// linkablePageScope), and such decisions must survive startup.
+// Therefore deletion happens only if there is EVIDENCE that the membership ended
+// after the link was created:
+//   - no active row in user_status_page_roles for (account, page) and
+//   - a soft-deleted row for (account, page), deleted AFTER the creation
+//     of the link (removal on the page deletes softly; the row
+//     is at the same time the marker against re-auto-join and is only read here,
+//     never changed).
 //
-// Wer nach dem Entfernen erneut (ohne Rolle) verknüpft, hat eine jüngere
-// Verknüpfung und bleibt unberührt. Hart gelöschte Mitgliedschaften (Seite am
-// Konto entzogen, Rolle gelöscht) hinterlassen keinen Beleg; solche Altfälle
-// sind von bewussten Verknüpfungen ohne Rolle nicht zu unterscheiden und
-// bleiben stehen (lösbar im Profil oder per DELETE durch einen Global Admin).
+// Anyone who links again (without a role) after removal has a more recent
+// link and stays untouched. Hard-deleted memberships (page withdrawn from the
+// account, role deleted) leave no evidence; such legacy cases
+// cannot be distinguished from deliberate links without a role and
+// stay (solvable in the profile or via DELETE by a global admin).
 //
-// Idempotent: Nach dem ersten Lauf trifft das Statement nichts mehr. Ein
-// DB-Fehler bricht nur die Bereinigung ab (Warnung), der Start läuft weiter;
-// dann bleibt der bisherige Zustand, es wird nichts zu viel gelöscht. Geloggt
-// wird nur die Anzahl, keine IDs oder E-Mails.
+// Idempotent: after the first run the statement matches nothing anymore. A
+// DB error only aborts the cleanup (warning), startup continues;
+// the previous state then remains, nothing too much is deleted. Only the
+// count is logged, no IDs or emails.
 func removeOrphanedPageSSOIdentities(db *gorm.DB) {
 	res := db.Exec(`DELETE FROM user_sso_identities
 WHERE NOT EXISTS (

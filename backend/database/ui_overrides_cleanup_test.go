@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Leere Altfälle verschwinden, echte Overrides (auch anderer
-// Seiten/Sprachen) bleiben, ein zweiter Lauf ändert nichts mehr.
+// Empty legacy cases disappear, real overrides (also of other
+// pages/languages) stay, a second run changes nothing anymore.
 func TestRemoveEmptyUiOverrides_KeepsRealOverrides(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "ui.db")), &gorm.Config{})
 	require.NoError(t, err)

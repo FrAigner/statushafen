@@ -15,16 +15,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Die früheren log.Fatalf-Pfade laufen jetzt über logging.Fatal
-// (slog.Error + Exit 1). Diese Tests lösen jeden Pfad gezielt per injiziertem
-// SQL-Fehler aus und prüfen die strukturierte Meldung, ohne den Testprozess
-// zu beenden (loggingtest.ExpectFatal).
+// The former log.Fatalf paths now go through logging.Fatal
+// (slog.Error + exit 1). These tests trigger each path specifically via an injected
+// SQL error and check the structured message, without terminating
+// the test process (loggingtest.ExpectFatal).
 
 var errInjected = errors.New("injizierter Fehler")
 
-// failOnSQL lässt jede Anweisung scheitern, deren SQL substr enthält. Die
-// Hooks laufen nach dem eigentlichen Callback, weil erst dann das SQL von
-// Query/Create/Update gebaut ist.
+// failOnSQL makes every statement fail whose SQL contains substr. The
+// hooks run after the actual callback, because only then is the SQL of
+// Query/Create/Update built.
 func failOnSQL(t *testing.T, db *gorm.DB, substr string) {
 	t.Helper()
 	hook := func(tx *gorm.DB) {
@@ -41,9 +41,9 @@ func failOnSQL(t *testing.T, db *gorm.DB, substr string) {
 	require.NoError(t, cb.Raw().After("gorm:raw").Register(name, hook))
 }
 
-// rewriteSQL ersetzt Raw-/Exec-Anweisungen, die substr enthalten, vor der
-// Ausführung durch replacement - z.B. Postgres-spezifisches SQL, das SQLite
-// nicht kennt.
+// rewriteSQL replaces raw/exec statements containing substr before
+// execution with replacement - e.g. Postgres-specific SQL that SQLite
+// does not know.
 func rewriteSQL(t *testing.T, db *gorm.DB, substr, replacement string) {
 	t.Helper()
 	hook := func(tx *gorm.DB) {
@@ -68,7 +68,7 @@ func newLoggingTestDB(t *testing.T) *gorm.DB {
 		&models.ComponentTag{}, &models.IncidentTag{}, &models.UserTag{},
 		&models.Language{}, &models.StatusPageLanguage{}, &models.UiTranslationOverride{},
 		&models.IncidentUpdate{}, &models.IncidentUpdateTranslation{},
-		// Tabellen aus createJoinTableUniqueIndexes.
+		// tables from createJoinTableUniqueIndexes.
 		&models.ExternalSource{}, &models.ExternalComponent{}, &models.ExternalComponentLink{},
 		&models.ExternalIncident{}, &models.ExternalIncidentUpdate{}, &models.ExternalIncidentComponent{},
 		&models.UserStatusPageRole{},
@@ -98,8 +98,8 @@ func TestFatalPaths(t *testing.T) {
 		{"createJoinTableUniqueIndexes: Drop", "DROP INDEX IF EXISTS idx_incident_component", nil, createJoinTableUniqueIndexes, "Failed to drop legacy index"},
 		{"createJoinTableUniqueIndexes: Create", "idx_incident_component_active", nil, createJoinTableUniqueIndexes, "Failed to create join table index"},
 		{"CreateSoftDeleteUniqueIndexes: Drop", "DROP INDEX IF EXISTS idx_tags_global_name", nil, CreateSoftDeleteUniqueIndexes, "Failed to drop legacy index"},
-		// Scheitert das Anlegen eines neuen Index, ist das kein Fatal
-		// mehr (Warnung, Altindex bleibt) - siehe TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure.
+		// If creating a new index fails, this is no longer a fatal
+		// (warning, legacy index stays) - see TestCreateSoftDeleteUniqueIndexes_KeepsLegacyOnFailure.
 		{"SeedSystemStatusPage: Legacy Lookup", "slug = ", nil, SeedSystemStatusPage, "Failed to check for legacy system status page"},
 		{"SeedSystemStatusPage: Legacy Mark", "UPDATE `status_pages`", func(t *testing.T, db *gorm.DB) {
 			require.NoError(t, db.Create(&models.StatusPage{Name: "S", Slug: SystemStatusPageSlug}).Error)
@@ -155,8 +155,8 @@ func prepareUnsupportedDefault(t *testing.T, db *gorm.DB) {
 	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: p.ID, LanguageCode: "fr", IsDefault: true}).Error)
 }
 
-// Der Erfolgsfall von migrateIncidentComponents (Postgres-SQL per Rewrite
-// neutralisiert) muss ohne Fatal durchlaufen und den Abschluss loggen.
+// The success case of migrateIncidentComponents (Postgres SQL neutralized via
+// rewrite) must run through without fatal and log completion.
 func TestMigrateIncidentComponents_SuccessLogs(t *testing.T) {
 	db := newLoggingTestDB(t)
 	rewriteSQL(t, db, "information_schema", "SELECT 1")
@@ -167,8 +167,8 @@ func TestMigrateIncidentComponents_SuccessLogs(t *testing.T) {
 	assert.Contains(t, out.String(), "incident_components migration completed")
 }
 
-// Fehlen die Legacy-Spalten nur bei incidents bzw. users, bricht die
-// Tag-Migration weich ab und loggt den übersprungenen Schritt.
+// If the legacy columns are missing only on incidents or users, the
+// tag migration aborts softly and logs the skipped step.
 func TestMigrateTagsFromCountryStrings_SkipLogs(t *testing.T) {
 	t.Run("incidents", func(t *testing.T) {
 		db := newLoggingTestDB(t)
@@ -189,7 +189,7 @@ func TestMigrateTagsFromCountryStrings_SkipLogs(t *testing.T) {
 
 func TestHashPassword_ErrorIsLogged(t *testing.T) {
 	out := captureLog(t)
-	// bcrypt lehnt Passwörter über 72 Byte ab.
+	// bcrypt rejects passwords over 72 bytes.
 	hash, err := HashPassword(strings.Repeat("x", 73))
 	assert.Empty(t, hash)
 	assert.ErrorIs(t, err, ErrPasswordTooLong)
@@ -197,8 +197,8 @@ func TestHashPassword_ErrorIsLogged(t *testing.T) {
 	assert.NotContains(t, out.String(), strings.Repeat("x", 73))
 }
 
-// faultDialector erlaubt InitDB-Tests, Callbacks auf der intern geöffneten
-// DB zu registrieren bzw. das Öffnen scheitern zu lassen.
+// faultDialector allows InitDB tests to register callbacks on the internally
+// opened DB or to make opening fail.
 type faultDialector struct {
 	gorm.Dialector
 	setup func(db *gorm.DB) error
@@ -239,8 +239,8 @@ func TestInitDB_FatalPaths(t *testing.T) {
 	})
 }
 
-// SEED_DB=true auf SQLite: Drop-Fehler wird nur geloggt, danach laufen
-// Migration und SeedData komplett durch.
+// SEED_DB=true on SQLite: drop error is only logged, afterwards the
+// migration and SeedData run through completely.
 func TestInitDB_SeedLogs(t *testing.T) {
 	useFaultDialector(t, "true", func(db *gorm.DB) error {
 		failOnSQL(t, db, "DROP TABLE IF EXISTS `user_tags`")

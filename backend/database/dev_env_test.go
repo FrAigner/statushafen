@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Entwicklungsausnahmen (Seed, unsichere OIDC-Aussteller, Domain-Check ohne
-// Token) gelten nur bei einer ausdrücklich benannten Entwicklungsumgebung.
-// Jeder andere Wert, auch ein vergessener oder falsch geschriebener, gilt als
-// Produktion (fail closed).
+// Development exceptions (seed, insecure OIDC issuers, domain check without
+// token) apply only in an explicitly named development environment.
+// Any other value, even a forgotten or misspelled one, counts as
+// production (fail closed).
 func TestIsDevelopmentAppEnv(t *testing.T) {
 	for _, env := range []string{"development", "dev", "test", "local", "Development", " LOCAL "} {
 		t.Run("Entwicklung: "+env, func(t *testing.T) {

@@ -8,15 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// BackfillComponentSlugs vergibt allen aktiven Komponenten und
-// Gruppen ohne Kennung eine aus dem Namen. Reihenfolge und Ergebnis sind
-// deterministisch: je Statusseite nach ID aufsteigend, Kollisionen (auch mit
-// bereits vergebenen Kennungen) bekommen -2, -3 …. Idempotent: angefasst
-// werden nur Zeilen mit leerer Kennung, vergebene Kennungen bleiben. Soft-
-// gelöschte Zeilen bleiben leer, der Unique-Index nimmt sie ohnehin aus.
+// BackfillComponentSlugs assigns to all active components and
+// groups without an identifier one derived from the name. Order and result are
+// deterministic: per status page ascending by ID, collisions (also with
+// already assigned identifiers) get -2, -3 …. Idempotent: only
+// rows with an empty identifier are touched, assigned identifiers stay. Soft-
+// deleted rows stay empty, the unique index excludes them anyway.
 //
-// Prod-sicher: Fehler führen nur zu einer Warnung, nie zum Startabbruch. Eine
-// Zeile ohne Kennung wird beim nächsten Start erneut versucht.
+// Prod-safe: errors only lead to a warning, never to a startup abort. A
+// row without an identifier is retried on the next start.
 func BackfillComponentSlugs(db *gorm.DB) {
 	var missing []models.Component
 	if err := db.Where("slug = ?", "").Order("status_page_id ASC, id ASC").Find(&missing).Error; err != nil {
@@ -26,7 +26,7 @@ func BackfillComponentSlugs(db *gorm.DB) {
 	if len(missing) == 0 {
 		return
 	}
-	used := map[uint]map[string]bool{} // status_page_id -> vergebene Kennungen
+	used := map[uint]map[string]bool{} // status_page_id -> assigned identifiers
 	usedOn := func(pageID uint) map[string]bool {
 		if set, ok := used[pageID]; ok {
 			return set

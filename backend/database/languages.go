@@ -10,12 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// createLanguageUniqueIndexes legt den partiellen Unique-Index
-// an, der sicherstellt, dass eine Statusseite höchstens eine
-// Default-Sprache hat (die eigentliche Eindeutigkeit von (StatusPageID,
-// LanguageCode) selbst übernimmt bereits createJoinTableUniqueIndexes).
-// GORMs AutoMigrate kann keine partiellen Indizes erzeugen (siehe
-// CreateSoftDeleteUniqueIndexes), daher Raw-SQL. Idempotent per IF NOT EXISTS.
+// createLanguageUniqueIndexes creates the partial unique index
+// that ensures a status page has at most one
+// default language (the actual uniqueness of (StatusPageID,
+// LanguageCode) itself is already handled by createJoinTableUniqueIndexes).
+// GORM's AutoMigrate cannot create partial indexes (see
+// CreateSoftDeleteUniqueIndexes), hence raw SQL. Idempotent via IF NOT EXISTS.
 func createLanguageUniqueIndexes(db *gorm.DB) {
 	sql := `CREATE UNIQUE INDEX IF NOT EXISTS idx_statuspage_language_default ON status_page_languages (status_page_id) WHERE is_default = true AND deleted_at IS NULL`
 	if err := db.Exec(sql).Error; err != nil {
@@ -42,16 +42,16 @@ var defaultLanguages = []models.Language{
 	{Code: "de", Name: "Deutsch", IsActive: true},
 }
 
-// seedLanguageCatalog legt den globalen Sprachkatalog an (defaultLanguages).
-// Idempotent: existiert ein Code bereits, wird er nicht erneut angelegt oder überschrieben
-// (ein Admin könnte den Namen oder die Aktivierung zwischenzeitlich angepasst haben, auch
-// eine abgeschaltete Sprache bleibt abgeschaltet, eine gelöschte bleibt gelöscht). Weitere Sprachen legt ein Admin über die
-// /api/languages-Endpunkte an.
+// seedLanguageCatalog creates the global language catalog (defaultLanguages).
+// Idempotent: if a code already exists, it is not created again or overwritten
+// (an admin may have adjusted the name or activation in the meantime, also
+// a deactivated language stays deactivated, a deleted one stays deleted). An admin creates further languages via the
+// /api/languages endpoints.
 func seedLanguageCatalog(db *gorm.DB) {
 	for _, lang := range defaultLanguages {
 		var count int64
-		// Unscoped, damit eine vom Admin gelöschte Sprache (Soft-Delete) nicht
-		// bei jedem Start wiederkehrt.
+		// Unscoped, so a language deleted by the admin (soft delete) does not
+		// come back on every start.
 		if err := db.Unscoped().Model(&models.Language{}).Where("code = ?", lang.Code).Count(&count).Error; err != nil {
 			logging.Fatal("Failed to check for existing language", "language", lang.Code, "error", err)
 		}
@@ -64,13 +64,13 @@ func seedLanguageCatalog(db *gorm.DB) {
 	}
 }
 
-// backfillStatusPageLanguages aktiviert für jede Statusseite,
-// die noch keine einzige StatusPageLanguage-Zeile hat, dieselben zwei
-// Sprachen mit derselben Default-Wahl, die vorher implizit durch die
-// hartcodierte NotificationTemplate-Konvention galt: de+en, de als Default
-// (Subscriber-Mails liefen bisher immer auf Deutsch).
-// Bewusst ohne Sonderbehandlung der System-Statusseite - sie ist ein Tenant
-// wie jeder andere (siehe SeedSystemStatusPage).
+// backfillStatusPageLanguages activates, for every status page
+// that does not yet have a single StatusPageLanguage row, the same two
+// languages with the same default choice that previously applied implicitly through the
+// hard-coded NotificationTemplate convention: de+en, de as default
+// (subscriber mails previously always ran in German).
+// Deliberately without special treatment of the system status page - it is a tenant
+// like any other (see SeedSystemStatusPage).
 func backfillStatusPageLanguages(db *gorm.DB) {
 	var pages []models.StatusPage
 	if err := db.Find(&pages).Error; err != nil {
@@ -96,11 +96,11 @@ func backfillStatusPageLanguages(db *gorm.DB) {
 	}
 }
 
-// DefaultStatusPageLanguages liefert die Sprachen, mit denen
-// eine neu angelegte Statusseite ausgestattet wird - dieselbe de+en/de-
-// Default-Kombination wie der Backfill für Bestandsseiten
-// (backfillStatusPageLanguages), damit sich neue und bestehende Seiten
-// direkt nach der Migration nicht unterscheiden.
+// DefaultStatusPageLanguages returns the languages with which
+// a newly created status page is equipped - the same de+en/de
+// default combination as the backfill for existing pages
+// (backfillStatusPageLanguages), so that new and existing pages
+// do not differ directly after the migration.
 func SeedDefaultStatusPageLanguages(db *gorm.DB, statusPageID uint) error {
 	entries := []models.StatusPageLanguage{
 		{StatusPageID: statusPageID, LanguageCode: "de", IsDefault: true},

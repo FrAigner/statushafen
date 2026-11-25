@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bestandsabos aus der Zeit vor dem Double-Opt-in (Tabelle ohne
-// status-Spalte) müssen nach der Migration aktiv sein, sonst verlieren sie
-// ihre Benachrichtigungen.
+// Existing subscriptions from the time before double opt-in (table without
+// status column) must be active after the migration, otherwise they lose
+// their notifications.
 func TestMigrateSubscriberStatus_LegacyRowsBecomeActive(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "legacy-subs.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -32,8 +32,8 @@ func TestMigrateSubscriberStatus_LegacyRowsBecomeActive(t *testing.T) {
 	assert.Equal(t, []string{models.SubscriberStatusActive}, statuses)
 }
 
-// captureLog leitet den slog-Default-Logger für die Dauer des Tests in einen
-// Puffer um (database loggt nur noch über slog).
+// captureLog redirects the slog default logger for the duration of the test into a
+// buffer (database only logs via slog now).
 func captureLog(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer
@@ -43,7 +43,7 @@ func captureLog(t *testing.T) *bytes.Buffer {
 	return &buf
 }
 
-// Fehlt die Tabelle (oder scheitert das Update sonstwie), loggt der Backfill nur.
+// If the table is missing (or the update fails otherwise), the backfill only logs.
 func TestBackfillSubscriberStatus_ErrorIsNotFatal(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "empty.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -52,8 +52,8 @@ func TestBackfillSubscriberStatus_ErrorIsNotFatal(t *testing.T) {
 	assert.Contains(t, out.String(), "Failed to backfill subscriber status")
 }
 
-// Der Backfill ist idempotent und lässt unbestätigte (pending) Abos in Ruhe -
-// sonst würde jeder Neustart das Double-Opt-in aushebeln.
+// The backfill is idempotent and leaves unconfirmed (pending) subscriptions alone -
+// otherwise every restart would undermine double opt-in.
 func TestBackfillSubscriberStatus_IdempotentAndKeepsPending(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "subs.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestBackfillSubscriberStatus_IdempotentAndKeepsPending(t *testing.T) {
 		Status: models.SubscriberStatusPending, ConfirmTokenHash: "abc", ConfirmTokenExpiry: &expiry}
 	require.NoError(t, db.Create(&legacy).Error)
 	require.NoError(t, db.Create(&pending).Error)
-	// Altbestand mit leerem bzw. NULL-Status nachbilden (z.B. vor einem Default).
+	// Recreate legacy data with empty or NULL status (e.g. before a default).
 	require.NoError(t, db.Exec(`UPDATE subscribers SET status = '' WHERE id = ?`, legacy.ID).Error)
 
 	out := captureLog(t)

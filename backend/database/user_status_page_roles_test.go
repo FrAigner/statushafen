@@ -12,8 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Doppelte Seitenrollen werden vor dem Unique-Index bereinigt; behalten
-// wird die bisher wirksame Zeile (kleinste ID).
+// Duplicate page roles are cleaned up before the unique index; the
+// previously effective row (smallest ID) is kept.
 func TestCreateUserStatusPageRoleUniqueIndex(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "usr.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -26,9 +26,9 @@ func TestCreateUserStatusPageRoleUniqueIndex(t *testing.T) {
 	for _, v := range []any{&page, &other, &roleA, &roleB, &u} {
 		require.NoError(t, db.Create(v).Error)
 	}
-	// Bisher wirkte per First() die Zeile mit der kleinsten ID (Viewer), auch wenn
-	// eine jüngere (höhere ID) Owner-Rolle trägt: Der Backfill darf die wirksame
-	// Rolle nicht ändern. Eine Zeile mit NULL in updated_at darf nichts brechen.
+	// So far First() made the row with the smallest ID (viewer) effective, even if
+	// a more recent (higher ID) one carries the owner role: the backfill must not change the effective
+	// role. A row with NULL in updated_at must not break anything.
 	viewerRow := models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: roleA.ID}
 	ownerRow := models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: roleB.ID}
 	single := models.UserStatusPageRole{UserID: u.ID, StatusPageID: other.ID, RoleID: roleB.ID}
@@ -49,7 +49,7 @@ func TestCreateUserStatusPageRoleUniqueIndex(t *testing.T) {
 	require.NoError(t, db.Model(&models.UserStatusPageRole{}).Where("status_page_id = ?", other.ID).Count(&n).Error)
 	require.EqualValues(t, 1, n, "Einzelzeile bleibt")
 
-	// Index greift; soft-gelöschte Zeilen blockieren nicht.
+	// Index applies; soft-deleted rows do not block.
 	dup := models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: roleB.ID}
 	require.Error(t, db.Create(&dup).Error)
 	require.NoError(t, db.Delete(&rows[0]).Error)

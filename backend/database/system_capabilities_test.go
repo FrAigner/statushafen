@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Funktionsverzeichnis auf der Systemseite.
+// Feature directory on the system page.
 
 func capabilityComponentCount() int64 {
 	n := int64(0)
@@ -40,8 +40,8 @@ func componentBySlug(t *testing.T, db *gorm.DB, slug string) models.Component {
 	return c
 }
 
-// Neue Funktionen müssen im Verzeichnis stehen: jede Hilfeseite (außer den
-// Übersichtsseiten) gehört zu genau einer Funktion und umgekehrt.
+// New features must be in the directory: every help page (except the
+// overview pages) belongs to exactly one feature and vice versa.
 func TestSystemCapabilities_CoverEveryDocsPage(t *testing.T) {
 	files, err := filepath.Glob("../../frontend/src/docs/de/*.md")
 	require.NoError(t, err)
@@ -96,8 +96,8 @@ func TestSystemCapabilities_SyncIsIdempotent(t *testing.T) {
 	assert.Equal(t, capabilityComponentCount(), total)
 }
 
-// Admin-Entscheidungen überleben den Neustart: umbenannt bleibt umbenannt,
-// gelöscht bleibt gelöscht, ein manuell gesetzter Status bleibt.
+// Admin decisions survive a restart: renamed stays renamed,
+// deleted stays deleted, a manually set status stays.
 func TestSystemCapabilities_RespectsAdminChanges(t *testing.T) {
 	db, page := seededSystemPage(t)
 	require.NoError(t, db.Model(&models.Component{}).Where("slug = ?", "feature-vorfaelle").Updates(map[string]any{"name": "Störungen", "status": "degraded_performance"}).Error)
@@ -125,7 +125,7 @@ func TestSystemCapabilities_DeletedGroupKeepsItsItemsGone(t *testing.T) {
 	assert.Zero(t, live)
 }
 
-// Eine später hinzugefügte Funktion erscheint beim nächsten Start in ihrer Gruppe.
+// A feature added later appears in its group on the next start.
 func TestSystemCapabilities_NewCapabilityIsAddedLater(t *testing.T) {
 	db, page := seededSystemPage(t)
 	orig := SystemCapabilities
@@ -142,7 +142,7 @@ func TestSystemCapabilities_NewCapabilityIsAddedLater(t *testing.T) {
 	assert.Equal(t, group.ID, *neu.ParentID)
 }
 
-// Eine bereits übernommene Plattform-Komponente, die der Admin wieder nach oben zieht, bleibt dort.
+// An already adopted platform component that the admin moves back to the top stays there.
 func TestSystemCapabilities_AdoptedComponentStaysWhereAdminPutsIt(t *testing.T) {
 	db, page := seededSystemPage(t)
 	require.NoError(t, db.Model(&models.Component{}).Where("slug = ?", "feature-plattform-api").Update("parent_id", nil).Error)
@@ -152,8 +152,8 @@ func TestSystemCapabilities_AdoptedComponentStaysWhereAdminPutsIt(t *testing.T) 
 	assert.Nil(t, componentBySlug(t, db, "feature-plattform-api").ParentID)
 }
 
-// Schlägt das Anlegen fehl (hier: Tabelle fehlt), liefert ensureComponent ok=false
-// und stürzt nicht ab; der Start läuft weiter.
+// If creating fails (here: table missing), ensureComponent returns ok=false
+// and does not crash; startup continues.
 func TestEnsureComponent_CreateErrorReturnsNotOK(t *testing.T) {
 	db, page := seededSystemPage(t)
 	if err := db.Migrator().DropTable(&models.Component{}); err != nil {

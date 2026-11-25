@@ -8,15 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// removeEmptyUiOverrides entfernt UI-Overrides mit leerem bzw.
-// nur aus Leerzeichen bestehendem Wert. Bis zum Fix hat "Speichern" einer
-// leeren Zeile im Editor "" als Override abgelegt und damit den Text (im
-// globalen Scope für alle Besucher) ausgeblendet; der Handler lehnt das jetzt
-// mit 400 ab, hier verschwinden die schon gespeicherten Altfälle. Ein leerer
-// Override ist nie gewollt (es gibt keinen Standardtext "leer"), deshalb geht
-// dabei keine Admin-Änderung verloren - es gilt wieder der Bundle-Default.
-// Soft-Delete wie im DELETE-Handler; idempotent, weil danach keine Zeile mehr
-// passt. Ein Fehler wird nur geloggt: Der Start soll daran nicht scheitern.
+// removeEmptyUiOverrides removes UI overrides with an empty or
+// whitespace-only value. Until the fix, "Save" on an
+// empty line in the editor stored "" as an override and thereby hid the text (in the
+// global scope for all visitors); the handler now rejects this
+// with 400, here the already stored legacy cases disappear. An empty
+// override is never wanted (there is no default text "empty"), so
+// no admin change is lost - the bundle default applies again.
+// Soft delete as in the DELETE handler; idempotent, because afterwards no row
+// matches anymore. An error is only logged: startup is not supposed to fail because of it.
 func removeEmptyUiOverrides(db *gorm.DB) {
 	if err := db.Where("TRIM(value) = ''").Delete(&models.UiTranslationOverride{}).Error; err != nil {
 		slog.Error("Failed to remove empty ui overrides", "error", err)

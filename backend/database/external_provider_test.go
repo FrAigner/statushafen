@@ -20,9 +20,9 @@ func setupExternalProviderTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// Der Anbieter-Schlüssel hieß früher "statuspage" und heißt jetzt "summaryv2".
-// Bestehende Quellen werden beim Start umgestellt (auch soft-gelöschte, damit der
-// Altwert nirgends überlebt); ein zweiter Lauf ändert nichts.
+// The provider key used to be "statuspage" and is now "summaryv2".
+// Existing sources are switched over on start (also soft-deleted ones, so the
+// legacy value survives nowhere); a second run changes nothing.
 func TestMigrateExternalSourceProvider(t *testing.T) {
 	db := setupExternalProviderTestDB(t)
 	page := models.StatusPage{Name: "P", Slug: "p"}
@@ -45,7 +45,7 @@ func TestMigrateExternalSourceProvider(t *testing.T) {
 		assert.Equal(t, "summaryv2", r.Provider, r.Name)
 	}
 
-	// Idempotent: nichts mehr zu tun, nichts ändert sich.
+	// Idempotent: nothing left to do, nothing changes.
 	migrateExternalSourceProvider(db)
 	var n int64
 	require.NoError(t, db.Unscoped().Model(&models.ExternalSource{}).Where("provider = ?", "statuspage").Count(&n).Error)
