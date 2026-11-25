@@ -16,7 +16,7 @@ test.describe('Seiten-Layout (standard / liste)', () => {
   const pageName = `E2E Layout ${Date.now()}`;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

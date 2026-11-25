@@ -28,10 +28,13 @@ const { currentPageSlug } = useCurrentPageSlug()
 // Marker, Navigation, Anmelden, Bestell-Knopf); LandingPage meldet sich dort an.
 const { isLanding, ordersEnabled } = useLandingChrome()
 
-// Auf einer Statusseite nimmt der Login-Knopf die Seite mit, damit
-// die Login-Seite ihren Knopf „Mit SSO anmelden“ zeigen kann.
+// The login button returns to the current page after sign-in (returnTo). On a
+// status page it also passes the page along, so the login page can show its
+// "Mit SSO anmelden" button.
 const goToLogin = () => {
-  router.push(currentPageSlug.value ? { path: '/login', query: { page: currentPageSlug.value } } : '/login')
+  const query = { returnTo: route.fullPath }
+  if (currentPageSlug.value) query.page = currentPageSlug.value
+  router.push({ path: '/login', query })
 }
 
 const isUserMenuOpen = ref(false)

@@ -10,7 +10,7 @@ test.describe('Private Status Page', () => {
     page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
     
     // 1. Login as global admin
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

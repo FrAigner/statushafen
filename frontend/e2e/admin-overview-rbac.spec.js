@@ -17,7 +17,7 @@ test.describe('Admin Overview RBAC', () => {
     page.on('console', msg => { if (msg.type() === 'error') console.log('CONSOLE ERROR:', msg.text()); });
 
     // Login als "Editor" (kein Global Admin) über das reguläre Login-Formular.
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('editor@statushafen.local');
     await page.locator('input[type=password]').fill('editor123');
     await page.locator('button.btn-login').click();
@@ -43,7 +43,7 @@ test.describe('Admin Overview RBAC', () => {
   });
 
   test('Global Admin sieht die Übersicht weiterhin normal', async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

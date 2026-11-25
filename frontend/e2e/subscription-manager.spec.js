@@ -6,7 +6,7 @@ const PORT = process.env.E2E_PORT || '5173';
 test.describe('Subscription Manager', () => {
   test('should allow an authenticated user to edit their subscription', async ({ page }) => {
     // 1. Login as global admin on the tenant subdomain
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
@@ -43,7 +43,7 @@ test.describe('Subscription Manager', () => {
   // verknüpft) – das deckt den Bug zuverlässig auf, weil hier ein *echtes* Ergebnis
   // erwartet wird statt nur "eine der beiden Meldungen".
   test('CTA-Button "Abonnement verwalten" öffnet den Editor und lädt das echte Abo', async ({ page }) => {
-    await page.goto(`http://acme.localhost:${PORT}/login`);
+    await page.goto(`http://acme.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
@@ -65,7 +65,7 @@ test.describe('Subscription Manager', () => {
   // stabil, ohne auf eine Datenbank-Rücksetzung zwischen E2E-Läufen angewiesen
   // zu sein.
   test('vollständiger Abo-Fluss: kein Abonnement -> abonnieren -> verwalten -> beenden', async ({ page }) => {
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

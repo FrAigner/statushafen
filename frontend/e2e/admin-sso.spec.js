@@ -9,7 +9,7 @@ const PORT = process.env.E2E_PORT || '5173';
 // wird separat geprüft (sso-oidc.spec.js und handlers/auth_sso_test.go).
 test.describe('Admin SSO Configuration Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
