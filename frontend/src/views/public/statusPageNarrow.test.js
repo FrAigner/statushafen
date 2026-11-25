@@ -97,6 +97,18 @@ describe('Statusseite bei 390 px', () => {
     it('Hilfe-Knopf schrumpft nicht und bleibt neben dem Feld', () => {
       expect(rule(css, '.search-help-btn')).toMatch(/flex-shrink:\s*0/)
     })
+
+    // The clear button is positioned against the wrapper, which also holds
+    // the help button; with right: var(--sp-2) the "x" sat on top of the "?".
+    it('Leeren-Knopf sitzt im Feld, nicht über dem Hilfe-Knopf', () => {
+      expect(rule(css, '.search-wrapper')).toMatch(/--search-help-size:\s*24px/)
+      const btn = rule(css, '.search-help-btn')
+      expect(btn).toMatch(/width:\s*var\(--search-help-size\)/)
+      expect(btn).toMatch(/height:\s*var\(--search-help-size\)/)
+      expect(rule(css, '.search-clear')).toMatch(
+        /right:\s*calc\(var\(--search-help-size\) \+ 3 \* var\(--sp-2\)\)/,
+      )
+    })
   })
 
   describe('Kopfzeile (PublicLayout)', () => {
