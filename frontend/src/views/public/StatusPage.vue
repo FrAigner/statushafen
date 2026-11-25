@@ -33,6 +33,7 @@ import OidcLoginButton from '../../components/OidcLoginButton.vue'
 import { useCurrentPageSlug } from '../../composables/useCurrentPageSlug'
 import { usePublicPageLanguages } from '../../composables/usePublicPageLanguages'
 import { useTheme } from '../../composables/useTheme'
+import { useDismissable } from '../../composables/useDismissable'
 import { ensureContrast } from '../../utils/contrast'
 import { BRAND_ON_PRIMARY, BRAND_SECONDARY_BACKGROUNDS } from '../../utils/brandContrast'
 
@@ -183,6 +184,11 @@ let searchTimeout = null
 const activeCountryTags = ref([])
 const activeStatusTags = ref([])
 const searchHelpOpen = ref(false)
+// The help closes on a click/tap outside the search field area; the field
+// itself counts as inside so the examples stay visible while typing. Escape
+// is handled on the input and the button (focus stays where it is).
+const searchWrapperRef = ref(null)
+useDismissable(searchHelpOpen, [searchWrapperRef], () => { searchHelpOpen.value = false }, { escape: false })
 
 const toggleIn = (list, key) => (list.includes(key) ? list.filter(k => k !== key) : [...list, key])
 const toggleCountry = (key) => { activeCountryTags.value = toggleIn(activeCountryTags.value, key) }
@@ -693,7 +699,7 @@ const closeHistory = () => {
       <!-- Filter-Bereich -->
       <div class="filter-bar" role="search" :aria-label="t('statusPage.filterLabel')">
         <!-- Freitext-Suche -->
-        <div class="search-wrapper">
+        <div ref="searchWrapperRef" class="search-wrapper">
           <AppIcon name="search" :size="15" class="search-icon" />
           <input
             v-model="searchText"

@@ -16,6 +16,7 @@ import EmptyState from './EmptyState.vue'
 import RelativeTime from './RelativeTime.vue'
 import { useTenant } from '../composables/useTenant'
 import { useAdminNotifications } from '../composables/useAdminNotifications'
+import { useDismissable } from '../composables/useDismissable'
 
 const POLL_MS = 60_000
 const BADGE_MAX = 9
@@ -69,9 +70,8 @@ const onFocusout = (e) => {
   if (e.relatedTarget && !rootRef.value?.contains(e.relatedTarget)) close()
 }
 
-const onDocumentClick = (e) => {
-  if (open.value && !rootRef.value?.contains(e.target)) close()
-}
+// Click/tap outside closes; Escape is handled on the root (onKeydown).
+useDismissable(open, [rootRef], () => close(), { escape: false })
 
 // Eine Nachricht öffnen: Link folgen, als gelesen markieren, Panel schließen.
 const onFollow = (item) => {
@@ -102,12 +102,10 @@ onMounted(() => {
   refreshCount()
   startPolling()
   document.addEventListener('visibilitychange', onVisibility)
-  document.addEventListener('click', onDocumentClick)
 })
 onBeforeUnmount(() => {
   stopPolling()
   document.removeEventListener('visibilitychange', onVisibility)
-  document.removeEventListener('click', onDocumentClick)
 })
 
 // Mandantenwechsel: Stand der alten Seite sofort verwerfen und neu abfragen.

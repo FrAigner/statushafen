@@ -27,13 +27,14 @@ function makeRouter() {
   })
 }
 
-async function mountLayout() {
+async function mountLayout(mountOptions = {}) {
   const router = makeRouter()
   router.push('/')
   await router.isReady()
 
   const wrapper = mount(PublicLayout, {
     global: { plugins: [i18n, router, createOnyx()] },
+    ...mountOptions,
   })
   await flushPromises()
   return { wrapper, router }
@@ -187,6 +188,59 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.user-menu-trigger').exists()).toBe(true)
     expect(wrapper.find('.user-menu-header strong').text()).toBe('user@x.de')
     expect(wrapper.find('.user-menu-header small').text()).toBe('(Viewer)')
+  })
+
+  // Regression 2026-11-25: the user menu only closed by clicking the person
+  // icon again. It now closes on a click/tap outside and on Escape.
+  describe('Benutzermenü schließt sich von selbst', () => {
+    async function openMenu() {
+      useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+      // Attached, so focus and document listeners behave as in the browser.
+      const { wrapper } = await mountLayout({ attachTo: document.body })
+      const trigger = wrapper.find('.user-menu-trigger')
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      return { wrapper, trigger }
+    }
+    const pointerdown = async (el) => {
+      el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      await flushPromises()
+    }
+
+    it('schließt bei Klick außerhalb von Menü und Icon', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(wrapper.find('.logo').element)
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      wrapper.unmount()
+    })
+
+    it('bleibt bei Klick ins Menü offen', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(wrapper.find('.user-menu-header').element)
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      wrapper.unmount()
+    })
+
+    it('Icon schaltet weiterhin um', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(trigger.element)
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      wrapper.unmount()
+    })
+
+    it('Escape schließt und gibt den Fokus an das Icon zurück', async () => {
+      const { wrapper, trigger } = await openMenu()
+      const item = wrapper.find('.user-menu-item').element
+      item.focus()
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      await flushPromises()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(document.activeElement).toBe(trigger.element)
+      wrapper.unmount()
+    })
   })
 
   it('blendet den Dashboard-Menüpunkt nur mit admin_dashboard-Permission ein', async () => {
