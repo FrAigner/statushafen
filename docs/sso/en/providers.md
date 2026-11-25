@@ -111,6 +111,46 @@ no `//`, no control characters or whitespace, no backslash, not under `/api`, at
 silently drops it otherwise. `POST /api/auth/sso-exchange` returns it as `return_to`. After linking,
 the user goes on to the profile.
 
+### Status pages on a custom domain
+
+When the login starts on the verified custom domain of a status page (for example
+`status.acme.example`), the user returns there after signing in, and the session is valid on that
+domain. This applies to global providers, page SSO and the password login.
+
+1. A login start that arrives on the custom domain first redirects to the same path under `BASE_URL`
+   and adds the domain as `return_host`. The state cookie has to reach the callback under `BASE_URL`.
+   The `Host` of the request wins over a `return_host` in the query.
+2. The server keeps `return_host` only if it is exactly the hostname of a custom domain in the state
+   "Verified" or "Active"; for page SSO only the domain of that same page. Anything else (unverified,
+   unknown or other tenants' domains, scheme, port, path, upper case, trailing dot) is dropped; the
+   login then ends under `FRONTEND_URL` as before.
+3. The callback checks the domain again. If the account agreed to a role on the domain's page
+   (invitation, assignment by a global admin, order), it redirects to
+   `https://<domain>/auth/sso-callback?code=…`. Otherwise the login ends under `FRONTEND_URL` on the
+   landing page (global providers: full session). A role from the auto-join never counts, because the
+   tenant maintains its e-mail domains; such roles are marked (`joined_via`). Roles from before this
+   marking count only if the page has no auto-join set up now and the audit log knows no auto-join of
+   this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
+   start (without any account) go to the custom domain.
+4. The frontend there redeems the code on the same origin. The code is bound to that origin: a code
+   for a custom domain is redeemed only there, a code for `FRONTEND_URL` never on a custom domain. The
+   password login runs on the same origin anyway.
+
+Whoever controls the DNS of a custom domain, i.e. the tenant, can serve their own code there and read
+what the browser stores for that domain. A session on a custom domain (OIDC and password) is therefore
+valid only for the status page of that domain, never has global admin rights and must not act on the
+account itself: deleting the account (`DELETE /api/me`), the data export (`GET /api/me/export`),
+linking or unlinking sign-ins (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
+`DELETE /api/me/sso/<id>`) answer `403 custom_domain_session`. For these, sign in under
+`FRONTEND_URL`. A private page needs a role on that page; global admins administer under
+`FRONTEND_URL`.
+
+Contract with the reverse proxy: for custom domains it passes the `Host` header on and serves `/api`
+on the same origin (default image, `VITE_API_URL` empty). Whether a request comes from a custom domain
+is decided by the backend from the browser's `Origin` header or from `Host`, both regardless of case,
+port and trailing dot. If the proxy rewrites `Host`, `Origin` still decides; the move to `BASE_URL` at
+the login start, however, needs the real `Host`.
+
 ## Troubleshooting
 
 Errors in the browser flow end up as a code on the login page (`?oidc_error=<code>`), when linking in

@@ -1627,6 +1627,7 @@
       "auth_code_missing": "The provider did not return an authorization code.",
       "login_code_required": "Please provide the sign-in code.",
       "login_code_invalid": "The sign-in code is invalid or expired.",
+      "custom_domain_session": "Not possible on a custom domain. Sign in on the main address for this.",
       "password_login_disabled": "Signing in with email and password is disabled.",
       "provider_unknown": "This sign-in provider is unknown or no longer active.",
       "identity_not_found": "The linked identity was not found.",

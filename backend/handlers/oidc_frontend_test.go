@@ -141,14 +141,11 @@ func TestOIDCCallback_LinkErrorsGoBackToProfile(t *testing.T) {
 	assertOIDCError(t, f.callback(state, "good-code", ck), "/admin/profile", "no_id_token")
 }
 
-func TestOIDCErrorURL_TargetsByFlow(t *testing.T) {
+func TestSSOErrorURL_TargetsByFlow(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://status.example.org")
-	assert.Equal(t, "https://status.example.org/login?oidc_error=not_linked",
-		oidcErrorURL(models.OIDCLoginState{}, errOIDCNotLinked))
-	assert.Equal(t, "https://status.example.org/admin/profile?oidc_error=not_linked",
-		oidcErrorURL(models.OIDCLoginState{LinkUserID: 1}, errOIDCNotLinked))
-	assert.Equal(t, "https://status.example.org/admin/sso?oidc_test=not_linked",
-		oidcErrorURL(models.OIDCLoginState{TestLogin: true}, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/login?oidc_error=not_linked", ssoErrorURL(false, 0, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/admin/profile?oidc_error=not_linked", ssoErrorURL(false, 1, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/admin/sso?oidc_test=not_linked", ssoErrorURL(true, 0, errOIDCNotLinked))
 }
 
 // --- Testanmeldung (test_login_enabled) ---

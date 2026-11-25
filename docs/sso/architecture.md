@@ -85,7 +85,7 @@ ab. Gehört die Identität bereits einem anderen Konto, leitet der Callback mit 
 Vertrauensgrenzen:
 
 1. **Browser ↔ Backend**: Alles aus dem Browser ist unvertrauenswürdig (Query `state`, `code`,
-   `return_to`, Cookies, Einmal-Code). Das Backend vertraut nur eigenen, in der Datenbank
+   `return_to`, `return_host`, `Host`-Header, Cookies, Einmal-Code). Das Backend vertraut nur eigenen, in der Datenbank
    gespeicherten Login-States.
 2. **Backend ↔ IdP**: Globale Anbieter konfiguriert der Betreiber (vertrauenswürdig, auch interne
    Adressen erlaubt); den IdP eines Seiten-SSO pflegt ein Seiten-Admin (eingeschränkt vertrauenswürdig:
@@ -105,13 +105,16 @@ STRIDE:
 | Repudiation | Unbemerkte Anmeldungen | Audit-Einträge `auth.sso_login`/`auth.sso_linked` mit Anbieter. |
 | Information Disclosure | JWT in URL, History, Referrer | Nur kurzlebiger Einmal-Code in der URL, JWT per `POST /api/auth/sso-exchange`; Code genau einmal. |
 | Information Disclosure | Geheimnisse im Log | Client-Secrets werden nie geloggt; Fehlertexte werden bereinigt (`logging.SanitizeErr`). |
-| Information Disclosure | Open Redirect über `return_to` | Nur ein Pfad mit genau einem `/` (auch nach Dekodieren), keine Steuerzeichen, Leerzeichen, Backslashes, nicht `/api`, höchstens 2048 Byte; sonst verworfen. Das Ziel geht nur als JSON ans Frontend. Fehler-Redirects nutzen nur `FRONTEND_URL` und feste Codes. |
+| Information Disclosure | Open Redirect über `return_to` | Nur ein Pfad mit genau einem `/` (auch nach Dekodieren), keine Steuerzeichen, Leerzeichen, Backslashes, nicht `/api`, höchstens 2048 Byte; sonst verworfen. Das Ziel geht nur als JSON ans Frontend. Fehler-Redirects nutzen nur `FRONTEND_URL` (oder die geprüfte eigene Domain, siehe nächste Zeile) und feste Codes. |
+| Information Disclosure | Open Redirect über `return_host` (Rücksprung auf eine eigene Domain) | Nur der exakte Hostname einer eigenen Domain im Status „Verifiziert“/„Aktiv“ aus der Datenbank, beim Seiten-SSO nur die Domain derselben Seite; beim Callback erneut geprüft; Ziel immer `https://` mit dem Wert aus der Datenbank. Sonst `FRONTEND_URL`. |
+| Elevation of Privilege | Mandant kontrolliert das DNS seiner eigenen Domain und liest die dort gespeicherte Sitzung (oder lockt mit einem präparierten Login-Link `return_host=<seine Domain>` ein fremdes Konto dorthin; bei laufender IdP-Sitzung ohne Klick) | Code geht nur an die eigene Domain, wenn das Konto einer Rolle dort zugestimmt hat (Auto-Join-Rollen sind markiert und zählen nie, Bestandsrollen nur ohne Hinweis auf einen Auto-Join), sonst Login unter `FRONTEND_URL` auf der Startseite; Callback-Fehler immer unter `FRONTEND_URL`. Sitzungen auf einer eigenen Domain (OIDC und Passwort) gelten nur für die Seite der Domain, nie mit Global-Admin-Rechten, und dürfen nicht am Konto handeln (löschen, exportieren, Anmeldungen verknüpfen/lösen: `403 custom_domain_session`). Host und Origin werden normalisiert (Groß-/Kleinschreibung, Port, Punkt am Ende). Der Einmal-Code ist an den Ziel-Origin gebunden. |
 | Denial of Service | Viele Login-Starts, langsame IdPs | Rate-Limits (20/min Login/Callback, 10/min Exchange, 60/min Auth-Config), Zeitgrenzen der HTTP-Clients, Discovery-Cache mit Negativ-Cache, abgelaufene States werden gelöscht. |
 | Elevation of Privilege | Seiten-IdP verschafft globale Rechte | Seiten-SSO-Sitzungen gelten nur für ihre Seite und dürfen keinen globalen Anbieter verknüpfen; Global Admins nutzen kein Seiten-SSO. |
 | Elevation of Privilege | Start-Admin über unbestätigte E-Mail | `SSO_BOOTSTRAP_ADMIN_EMAILS` greift nur mit `email_verified=true` und der E-Mail des Kontos. |
 | Elevation of Privilege | Passwort-Login trotz Abschaltung | `POST /api/login` und alle Passwort-Setz-Endpunkte antworten `403 password_login_disabled`. |
 
-Missbrauchsfälle als Go-Tests: `handlers/return_to_test.go`, `handlers/oidc_global_test.go`
+Missbrauchsfälle als Go-Tests: `handlers/return_to_test.go`, `handlers/login_origin_test.go`
+(eigene Domains), `handlers/oidc_global_test.go`
 (State, Nonce, Issuer, Client-ID, `email_verified`, Domains, unbekannte Anbieter),
 `handlers/password_login_test.go`, `main_sso_removed_routes_test.go`.
 

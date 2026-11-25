@@ -26,9 +26,12 @@ func randomToken(nBytes int) string {
 //
 // returnTo is the validated frontend path the login started from (see
 // sanitizeReturnTo), "" if none.
+// host is the custom domain the code was sent to ("" for FRONTEND_URL); the
+// code is redeemed only from there (see SSOExchangeHandler).
 type ssoCodeEntry struct {
 	token    string
 	returnTo string
+	host     string
 	expires  time.Time
 }
 
@@ -37,10 +40,10 @@ var (
 	ssoCodeStore = map[string]ssoCodeEntry{}
 )
 
-func storeSSOCode(token, returnTo string) string {
+func storeSSOCode(token, returnTo, host string) string {
 	code := randomToken(32)
 	ssoCodeMu.Lock()
-	ssoCodeStore[code] = ssoCodeEntry{token: token, returnTo: returnTo, expires: time.Now().Add(ssoCodeExpiry())}
+	ssoCodeStore[code] = ssoCodeEntry{token: token, returnTo: returnTo, host: host, expires: time.Now().Add(ssoCodeExpiry())}
 	ssoCodeMu.Unlock()
 	return code
 }
@@ -168,8 +171,12 @@ func (h *Handler) SSOExchangeHandler(c *gin.Context) {
 		return
 	}
 
+	// The code is redeemed once, also when the origin does not match: a code
+	// for a custom domain only there, a code for FRONTEND_URL never on one.
+	// No boundary against a server-side attacker (any header can be sent);
+	// that is what the page limit and the role check are for.
 	entry, ok := consumeSSOCode(req.Code)
-	if !ok {
+	if !ok || h.browserOrigin(c).host != entry.host {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Ungültiger oder abgelaufener Code", "code": "login_code_invalid"})
 		return
 	}

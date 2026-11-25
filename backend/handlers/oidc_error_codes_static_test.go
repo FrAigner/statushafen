@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// OIDC login errors reach the browser as ?oidc_error=<code> (oidcErrorURL) and the frontend
+// OIDC login errors reach the browser as ?oidc_error=<code> (ssoErrorURL, loginStartErrorURL) and the frontend
 // translates them under auth.oidcErrors.<code>; an unknown code only shows the generic
 // "unknown" text. Every code declared as an oidcError literal therefore needs a translation in
 // both UI languages. "internal" is deliberately shown with the generic text.

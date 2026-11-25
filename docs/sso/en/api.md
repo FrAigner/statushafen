@@ -100,7 +100,7 @@ instead.
 ### `GET /api/auth/sso/login`
 
 Public, limited to 20 calls per minute. Query: `slug` (slug of the status page), optional
-`return_to`. Entry into the page
+`return_to` and `return_host` (see [custom domain](providers.md#status-pages-on-a-custom-domain)). Entry into the page
 SSO without the page ID: the server starts the
 flow like `oidc/login` and redirects to the IdP with `307`. An unknown page, a page
 without active SSO and a missing `slug` all end the same way: a redirect to the login page with the
@@ -113,7 +113,7 @@ visitor (missing or private).
 ### `GET /api/auth/oidc/login`
 
 Public, limited to 20 calls per minute. Query: `page` (ID of the status page, mandatory),
-`return_to` (optional, see [returning](providers.md#returning-after-the-login)). Creates
+`return_to` and `return_host` (optional, see [returning](providers.md#returning-after-the-login)). Creates
 state, nonce and PKCE verifier (valid for 10 minutes), sets the cookie `oidc_state` (HttpOnly,
 Secure) and redirects to the IdP with `307`. Errors redirect to the login page (codes `bad_page`,
 `not_configured`, `provider_unreachable`, `internal`).
@@ -157,8 +157,10 @@ client data.
 
 ### `GET /api/auth/provider/:id/login`
 
-Public, limited to 20 calls per minute. Query: `return_to` (optional, see
-[returning](providers.md#returning-after-the-login)). Creates state, nonce and PKCE verifier (valid for
+Public, limited to 20 calls per minute. Query: `return_to` and `return_host` (optional, see
+[returning](providers.md#returning-after-the-login)). If one of these three login starts arrives on a
+verified custom domain, it first redirects with `307` to the same path under `BASE_URL` (with the
+domain as `return_host`). Creates state, nonce and PKCE verifier (valid for
 10 minutes), sets the cookie `oidc_state` (path `/api/auth/provider`, HttpOnly, Secure) and redirects
 to the provider with `307`. Errors redirect to the login page (`provider_unknown`,
 `provider_unreachable`, `internal`).
@@ -185,7 +187,8 @@ a page SSO), `404` (unknown ID), `502` (provider not reachable), `500`.
 
 Public, limited to 10 calls per minute. Exchanges the one-time code from the redirect for the JWT.
 Body: `{"code": "<one-time code>"}`. Response `200`: `{"token": "<JWT>", "return_to": "/path"}`
-(`return_to` is the checked return path from the login start, otherwise `""`). The code is valid only
+(`return_to` is the checked return path from the login start, otherwise `""`). A code for a custom domain
+is redeemed only there, a code for `FRONTEND_URL` never on a custom domain (otherwise `401`). The code is valid only
 once and only briefly. After a page SSO the JWT is valid only for the page whose IdP confirmed the
 sign-in; after a global provider for the whole account.
 

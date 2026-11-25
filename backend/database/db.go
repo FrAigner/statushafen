@@ -251,6 +251,8 @@ func InitDB() {
 	dropLegacySSOIdentityIndex(DB)
 	// Bestandsabos vor dem Double-Opt-in gelten als bestätigt.
 	backfillSubscriberStatus(DB)
+	// Memberships from before joined_via count as legacy (custom domain login).
+	backfillMembershipOrigin(DB)
 	// Altwert "completed" bei Vorfällen/Wartungen auf "resolved".
 	migrateCompletedIncidentStatus(DB)
 	migrateExternalSourceProvider(DB)

@@ -301,6 +301,11 @@ paths:
         Nur mit `PASSWORD_LOGIN_ENABLED=true` (bzw. `1`, `yes`). Standardmäßig
         aus: dann `403` mit Code `password_login_disabled`, ohne Prüfung der
         Zugangsdaten; angemeldet wird über die globalen OIDC-Anbieter.
+        Kommt die Anfrage von der verifizierten eigenen Domain einer
+        Statusseite (`Origin`- oder `Host`-Header, ohne Rücksicht auf
+        Groß-/Kleinschreibung, Port und Punkt am Ende), gilt die Sitzung nur
+        für diese Seite (`sso_page_id` und `custom_domain` im JWT,
+        `is_global_admin` immer `false`).
       security: []
       x-rate-limit: 20/min pro IP
       requestBody:
@@ -348,6 +353,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -404,6 +410,8 @@ paths:
         Auch für Global Admins. Eine Sitzung aus einem Seiten-SSO
         (`sso_page_id`) darf keinen globalen Anbieter verknüpfen (`403`).
         Unbekannte Anbieter-ID: `404`.
+        Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
       x-required-permission: authenticated
       responses:
         "200":
@@ -421,6 +429,11 @@ paths:
       tags: [Auth]
       operationId: ssoExchange
       summary: SSO-Einmal-Code gegen Login-Token tauschen
+      description: |
+        Der Code gilt genau einmal und nur auf dem Origin, an den er ging: ein
+        Code für eine eigene Domain nur dort (`Origin`- oder `Host`-Header),
+        ein Code für `FRONTEND_URL` nie auf einer eigenen Domain; sonst `401`
+        `login_code_invalid` (der Code ist dann verbraucht).
       security: []
       x-rate-limit: 10/min pro IP
       requestBody:
@@ -442,7 +455,7 @@ paths:
                 required: [token, return_to]
                 properties:
                   return_to: { type: string, description: "Geprüfter Rücksprungpfad aus dem Login-Start (`return_to`), sonst leer. Nach einer Verknüpfung immer leer (dort gilt `next=profile`)." }
-                  token: { type: string, description: "JWT für `X-Auth-Token` (oder `Authorization: Bearer`). Nach OIDC einer Statusseite mit Claim `sso_page_id`: Das Token gilt nur für diese Seite und nie mit Global-Admin-Rechten." }
+                  token: { type: string, description: "JWT für `X-Auth-Token` (oder `Authorization: Bearer`). Nach OIDC einer Statusseite mit Claim `sso_page_id`: Das Token gilt nur für diese Seite und nie mit Global-Admin-Rechten. Auf einer eigenen Domain zusätzlich `custom_domain` (siehe Parameter `return_host`)." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -475,6 +488,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -507,6 +521,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -545,6 +560,8 @@ paths:
         Liefert die Authorize-URL als JSON (ein Redirect würde den
         Authorization-Header nicht mitschicken). Für Global Admins und Konten
         mit Rolle auf einer anderen Seite gesperrt.
+        Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
       x-required-permission: authenticated
       parameters:
         - name: page
@@ -1940,6 +1957,8 @@ paths:
         nur mitgelöscht, wenn ihre IDs in `confirm_delete_page_ids` stehen.
         Der letzte Global Admin kann sich nicht löschen (409
         `last_global_admin`).
+        Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
       x-required-permission: authenticated
       requestBody:
         required: true
@@ -1987,6 +2006,9 @@ paths:
       tags: [Me]
       operationId: exportMe
       summary: Eigene Daten als JSON-Download (DSGVO)
+      description: |
+        Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
       x-required-permission: authenticated
       responses:
         "200":
@@ -2024,6 +2046,7 @@ paths:
                         created_at: { type: string, format: date-time }
                         expires_at: { type: string, format: date-time }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/me/pages:
     get:
       tags: [Me]
@@ -2232,11 +2255,15 @@ paths:
       tags: [Me]
       operationId: deleteMySSO
       summary: SSO-Verknüpfung lösen
+      description: |
+        Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
       x-required-permission: authenticated
       responses:
         "204": { description: Gelöst. }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ------------------------------------------------------------------
@@ -4684,6 +4711,27 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    ReturnHost:
+      name: return_host
+      in: query
+      required: false
+      description: |
+        Verifizierte eigene Domain einer Statusseite, auf der der Login begann
+        (exakter Hostname, ohne Schema, Port oder Pfad). Nach der Anmeldung
+        geht der Einmal-Code an `https://<return_host>/auth/sso-callback`,
+        Fehler beim Login-Start an `https://<return_host>/login?oidc_error=<code>`
+        (Fehler im Callback immer an `FRONTEND_URL`). Gilt nur
+        für Domains im Status `verified`/`active`, beim Seiten-SSO nur für die
+        Domain derselben Seite, und wird beim Callback erneut geprüft; sonst
+        verworfen (Ziel `FRONTEND_URL`). Der Code geht nur an die Domain, wenn
+        das Konto einer Rolle auf ihrer Seite zugestimmt hat (nicht per
+        Auto-Join); sonst endet der Login unter `FRONTEND_URL` auf der Startseite. Die Sitzung gilt dann nur für die
+        Seite der Domain (`sso_page_id`, keine Global-Admin-Rechte, Claim
+        `custom_domain`: kein Löschen, Export oder Verknüpfen des Kontos). Kommt der
+        Login-Start selbst auf einer verifizierten eigenen Domain an, leitet er
+        zuerst mit `307` auf denselben Pfad unter `BASE_URL` um und setzt
+        `return_host` auf diese Domain (der `Host` gewinnt gegen die Query).
+      schema: { type: string, maxLength: 253 }
     ProviderId:
       name: id
       in: path

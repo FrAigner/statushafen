@@ -125,3 +125,22 @@ func TestGenerateTokenFull_CarriesTokenVersion(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, callWithToken(r, "/strict", sso).Code)
 	assert.Equal(t, http.StatusUnauthorized, callWithToken(r, "/strict", page).Code)
 }
+
+// WithSSOPageID limits a password session to one page (custom domain login).
+func TestGenerateToken_WithSSOPageIDLimitsTheSession(t *testing.T) {
+	db := testutils.SetupTestDB()
+	u := models.User{Email: "scoped@example.com"}
+	require.NoError(t, db.Create(&u).Error)
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/scope", middleware.AuthMiddleware(), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"page": middleware.SSOPageID(c), "other": middleware.SSOAllowsPage(c, 8)})
+	})
+	scoped, err := middleware.GenerateToken(u.ID, u.Email, "", "", false, middleware.WithSSOPageID(7))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"page":7,"other":false}`, callWithToken(r, "/scope", scoped).Body.String())
+
+	full, err := middleware.GenerateToken(u.ID, u.Email, "", "", false, middleware.WithSSOPageID(0))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"page":0,"other":true}`, callWithToken(r, "/scope", full).Body.String())
+}

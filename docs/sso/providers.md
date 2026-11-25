@@ -108,6 +108,46 @@ führender `/`, kein `//`, keine Steuer- oder Leerzeichen, kein Backslash, nicht
 höchstens 2048 Byte) und verwirft ihn sonst stillschweigend. `POST /api/auth/sso-exchange` liefert
 ihn als `return_to` zurück. Nach dem Verknüpfen geht es weiter ins Profil.
 
+### Statusseiten auf eigener Domain
+
+Startet der Login auf der verifizierten eigenen Domain einer Statusseite (etwa `status.acme.example`),
+geht es nach der Anmeldung dorthin zurück, und die Sitzung gilt auf dieser Domain. Das gilt für
+globale Anbieter, das Seiten-SSO und den Passwort-Login.
+
+1. Ein Login-Start, der auf der eigenen Domain ankommt, leitet zuerst auf denselben Pfad unter
+   `BASE_URL` weiter und hängt die Domain als `return_host` an. Das State-Cookie muss den Callback
+   unter `BASE_URL` erreichen. Der `Host` der Anfrage gewinnt gegen ein `return_host` in der Query.
+2. Der Server übernimmt `return_host` nur, wenn es exakt der Hostname einer eigenen Domain im Status
+   „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
+   (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)
+   wird verworfen; der Login endet dann wie bisher unter `FRONTEND_URL`.
+3. Der Callback prüft die Domain erneut. Hat das Konto einer Rolle auf der Seite der Domain zugestimmt
+   (Einladung, Zuweisung durch einen Global Admin, Bestellung), leitet er nach
+   `https://<Domain>/auth/sso-callback?code=…` weiter. Sonst endet der Login unter `FRONTEND_URL` auf der
+   Startseite (globale Anbieter: volle Sitzung). Eine Rolle aus dem Auto-Join zählt nie, denn dessen
+   E-Mail-Domains pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Rollen aus der Zeit
+   vor dieser Markierung zählen nur, wenn die Seite gerade keinen Auto-Join eingerichtet hat und das
+   Audit-Log keinen Auto-Join dieses Kontos auf dieser Seite kennt. Fehler im Callback gehen immer an
+   `FRONTEND_URL`, nur Fehler beim Login-Start (ohne Kontobezug) an die eigene Domain.
+4. Das Frontend dort tauscht den Code auf demselben Origin ein. Der Code ist an diesen Origin gebunden:
+   Ein Code für eine eigene Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer
+   eigenen Domain. Der Passwort-Login läuft ohnehin auf demselben Origin.
+
+Wer das DNS einer eigenen Domain kontrolliert, also der Mandant, kann dort eigenen Code ausliefern und
+lesen, was der Browser für diese Domain speichert. Eine Sitzung auf einer eigenen Domain (OIDC und
+Passwort) gilt deshalb nur für die Statusseite dieser Domain, nie mit Global-Admin-Rechten, und darf
+nicht am Konto selbst handeln: Konto löschen (`DELETE /api/me`), Datenexport (`GET /api/me/export`),
+Anmeldungen verknüpfen oder lösen (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
+`DELETE /api/me/sso/<id>`) antworten mit `403 custom_domain_session`. Dafür meldet man sich unter
+`FRONTEND_URL` an. Für eine private Seite braucht man eine Rolle auf dieser Seite; Global Admins
+verwalten unter `FRONTEND_URL`.
+
+Vertrag mit dem Reverse-Proxy: Er reicht für eigene Domains den `Host`-Header durch und liefert `/api`
+auf demselben Origin aus (Standard-Image, `VITE_API_URL` leer). Ob eine Anfrage von einer eigenen
+Domain kommt, entscheidet das Backend am `Origin`-Header des Browsers oder am `Host`, beide ohne
+Rücksicht auf Groß-/Kleinschreibung, Port und Punkt am Ende. Schreibt der Proxy den `Host` um, bleibt
+der `Origin` maßgeblich; der Umweg über `BASE_URL` beim Login-Start braucht aber den echten `Host`.
+
 ## Fehlersuche
 
 Fehler im Browser-Ablauf landen als Code auf der Login-Seite (`?oidc_error=<Code>`), beim Verknüpfen
