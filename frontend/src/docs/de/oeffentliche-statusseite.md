@@ -25,10 +25,12 @@ die normal laufen. Darunter folgen, soweit es etwas zu zeigen gibt:
 ## Suchen und Filtern
 
 - **Suchfeld:** durchsucht Komponenten (Name und Beschreibung) und Vorfälle (Titel und Nachricht).
-  Mehrere Wörter gelten als UND. Mit `AND`/`UND` und `OR`/`ODER` lassen sich Begriffe verknüpfen,
-  wobei UND stärker bindet als ODER. Eine Phrase steht in Anführungszeichen. Beispiele:
-  `Frankfurt UND Datenbank`, `London ODER Paris`, `"Frankfurt Süd" ODER Hamburg`. Das Fragezeichen
-  neben dem Feld zeigt diese Hilfe.
+  - Mehrere Wörter gelten als UND.
+  - Mit `AND`/`UND` und `OR`/`ODER` lassen sich Begriffe verknüpfen, wobei UND stärker bindet als
+    ODER.
+  - Eine Phrase steht in Anführungszeichen.
+  - Beispiele: `Frankfurt UND Datenbank`, `London ODER Paris`, `"Frankfurt Süd" ODER Hamburg`.
+  - Das Fragezeichen neben dem Feld zeigt diese Hilfe.
 - **Region:** Chips mit den [Tags](/docs/komponenten-und-tags#tags-und-reichweite) der Seite. Man
   kann mehrere Regionen wählen. Bei vielen Tags zeigt die Seite zunächst nur einen Teil und den
   Knopf „Mehr anzeigen“.
@@ -40,13 +42,18 @@ die normal laufen. Darunter folgen, soweit es etwas zu zeigen gibt:
 ## Vorfälle und ihr Verlauf
 
 Unter „Aktuelle Vorfälle“ steht jeder offene Vorfall mit Titel, Status, betroffenen Komponenten und
-Beginn. Die drei jüngsten Vorfälle zeigen ihre neuesten drei Updates gleich darunter; das neueste
-trägt die Kennzeichnung **Letztes Update**. Ein Klick auf „Vollständigen Verlauf anzeigen“ öffnet
-alle Updates, neueste zuerst. Ganz unten im Verlauf steht die **Erstmeldung**, also die
-ursprüngliche Beschreibung des Vorfalls. Sie bleibt erhalten, auch wenn spätere Updates den Stand
-ändern. Sobald ein Vorfall behoben ist, wandert er in „Vergangene Vorfälle“. Die Seite zeigt zunächst
-alle offenen und die neuesten 50 behobenen Vorfälle; mit „Ältere Vorfälle laden“ kommen jeweils 50
-weitere dazu. Wie Admins Vorfälle pflegen, steht unter [Vorfälle](/docs/vorfaelle).
+Beginn.
+
+- **Neueste Updates:** Die drei jüngsten Vorfälle zeigen ihre neuesten drei Updates gleich
+  darunter; das neueste trägt die Kennzeichnung **Letztes Update**.
+- **Vollständiger Verlauf:** Ein Klick auf „Vollständigen Verlauf anzeigen“ öffnet alle Updates,
+  neueste zuerst. Ganz unten im Verlauf steht die **Erstmeldung**, also die ursprüngliche
+  Beschreibung des Vorfalls. Sie bleibt erhalten, auch wenn spätere Updates den Stand ändern.
+- **Behobene Vorfälle:** Sobald ein Vorfall behoben ist, wandert er in „Vergangene Vorfälle“.
+- **Umfang:** Die Seite zeigt zunächst alle offenen und die neuesten 50 behobenen Vorfälle; mit
+  „Ältere Vorfälle laden“ kommen jeweils 50 weitere dazu.
+
+Wie Admins Vorfälle pflegen, steht unter [Vorfälle](/docs/vorfaelle).
 
 ## Verfügbarkeit der letzten 90 Tage
 
@@ -68,17 +75,20 @@ Komponente. Die Werte stammen aus den Vorfällen und Wartungen der Seite; der Se
   Seite mindestens 24 Stunden beobachtet wurde; davor zeigt die Seite „noch keine Daten“.
 - **Statushistorie der Komponenten:** Jede Statusänderung einer Komponente (per Webhook, von Hand,
   durch ein Wartungsfenster oder die Selbstüberwachung) wird mit Zeitpunkt, altem und neuem Status
-  und Quelle gespeichert und zählt in der Verfügbarkeit mit ihrem Status, auch ohne Vorfall. Läuft
-  zugleich ein Vorfall, gilt der schlimmste Status. Die Historie beginnt mit dem Update, das sie
-  einführt: Der damals aktuelle Status gilt ab diesem Zeitpunkt, davor Gesetztes kennt Statushafen
-  nicht (dafür bleibt ein [Vorfall](/docs/vorfaelle) nötig). Einträge werden 365 Tage aufbewahrt, der
-  jeweils letzte Stand vor dieser Frist bleibt als Ausgangsstatus erhalten.
-  Wechselt ein Monitoring per Webhook binnen 30 Sekunden mehrfach (Flattern), fasst Statushafen
-  die Historie zusammen: Der Status gilt sofort, aber es bleiben höchstens zwei Einträge je
-  30-Sekunden-Fenster: einer mit dem schlimmsten Status des Fensters und einer mit dem Endstand.
-  Es geht nie ein Ausfall verloren. Die Verfügbarkeit ist dabei pessimistisch: Das ganze Fenster
-  zählt als schlimmster Status, nie als besser. Je Komponente fließen höchstens die neuesten 10.000 Wechsel des Fensters ein; wird
-  gekürzt, enthält die Antwort der Verfügbarkeit `history_truncated: true`.
+  und Quelle gespeichert und zählt in der Verfügbarkeit mit ihrem Status, auch ohne Vorfall.
+  - Läuft zugleich ein Vorfall, gilt der schlimmste Status.
+  - **Beginn:** Die Historie beginnt mit dem Update, das sie einführt: Der damals aktuelle Status
+    gilt ab diesem Zeitpunkt, davor Gesetztes kennt Statushafen nicht (dafür bleibt ein
+    [Vorfall](/docs/vorfaelle) nötig).
+  - **Aufbewahrung:** Einträge werden 365 Tage aufbewahrt, der jeweils letzte Stand vor dieser
+    Frist bleibt als Ausgangsstatus erhalten.
+  - **Flattern:** Wechselt ein Monitoring per Webhook binnen 30 Sekunden mehrfach, fasst
+    Statushafen die Historie zusammen: Der Status gilt sofort, aber es bleiben
+    höchstens zwei Einträge je 30-Sekunden-Fenster: einer mit dem schlimmsten Status des Fensters und einer mit
+    dem Endstand. Es geht nie ein Ausfall verloren. Die Verfügbarkeit ist dabei pessimistisch: Das
+    ganze Fenster zählt als schlimmster Status, nie als besser.
+  - **Obergrenze:** Je Komponente fließen höchstens die neuesten 10.000 Wechsel des Fensters ein;
+    wird gekürzt, enthält die Antwort der Verfügbarkeit `history_truncated: true`.
 - Prozentwerte werden abgeschnitten, nicht gerundet, damit 99,996 % nicht als 100,00 % erscheint.
 
 ### Verfügbarkeit und Berechnung
@@ -102,14 +112,15 @@ Stunden „Beeinträchtigt“ ergeben 1,8 Stunden gewichtete Ausfallzeit, also 9
 - **Gesamtseite:** Der Wert der Seite ist der Durchschnitt über alle sichtbaren Komponenten, die
   Tagesfarbe der schlimmste Status eines beliebigen Tages. Ein Vorfall ohne Komponente betrifft
   alle sichtbaren Komponenten.
-- **Woher der Schweregrad kommt:** Eigene Vorfälle tragen einen Schweregrad
-  (Beeinträchtigt 0,3, Teilausfall 0,6, Großstörung 1,0); Vorfälle ohne Angabe, auch ältere,
-  zählen als „Beeinträchtigt“. Die Änderung gilt auch rückwirkend (nach spätestens einer Minute,
-  wegen des Zwischenspeichers). Gespiegelte Meldungen [externer Quellen](/docs/externe-quellen)
-  bringen ihre Auswirkung mit: „minor“ zählt als Beeinträchtigt, „major“ als Teilausfall,
-  „critical“ als Großstörung, „none“ gar nicht. Der Status aus der Statushistorie der
-  Komponenten zählt mit seiner eigenen Stufe (Beeinträchtigt, Teilausfall, Großstörung; Wartung
-  zählt nicht).
+- **Woher der Schweregrad kommt:**
+  - Eigene Vorfälle tragen einen Schweregrad (Beeinträchtigt 0,3, Teilausfall 0,6, Großstörung
+    1,0); Vorfälle ohne Angabe, auch ältere, zählen als „Beeinträchtigt“. Die Änderung gilt auch
+    rückwirkend (nach spätestens einer Minute, wegen des Zwischenspeichers).
+  - Gespiegelte Meldungen [externer Quellen](/docs/externe-quellen) bringen ihre Auswirkung mit:
+    „minor“ zählt als Beeinträchtigt, „major“ als Teilausfall, „critical“ als Großstörung, „none“
+    gar nicht.
+  - Der Status aus der Statushistorie der Komponenten zählt mit seiner eigenen Stufe
+    (Beeinträchtigt, Teilausfall, Großstörung; Wartung zählt nicht).
 - Unter 24 Stunden Beobachtung zeigt die Seite weiter „Keine Daten“ statt einer Prozentzahl.
 
 Die Rohdaten liefert `GET /api/public/pages/<slug>/availability`, siehe
@@ -125,16 +136,19 @@ Status.
 
 Der Abschnitt **Meldungen externer Quellen** zeigt die Vorfälle und Wartungen der Anbieter, die
 gekoppelte Komponenten betreffen: offene Meldungen und solche, die in den letzten 14 Tagen endeten.
-Jede ist als „extern“ gekennzeichnet, nennt die betroffenen Komponenten und verlinkt auf die
-Originalseite („Original bei … ansehen“); maßgeblich ist stets die Originalseite. Suche und
-Filter wirken auch auf diese Meldungen, über die betroffenen Komponenten.
+
+- Jede ist als „extern“ gekennzeichnet, nennt die betroffenen Komponenten und verlinkt auf die
+  Originalseite („Original bei … ansehen“); maßgeblich ist stets die Originalseite.
+- Suche und Filter wirken auch auf diese Meldungen, über die betroffenen Komponenten.
 
 ## Private Seiten
 
-Eine private Seite zeigt nur angemeldeten Nutzern mit Zugriff Inhalt; alle anderen sehen den Hinweis
-„Statusseite nicht verfügbar“ mit Link zum Login (und, wenn die Seite ein SSO nutzt, dem Knopf „Mit
-SSO anmelden“). Der Hinweis lautet bewusst „gibt es nicht oder ist privat“: Für Besucher ohne
-Berechtigung antwortet eine private Seite technisch genauso wie eine Seite, die es nicht gibt (HTTP 404),
-damit niemand von außen erkennen kann, welche Adressen zu privaten Seiten gehören. Auch die
-Programmierschnittstelle verrät es nicht. Auf der Startseite von Statushafen erscheinen private
-Seiten nicht.
+Eine private Seite zeigt nur angemeldeten Nutzern mit Zugriff Inhalt.
+
+- **Alle anderen** sehen den Hinweis „Statusseite nicht verfügbar“ mit Link zum Login (und, wenn
+  die Seite ein SSO nutzt, dem Knopf „Mit SSO anmelden“).
+- **Kein Verraten:** Der Hinweis lautet bewusst „gibt es nicht oder ist privat“: Für Besucher ohne
+  Berechtigung antwortet eine private Seite technisch genauso wie eine Seite, die es nicht gibt
+  (HTTP 404), damit niemand von außen erkennen kann, welche Adressen zu privaten Seiten gehören.
+  Auch die Programmierschnittstelle verrät es nicht.
+- **Startseite:** Auf der Startseite von Statushafen erscheinen private Seiten nicht.

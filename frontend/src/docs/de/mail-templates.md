@@ -55,13 +55,16 @@ Editor zeigt „Verfügbare Platzhalter“ die Liste; tippt man `{`, schlägt de
 
 ## Erlaubte Konstrukte und Grenzen
 
-Vorlagen dürfen nur Platzhalter und einfache Bedingungen enthalten: `{{if …}}…{{else}}…{{end}}` mit
-den Funktionen `eq`, `ne`, `not`, `and` und `or`, zum Beispiel `{{if eq .Status "resolved"}}…{{end}}`.
-Schleifen (`range`), Unterschablonen (`template`, `define`, `block`), Variablen, `printf` und andere
-Funktionen werden beim Speichern und in der Vorschau abgelehnt. Der Betreff darf höchstens 500 Zeichen
-lang sein, der Inhalt höchstens 64 KB; das gerenderte Ergebnis ist in Größe und Laufzeit begrenzt.
-Eine früher gespeicherte Vorlage, die diese Regeln verletzt, wird nicht verwendet; stattdessen
-geht der eingebaute Text raus.
+Vorlagen dürfen nur Platzhalter und einfache Bedingungen enthalten:
+
+- **Erlaubt:** `{{if …}}…{{else}}…{{end}}` mit den Funktionen `eq`, `ne`, `not`, `and` und `or`,
+  zum Beispiel `{{if eq .Status "resolved"}}…{{end}}`.
+- **Abgelehnt** (beim Speichern und in der Vorschau): Schleifen (`range`), Unterschablonen
+  (`template`, `define`, `block`), Variablen, `printf` und andere Funktionen.
+- **Grenzen:** Der Betreff darf höchstens 500 Zeichen lang sein, der Inhalt höchstens 64 KB; das
+  gerenderte Ergebnis ist in Größe und Laufzeit begrenzt.
+- **Alte Vorlagen:** Eine früher gespeicherte Vorlage, die diese Regeln verletzt, wird nicht
+  verwendet; stattdessen geht der eingebaute Text raus.
 
 Die Vorlage der **Abo-Bestätigung** muss `{{.ConfirmURL}}` enthalten (nicht nur innerhalb einer
 Bedingung). Statushafen setzt sie in einen festen Rahmen mit Seitenname und einem Hinweis für
@@ -89,26 +92,39 @@ Text:
 Für gespiegelte Meldungen [externer Quellen](/docs/externe-quellen#gespiegelte-meldungen) gibt es
 sechs weitere Ereignisse (`external_incident_created`, `external_incident_updated`,
 `external_incident_resolved` und dieselben drei für Wartungen mit `external_maintenance_…`),
-jeweils für die Empfängergruppe „Abonnenten“ in der Standardsprache der Seite. Der Editor bietet
-sie unter „Externer Vorfall: …“ und „Externe Wartung: …“ an und stellt die Empfängergruppe dabei
-auf „Abonnenten“. Zusätzlich zu den Platzhaltern oben stehen dort `{{.SourceName}}` (Name der Quelle) und `{{.SourceURL}}` (Link auf
-die Originalmeldung) zur Verfügung. Ohne eigenes Template verschickt Statushafen einen
-eingebauten Text. Die Ausfall-Mails einer Quelle haben immer den eingebauten Text.
+jeweils für die Empfängergruppe „Abonnenten“ in der Standardsprache der Seite.
+
+- **Im Editor:** unter „Externer Vorfall: …“ und „Externe Wartung: …“; die Empfängergruppe wird
+  dabei auf „Abonnenten“ gestellt.
+- **Zusätzliche Platzhalter:** Zusätzlich zu den Platzhaltern oben stehen dort `{{.SourceName}}`
+  (Name der Quelle) und `{{.SourceURL}}` (Link auf die Originalmeldung) zur Verfügung.
+- **Ohne eigenes Template** verschickt Statushafen einen eingebauten Text.
+- Die **Ausfall-Mails** einer Quelle haben immer den eingebauten Text.
 
 ## Aktuelle Einschränkung
 
 Beim Abonnieren wird die Sprache des Besuchers als Mailsprache gespeichert, sofern die Seite sie
 aktiviert hat (sonst gilt die Standardsprache der Seite). Alle Mails an Abonnenten (Vorfälle,
-Wartungen, Ankündigungen, Abo-Bestätigung, Meldungen externer Quellen) nutzen das
-Abonnenten-Template in dieser Sprache, ersatzweise in der **Standardsprache der Seite**; fehlt
-auch das, geht der eingebaute Standardtext raus (Deutsch bzw. Englisch, bei jeder anderen Sprache
-Englisch). Ein Template einer dritten Sprache wird nicht ersatzweise genommen. Die Sprache ändern
+Wartungen, Ankündigungen, Abo-Bestätigung, Meldungen externer Quellen) wählen ihren Text in dieser
+Reihenfolge:
+
+1. das Abonnenten-Template in dieser Sprache,
+2. ersatzweise das in der **Standardsprache der Seite**,
+3. fehlt auch das, geht der eingebaute Standardtext raus (Deutsch bzw. Englisch, bei jeder
+   anderen Sprache Englisch).
+
+Ein Template einer dritten Sprache wird nicht ersatzweise genommen. Die Sprache ändern
 Abonnenten im Abo-Manager, Admins im Abonnenten-Formular (oder per API: `PUT /api/me/subscription`, Feld `language`).
 
 Interne Nutzer bekommen Vorfall-Mails in ihrer Oberflächensprache (Deutsch oder Englisch, ohne
 gespeicherte Sprache Englisch): zuerst das Staff-Template in dieser Sprache, ersatzweise das
 englische, sonst der eingebaute Text.
 
-Die Nachrichten an Google-Chat-Webhooks sind feste Texte ohne Template, auf Deutsch oder Englisch
-nach der Sprache des Abonnenten (jede andere Sprache bekommt Englisch); der globale Webhook
-(`GOOGLE_CHAT_WEBHOOK_URL`) bleibt englisch. Der globale Webhook ist ein Betreiber-Hilfsmittel für die ganze Instanz: Er erhält nur Vorfälle öffentlicher Seiten, nie die privater Seiten. Die Nachricht darin steht als Klartext (siehe [Formatierte Texte](/docs/formatierte-texte)).
+Google-Chat-Webhooks:
+
+- Die Nachrichten an Google-Chat-Webhooks sind feste Texte ohne Template, auf Deutsch oder
+  Englisch nach der Sprache des Abonnenten (jede andere Sprache bekommt Englisch).
+- Der globale Webhook (`GOOGLE_CHAT_WEBHOOK_URL`) bleibt englisch. Er ist ein
+  Betreiber-Hilfsmittel für die ganze Instanz: Er erhält nur Vorfälle öffentlicher Seiten, nie
+  die privater Seiten.
+- Die Nachricht darin steht als Klartext (siehe [Formatierte Texte](/docs/formatierte-texte)).
