@@ -12,8 +12,9 @@ Siehe den Schnellstart in der [README](README.de.md). Aufbau des Repositorys:
 
 - `backend/`: Go-API (Gin, GORM; PostgreSQL im Betrieb, SQLite im Speicher in den Tests). `main.go`
   registriert alle Routen, das Schema migriert `database.InitDB()`.
-- `frontend/`: Vue-3-Anwendung (Vite, vue-i18n, sit-onyx). Tests mit Vitest (`npm test`);
-  Komponententests stubben `global.fetch` und nutzen `src/test-support/onyxStubs.js`.
+- `frontend/`: Vue-3-Anwendung (Vite, vue-i18n, sit-onyx), im Umstieg von JavaScript auf TypeScript.
+  Tests mit Vitest (`npm test`); Komponententests stubben `global.fetch` und nutzen
+  `src/test-support/onyxStubs.js`.
 - `docs/`: Benutzerhandbuch, SSO-Anleitungen und OpenAPI-Spezifikation; die Hilfe in der Anwendung
   liegt in `frontend/src/docs`.
 - `scripts/`: Entwicklungsskripte hinter `./start.sh`.
@@ -21,8 +22,8 @@ Siehe den Schnellstart in der [README](README.de.md). Aufbau des Repositorys:
 ## Ablauf
 
 1. Eröffne bei größeren Änderungen zuerst ein Issue, damit wir den Weg abstimmen.
-2. Lege einen Branch an und committe in kleinen, fokussierten Schritten. Kommentare im Code und
-   Commit-Nachrichten sind üblicherweise deutsch; für Pull Requests und Issues ist Englisch in Ordnung.
+2. Lege einen Branch an und committe in kleinen, fokussierten Schritten. Kommentare und
+   Commit-Nachrichten schreibst du auf Englisch (siehe „Sprache“ unter [Konventionen](#konventionen)).
 3. Schreibe möglichst zuerst den Test (rot, dann grün) und ergänze Tests für Fehlerpfade.
 4. Führe die Prüfungen unten aus und öffne dann den Pull Request (ein Entwurf ist in Ordnung).
 
@@ -31,7 +32,7 @@ Siehe den Schnellstart in der [README](README.de.md). Aufbau des Repositorys:
 ```bash
 (cd backend && go vet ./... && go test ./...)
 (cd backend && golangci-lint run --config .golangci.yml)   # golangci-lint v2, gebaut mit der Go-Version aus go.mod
-(cd frontend && npm ci && npm run lint && npm test)
+(cd frontend && npm ci && npm run lint && npm run typecheck && npm test)
 (cd backend && go run ./cmd/workflowlint ../.github/workflows)  # bei Änderungen an Workflows
 ```
 
@@ -74,6 +75,16 @@ Mutationstests laufen nachts (`.github/workflows/mutation-nachts.yml`): Backend 
 
 ## Konventionen
 
+- **Sprache:** Alles, was nur Entwickler sehen, ist englisch: Code-Kommentare, Testbeschreibungen und
+  Commit-Nachrichten. Alles, was Anwender und Admins sehen (UI-Texte, Fehlermeldungen an der Oberfläche,
+  Hilfe in der Anwendung, Dokumentation), gibt es auf Deutsch und Englisch. Bestehende deutsche
+  Kommentare werden schrittweise umgestellt; schreibe sie nicht nur deshalb um. Pull Requests und Issues
+  gehen auf Englisch oder Deutsch.
+- **TypeScript im Frontend:** Neue Dateien schreibst du in TypeScript (`.ts`, `<script setup lang="ts">`).
+  Geprüft wird mit `strict` (`frontend/tsconfig.app.json`; Tests, E2E und Konfigurationsdateien in
+  `tsconfig.node.json`). Bestehender JavaScript-Code wird schrittweise migriert und bis dahin nicht
+  typgeprüft (`checkJs: false`). `npm run typecheck` (vue-tsc) gehört zu den Prüfungen vor dem Pull
+  Request und läuft in der CI; `src/tsconfigStrict.test.js` wacht über die Konfiguration.
 - **Neues Model:** in ALLE AutoMigrate-Listen eintragen (`backend/database/db.go`,
   `backend/testutils/setup.go` und lokale Test-Setups wie `backend/database/db_test.go`).
 - **Partielle Unique-Indizes** (Soft-Delete, „genau ein Default“) kann GORM AutoMigrate nicht; lege sie

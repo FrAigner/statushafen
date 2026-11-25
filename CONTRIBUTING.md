@@ -12,8 +12,9 @@ See the quick start in the [README](README.md). Layout of the repository:
 
 - `backend/` is the Go API (Gin, GORM; PostgreSQL in production, SQLite in memory in tests).
   `main.go` registers all routes; the schema is migrated by `database.InitDB()`.
-- `frontend/` is the Vue 3 app (Vite, vue-i18n, sit-onyx). Tests use Vitest (`npm test`); component
-  tests stub `global.fetch` and use `src/test-support/onyxStubs.js`.
+- `frontend/` is the Vue 3 app (Vite, vue-i18n, sit-onyx), moving from JavaScript to TypeScript.
+  Tests use Vitest (`npm test`); component tests stub `global.fetch` and use
+  `src/test-support/onyxStubs.js`.
 - `docs/` holds the user guide, the SSO guides and the OpenAPI specification; the in-app help lives in
   `frontend/src/docs`.
 - `scripts/` holds the development scripts behind `./start.sh`.
@@ -21,8 +22,8 @@ See the quick start in the [README](README.md). Layout of the repository:
 ## Workflow
 
 1. Open an issue for larger changes first, so we can agree on the approach.
-2. Create a branch, make small focused commits. Code comments and commit messages are written in
-   German by convention; English is fine for pull requests and issues.
+2. Create a branch, make small focused commits. Comments and commit messages are written in English
+   (see "Language" under [Conventions](#conventions)).
 3. Write the test first when you can (red, then green) and include tests for error paths.
 4. Run the checks below, then open a pull request (draft is fine).
 
@@ -31,7 +32,7 @@ See the quick start in the [README](README.md). Layout of the repository:
 ```bash
 (cd backend && go vet ./... && go test ./...)
 (cd backend && golangci-lint run --config .golangci.yml)   # golangci-lint v2, built with the Go version of go.mod
-(cd frontend && npm ci && npm run lint && npm test)
+(cd frontend && npm ci && npm run lint && npm run typecheck && npm test)
 (cd backend && go run ./cmd/workflowlint ../.github/workflows)  # when you change workflows
 ```
 
@@ -72,6 +73,16 @@ Mutation tests run nightly (`.github/workflows/mutation-nachts.yml`): backend wi
 
 ## Conventions
 
+- **Language:** everything only developers see is in English: code comments, test descriptions and
+  commit messages. Everything users and admins see (UI texts, error messages shown in the interface,
+  in-app help, documentation) exists in German and English. Existing German comments are switched to
+  English step by step; do not rewrite them just for that. Pull requests and issues may be in English
+  or German.
+- **TypeScript in the frontend:** write new files in TypeScript (`.ts`, `<script setup lang="ts">`).
+  They are checked with `strict` (`frontend/tsconfig.app.json`; tests, e2e and config files in
+  `tsconfig.node.json`). Existing JavaScript is migrated step by step and is not type-checked until then
+  (`checkJs: false`). `npm run typecheck` (vue-tsc) is part of the checks before a pull request and runs
+  in CI; `src/tsconfigStrict.test.js` guards the configuration.
 - **New model:** add it to every AutoMigrate list (`backend/database/db.go`, `backend/testutils/setup.go`,
   and local test setups such as `backend/database/db_test.go`).
 - **Partial unique indexes** (soft delete, "exactly one default") cannot be created by GORM
