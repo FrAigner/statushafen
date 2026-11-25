@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fraigner/statushafen/handlers"
+	"github.com/fraigner/statushafen/middleware"
 	"github.com/fraigner/statushafen/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -86,6 +88,10 @@ func TestRouter_EveryAnonymousReadRouteIsRateLimited(t *testing.T) {
 // Die Limits der zuvor unbegrenzten Routen (120 je Minute, die OAuth-Routen 20):
 // Das 121. bzw. 21. Anfrage wird mit 429 abgewiesen, normale Nutzung nicht.
 func TestRouter_FormerlyUnlimitedReadRoutesHaveTheirLimit(t *testing.T) {
+	// Freeze the limiter clock: under -race the requests are slow enough for the token bucket
+	// to refill mid-loop, which let the request over the limit through (404 instead of 429).
+	frozen := time.Date(2026, time.November, 25, 12, 0, 0, 0, time.UTC)
+	middleware.SetRateLimiterClockForTests(t.Cleanup, func() time.Time { return frozen })
 	r := newRouter(handlers.NewHandler(testutils.SetupTestDB()))
 	cases := []struct {
 		path  string

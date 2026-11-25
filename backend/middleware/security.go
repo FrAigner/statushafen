@@ -153,13 +153,25 @@ type rateLimiter struct {
 	now      func() time.Time
 }
 
+// rateLimiterNow is the clock of all rate limiters created by NewRateLimiter (tests replace it).
+var rateLimiterNow = time.Now
+
+// SetRateLimiterClockForTests replaces the rate limiter clock and registers the reset via
+// cleanup (like the other *ForTests helpers). It also affects limiters created earlier.
+func SetRateLimiterClockForTests(cleanup func(func()), now func() time.Time) {
+	prev := rateLimiterNow
+	rateLimiterNow = now
+	cleanup(func() { rateLimiterNow = prev })
+}
+
 func newRateLimiter(max int, per time.Duration, maxEntries int) *rateLimiter {
 	return &rateLimiter{
 		visitors: newLRUTable[visitor](maxEntries),
 		max:      float64(max),
 		refill:   float64(max) / per.Seconds(),
 		window:   per,
-		now:      time.Now,
+		// Indirection so that SetRateLimiterClockForTests also reaches limiters built before it.
+		now: func() time.Time { return rateLimiterNow() },
 	}
 }
 
