@@ -94,3 +94,16 @@ func TestSubscriberTestMessage_MailDisabled(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, status, body)
 	assert.Equal(t, "email_disabled", body["code"])
 }
+
+// A page name with CR/LF must not reach the Subject header.
+func TestSubscriberTestMessage_HeaderInjectionIsRejected(t *testing.T) {
+	srv := startFakeSMTPServerWithEnv(t)
+	defer srv.close()
+	db := testutils.SetupTestDB()
+	page := models.StatusPage{Name: "Acme\r\nBcc: victim@example.com", Slug: "acme-inject"}
+	require.NoError(t, db.Create(&page).Error)
+
+	status, body := sendTestMail(t, handlers.NewHandler(db), page, "en")
+	assert.Equal(t, http.StatusInternalServerError, status, body)
+	assert.Equal(t, "server_error", body["code"])
+}
