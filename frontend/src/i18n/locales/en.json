@@ -2360,6 +2360,120 @@
         "effect": "Only changes what this list shows.",
         "example": "Only the reports from “GitHub”."
       }
+    },
+    "incidentTemplates": {
+      "newTemplate": {
+        "what": "Opens an empty form for a new template on the currently selected status page.",
+        "effect": "Nothing is created until you click “Save”. Afterwards the template can be picked under “Use template” when creating an incident or a maintenance window, depending on its type. It never appears on the public status page.",
+        "example": "Create a template “DB outage” so the next database incident can be reported in a few clicks."
+      },
+      "search": {
+        "what": "Filters the list by template name, title and message.",
+        "effect": "Only the view changes, nothing is saved. The type filter next to it (All, Incident, Maintenance window) applies as well.",
+        "example": "Type “database” to find all templates about the database."
+      },
+      "rowActions": {
+        "what": "The “…” menu in the row offers “Edit” (opens the template in the form, read-only as “View” without permission to edit) and “Delete” (after a confirmation).",
+        "effect": "A deleted template disappears from “Use template” right away; this cannot be undone in the interface. Incidents and maintenance windows created from it stay unchanged, because they do not remember their template.",
+        "example": "Delete an outdated template “Data centre move” so nobody picks it by mistake."
+      },
+      "name": {
+        "what": "The internal name of the template, only visible in the admin area. Required.",
+        "effect": "The template is listed under this name here and in the “Use template” selection. It never appears on the status page or in notifications.",
+        "example": "“DB outage” or “Monthly patching”."
+      },
+      "kind": {
+        "what": "Defines whether the template is meant for incidents or for maintenance windows.",
+        "effect": "The template only shows up under “Use template” in the matching form, i.e. for incidents or for maintenance windows. For “Maintenance window” there is no default status.",
+        "example": "“Maintenance window” for a template “Monthly patching”."
+      },
+      "title": {
+        "what": "The suggested title of the incident or maintenance window. Required.",
+        "effect": "“Use template” copies it once into the title field, where it can still be changed before saving. Once saved, the title is public on the status page and in notifications. If the page has more languages, the field applies to the language selected above.",
+        "example": "“Database unreachable”."
+      },
+      "message": {
+        "what": "The suggested message text, with simple formatting (bold, italic, list, quote, code, link) and a preview. Required.",
+        "effect": "“Use template” copies it once into the message field; after that it can be edited freely. Later changes to the template do not affect incidents or maintenance windows already created. If the page has more languages, the field applies to the language selected above.",
+        "example": "“We are investigating connection problems with the database. Next update in 30 minutes.”"
+      },
+      "defaultStatus": {
+        "what": "The status an incident created from this template starts with. Only for type “Incident”.",
+        "effect": "“Use template” presets this status in the incident form; it can still be changed there before saving.",
+        "example": "“Identified” for a template about a known, recurring error."
+      },
+      "components": {
+        "what": "The components preselected as affected when the template is used. Optional, several allowed.",
+        "effect": "“Use template” replaces the component selection in the form with this selection; it can be adjusted afterwards. Without a selection, no component is selected in the form at first.",
+        "example": "“API” and “Web app” for a template “Data centre outage”."
+      },
+      "cancel": {
+        "what": "Closes the form without saving.",
+        "effect": "Unsaved input is discarded; the template stays as it was.",
+        "example": "Clicked “Edit” by mistake: “Cancel” takes you back to the list without changes."
+      },
+      "save": {
+        "what": "Saves the form.",
+        "effect": "Creates the template or applies your changes, including the texts of other languages; this is recorded in the audit log. Nothing is saved without name, title and message. Existing incidents and maintenance windows are not changed.",
+        "example": "Change the title “Database unreachable” to “Database degraded” and save."
+      }
+    },
+    "subscribers": {
+      "newSubscriber": {
+        "what": "Opens an empty form to add a subscriber to the currently selected status page by hand.",
+        "effect": "Nothing is created until you click “Save”. An email subscription starts unconfirmed: the address receives a confirmation email and only gets notifications after clicking the link (except your own account address). Google Chat subscriptions are active right away.",
+        "example": "Add the mailbox “servicedesk{'@'}example.com” so the service desk is informed about outages."
+      },
+      "search": {
+        "what": "Filters the list by email address, webhook URL and creator.",
+        "effect": "Only the view changes, nothing is saved.",
+        "example": "Type “example.com” to see all subscribers of that domain."
+      },
+      "testWebhook": {
+        "what": "Sends a test message to the webhook URL of this Google Chat subscription.",
+        "effect": "A short test notification appears in the chat space; the subscription is not changed. The result is shown as a message at the top, for example when Google is throttling or the target rejects the URL. The test never waits and is not retried.",
+        "example": "After adding it, check that the messages really arrive in the chat space “Operations”."
+      },
+      "rowActions": {
+        "what": "The “…” menu in the row offers “Edit” (opens the subscription in the form, read-only as “View” without permission to edit) and “Delete” (after a confirmation).",
+        "effect": "A deleted subscription stops receiving notifications immediately; this cannot be undone in the interface, the subscriber has to subscribe again. The deletion is recorded in the audit log.",
+        "example": "Delete the address of a former colleague whose mailbox no longer exists."
+      },
+      "channel": {
+        "what": "How the subscriber is notified: by email or via a Google Chat webhook.",
+        "effect": "Depending on the channel, the form asks for the email address or the webhook URL. Changing the channel while editing counts as a new address; an email subscription then has to be confirmed again. Announcements are only sent to email subscriptions.",
+        "example": "“Google Chat Webhook” for the chat space of the on-call team."
+      },
+      "email": {
+        "what": "The email address notifications are sent to. Required for the email channel.",
+        "effect": "A new or changed address receives a confirmation email. Until the link (valid for 24 hours) is clicked, the subscription is “Unconfirmed” and receives nothing. Your own account address is active right away.",
+        "example": "“operations{'@'}example.com”."
+      },
+      "webhookUrl": {
+        "what": "The webhook URL of the Google Chat space to notify. Required for the Google Chat channel.",
+        "effect": "For every incident and maintenance affecting a subscribed component, a text message is sent there. The URL is checked on save: only https addresses that resolve and do not point to internal addresses. “Send test” in the list tries it out.",
+        "example": "“https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…” from the webhook settings of the chat space."
+      },
+      "language": {
+        "what": "The language this subscriber receives emails and chat messages in. Only shown when the page offers several languages.",
+        "effect": "“Page default” follows the default language of the page, even if it changes later. If a chosen language is no longer active later, messages are sent in the default language. Google Chat messages exist only in German or English; other languages get English.",
+        "example": "“English” for a subscriber from the international team."
+      },
+      "components": {
+        "what": "The components the subscriber is notified about. Optional, several allowed.",
+        "effect": "A notification is sent as soon as an incident or maintenance affects at least one of the selected components, including mirrored reports from external sources. Without a selection, the subscription covers all components, including ones added later.",
+        "example": "Select only “Payments API” so accounting is not notified about other services."
+      },
+      "cancel": {
+        "what": "Closes the form without saving.",
+        "effect": "Unsaved input is discarded; the subscription stays as it was.",
+        "example": "Clicked “Edit” by mistake: “Cancel” takes you back to the list without changes."
+      },
+      "save": {
+        "what": "Saves the form.",
+        "effect": "Creates the subscriber or applies your changes; this is recorded in the audit log. A new or changed email address receives a confirmation email. Nothing is saved without an email address or webhook URL.",
+        "example": "Additionally select the component “Web app” for a subscription and save; its confirmation status is kept."
+      }
     }
   },
   "docs": {

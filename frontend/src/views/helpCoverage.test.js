@@ -16,6 +16,8 @@ import AdminIncidents from './admin/AdminIncidents.vue'
 import AdminIncidentDetail from './admin/AdminIncidentDetail.vue'
 import AdminMaintenance from './admin/AdminMaintenance.vue'
 import AdminNotices from './admin/AdminNotices.vue'
+import AdminIncidentTemplates from './admin/AdminIncidentTemplates.vue'
+import AdminSubscribers from './admin/AdminSubscribers.vue'
 
 // Abdeckungs-Test für Hilfetexte (Was / Auswirkung / Beispiel).
 //
@@ -213,6 +215,61 @@ export const HELP_COMPLETE_VIEWS = [
       await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
       await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('notices.newButton'))).trigger('click')
       await check('Neu')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidentTemplates.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminIncidentTemplates, {
+        '/incident-templates$': [
+          { ID: 1, Name: 'DB-Wartung', Kind: 'maintenance', Title: 'Datenbank-Wartung', Message: 'Details', ComponentIDs: '10' },
+          { ID: 2, Name: 'API-Ausfall', Kind: 'incident', Title: 'API gestört', Message: 'Wir prüfen', DefaultStatus: 'investigating', ComponentIDs: '' },
+        ],
+        '/components$': [{ ID: 10, Name: 'API', Children: [] }, { ID: 11, Name: 'Web' }],
+      })
+      await check('Liste')
+      const editItems = () => wrapper.findAll('[role="menuitem"]').filter(i => i.text().includes(i18n.global.t('common.edit')))
+      await editItems().at(1).trigger('click')
+      await check('Bearbeiten (Vorfall)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await editItems().at(0).trigger('click')
+      await check('Bearbeiten (Wartung)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('incidentTemplates.newButton'))).trigger('click')
+      await check('Neu')
+      await wrapper.find('.rte__btn--preview').trigger('click')
+      await check('Neu: Vorschau')
+      await wrapper.find('form').trigger('submit')
+      await check('Neu: Pflichtfelder fehlen')
+    },
+  },
+  {
+    file: 'views/admin/AdminSubscribers.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminSubscribers, {
+        '/subscribers$': [
+          { ID: 1, Channel: 'email', Email: 'a@example.com', Status: 'pending', SubscribedComponentIDs: '10', CreatedBy: { Email: 'admin@example.com' } },
+          { ID: 2, Channel: 'google_chat', WebhookURL: 'https://chat.googleapis.com/hook-1', SubscribedComponentIDs: '', CreatedBy: null },
+        ],
+        '/components$': [{ ID: 10, Name: 'API', Children: [] }, { ID: 11, Name: 'Web' }],
+        '/languages$': [
+          { LanguageCode: 'de', IsDefault: true, Language: { Name: 'Deutsch' } },
+          { LanguageCode: 'en', IsDefault: false, Language: { Name: 'English' } },
+        ],
+      })
+      await check('Liste')
+      await wrapper.find('[role="menuitem"]').trigger('click')
+      await check('Bearbeiten (E-Mail)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('[role="menuitem"]').filter(i => i.text().includes(i18n.global.t('common.edit'))).at(1).trigger('click')
+      await check('Bearbeiten (Google Chat)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('subscribers.newButton'))).trigger('click')
+      await check('Neu')
+      await wrapper.find('form').trigger('submit')
+      await check('Neu: Pflichtfeld fehlt (Meldung)')
+      await wrapper.find('form select').setValue('google_chat')
+      await check('Neu: Google Chat')
     },
   },
 ]

@@ -23,6 +23,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import { idsFromCsv, csvFromIds, componentLabelsFromCsv } from '../../utils/subscribedComponents'
 import { fromAdminPageLanguages, hasLanguageChoice, subscriberLanguageOptions, selectableSubscriberLanguage } from '../../utils/subscriberLanguage'
 import { confirmDialog } from '../../composables/useConfirm'
+import { vHelp } from '../../directives/vHelp'
 
 const { apiFetch } = useApi()
 // Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
@@ -229,13 +230,14 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
     <!-- Alert -->
     <div v-if="alertMsg" :class="`alert alert-${alertType} fade-in mb-16`">
       <span>{{ alertMsg }}</span>
-      <button class="alert-close" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+      <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
     </div>
 
     <PageHeader :level="2" :title="t('subscribers.title')" :subtitle="subtitle" :breadcrumbs="breadcrumbs">
       <template #actions>
         <OnyxButton
           v-if="canCreate"
+          v-help="'subscribers.newSubscriber'"
           :label="t('subscribers.newButton')"
           @click="openNew"
         />
@@ -246,7 +248,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('subscribers.cardTitle')">
         <template #tools>
-          <SearchBox v-model="query" :label="t('subscribers.searchLabel')" />
+          <SearchBox v-model="query" v-help="'subscribers.search'" :label="t('subscribers.searchLabel')" />
         </template>
         <p v-if="searching" class="sr-only" role="status">{{ t('subscribers.searchResult', { n: rows.length }, rows.length) }}</p>
 
@@ -273,7 +275,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
                 <div v-else class="cell-contact">
                   <span class="cell-truncate" :title="s.WebhookURL">{{ s.WebhookURL }}</span>
                   <!-- Der Test steht auch Lesenden offen, daher nicht im Zeilenmenü (nur mit subscribers:update). -->
-                  <button class="action-btn" @click="testWebhook(s.WebhookURL)" :disabled="testingUrl === s.WebhookURL">
+                  <button v-help="'subscribers.testWebhook'" class="action-btn" @click="testWebhook(s.WebhookURL)" :disabled="testingUrl === s.WebhookURL">
                     {{ testingUrl === s.WebhookURL ? t('subscribers.testSending') : t('subscribers.testSend') }}
                   </button>
                 </div>
@@ -286,7 +288,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
                 <RelativeTime :value="s.CreatedAt" />
               </td>
               <td class="actions-col">
-                <RowMenu :label="t('subscribers.menuLabel', { name: s.Email || s.WebhookURL })" :items="menuItems(s)" @select="key => onMenuSelect(s, key)" />
+                <RowMenu v-help="'subscribers.rowActions'" :label="t('subscribers.menuLabel', { name: s.Email || s.WebhookURL })" :items="menuItems(s)" @select="key => onMenuSelect(s, key)" />
               </td>
             </tr>
           </tbody>
@@ -300,21 +302,21 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
           <p v-if="formReadOnly" class="form-lock-hint" role="status">{{ t('common.readOnlyForm') }}</p>
           <fieldset class="form-lock" :disabled="formReadOnly">
 
-          <FormField v-slot="f" :label="t('subscribers.fieldChannel')" required>
+          <FormField v-slot="f" :label="t('subscribers.fieldChannel')" required help="subscribers.channel">
             <select :id="f.id" v-model="formData.Channel" :required="f.required" @change="fieldError = ''">
               <option v-for="o in channelOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </FormField>
 
-          <FormField v-if="formData.Channel === 'email'" v-slot="f" :label="t('subscribers.fieldEmail')" required :error="fieldError || null">
+          <FormField v-if="formData.Channel === 'email'" v-slot="f" :label="t('subscribers.fieldEmail')" required help="subscribers.email" :error="fieldError || null">
             <input :id="f.id" v-model="formData.Email" type="email" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('subscribers.emailPlaceholder')" @input="fieldError = ''">
           </FormField>
 
-          <FormField v-else v-slot="f" :label="t('subscribers.fieldWebhookUrl')" required :error="fieldError || null">
+          <FormField v-else v-slot="f" :label="t('subscribers.fieldWebhookUrl')" required help="subscribers.webhookUrl" :error="fieldError || null">
             <input :id="f.id" v-model="formData.WebhookURL" type="url" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('subscribers.webhookPlaceholder')" @input="fieldError = ''">
           </FormField>
 
-          <FormField v-if="showLanguageChoice" v-slot="f" :label="t('subscribers.fieldLanguage')" :hint="t('subscribers.fieldLanguageHint')">
+          <FormField v-if="showLanguageChoice" v-slot="f" :label="t('subscribers.fieldLanguage')" help="subscribers.language" :hint="t('subscribers.fieldLanguageHint')">
             <select :id="f.id" v-model="formData.Language" :aria-describedby="f.describedby">
               <option v-for="o in languageOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
@@ -323,6 +325,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
           <div class="form-group">
             <OnyxSelect
               v-model="selectedComponentIds"
+              v-help="'subscribers.components'"
               :options="componentOptions(components, selectedComponentIds)"
               multiple
               :label="t('subscribers.fieldComponents')"
@@ -332,8 +335,8 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
 
           </fieldset>
           <div class="form-actions">
-            <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
-            <OnyxButton v-if="!formReadOnly" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
+            <OnyxButton v-help="'subscribers.cancel'" :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
+            <OnyxButton v-if="!formReadOnly" v-help="'subscribers.save'" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
       </FormPanel>

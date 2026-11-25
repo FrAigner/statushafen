@@ -2360,6 +2360,120 @@
         "effect": "Ändert nur die Anzeige dieser Liste.",
         "example": "Nur die Meldungen von „GitHub“."
       }
+    },
+    "incidentTemplates": {
+      "newTemplate": {
+        "what": "Öffnet ein leeres Formular für eine neue Vorlage auf der gerade gewählten Statusseite.",
+        "effect": "Angelegt wird erst mit „Speichern“. Danach steht die Vorlage je nach Typ beim Neuanlegen eines Vorfalls bzw. Wartungsfensters unter „Vorlage verwenden“ zur Auswahl. Auf der öffentlichen Statusseite ist sie nie zu sehen.",
+        "example": "Eine Vorlage „DB-Ausfall“ anlegen, damit die nächste Datenbankstörung mit wenigen Klicks gemeldet ist."
+      },
+      "search": {
+        "what": "Filtert die Liste nach Vorlagenname, Titel und Nachricht.",
+        "effect": "Es ändert sich nur die Ansicht, nichts wird gespeichert. Der Typfilter daneben (Alle, Vorfall, Wartungsfenster) gilt zusätzlich.",
+        "example": "„Datenbank“ eingeben, um alle Vorlagen rund um die Datenbank zu finden."
+      },
+      "rowActions": {
+        "what": "Das Menü „…“ in der Zeile bietet „Bearbeiten“ (öffnet die Vorlage im Formular, ohne Recht zum Ändern schreibgeschützt als „Ansehen“) und „Löschen“ (nach einer Rückfrage).",
+        "effect": "Eine gelöschte Vorlage fehlt sofort in der Auswahl „Vorlage verwenden“; das lässt sich in der Oberfläche nicht rückgängig machen. Vorfälle und Wartungsfenster, die mit ihr angelegt wurden, bleiben unverändert, weil sie sich ihre Vorlage nicht merken.",
+        "example": "Eine veraltete Vorlage „Umzug Rechenzentrum“ löschen, damit sie niemand mehr versehentlich auswählt."
+      },
+      "name": {
+        "what": "Der interne Name der Vorlage, nur im Admin-Bereich sichtbar. Pflichtfeld.",
+        "effect": "Unter diesem Namen steht die Vorlage in dieser Liste und in der Auswahl „Vorlage verwenden“. Auf der Statusseite und in Benachrichtigungen erscheint er nie.",
+        "example": "„DB-Ausfall“ oder „Monatliches Patchen“."
+      },
+      "kind": {
+        "what": "Legt fest, ob die Vorlage für Vorfälle oder für Wartungsfenster gedacht ist.",
+        "effect": "Die Vorlage erscheint unter „Vorlage verwenden“ nur im passenden Formular, also bei Vorfällen oder bei Wartungsfenstern. Bei „Wartungsfenster“ entfällt der Standard-Status.",
+        "example": "„Wartungsfenster“ für eine Vorlage „Monatliches Patchen“."
+      },
+      "title": {
+        "what": "Der Vorschlag für den Titel des Vorfalls bzw. Wartungsfensters. Pflichtfeld.",
+        "effect": "„Vorlage verwenden“ kopiert ihn einmalig ins Titelfeld, dort ist er vor dem Speichern frei änderbar. Gespeichert steht der Titel öffentlich auf der Statusseite und in Benachrichtigungen. Hat die Seite weitere Sprachen, gilt das Feld für die oben gewählte Sprache.",
+        "example": "„Datenbank nicht erreichbar“."
+      },
+      "message": {
+        "what": "Der Vorschlag für den Meldungstext, mit einfacher Formatierung (Fett, Kursiv, Liste, Zitat, Code, Link) und Vorschau. Pflichtfeld.",
+        "effect": "„Vorlage verwenden“ kopiert ihn einmalig ins Nachrichtenfeld; danach ist er frei änderbar. Spätere Änderungen an der Vorlage wirken nicht auf bereits angelegte Vorfälle oder Wartungsfenster. Hat die Seite weitere Sprachen, gilt das Feld für die oben gewählte Sprache.",
+        "example": "„Wir untersuchen derzeit Verbindungsprobleme zur Datenbank. Nächstes Update in 30 Minuten.“"
+      },
+      "defaultStatus": {
+        "what": "Der Status, mit dem ein Vorfall aus dieser Vorlage startet. Nur beim Typ „Vorfall“.",
+        "effect": "„Vorlage verwenden“ setzt diesen Status im Vorfallformular vor; er lässt sich dort vor dem Speichern noch ändern.",
+        "example": "„Identifiziert“ für eine Vorlage zu einem bekannten, wiederkehrenden Fehler."
+      },
+      "components": {
+        "what": "Die Komponenten, die beim Verwenden der Vorlage als betroffen vorausgewählt werden. Optional, mehrere möglich.",
+        "effect": "„Vorlage verwenden“ ersetzt die Komponentenauswahl im Formular durch diese Auswahl; sie lässt sich danach anpassen. Ohne Auswahl ist im Formular zunächst keine Komponente gewählt.",
+        "example": "„API“ und „Web-App“ für eine Vorlage „Ausfall Rechenzentrum“."
+      },
+      "cancel": {
+        "what": "Schließt das Formular, ohne zu speichern.",
+        "effect": "Ungespeicherte Eingaben gehen verloren, die Vorlage bleibt, wie sie war.",
+        "example": "Versehentlich „Bearbeiten“ geklickt: „Abbrechen“ führt ohne Änderung zurück zur Liste."
+      },
+      "save": {
+        "what": "Speichert das Formular.",
+        "effect": "Legt die Vorlage an oder übernimmt die Änderungen samt der Texte weiterer Sprachen; der Vorgang steht im Audit-Log. Ohne Name, Titel und Nachricht wird nicht gespeichert. Bestehende Vorfälle und Wartungsfenster ändern sich dadurch nicht.",
+        "example": "Im Titel „Datenbank nicht erreichbar“ auf „Datenbank gestört“ ändern und speichern."
+      }
+    },
+    "subscribers": {
+      "newSubscriber": {
+        "what": "Öffnet ein leeres Formular, um für die gerade gewählte Statusseite von Hand einen Abonnenten anzulegen.",
+        "effect": "Angelegt wird erst mit „Speichern“. Ein E-Mail-Abonnement ist zunächst unbestätigt: Die Adresse bekommt eine Bestätigungsmail und erst nach dem Klick auf den Link Benachrichtigungen (außer bei deiner eigenen Konto-Adresse). Google-Chat-Abonnements sind sofort aktiv.",
+        "example": "Das Postfach „servicedesk{'@'}example.com“ eintragen, damit der Service-Desk bei Störungen informiert wird."
+      },
+      "search": {
+        "what": "Filtert die Liste nach E-Mail-Adresse, Webhook-URL und Ersteller.",
+        "effect": "Es ändert sich nur die Ansicht, nichts wird gespeichert.",
+        "example": "„example.com“ eingeben, um alle Abonnenten dieser Domain zu sehen."
+      },
+      "testWebhook": {
+        "what": "Schickt eine Testnachricht an die Webhook-URL dieses Google-Chat-Abonnements.",
+        "effect": "Im Chat-Raum erscheint eine kurze Test-Benachrichtigung, am Abonnement ändert sich nichts. Das Ergebnis steht oben als Meldung, etwa wenn Google gerade drosselt oder das Ziel die URL ablehnt. Der Test wartet nie und wird nicht wiederholt.",
+        "example": "Nach dem Anlegen prüfen, ob die Nachrichten wirklich im Chat-Raum „Betrieb“ ankommen."
+      },
+      "rowActions": {
+        "what": "Das Menü „…“ in der Zeile bietet „Bearbeiten“ (öffnet das Abonnement im Formular, ohne Recht zum Ändern schreibgeschützt als „Ansehen“) und „Löschen“ (nach einer Rückfrage).",
+        "effect": "Ein gelöschtes Abonnement erhält sofort keine Benachrichtigungen mehr; das lässt sich in der Oberfläche nicht rückgängig machen, der Abonnent muss neu abonnieren. Das Löschen steht im Audit-Log.",
+        "example": "Die Adresse einer ausgeschiedenen Kollegin löschen, deren Postfach nicht mehr existiert."
+      },
+      "channel": {
+        "what": "Wie der Abonnent benachrichtigt wird: per E-Mail oder per Google-Chat-Webhook.",
+        "effect": "Je nach Kanal fragt das Formular die E-Mail-Adresse oder die Webhook-URL ab. Ein Kanalwechsel beim Bearbeiten zählt als neue Adresse; ein E-Mail-Abonnement muss dann erneut bestätigt werden. Ankündigungen gehen nur an E-Mail-Abonnements.",
+        "example": "„Google Chat Webhook“ für den Chat-Raum des Bereitschaftsteams."
+      },
+      "email": {
+        "what": "Die E-Mail-Adresse, an die die Benachrichtigungen gehen. Pflichtfeld beim Kanal E-Mail.",
+        "effect": "Eine neue oder geänderte Adresse bekommt eine Bestätigungsmail. Bis zum Klick auf den Link (24 Stunden gültig) ist das Abonnement „Unbestätigt“ und erhält nichts. Deine eigene Konto-Adresse ist sofort aktiv.",
+        "example": "„betrieb{'@'}example.com“."
+      },
+      "webhookUrl": {
+        "what": "Die Webhook-URL des Google-Chat-Raums, der benachrichtigt wird. Pflichtfeld beim Kanal Google Chat.",
+        "effect": "Bei jedem Vorfall und jeder Wartung, die eine abonnierte Komponente betreffen, geht eine Textnachricht dorthin. Beim Speichern wird die URL geprüft: Nur https-Adressen, die sich auflösen lassen und nicht auf interne Adressen zeigen. „Test senden“ in der Liste probiert sie aus.",
+        "example": "„https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…“ aus den Webhook-Einstellungen des Chat-Raums."
+      },
+      "language": {
+        "what": "Die Sprache, in der dieser Abonnent E-Mails und Chat-Nachrichten bekommt. Nur sichtbar, wenn die Seite mehrere Sprachen anbietet.",
+        "effect": "„Seitenstandard“ folgt der Standardsprache der Seite, auch wenn sie später wechselt. Ist eine gewählte Sprache später nicht mehr aktiv, geht der Versand in der Standardsprache raus. Google-Chat-Nachrichten gibt es nur auf Deutsch oder Englisch, andere Sprachen bekommen Englisch.",
+        "example": "„English“ für einen Abonnenten aus dem internationalen Team."
+      },
+      "components": {
+        "what": "Die Komponenten, zu denen der Abonnent benachrichtigt wird. Optional, mehrere möglich.",
+        "effect": "Benachrichtigt wird, sobald ein Vorfall oder eine Wartung mindestens eine der gewählten Komponenten betrifft, auch bei gespiegelten Meldungen externer Quellen. Ohne Auswahl gilt das Abonnement für alle Komponenten, auch für später angelegte.",
+        "example": "Nur „Zahlungs-API“ wählen, damit die Buchhaltung nicht über andere Dienste informiert wird."
+      },
+      "cancel": {
+        "what": "Schließt das Formular, ohne zu speichern.",
+        "effect": "Ungespeicherte Eingaben gehen verloren, das Abonnement bleibt, wie es war.",
+        "example": "Versehentlich „Bearbeiten“ geklickt: „Abbrechen“ führt ohne Änderung zurück zur Liste."
+      },
+      "save": {
+        "what": "Speichert das Formular.",
+        "effect": "Legt den Abonnenten an oder übernimmt die Änderungen; der Vorgang steht im Audit-Log. Bei einer neuen oder geänderten E-Mail-Adresse geht eine Bestätigungsmail raus. Ohne E-Mail-Adresse bzw. Webhook-URL wird nicht gespeichert.",
+        "example": "Bei einem Abonnement zusätzlich die Komponente „Web-App“ auswählen und speichern; der Bestätigungsstatus bleibt dabei erhalten."
+      }
     }
   },
   "docs": {
