@@ -16,6 +16,7 @@ import SearchBox from '../../components/SearchBox.vue'
 import RowMenu from '../../components/RowMenu.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
+import StatusPage from '../public/StatusPage.vue'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { formatRelative } from '../../utils/relativeTime'
 import { serverInputErrorText } from '../../utils/inputRules'
@@ -49,6 +50,20 @@ const pageLayoutOptions = [
 // kollisionssichere Generierung passiert serverseitig, falls das Feld beim
 // Speichern trotzdem leer bleibt.
 const slugTouched = ref(false)
+
+// Design preview: the real public page, rendered with the unsaved design
+// values of the form (StatusPage preview mode, read-only). Only for saved
+// pages, because the page content comes from the public dashboard of the
+// saved slug.
+const previewOpen = ref(false)
+const previewSlug = computed(() => pages.value.find(p => p.ID === currentEditItem.value)?.Slug || '')
+const designPreview = computed(() => ({
+  LogoURL: formData.value.LogoURL || '',
+  PrimaryColor: formData.value.PrimaryColor || '',
+  SecondaryColor: formData.value.SecondaryColor || '',
+  HeaderStyle: formData.value.HeaderStyle || 'classic',
+  PageLayout: formData.value.PageLayout || 'standard',
+}))
 function slugify(name) {
   const umlauts = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }
   return (name || '')
@@ -242,6 +257,7 @@ const openEdit = (item) => {
     : JSON.parse(JSON.stringify(item))
   currentEditItem.value = item === 'new' ? 'new' : item.ID
   slugTouched.value = false
+  previewOpen.value = false
   webhookToken.value = ''
   tokenCopied.value = false
   customDomainInput.value = item === 'new' ? '' : (item.CustomDomain || '')
@@ -267,6 +283,7 @@ const focusForm = async () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  previewOpen.value = false
   currentEditItem.value = null
   formData.value = {}
   webhookToken.value = ''
@@ -651,6 +668,32 @@ const removeUser = async (assignment) => {
             </label>
           </fieldset>
 
+          <!-- Live preview of the design fields above; nothing is saved here. -->
+          <section class="design-preview" aria-labelledby="design-preview-heading">
+            <div class="design-preview__head">
+              <h4 id="design-preview-heading" class="adm-subhead">{{ t('statusPages.previewHeading') }}</h4>
+              <button
+                v-if="currentEditItem !== 'new' && previewSlug"
+                type="button"
+                class="action-btn"
+                data-test="design-preview-toggle"
+                aria-controls="design-preview-body"
+                :aria-expanded="previewOpen ? 'true' : 'false'"
+                @click="previewOpen = !previewOpen"
+              >
+                <AppIcon :name="previewOpen ? 'chevron-down' : 'chevron-right'" :size="14" />
+                {{ previewOpen ? t('statusPages.previewHide') : t('statusPages.previewShow') }}
+              </button>
+            </div>
+            <p v-if="currentEditItem === 'new' || !previewSlug" class="adm-hint" data-test="design-preview-new">{{ t('statusPages.previewNewPage') }}</p>
+            <div v-else-if="previewOpen" id="design-preview-body">
+              <p class="adm-hint">{{ t('statusPages.previewHint') }}</p>
+              <div class="design-preview-frame theme-public">
+                <StatusPage :slug="previewSlug" :preview="designPreview" />
+              </div>
+            </div>
+          </section>
+
           <FormField v-slot="f" :label="t('statusPages.fieldNotificationFrom')" :hint="t('statusPages.fromAddressHint')" field-id="page-notification-from">
             <input
               :id="f.id"
@@ -869,4 +912,20 @@ const removeUser = async (assignment) => {
 /* Der Slug ist Teil der URL (klein geschrieben); die globale
    .meta-tag-Regel setzt sonst Großbuchstaben ("SYSTEM"). */
 .meta-tag--slug { text-transform: none; letter-spacing: normal; }
+
+/* Design preview: the public page in its own token layer (.theme-public),
+   framed and growing with its content, so the edit panel keeps a single scroll. */
+.design-preview { margin: 0 0 var(--sp-4); }
+.design-preview__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.design-preview__head .adm-subhead { margin: 0; }
+.design-preview-frame {
+  margin-top: var(--sp-2);
+  padding: 0 var(--sp-3) var(--sp-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  min-inline-size: 0;
+}
 </style>

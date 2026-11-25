@@ -48,11 +48,23 @@ const props = defineProps({
   slug: {
     type: String,
     required: true
+  },
+  // Preview mode for the admin edit form: unsaved design values (LogoURL,
+  // PrimaryColor, SecondaryColor, HeaderStyle, PageLayout) override the saved
+  // ones. The page is then read-only (inert), does not poll and leaves the
+  // shared page state (current slug, page languages, active tenant) alone.
+  preview: {
+    type: Object,
+    default: null
   }
 })
 // Stryker restore all
 
-const pageInfo = ref(null)
+const savedPageInfo = ref(null)
+const isPreview = computed(() => props.preview !== null)
+const pageInfo = computed(() => (savedPageInfo.value && isPreview.value
+  ? { ...savedPageInfo.value, ...props.preview }
+  : savedPageInfo.value))
 
 // seiten-spezifisches Branding (Logo, Farben, Header-Design).
 // Setzt --primary/--primary-hover/--text-secondary als Inline-Style-Override
@@ -250,8 +262,8 @@ const loadData = async (isInitial = false) => {
       apiFetch(`/api/public/pages/${props.slug}/dashboard${tokenParam}`),
       loadTranslations(),
     ])
-    pageInfo.value = res.page
-    setPageLanguages(res.languages)
+    savedPageInfo.value = res.page
+    if (!isPreview.value) setPageLanguages(res.languages)
     if (request === translationsRequest) translations.value = translated
     // überall der effektive Status (eigener + externer).
     rawComponents.value = applyEffectiveStatus(res.components)
@@ -304,7 +316,7 @@ const loadMoreIncidents = async () => {
 // The Dashboard link in PublicLayout is decided by the role on THIS page
 // (matched via currentPageSlug), never by a role on another page.
 watch(() => [pageInfo.value?.ID, isLoggedIn.value], async ([pageId, loggedIn]) => {
-  if (!pageId || !loggedIn) return
+  if (!pageId || !loggedIn || isPreview.value) return
   try {
     const pages = await apiFetch('/api/me/pages')
     setMyPages(pages)
@@ -314,7 +326,16 @@ watch(() => [pageInfo.value?.ID, isLoggedIn.value], async ([pageId, loggedIn]) =
   }
 })
 
+// Preview: switching the layout to "liste" needs the per-component bars.
+watch(isListLayout, () => {
+  if (isPreview.value && savedPageInfo.value) loadAvailability()
+})
+
 onMounted(async () => {
+  if (isPreview.value) {
+    await loadData(true)
+    return
+  }
   window.addEventListener('statushafen:open-subscription-manager', handleOpenSubscriptionManagerEvent)
   await loadData(true)
   pollInterval = setInterval(() => {
@@ -326,8 +347,12 @@ onMounted(async () => {
 const { currentPageSlug } = useCurrentPageSlug()
 // Sprachen der Seite für den Sprachumschalter im Kopf.
 const { setPageLanguages, clearPageLanguages } = usePublicPageLanguages()
-watch(() => props.slug, (slug) => { currentPageSlug.value = slug }, { immediate: true })
-onUnmounted(() => { currentPageSlug.value = null; clearPageLanguages() })
+watch(() => props.slug, (slug) => { if (!isPreview.value) currentPageSlug.value = slug }, { immediate: true })
+onUnmounted(() => {
+  if (isPreview.value) return
+  currentPageSlug.value = null
+  clearPageLanguages()
+})
 
 onUnmounted(() => {
   window.removeEventListener('statushafen:open-subscription-manager', handleOpenSubscriptionManagerEvent)
@@ -612,7 +637,7 @@ const closeHistory = () => {
   <!-- 4a: Der einzige Inline-Style dieser View ist die Kundenmarke
        (--primary/--primary-hover/--text-secondary aus brandingStyle); alles
        andere läuft über Klassen und Tokens. -->
-  <div class="content-area" :style="brandingStyle">
+  <div class="content-area" :style="brandingStyle" :inert="isPreview || undefined">
     <div v-if="errorMessage && !isPrivateError" class="alert alert-error sp-alert">
       {{ errorMessage }}
     </div>
@@ -950,6 +975,7 @@ const closeHistory = () => {
 
       <!-- ====== Abonnement verwalten (einzige Stelle; der Kopf-Menüpunkt öffnet sie per Event) ====== -->
       <SubscriptionManager
+        v-if="!isPreview"
         id="subscription-manager-anchor"
         ref="subscriptionManagerRef"
         :isLoggedIn="isLoggedIn"

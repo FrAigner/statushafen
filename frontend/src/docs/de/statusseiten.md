@@ -55,6 +55,16 @@ Die Liste unter **Statusseiten** lässt sich nach Name, Slug, Beschreibung und D
 Zeilenmenü stehen „Öffnen“ (öffentliche Seite) und „Benutzer“ (Rollen auf dieser Seite). Beim
 Löschen einer Seite entfernt Statushafen alle zugehörigen Daten.
 
+### Vorschau des Designs
+
+Unter den Design-Feldern (Logo-URL, Primär- und Sekundärfarbe, Header-Design, Seiten-Layout) steht
+beim Bearbeiten einer gespeicherten Seite der Abschnitt **Vorschau**. „Vorschau anzeigen“ blendet die
+echte Statusseite mit ihren Komponenten, Vorfällen und Ankündigungen ein, dargestellt mit den noch
+nicht gespeicherten Werten. Jede Änderung an den Feldern ist sofort in der Vorschau zu sehen. Die
+Vorschau ist nur eine Ansicht: Besucher sehen weiterhin den gespeicherten Stand, bis du
+**Speichern** klicken. Knöpfe und Links (Abonnieren, Filter, Verlauf) sind in der Vorschau
+abgeschaltet. Für eine neue Seite steht die Vorschau nach dem ersten Speichern zur Verfügung.
+
 ### Privat und automatischer Beitritt
 
 Eine **private** Seite ist nur nach dem Login sichtbar, und nur für Nutzer mit einer Rolle auf der

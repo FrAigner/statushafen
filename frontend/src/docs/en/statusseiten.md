@@ -55,6 +55,16 @@ The list under **Status Pages** can be searched by name, slug, description and d
 menu offers "Open" (public page) and "Users" (roles on this page). When you delete a page,
 Statushafen removes all its data.
 
+### Design preview
+
+When you edit a saved page, the **Preview** section appears below the design fields (logo URL,
+primary and secondary color, header design, page layout). "Show preview" displays the real status
+page with its components, incidents and announcements, rendered with the values you have not saved
+yet. Every change to the fields shows up in the preview right away. The preview is only a view:
+visitors keep seeing the saved version until you click **Save**. Buttons and links (subscribe,
+filters, history) are disabled in the preview. For a new page the preview is available once it has
+been saved for the first time.
+
 ### Private and automatic joining
 
 A **private** page is only visible after login, and only to users with a role on the page. Users
