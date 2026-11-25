@@ -1,12 +1,16 @@
 # Statusseiten und Mandanten
 
 Jede Statusseite ist ein eigener Mandant: Komponenten, Vorfälle, Abonnenten, Vorlagen und
-Rollen gehören immer zu genau einer Seite. Statusseiten anlegen und auflisten dürfen nur Global
-Admins (Menü **Statusseiten**, Knopf „+ Neue Statusseite“). Das Menü **Statusseiten** mit allen
-Einstellungen dieses Abschnitts steht in der Oberfläche nur Global Admins offen. Die Rechte
-`pages:create`, `pages:update` und `pages:delete` (zum Beispiel in der Rolle „Page Owner“, siehe
-[Benutzer, Rollen und Rechte](/docs/benutzer-und-rollen)) erlaubt dieselben Änderungen an der
-eigenen Seite über die API; in der Oberfläche öffnet es SSO, Mail-Templates, Sprachen und UI-Texte.
+Rollen gehören immer zu genau einer Seite.
+
+- Statusseiten anlegen und auflisten dürfen nur Global Admins (Menü **Statusseiten**, Knopf „+ Neue
+  Statusseite“).
+- Das Menü **Statusseiten** mit allen Einstellungen dieses Abschnitts steht in der Oberfläche nur
+  Global Admins offen.
+- Die Rechte `pages:create`, `pages:update` und `pages:delete` (zum Beispiel in der Rolle „Page
+  Owner“, siehe [Benutzer, Rollen und Rechte](/docs/benutzer-und-rollen)) erlauben dieselben
+  Änderungen an der eigenen Seite über die API; in der Oberfläche öffnen sie SSO, Mail-Templates,
+  Sprachen und UI-Texte.
 
 ## Adresse einer Statusseite
 
@@ -60,11 +64,14 @@ Löschen einer Seite entfernt Statushafen alle zugehörigen Daten.
 Beim Bearbeiten einer gespeicherten Seite steht unter den Design-Feldern (Logo-URL, Primär- und
 Sekundärfarbe, Header-Design, Seiten-Layout) der Knopf **Vorschau öffnen**. Er zeigt in einem großen
 Fenster die echte Statusseite mit ihren Komponenten, Vorfällen und Ankündigungen, dargestellt mit den
-noch nicht gespeicherten Werten aus dem Formular. Die Vorschau ist nur eine Ansicht: Besucher sehen
-weiterhin den gespeicherten Stand, bis du **Speichern** klickst. Knöpfe und Links (Abonnieren, Filter,
-Verlauf) sind in der Vorschau abgeschaltet. Nach dem Schließen (Esc oder Schließen-Knopf) kannst du
-weiter ändern und die Vorschau erneut öffnen. Für eine neue Seite steht die Vorschau nach dem ersten
-Speichern zur Verfügung.
+noch nicht gespeicherten Werten aus dem Formular.
+
+- Die Vorschau ist nur eine Ansicht: Besucher sehen weiterhin den gespeicherten Stand, bis du
+  **Speichern** klickst.
+- Knöpfe und Links (Abonnieren, Filter, Verlauf) sind in der Vorschau abgeschaltet.
+- Nach dem Schließen (Esc oder Schließen-Knopf) kannst du weiter ändern und die Vorschau erneut
+  öffnen.
+- Für eine neue Seite steht die Vorschau nach dem ersten Speichern zur Verfügung.
 
 ### Privat und automatischer Beitritt
 
@@ -75,11 +82,15 @@ Seite. Eine Rolle bekommen Nutzer durch Zuweisung (Zeilenmenü „Benutzer“) o
 - eine Standard-Rolle („Standard-Zugriff für alle eingeloggten Nutzer“) und
 - die E-Mail-Domain des Kontos steht in der Liste „E-Mail-Domains für automatischen Beitritt“.
 
-Die Domains stehen kommagetrennt und müssen exakt passen; Subdomains zählen nicht (`acme.example`
-schließt `mail.acme.example` nicht ein). Ist eines der beiden Felder leer, gilt „nur explizit
-zugewiesene Nutzer“. Die Standard-Rolle darf keine Rechte zum Anlegen, Ändern oder Löschen (`…:create`, `…:update`, `…:delete`) und keinen Zugriff
-auf Abonnenten enthalten; Statushafen prüft das beim Speichern und noch einmal beim Beitritt.
-Wer von einem Admin von der Seite entfernt wurde, tritt nicht automatisch wieder bei.
+Dabei gilt:
+
+- Die Domains stehen kommagetrennt und müssen exakt passen; Subdomains zählen nicht (`acme.example`
+  schließt `mail.acme.example` nicht ein).
+- Ist eines der beiden Felder leer, gilt „nur explizit zugewiesene Nutzer“.
+- Die Standard-Rolle darf keine Rechte zum Anlegen, Ändern oder Löschen (`…:create`, `…:update`,
+  `…:delete`) und keinen Zugriff auf Abonnenten enthalten; Statushafen prüft das beim Speichern und
+  noch einmal beim Beitritt.
+- Wer von einem Admin von der Seite entfernt wurde, tritt nicht automatisch wieder bei.
 
 Sollen Nutzer die private Seite nur sehen und abonnieren, aber nicht in den Admin-Bereich kommen,
 bekommen sie eine Rolle ohne Rechte in der Matrix („Nur Statusseite“, siehe
@@ -101,54 +112,122 @@ Danach sind zwei DNS-Einträge nötig:
    zeigt das Formular nach dem Speichern.
 
 Anschließend klickt man auf „DNS verifizieren“. Der Zustand der Domain steht daneben:
-„Ausstehend“, „Verifiziert“ (wartet auf den ersten Aufruf über die Domain) und „Aktiv“. „Domain
-entfernen“ löst die Zuordnung wieder. Das Verifizieren ist auf 10 Prüfungen pro Minute je Seite und je
-Nutzer begrenzt; darüber meldet die Oberfläche, dass zu viele Anfragen gestellt wurden.
 
-Erlaubt sind nur gültige Hostnamen in Kleinbuchstaben (ohne abschließenden Punkt, ohne Wildcard, ohne
-IP-Adresse; internationale Namen in Punycode-Schreibweise). Das Eintragen reserviert die Domain
-nicht: Mehrere Seiten können dieselbe Domain eintragen, den Zuschlag bekommt die Seite, die sie
-**zuerst per TXT-Eintrag verifiziert**. Ist die Domain bei einer anderen Seite bereits verifiziert
-oder aktiv, schlägt das Verifizieren mit dem Hinweis „Diese Domain wird bereits von einer anderen Statusseite verwendet“ fehl.
+- „Ausstehend“,
+- „Verifiziert“ (wartet auf den ersten Aufruf über die Domain) und
+- „Aktiv“.
 
-**Anmelden auf der eigenen Domain:** Wer eine Rolle auf der Seite hat (per Einladung, nicht per
-Auto-Join) und sich auf ihrer verifizierten oder aktiven eigenen Domain anmeldet (globaler Anbieter,
-SSO der Seite oder Passwort), landet danach wieder auf dieser Seite und dieser Domain und ist dort
-angemeldet. Wer per Auto-Join beigetreten ist, kommt dorthin zurück, sobald er eine Einladung auf die
-Seite angenommen hat. Alle anderen landen nach der Anmeldung unter der Hauptadresse der Anwendung,
-Global Admins direkt auf dieser Seite. Die Anmeldung gilt auf der eigenen
-Domain nur für diese Statusseite, nie mit Global-Admin-Rechten: Das DNS der Domain liegt beim Inhaber
-der Domain, nicht beim Betreiber. Konto löschen, Datenexport und das Verknüpfen oder Lösen von
-Anmeldungen gehen deshalb nur über die Hauptadresse; dort erreicht man auch die Verwaltung aller Seiten.
+„Domain entfernen“ löst die Zuordnung wieder. Das Verifizieren ist auf 10 Prüfungen pro Minute je
+Seite und je Nutzer begrenzt; darüber meldet die Oberfläche, dass zu viele Anfragen gestellt wurden.
+
+### Regeln für die Domain
+
+- Erlaubt sind nur gültige Hostnamen in Kleinbuchstaben (ohne abschließenden Punkt, ohne Wildcard,
+  ohne IP-Adresse; internationale Namen in Punycode-Schreibweise).
+- Das Eintragen reserviert die Domain nicht: Mehrere Seiten können dieselbe Domain eintragen, den
+  Zuschlag bekommt die Seite, die sie **zuerst per TXT-Eintrag verifiziert**.
+- Ist die Domain bei einer anderen Seite bereits verifiziert oder aktiv, schlägt das Verifizieren
+  mit dem Hinweis „Diese Domain wird bereits von einer anderen Statusseite verwendet“ fehl.
+
+### Anmelden auf der eigenen Domain
+
+Wohin man nach der Anmeldung auf der verifizierten oder aktiven eigenen Domain (globaler Anbieter,
+SSO der Seite oder Passwort) gelangt:
+
+- Wer eine Rolle auf der Seite hat (per Einladung, nicht per Auto-Join), landet danach wieder auf
+  dieser Seite und dieser Domain und ist dort angemeldet.
+- Wer per Auto-Join beigetreten ist, kommt dorthin zurück, sobald er eine Einladung auf die Seite
+  angenommen hat.
+- Alle anderen landen nach der Anmeldung unter der Hauptadresse der Anwendung, Global Admins direkt
+  auf dieser Seite.
+
+Die Anmeldung gilt auf der eigenen Domain nur für diese Statusseite, nie mit Global-Admin-Rechten:
+Das DNS der Domain liegt beim Inhaber der Domain, nicht beim Betreiber. Konto löschen, Datenexport
+und das Verknüpfen oder Lösen von Anmeldungen gehen deshalb nur über die Hauptadresse; dort erreicht
+man auch die Verwaltung aller Seiten.
 
 ## Benutzer einer Seite
 
-Im Zeilenmenü „Benutzer“ weist man Nutzern eine Rolle auf der Seite zu oder entzieht sie (nur
-Global Admins in der Oberfläche; die API verlangt `pages:create` bzw. `pages:delete`).
-Global Admins wählen das Konto aus der Liste und ordnen es direkt zu. Alle anderen (z. B. Page
-Owner, über die API) **laden per E-Mail-Adresse ein**: Statushafen legt eine Einladung an und
-schickt dem Konto mit dieser Adresse einen Link. Mitglied wird das Konto erst, wenn sein Inhaber
-den Link öffnet, sich mit genau dieser Adresse anmeldet und „Annehmen“ wählt; „Ablehnen“ löscht die
-Einladung. Die Antwort beim Einladen ist für bekannte und unbekannte Adressen gleich, und die Liste
-„Offene Einladungen“ zeigt jede eingegebene Adresse; ohne Konto geht keine Mail raus. Der Link gilt
-7 Tage und nur einmal, gespeichert ist nur ein Hash; annehmen kann nur das Konto, das beim Einladen
-existierte. Erneutes Einladen derselben Adresse ersetzt den alten Link frühestens nach 30 Minuten
-(vorher passiert nichts, es geht auch keine neue Mail raus) und nur, wenn die eigene Rolle die Rolle
-der offenen Einladung abdeckt. Offene Einladungen lassen sich zurückziehen; eine Seite hat höchstens
-100 offene und 200 neue Einladungen pro Tag. Abgelaufene Einladungen löscht Statushafen automatisch,
-beim Löschen eines Kontos auch alle Einladungen an und von diesem Konto; der Datenexport enthält die
-offenen Einladungen an die eigene Adresse. Verliert der Einladende sein Recht, die Rolle zu vergeben, verfällt die Einladung.
-Konten mit altem globalem SSO, mit einer Seiten-SSO-Verknüpfung (OIDC) oder einer Rolle auf
-einer anderen Seite sowie Global-Admin-Konten bekommen keine Mail und können eine Einladung nicht
-selbst annehmen; sie fügt nur ein Global Admin hinzu (eine zweite Seite würde sonst die
-SSO-Anmeldung der ersten sperren). Einladen ist auf 20 Anfragen pro Minute begrenzt, Annehmen und
-Ablehnen ebenso. Bestehende Mitglieder der Seite lassen sich auch
-ohne E-Mail umstufen. Eine Rolle darf nur vergeben werden, wenn sie nicht mehr Rechte hat als die
-eigene Rolle auf dieser Seite; ein Mitglied mit stärkerer Rolle lässt sich nicht ändern oder
-entfernen. Die Mitgliederliste zeigt nur E-Mail und Rolle.
-Pro Konto und Seite gibt es genau eine Rolle; ein erneutes Hinzufügen ändert die Rolle des bestehenden Mitglieds. Wer nicht Global Admin ist, kann sich nicht selbst entfernen oder auf eine Rolle ohne `pages:update` herabstufen, wenn er das letzte Mitglied mit diesem Recht auf der Seite ist (Fehler „letzter Benutzer mit Verwaltungsrechten“); ein Global Admin kann das jederzeit reparieren. Wird ein Mitglied entfernt, löscht Statushafen auch seine Seiten-SSO-Verknüpfung dieser Seite, damit das Konto später anderswo angemeldet oder hinzugefügt werden kann. Dasselbe gilt, wenn eine Rolle gelöscht oder die Seite beim Bearbeiten des Kontos entzogen wird.
-„Global Admin“ ist keine Seitenrolle; Global Admins setzt man unter **Benutzer** mit dem Schalter
-„Global Admin“.
+Im Zeilenmenü „Benutzer“ weist man Nutzern eine Rolle auf der Seite zu oder entzieht sie.
+
+- In der Oberfläche geht das nur für Global Admins; die API verlangt `pages:create` bzw.
+  `pages:delete`.
+- „Global Admin“ ist keine Seitenrolle; Global Admins setzt man unter **Benutzer** mit dem Schalter
+  „Global Admin“.
+
+### Mitglieder hinzufügen als Global Admin
+
+Global Admins wählen das Konto aus der Liste und ordnen es direkt zu.
+
+### Per E-Mail einladen
+
+Alle anderen (z. B. Page Owner, über die API) **laden per E-Mail-Adresse ein**:
+
+1. Statushafen legt eine Einladung an und schickt dem Konto mit dieser Adresse einen Link.
+2. Der Inhaber des Kontos öffnet den Link und meldet sich mit genau dieser Adresse an.
+3. Er wählt „Annehmen“. Erst dann wird das Konto Mitglied. „Ablehnen“ löscht die Einladung.
+
+Die Antwort beim Einladen ist für bekannte und unbekannte Adressen gleich, und die Liste „Offene
+Einladungen“ zeigt jede eingegebene Adresse. Ohne Konto geht keine Mail raus.
+
+### Einladungslink und Grenzen
+
+| Regel | Wert |
+|---|---|
+| Gültigkeit des Links | 7 Tage, nur einmal nutzbar |
+| Erneutes Einladen derselben Adresse | ersetzt den alten Link frühestens nach 30 Minuten |
+| Offene Einladungen je Seite | höchstens 100 |
+| Neue Einladungen je Seite | höchstens 200 pro Tag |
+| Einladen, Annehmen und Ablehnen | jeweils höchstens 20 Anfragen pro Minute |
+
+Außerdem gilt:
+
+- Gespeichert ist nur ein Hash des Links.
+- Annehmen kann nur das Konto, das beim Einladen existierte.
+- Lädt man dieselbe Adresse vor Ablauf der 30 Minuten erneut ein, passiert nichts; es geht auch keine
+  neue Mail raus.
+- Der alte Link wird nur ersetzt, wenn die eigene Rolle die Rolle der offenen Einladung abdeckt.
+- Offene Einladungen lassen sich zurückziehen.
+- Verliert der Einladende sein Recht, die Rolle zu vergeben, verfällt die Einladung.
+- Abgelaufene Einladungen löscht Statushafen automatisch.
+- Beim Löschen eines Kontos löscht Statushafen auch alle Einladungen an und von diesem Konto.
+- Der Datenexport enthält die offenen Einladungen an die eigene Adresse.
+
+### Wer Einladungen nicht selbst annehmen kann
+
+Diese Konten bekommen keine Mail und können eine Einladung nicht selbst annehmen; sie fügt nur ein
+Global Admin hinzu:
+
+- Konten mit altem globalem SSO,
+- Konten mit einer Seiten-SSO-Verknüpfung (OIDC),
+- Konten mit einer Rolle auf einer anderen Seite (eine zweite Seite würde sonst die SSO-Anmeldung
+  der ersten sperren),
+- Global-Admin-Konten.
+
+### Mitglieder ändern und Regeln für Rollen
+
+- Bestehende Mitglieder der Seite lassen sich auch ohne E-Mail umstufen.
+- Pro Konto und Seite gibt es genau eine Rolle; ein erneutes Hinzufügen ändert die Rolle des
+  bestehenden Mitglieds.
+- Eine Rolle darf nur vergeben werden, wenn sie nicht mehr Rechte hat als die eigene Rolle auf dieser
+  Seite.
+- Ein Mitglied mit stärkerer Rolle lässt sich nicht ändern oder entfernen.
+- Die Mitgliederliste zeigt nur E-Mail und Rolle.
+
+### Letztes Mitglied mit Verwaltungsrechten
+
+Wer nicht Global Admin ist, kann sich nicht selbst entfernen oder auf eine Rolle ohne `pages:update`
+herabstufen, wenn er das letzte Mitglied mit diesem Recht auf der Seite ist. Die Oberfläche meldet
+dann den Fehler „letzter Benutzer mit Verwaltungsrechten“. Ein Global Admin kann das jederzeit
+reparieren.
+
+### Was beim Entfernen passiert
+
+Wird ein Mitglied entfernt, löscht Statushafen auch seine Seiten-SSO-Verknüpfung dieser Seite, damit
+das Konto später anderswo angemeldet oder hinzugefügt werden kann. Dasselbe gilt, wenn
+
+- eine Rolle gelöscht wird oder
+- die Seite beim Bearbeiten des Kontos entzogen wird.
 
 ## Mandant wechseln
 

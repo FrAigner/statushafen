@@ -1,12 +1,15 @@
 # Status pages and tenants
 
 Each status page is its own tenant: components, incidents, subscribers, templates and roles
-always belong to exactly one page. Only global admins may create and list status pages (menu
-**Status Pages**, button "+ New status page"). In the interface, the **Status Pages** menu with
-all settings of this section is open to global admins only. The `pages:create`, `pages:update` and `pages:delete` permissions (for
-example in the "Page Owner" role, see [Users, roles and permissions](/docs/benutzer-und-rollen))
-allows the same changes to your own page through the API; in the interface it opens SSO, mail
-templates, languages and UI texts.
+always belong to exactly one page.
+
+- Only global admins may create and list status pages (menu **Status Pages**, button "+ New status
+  page").
+- In the interface, the **Status Pages** menu with all settings of this section is open to global
+  admins only.
+- The `pages:create`, `pages:update` and `pages:delete` permissions (for example in the "Page Owner"
+  role, see [Users, roles and permissions](/docs/benutzer-und-rollen)) allow the same changes to your
+  own page through the API; in the interface they open SSO, mail templates, languages and UI texts.
 
 ## Address of a status page
 
@@ -60,10 +63,12 @@ Statushafen removes all its data.
 When you edit a saved page, the **Open preview** button appears below the design fields (logo URL,
 primary and secondary color, header design, page layout). It shows the real status page with its
 components, incidents and announcements in a large window, rendered with the values from the form
-that you have not saved yet. The preview is only a view: visitors keep seeing the saved version until
-you click **Save**. Buttons and links (subscribe, filters, history) are disabled in the preview. After
-closing it (Esc or the close button) you can keep editing and open the preview again. For a new page
-the preview is available once it has been saved for the first time.
+that you have not saved yet.
+
+- The preview is only a view: visitors keep seeing the saved version until you click **Save**.
+- Buttons and links (subscribe, filters, history) are disabled in the preview.
+- After closing it (Esc or the close button) you can keep editing and open the preview again.
+- For a new page the preview is available once it has been saved for the first time.
 
 ### Private and automatic joining
 
@@ -74,11 +79,15 @@ are set:
 - a default role ("Default access for all logged-in users") and
 - the account's email domain is in the list "E-mail domains for automatic join".
 
-The domains are comma-separated and must match exactly; subdomains do not count (`acme.example`
-does not include `mail.acme.example`). If either field is empty, only explicitly assigned users
-get access. The default role must not contain permissions to create, update or delete (`…:create`, `…:update`, `…:delete`) or access to
-subscribers; Statushafen checks this when saving and again when someone joins. Someone an admin
-has removed from the page does not rejoin automatically.
+The following applies:
+
+- The domains are comma-separated and must match exactly; subdomains do not count (`acme.example`
+  does not include `mail.acme.example`).
+- If either field is empty, only explicitly assigned users get access.
+- The default role must not contain permissions to create, update or delete (`…:create`,
+  `…:update`, `…:delete`) or access to subscribers; Statushafen checks this when saving and again
+  when someone joins.
+- Someone an admin has removed from the page does not rejoin automatically.
 
 If users should only see and subscribe to the private page but not enter the admin area, give them
 a role without rights in the matrix ("Status page only", see
@@ -99,52 +108,120 @@ records are needed afterwards:
 2. As proof of ownership, a **TXT record** of the form `statushafen-verify=<token>`. The form
    shows the exact value after saving.
 
-Then click "Verify DNS". The state of the domain is shown next to it: "Pending", "Verified"
-(waiting for the first request via the domain) and "Active". "Remove domain" undoes the
-assignment. Verification is limited to 10 checks per minute per page and per user; beyond that the
-interface reports that too many requests were made.
+Then click "Verify DNS". The state of the domain is shown next to it:
 
-Only valid hostnames in lowercase are accepted (no trailing dot, no wildcard, no IP address;
-international names in Punycode). Entering a domain does not reserve it: several pages can enter
-the same domain, and the page that **verifies it first via the TXT record** wins. If the domain is
-already verified or active on another page, verifying fails with the message "Domain is already in
-use".
+- "Pending",
+- "Verified" (waiting for the first request via the domain) and
+- "Active".
 
-**Signing in on the custom domain:** whoever has a role on the page (by invitation, not by auto-join)
-and signs in on its verified or active custom domain (global provider, SSO of the page or password)
-lands back on this page and this domain afterwards and is signed in there. Whoever joined by auto-join
-gets there once they have accepted an invitation to the page. Everyone else lands under the main
-address of the application after signing in, global admins directly on this page. On the custom domain the sign-in is valid only for this status page,
-never with global admin rights: the DNS of the domain belongs to the owner of the domain, not to the
-operator. Deleting the account, the data export and linking or unlinking sign-ins therefore only work
-through the main address; the administration of all pages is reached there too.
+"Remove domain" undoes the assignment. Verification is limited to 10 checks per minute per page and
+per user; beyond that the interface reports that too many requests were made.
+
+### Rules for the domain
+
+- Only valid hostnames in lowercase are accepted (no trailing dot, no wildcard, no IP address;
+  international names in Punycode).
+- Entering a domain does not reserve it: several pages can enter the same domain, and the page that
+  **verifies it first via the TXT record** wins.
+- If the domain is already verified or active on another page, verifying fails with the message
+  "Domain is already in use".
+
+### Signing in on the custom domain
+
+Where you end up after signing in on the page's verified or active custom domain (global provider,
+SSO of the page or password):
+
+- Whoever has a role on the page (by invitation, not by auto-join) lands back on this page and this
+  domain afterwards and is signed in there.
+- Whoever joined by auto-join gets there once they have accepted an invitation to the page.
+- Everyone else lands under the main address of the application after signing in, global admins
+  directly on this page.
+
+On the custom domain the sign-in is valid only for this status page, never with global admin rights:
+the DNS of the domain belongs to the owner of the domain, not to the operator. Deleting the account,
+the data export and linking or unlinking sign-ins therefore only work through the main address; the
+administration of all pages is reached there too.
 
 ## Users of a page
 
-In the row menu "Users" you assign users a role on the page or withdraw it (global admins only in
-the interface; the API requires `pages:create` or `pages:delete`). "Global Admin" is not a page role; set global
-admins under **Users** with the "Global Admin" switch.
-Global admins pick the account from the list and assign it directly. Everyone else (for example a
-Page Owner, via the API) **invites by email address**: Statushafen creates an invitation and sends
-the account with that address a link. The account only becomes a member once its owner opens the
-link, signs in with exactly that address and chooses "Accept"; "Decline" deletes the invitation. The
-response when inviting is the same for known and unknown addresses, and the "Open invitations" list
-shows every address entered; no email is sent without an account. The link is valid for 7 days and
-can be used once; only a hash is stored, and only the account that existed when the invitation was
-sent can accept it. Inviting the same address again replaces the old link after 30 minutes at the
-earliest (before that nothing happens and no new email is sent), and only if your own role covers the
-role of the open invitation. Open invitations can be revoked; a page has at most 100 open and 200 new
-invitations per day. Statushafen deletes expired invitations automatically, and deleting an account
-also deletes all invitations to and from it; the data export contains the open invitations to your
-own address. If the inviter loses the right
-to assign the role, the invitation lapses. Accounts with the old global SSO, a page SSO link
-(OIDC) or a role on another page, and global admin accounts, get no email and cannot accept an
-invitation themselves; only a global admin adds them (a second page would otherwise block the SSO
-sign-in of the first). Inviting is limited to 20 requests per minute, as are accepting and
-declining. Existing members of the page can also be changed without an email. A
-role can only be assigned if it has no more rights than your own role on this page; a member with a
-stronger role cannot be changed or removed. The member list shows only email and role.
-Each account has exactly one role per page; adding it again changes the existing member's role. Anyone who is not a global admin cannot remove themselves or downgrade to a role without `pages:update` if they are the last member with that right on the page (error "last user with management rights"); a global admin can always repair this. When a member is removed, Statushafen also deletes that account's page SSO link for this page, so the account can later sign in or be added elsewhere. The same applies when a role is deleted or the page is taken away while editing the account.
+In the row menu "Users" you assign users a role on the page or withdraw it.
+
+- In the interface only global admins can do this; the API requires `pages:create` or
+  `pages:delete`.
+- "Global Admin" is not a page role; set global admins under **Users** with the "Global Admin"
+  switch.
+
+### Adding members as a global admin
+
+Global admins pick the account from the list and assign it directly.
+
+### Inviting by email
+
+Everyone else (for example a Page Owner, via the API) **invites by email address**:
+
+1. Statushafen creates an invitation and sends the account with that address a link.
+2. The owner of the account opens the link and signs in with exactly that address.
+3. They choose "Accept". Only then does the account become a member. "Decline" deletes the
+   invitation.
+
+The response when inviting is the same for known and unknown addresses, and the "Open invitations"
+list shows every address entered. No email is sent without an account.
+
+### Invitation link and limits
+
+| Rule | Value |
+|---|---|
+| Validity of the link | 7 days, can be used once |
+| Inviting the same address again | replaces the old link after 30 minutes at the earliest |
+| Open invitations per page | at most 100 |
+| New invitations per page | at most 200 per day |
+| Inviting, accepting and declining | at most 20 requests per minute each |
+
+Also:
+
+- Only a hash of the link is stored.
+- Only the account that existed when the invitation was sent can accept it.
+- If you invite the same address again before the 30 minutes are up, nothing happens and no new
+  email is sent.
+- The old link is only replaced if your own role covers the role of the open invitation.
+- Open invitations can be revoked.
+- If the inviter loses the right to assign the role, the invitation lapses.
+- Statushafen deletes expired invitations automatically.
+- Deleting an account also deletes all invitations to and from it.
+- The data export contains the open invitations to your own address.
+
+### Who cannot accept invitations themselves
+
+These accounts get no email and cannot accept an invitation themselves; only a global admin adds
+them:
+
+- accounts with the old global SSO,
+- accounts with a page SSO link (OIDC),
+- accounts with a role on another page (a second page would otherwise block the SSO sign-in of the
+  first),
+- global admin accounts.
+
+### Changing members and rules for roles
+
+- Existing members of the page can also be changed without an email.
+- Each account has exactly one role per page; adding it again changes the existing member's role.
+- A role can only be assigned if it has no more rights than your own role on this page.
+- A member with a stronger role cannot be changed or removed.
+- The member list shows only email and role.
+
+### Last member with management rights
+
+Anyone who is not a global admin cannot remove themselves or downgrade to a role without
+`pages:update` if they are the last member with that right on the page. The interface then shows
+the error "last user with management rights". A global admin can always repair this.
+
+### What happens on removal
+
+When a member is removed, Statushafen also deletes that account's page SSO link for this page, so
+the account can later sign in or be added elsewhere. The same applies when
+
+- a role is deleted or
+- the page is taken away while editing the account.
 
 ## Switch tenant
 
