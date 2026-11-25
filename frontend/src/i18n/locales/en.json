@@ -1625,6 +1625,7 @@
       "login_code_required": "Please provide the sign-in code.",
       "login_code_invalid": "The sign-in code is invalid or expired.",
       "password_login_disabled": "Signing in with email and password is disabled.",
+      "provider_unknown": "This sign-in provider is unknown or no longer active.",
       "identity_not_found": "The linked identity was not found.",
       "confirmation_invalid": "The confirmation does not match.",
       "last_global_admin": "The last global admin cannot be removed.",
@@ -1740,7 +1741,8 @@
       "test_disabled": "Test sign-in is disabled for this page.",
       "test_incomplete": "Test sign-in needs a discovery URL, client ID and client secret.",
       "unsafe_redirect": "The sign-in service returned an unsafe address. The redirect was not followed.",
-      "unknown": "SSO sign-in failed."
+      "unknown": "SSO sign-in failed.",
+      "provider_unknown": "This sign-in provider is unknown or no longer active."
     }
   },
   "layout": {

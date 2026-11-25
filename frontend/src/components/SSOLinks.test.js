@@ -120,7 +120,8 @@ describe('SSOLinks', () => {
       await wrapper.find('[data-test="sso-provider"] button').trigger('click')
       await flushPromises()
 
-      expect(wrapper.find('[role="alert"]').text()).toContain('Verknüpfung konnte nicht gestartet werden')
+      expect(wrapper.find('[role="alert"]').text())
+        .toBe('Verknüpfung konnte nicht gestartet werden: Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.')
       expect(window.location.assign).not.toHaveBeenCalled()
     })
 

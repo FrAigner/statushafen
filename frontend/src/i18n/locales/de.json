@@ -1625,6 +1625,7 @@
       "login_code_required": "Bitte gib den Anmeldecode an.",
       "login_code_invalid": "Der Anmeldecode ist ungültig oder abgelaufen.",
       "password_login_disabled": "Die Anmeldung mit E-Mail und Passwort ist abgeschaltet.",
+      "provider_unknown": "Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.",
       "identity_not_found": "Die Verknüpfung wurde nicht gefunden.",
       "confirmation_invalid": "Die Bestätigung stimmt nicht.",
       "last_global_admin": "Der letzte Global Admin kann nicht entfernt werden.",
@@ -1740,7 +1741,8 @@
       "test_disabled": "Die Testanmeldung ist für diese Seite abgeschaltet.",
       "test_incomplete": "Für die Testanmeldung fehlen Discovery URL, Client ID oder Client Secret.",
       "unsafe_redirect": "Der Anmeldedienst hat eine unsichere Adresse geliefert. Die Weiterleitung wurde nicht ausgeführt.",
-      "unknown": "Die SSO-Anmeldung ist fehlgeschlagen."
+      "unknown": "Die SSO-Anmeldung ist fehlgeschlagen.",
+      "provider_unknown": "Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv."
     }
   },
   "layout": {

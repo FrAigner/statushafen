@@ -299,6 +299,16 @@ describe('LoginView', () => {
     expect(wrapper.find('.login-alert.error').text()).toContain('mit keinem Konto verknüpft')
   })
 
+  it.each([
+    ['de', 'Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.'],
+    ['en', 'This sign-in provider is unknown or no longer active.'],
+  ])('translates the callback error provider_unknown (%s)', async (locale, expected) => {
+    i18n.global.locale.value = locale
+    const { wrapper } = await mountLogin('?oidc_error=provider_unknown')
+
+    expect(wrapper.find('.login-alert.error').text()).toBe(expected)
+  })
+
   it('zeigt bei unbekanntem OIDC-Fehlercode eine allgemeine Meldung statt des Codes', async () => {
     const { wrapper } = await mountLogin('?oidc_error=%3Cb%3Ehallo')
 
