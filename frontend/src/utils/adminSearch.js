@@ -59,7 +59,7 @@ export function navItemForPath(path) {
 
 // Lowercase, fold diacritics (ü -> u, ß -> ss) and collapse whitespace.
 export function normalize(text) {
-  return String(text ?? '')
+  return String(text)
     .toLowerCase()
     .replace(/ß/g, 'ss')
     .normalize('NFD')
@@ -111,7 +111,7 @@ function score(entry, query, tokens) {
   if (label.startsWith(query)) return 0
   if (label.includes(query)) return 1
   const words = label.split(/[^a-z0-9]+/)
-  if (tokens.every(tok => words.some(w => w.startsWith(tok)) || label.includes(tok))) return 2
+  if (tokens.every(tok => words.some(w => w.startsWith(tok)))) return 2
   if (entry.keywords.some(k => normalize(k).startsWith(query))) return 3
   return 4
 }

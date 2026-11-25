@@ -75,7 +75,7 @@ const showNoResults = computed(() => open.value && query.value.trim() !== '' && 
 
 watch(query, () => { activeIndex.value = 0 })
 
-const isMac = () => /Mac|iPhone|iPad/.test(navigator.userAgentData?.platform ?? navigator.platform ?? '')
+const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform)
 const shortcutLabel = computed(() => (isMac() ? '⌘ K' : t('quickSearch.shortcut')))
 
 const focusInput = () => {
@@ -100,12 +100,7 @@ const reset = () => {
 const select = async (entry) => {
   reset()
   inputRef.value?.blur()
-  try {
-    await router.push(entry.to)
-  } catch (err) {
-    console.error('Quick search navigation failed', err)
-    return
-  }
+  await router.push(entry.to)
   if (entry.targetId) revealSetting(entry.targetId, { fallbackId: entry.fallbackId })
 }
 
@@ -120,8 +115,8 @@ const onKeydown = (e) => {
       open.value = true
       return
     }
-    const next = nextActiveIndex(activeIndex.value, e.key, flat.value.length)
-    if (next !== null) activeIndex.value = next
+    // The list is open, so it has options and the arrow key always moves.
+    activeIndex.value = nextActiveIndex(activeIndex.value, e.key, flat.value.length)
     scrollActiveIntoView()
   } else if (e.key === 'Enter') {
     const entry = listOpen.value ? flat.value[activeIndex.value] : null
@@ -233,7 +228,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
           @mousemove="activeIndex = indexOf(entry)"
           @click="select(entry)"
         >
-          <AppIcon :name="entry.kind === 'page' ? (entry.icon || 'grid') : entry.kind === 'doc' ? 'book' : 'settings'" :size="14" class="quick-search__option-icon" />
+          <AppIcon :name="entry.kind === 'page' ? entry.icon : entry.kind === 'doc' ? 'book' : 'settings'" :size="14" class="quick-search__option-icon" />
           <span class="quick-search__option-text">
             <span class="quick-search__option-label">{{ entry.label }}</span>
             <span class="quick-search__option-context">{{ entry.context }}</span>

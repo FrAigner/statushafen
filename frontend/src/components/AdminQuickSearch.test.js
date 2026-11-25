@@ -182,4 +182,89 @@ describe('AdminQuickSearch', () => {
     const labels = () => wrapper.findAll('[role="group"]').map(g => wrapper.find(`#${g.attributes('aria-labelledby')}`).text())
     await vi.waitFor(() => expect(labels()).toContain(i18n.global.t('quickSearch.groups.docs')), { timeout: 5000 })
   })
+
+  it('ArrowDown reopens a closed list, Enter on a closed list does nothing', async () => {
+    const { router } = await mountSearch()
+    await type('privat')
+    await input().trigger('keydown', { key: 'Escape' })
+    await input().trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/admin/components')
+    await input().trigger('keydown', { key: 'ArrowDown' })
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+    // Other keys are left to the input.
+    await input().trigger('keydown', { key: 'a' })
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+  })
+
+  it('the pointer moves the active option', async () => {
+    await mountSearch()
+    await type('statusseite')
+    const options = wrapper.findAll('[role="option"]')
+    await options[1].trigger('mousemove')
+    expect(input().attributes('aria-activedescendant')).toBe(options[1].attributes('id'))
+  })
+
+  it('Escape on an empty field closes the opened field on small screens and returns focus to the button', async () => {
+    await mountSearch()
+    const toggle = wrapper.find('button.quick-search__toggle')
+    await toggle.trigger('click')
+    await flushPromises()
+    await input().trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('.quick-search').classes()).not.toContain('is-open')
+    expect(document.activeElement).toBe(toggle.element)
+    // A further Escape with nothing open changes nothing.
+    await input().trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('.quick-search').classes()).not.toContain('is-open')
+  })
+
+  it('the toggle button closes the opened field again', async () => {
+    await mountSearch()
+    const toggle = wrapper.find('button.quick-search__toggle')
+    await toggle.trigger('click')
+    await flushPromises()
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+  })
+
+  it('stays open while focus moves inside, closes when it leaves', async () => {
+    await mountSearch()
+    await type('privat')
+    const toggle = wrapper.find('button.quick-search__toggle')
+    await input().trigger('focusout', { relatedTarget: toggle.element })
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(true)
+    await input().trigger('focusout', { relatedTarget: document.body })
+    expect(wrapper.find('[role="listbox"]').exists()).toBe(false)
+  })
+
+  it('loads the docs index only once', async () => {
+    await mountSearch()
+    await type('Selbstüberwachung')
+    const docsGroup = () => wrapper.findAll('[role="option"][data-kind="doc"]').length
+    await vi.waitFor(() => expect(docsGroup()).toBeGreaterThan(0), { timeout: 5000 })
+    input().element.blur()
+    await input().trigger('focus')
+    await flushPromises()
+    expect(docsGroup()).toBeGreaterThan(0)
+  })
+
+  it('shows the Mac shortcut on Apple devices', async () => {
+    const spy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel')
+    try {
+      await mountSearch()
+      expect(wrapper.find('.quick-search__kbd').text()).toBe('⌘ K')
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('shows the Ctrl shortcut elsewhere', async () => {
+    const spy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Linux x86_64')
+    try {
+      await mountSearch()
+      expect(wrapper.find('.quick-search__kbd').text()).toBe(i18n.global.t('quickSearch.shortcut'))
+    } finally {
+      spy.mockRestore()
+    }
+  })
 })

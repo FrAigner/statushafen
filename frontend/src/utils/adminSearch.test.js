@@ -85,6 +85,18 @@ describe('admin quick search', () => {
     expect(settings[0].key).toBe('isPrivate')
   })
 
+  it('ranks: label prefix, label substring, label word prefixes, keyword prefix, other matches', () => {
+    const e = (key, label, keywords = []) => ({ kind: 'setting', key, label, context: '', keywords })
+    const entries = [
+      e('other', 'Etwas', ['xabc def']),
+      e('keyword', 'Etwas', ['abc def']),
+      e('words', 'Def Abc'),
+      e('substring', 'xx abc def'),
+      e('prefix', 'Abc def'),
+    ]
+    expect(searchIndex(entries, 'abc def')[0].entries.map(x => x.key)).toEqual(['prefix', 'substring', 'words', 'keyword', 'other'])
+  })
+
   it('returns nothing for an empty query', () => {
     expect(searchIndex(build(), '   ')).toEqual([])
   })

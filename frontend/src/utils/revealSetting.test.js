@@ -55,6 +55,21 @@ describe('revealSetting', () => {
     expect((await done).id).toBe('isPrivate')
   })
 
+  it('highlights the target itself when it has no field container, without smooth scrolling for reduced motion', async () => {
+    const original = window.matchMedia
+    window.matchMedia = vi.fn(() => ({ matches: true }))
+    try {
+      document.body.innerHTML = '<div><input id="bare"></div>'
+      const done = revealSetting('bare')
+      await vi.advanceTimersByTimeAsync(0)
+      const el = await done
+      expect(el.classList.contains(HIGHLIGHT_CLASS)).toBe(true)
+      expect(el.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' })
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
   it('gives up quietly after the timeout', async () => {
     const done = revealSetting('missing', { timeout: 500 })
     await vi.advanceTimersByTimeAsync(600)

@@ -38,7 +38,7 @@ export async function revealSetting(id, { fallbackId, timeout = 4000, interval =
   const el = await waitForTarget(id, fallbackId, timeout, interval)
   if (!el) return null
   const container = el.matches(CONTAINER) ? el : (el.closest(CONTAINER) ?? el)
-  el.scrollIntoView?.({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
+  el.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
   focusTarget(el).focus({ preventScroll: true })
   container.classList.add(HIGHLIGHT_CLASS)
   setTimeout(() => container.classList.remove(HIGHLIGHT_CLASS), HIGHLIGHT_MS)

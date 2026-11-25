@@ -20,6 +20,11 @@ describe('buildDocsEntries', () => {
     ])
   })
 
+  it('skips missing sections and falls back to the slug without a title', () => {
+    const entries = buildDocsEntries('de', { sources: { de: { a: 'Nur Text' } }, sectionIds: ['a', 'missing'] })
+    expect(entries).toEqual([{ kind: 'doc', key: 'a', label: 'a', context: 'a', to: '/docs/a' }])
+  })
+
   it('uses the current language and falls back to German', () => {
     const entries = buildDocsEntries('en', { sources, sectionIds: ['sso', 'faq'] })
     expect(entries.map(e => e.label)).toEqual(['Single sign-on', 'Set up OIDC', 'FAQ'])
