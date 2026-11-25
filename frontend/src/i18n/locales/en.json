@@ -1096,7 +1096,6 @@
     "summary": {
       "all": "All permissions",
       "more": "+{n}",
-      "none": "No permissions",
       "pageOnly": "Status page only"
     },
     "cardTitle": "All roles",
@@ -2487,6 +2486,11 @@
         "what": "The webhook URL of the Google Chat space to notify. Required for the Google Chat channel.",
         "effect": "For every incident and maintenance affecting a subscribed component, a text message is sent there. The URL is checked on save: only https addresses that resolve and do not point to internal addresses. “Send test” in the list tries it out.",
         "example": "“https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…” from the webhook settings of the chat space."
+      },
+      "testMessage": {
+        "what": "Sends a test message to the entered e-mail address or webhook URL right away, even before saving.",
+        "effect": "The message uses the language selected at the top of the admin area. Nothing is saved; the target is checked as on saving. At most five tests per minute.",
+        "example": "Enter the webhook URL of a new chat space, click “Send test message” and check that it arrives in the space."
       },
       "language": {
         "what": "The language this subscriber receives emails and chat messages in. Only shown when the page offers several languages.",

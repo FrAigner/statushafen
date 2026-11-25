@@ -154,6 +154,10 @@ describe('AdminSubscribers', () => {
 
     expect(wrapper.find('.alert-error').exists()).toBe(true)
     expect(wrapper.text()).toContain('Fehler beim Laden')
+
+    // The close button dismisses the message.
+    await wrapper.find('.alert-close').trigger('click')
+    expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
   // unbestätigte Abos (Double-Opt-in) sind in der Liste markiert.

@@ -54,7 +54,8 @@ const detail = computed(() => {
 
 <template>
   <span v-if="pageOnly" class="perm-summary perm-summary--none">{{ t('roles.summary.pageOnly') }}</span>
-  <span v-else-if="chips.length" class="perm-summary" :title="detail">
+  <!-- With an admin right there is always at least one chip (pageOnly covers the rest). -->
+  <span v-else class="perm-summary" :title="detail">
     <span class="sr-only">{{ detail }}</span>
     <span class="perm-summary__chips" aria-hidden="true">
       <span v-if="everything" class="tag-pill perm-summary__chip">{{ t('roles.summary.all') }}</span>
@@ -64,7 +65,6 @@ const detail = computed(() => {
       </template>
     </span>
   </span>
-  <span v-else class="perm-summary perm-summary--none">{{ t('roles.summary.none') }}</span>
 </template>
 
 <style scoped>

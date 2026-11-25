@@ -1096,7 +1096,6 @@
     "summary": {
       "all": "Alle Rechte",
       "more": "+{n}",
-      "none": "Keine Rechte",
       "pageOnly": "Nur Statusseite"
     },
     "cardTitle": "Alle Rollen",
@@ -2487,6 +2486,11 @@
         "what": "Die Webhook-URL des Google-Chat-Raums, der benachrichtigt wird. Pflichtfeld beim Kanal Google Chat.",
         "effect": "Bei jedem Vorfall und jeder Wartung, die eine abonnierte Komponente betreffen, geht eine Textnachricht dorthin. Beim Speichern wird die URL geprüft: Nur https-Adressen, die sich auflösen lassen und nicht auf interne Adressen zeigen. „Test senden“ in der Liste probiert sie aus.",
         "example": "„https://chat.googleapis.com/v1/spaces/AAAA…/messages?key=…“ aus den Webhook-Einstellungen des Chat-Raums."
+      },
+      "testMessage": {
+        "what": "Schickt sofort eine Testnachricht an die eingetragene E-Mail-Adresse bzw. Webhook-URL, schon vor dem Speichern.",
+        "effect": "Die Nachricht kommt in der Sprache, die oben im Admin-Bereich eingestellt ist. Gespeichert wird dabei nichts; das Ziel wird wie beim Speichern geprüft. Höchstens fünf Tests pro Minute.",
+        "example": "Webhook-URL eines neuen Chat-Raums eintragen, „Testnachricht senden“ klicken und im Raum nachsehen, ob sie ankommt."
       },
       "language": {
         "what": "Die Sprache, in der dieser Abonnent E-Mails und Chat-Nachrichten bekommt. Nur sichtbar, wenn die Seite mehrere Sprachen anbietet.",

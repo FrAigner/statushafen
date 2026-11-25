@@ -116,6 +116,10 @@ describe('AdminIncidentTemplates', () => {
     const { wrapper } = await mountTemplates({ fetchImpl: makeFetchRouter({ loadOk: false }) })
 
     expect(wrapper.find('.alert-error').text()).toContain('kaputt')
+
+    // The close button dismisses the message.
+    await wrapper.find('.alert-close').trigger('click')
+    expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
   // Nachrichtenfeld der Vorlage ist der Editor.

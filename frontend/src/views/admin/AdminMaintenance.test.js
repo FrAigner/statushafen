@@ -150,6 +150,10 @@ describe('AdminMaintenance', () => {
 
     expect(wrapper.findAll('tbody tr')).toHaveLength(200)
     expect(wrapper.find('.alert-error').exists()).toBe(true)
+
+    // The close button dismisses the message.
+    await wrapper.find('.alert-close').trigger('click')
+    expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
   // vorher bot die Auswahl nur die oberste Ebene an.

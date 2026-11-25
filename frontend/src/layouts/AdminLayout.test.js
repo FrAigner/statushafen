@@ -1178,6 +1178,23 @@ describe('AdminLayout', () => {
         })
       }
 
+      it('uses the first status page when the active page is not among the memberships', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }, { ID: 9, Name: 'Beta', Slug: 'beta', Permissions: '' }])
+        useTenant().setActiveTenant(42)
+        const { router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/status/acme')
+      })
+
+      it('treats an empty pages answer as no membership', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }])
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => null })
+        const { wrapper, router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/admin/components')
+        expect(wrapper.find('section[data-status="forbidden"]').exists()).toBe(true)
+      })
+
       it('lässt das eigene Profil erreichbar', async () => {
         asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }])
         const { router } = await mountLayout({ initialPath: '/admin/profile' })

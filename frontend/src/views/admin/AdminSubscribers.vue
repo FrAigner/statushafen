@@ -348,6 +348,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
           <div class="form-group test-message">
             <button
               type="button"
+              v-help="'subscribers.testMessage'"
               class="action-btn"
               data-test="send-test-message"
               aria-describedby="subscriber-test-message-hint"
