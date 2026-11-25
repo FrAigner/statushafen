@@ -6,6 +6,8 @@ export default [
   // sind Kopien bzw. generierte Dateien und dürfen nicht gelintet werden.
   { ignores: ['.stryker-tmp/**', 'reports/**', 'dist/**'] },
   ...pluginVue.configs['flat/essential'],
+  // Also covers TypeScript: *.ts and <script lang="ts"> in SFCs get the typescript-eslint parser and its
+  // recommended rules (e.g. no-explicit-any, ban-ts-comment). Type errors are vue-tsc's job (npm run typecheck).
   ...vueTsEslintConfig(),
   {
     languageOptions: {
