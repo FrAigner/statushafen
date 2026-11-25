@@ -33,6 +33,8 @@ import { incidentBadge, actionBadge } from '../../utils/badgeStatus'
 import { useFormTranslations } from '../../composables/useFormTranslations'
 import FormLanguageSwitch from '../../components/FormLanguageSwitch.vue'
 import FormLanguageDone from '../../components/FormLanguageDone.vue'
+// Help tooltips (what / effect / example) on every field and button via v-help.
+import { vHelp } from '../../directives/vHelp'
 
 const route = useRoute()
 const { apiFetch } = useApi()
@@ -212,10 +214,10 @@ const submitPostMortem = async (publish) => {
 
 // Felder des Post-Mortem-Formulars: Schlüssel, Beschriftung, Platzhalter.
 const pmFields = computed(() => [
-  { key: 'root_cause', label: t('incidentDetail.rootCause'), placeholder: t('incidentDetail.rootCausePlaceholder') },
-  { key: 'impact', label: t('incidentDetail.impact'), placeholder: t('incidentDetail.impactPlaceholder') },
-  { key: 'resolution', label: t('incidentDetail.resolution'), placeholder: t('incidentDetail.resolutionPlaceholder') },
-  { key: 'detection', label: t('incidentDetail.detection'), placeholder: t('incidentDetail.detectionPlaceholder') },
+  { key: 'root_cause', label: t('incidentDetail.rootCause'), placeholder: t('incidentDetail.rootCausePlaceholder'), help: 'incidentDetail.rootCause' },
+  { key: 'impact', label: t('incidentDetail.impact'), placeholder: t('incidentDetail.impactPlaceholder'), help: 'incidentDetail.impact' },
+  { key: 'resolution', label: t('incidentDetail.resolution'), placeholder: t('incidentDetail.resolutionPlaceholder'), help: 'incidentDetail.resolution' },
+  { key: 'detection', label: t('incidentDetail.detection'), placeholder: t('incidentDetail.detectionPlaceholder'), help: 'incidentDetail.detection' },
 ])
 </script>
 
@@ -250,18 +252,18 @@ const pmFields = computed(() => [
             <p class="tl-msg">{{ u.message }}</p>
             <div v-if="u.author_email" class="tl-author">— {{ u.author_email }}</div>
             <div v-if="trans.showSwitcher.value && editUpdateId !== u.id" class="tl-actions">
-              <OnyxButton :label="t('incidentDetail.translationsButton')" mode="plain" type="button" data-test="update-translations-open" @click="openTranslations(u)" />
+              <OnyxButton v-help="'incidentDetail.translations'" :label="t('incidentDetail.translationsButton')" mode="plain" type="button" data-test="update-translations-open" @click="openTranslations(u)" />
             </div>
             <div v-if="editUpdateId === u.id" class="tl-trans" data-test="update-translations">
               <div v-if="editAlert" class="alert alert-error">{{ editAlert }}</div>
               <FormLanguageSwitch :trans="editTrans" />
-              <FormField v-slot="f" :label="t('incidentDetail.fieldUpdateMessage')">
+              <FormField v-slot="f" :label="t('incidentDetail.fieldUpdateMessage')" help="incidentDetail.translationMessage">
                 <RichTextEditor :id="f.id" v-model="editMessage" class="form-textarea" :readonly="editOnDefaultLang" />
               </FormField>
               <FormLanguageDone :trans="editTrans" />
               <div class="form-actions">
-                <OnyxButton :label="t('incidentDetail.saveTranslationsButton')" type="button" :loading="editSaving" data-test="update-translations-save" @click="saveTranslations" />
-                <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="closeTranslations" />
+                <OnyxButton v-help="'incidentDetail.saveTranslations'" :label="t('incidentDetail.saveTranslationsButton')" type="button" :loading="editSaving" data-test="update-translations-save" @click="saveTranslations" />
+                <OnyxButton v-help="'incidentDetail.cancelTranslations'" :label="t('common.cancel')" mode="outline" type="button" @click="closeTranslations" />
               </div>
             </div>
           </li>
@@ -270,18 +272,18 @@ const pmFields = computed(() => [
         <div v-if="hasPerm('incidents:create')" id="update-form" class="update-form">
           <div v-if="updateAlert" class="alert alert-error">{{ updateAlert }}</div>
           <form novalidate @submit.prevent="submitUpdate">
-            <FormField v-slot="f" required :label="t('incidentDetail.fieldNewStatus')">
+            <FormField v-slot="f" required :label="t('incidentDetail.fieldNewStatus')" help="incidentDetail.newStatus">
               <select :id="f.id" v-model="updateForm.status" class="form-select" :required="f.required">
                 <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
             </FormField>
             <FormLanguageSwitch :trans="trans" />
-            <FormField v-slot="f" required :label="t('incidentDetail.fieldUpdateMessage')">
+            <FormField v-slot="f" required :label="t('incidentDetail.fieldUpdateMessage')" help="incidentDetail.updateMessage">
               <RichTextEditor :id="f.id" v-model="updateMessage" class="form-textarea" :required="f.required" :placeholder="t('incidentDetail.updateMessagePlaceholder')" />
             </FormField>
             <FormLanguageDone :trans="trans" />
             <div class="form-actions">
-              <OnyxButton :label="t('incidentDetail.addUpdateButton')" type="submit" :loading="updateSaving" />
+              <OnyxButton v-help="'incidentDetail.addUpdate'" :label="t('incidentDetail.addUpdateButton')" type="submit" :loading="updateSaving" />
             </div>
           </form>
         </div>
@@ -321,14 +323,14 @@ const pmFields = computed(() => [
         <h3 class="section-title">{{ t('incidentDetail.editPostMortemHeading') }}</h3>
         <div v-if="pmAlert" class="alert alert-error">{{ pmAlert }}</div>
         <div v-if="pmNotice" class="alert alert-success" role="status">
-          {{ pmNotice }} <button class="alert-close" @click="pmNotice = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+          {{ pmNotice }} <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="pmNotice = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
         </div>
 
-        <FormField v-slot="f" :label="t('incidentDetail.summaryLabel')">
+        <FormField v-slot="f" :label="t('incidentDetail.summaryLabel')" help="incidentDetail.summary">
           <textarea :id="f.id" v-model="pmForm.summary" class="form-textarea" :placeholder="t('incidentDetail.summaryPlaceholder')"></textarea>
         </FormField>
         <div class="pm-grid">
-          <FormField v-for="field in pmFields" :key="field.key" v-slot="f" :label="field.label">
+          <FormField v-for="field in pmFields" :key="field.key" v-slot="f" :label="field.label" :help="field.help">
             <textarea :id="f.id" v-model="pmForm[field.key]" class="form-textarea" :placeholder="field.placeholder"></textarea>
           </FormField>
         </div>
@@ -336,21 +338,21 @@ const pmFields = computed(() => [
         <h4 class="pm-k pm-k-spaced">{{ t('incidentDetail.followUpActions') }}</h4>
         <ul v-if="pmForm.actions.length" class="actions">
           <li v-for="(a, idx) in pmForm.actions" :key="idx" class="action-row edit">
-            <input v-model="a.text" class="form-input flex-1" :aria-label="t('incidentDetail.actionTextAria')" :placeholder="t('incidentDetail.actionTextPlaceholder')">
-            <input v-model="a.owner" class="form-input w-owner" :aria-label="t('incidentDetail.actionOwnerAria')" :placeholder="t('incidentDetail.actionOwnerPlaceholder')">
-            <select v-model="a.state" class="form-select w-state" :aria-label="t('incidentDetail.actionStateAria')">
+            <input v-model="a.text" v-help="'incidentDetail.actionText'" class="form-input flex-1" :aria-label="t('incidentDetail.actionTextAria')" :placeholder="t('incidentDetail.actionTextPlaceholder')">
+            <input v-model="a.owner" v-help="'incidentDetail.actionOwner'" class="form-input w-owner" :aria-label="t('incidentDetail.actionOwnerAria')" :placeholder="t('incidentDetail.actionOwnerPlaceholder')">
+            <select v-model="a.state" v-help="'incidentDetail.actionState'" class="form-select w-state" :aria-label="t('incidentDetail.actionStateAria')">
               <option v-for="opt in actionStateOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
-            <button type="button" class="action-remove" :aria-label="t('incidentDetail.removeActionAria')" :title="t('incidentDetail.removeActionAria')" @click="removeActionRow(idx)">
+            <button v-help="'incidentDetail.removeAction'" type="button" class="action-remove" :aria-label="t('incidentDetail.removeActionAria')" :title="t('incidentDetail.removeActionAria')" @click="removeActionRow(idx)">
               <AppIcon name="x" :size="14" />
             </button>
           </li>
         </ul>
-        <button type="button" class="action-add" @click="addActionRow">{{ t('incidentDetail.addActionButton') }}</button>
+        <button v-help="'incidentDetail.addAction'" type="button" class="action-add" @click="addActionRow">{{ t('incidentDetail.addActionButton') }}</button>
 
         <div class="form-actions">
-          <OnyxButton :label="t('incidentDetail.saveDraftButton')" mode="outline" :loading="pmSaving" @click="submitPostMortem(false)" />
-          <OnyxButton :label="t('incidentDetail.publishButton')" :loading="pmSaving" @click="submitPostMortem(true)" />
+          <OnyxButton v-help="'incidentDetail.saveDraft'" :label="t('incidentDetail.saveDraftButton')" mode="outline" :loading="pmSaving" @click="submitPostMortem(false)" />
+          <OnyxButton v-help="'incidentDetail.publish'" :label="t('incidentDetail.publishButton')" :loading="pmSaving" @click="submitPostMortem(true)" />
         </div>
       </section>
     </template>

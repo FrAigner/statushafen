@@ -37,6 +37,8 @@ import StatusBadge from '../../components/StatusBadge.vue'
 import { incidentBadge } from '../../utils/badgeStatus'
 import { isResolvedStatus } from '../../utils/incidentStatus'
 import { incidentListUrl, mergeIncidents, ADMIN_PAGE_SIZE } from '../../utils/incidentPaging'
+// Help tooltips (what / effect / example) on every field and button via v-help.
+import { vHelp } from '../../directives/vHelp'
 
 const { apiFetch } = useApi()
 const { hasPerm }  = useAuth()
@@ -302,12 +304,12 @@ const onMenuSelect = (item, key) => {
     <!-- Alert -->
     <div v-if="alertMsg" :class="`alert alert-${alertType} fade-in mb-16`">
       <span>{{ alertMsg }}</span>
-      <button class="alert-close" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+      <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
     </div>
 
     <PageHeader :level="2" :title="t('incidents.title')" :subtitle="forbidden ? null : subtitle" :breadcrumbs="breadcrumbs">
       <template v-if="canCreate" #actions>
-        <OnyxButton :label="t('incidents.newButton')" @click="openNew" />
+        <OnyxButton v-help="'incidents.newIncident'" :label="t('incidents.newButton')" @click="openNew" />
       </template>
     </PageHeader>
 
@@ -317,8 +319,8 @@ const onMenuSelect = (item, key) => {
     <div v-else class="split" :class="{ 'split--open': isEditing }">
       <ListCard :title="t('incidents.cardTitle')" class="split__main">
         <template #tools>
-          <SegmentControl v-model="filter" :options="filterOptions" :label="t('incidents.filterLabel')" />
-          <SearchBox v-model="query" :label="t('incidents.searchLabel')" :placeholder="t('incidents.searchPlaceholder')" />
+          <SegmentControl v-model="filter" v-help="'incidents.filter'" :options="filterOptions" :label="t('incidents.filterLabel')" />
+          <SearchBox v-model="query" v-help="'incidents.search'" :label="t('incidents.searchLabel')" :placeholder="t('incidents.searchPlaceholder')" />
         </template>
         <p v-if="searching" class="sr-only" role="status">{{ t('patterns.searchResult', { n: rows.length }, rows.length) }}</p>
 
@@ -336,13 +338,13 @@ const onMenuSelect = (item, key) => {
           <template #cell-CreatedAt="{ item }"><RelativeTime :value="item.CreatedAt" /></template>
           <template #actions="{ item }">
             <!-- Übersetzungen nur noch über das Zeilenmenü. -->
-            <RowMenu :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
+            <RowMenu v-help="'incidents.rowActions'" :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
           </template>
         </ResponsiveTable>
         <EmptyState v-else-if="items.length" :title="t('incidents.noResults')" :text="t('incidents.noResultsText')" />
         <ListState v-else :loading="loading" :error="loadFailed" :count="items.length" :empty-text="t('incidents.empty')" icon="alert-triangle" />
         <div v-if="hasMore" class="list-more">
-          <OnyxButton :label="t('incidents.loadMore')" mode="outline" :disabled="loadingMore" data-test="load-more" @click="loadMore" />
+          <OnyxButton v-help="'incidents.loadMore'" :label="t('incidents.loadMore')" mode="outline" :disabled="loadingMore" data-test="load-more" @click="loadMore" />
         </div>
       </ListCard>
 
@@ -352,24 +354,24 @@ const onMenuSelect = (item, key) => {
           <FormLanguageSwitch :trans="trans" />
           <fieldset class="form-lock" :disabled="formReadOnly">
 
-          <FormField v-if="currentEditId === null && templates.length > 0" v-slot="f" :label="t('incidents.templateLabel')">
+          <FormField v-if="currentEditId === null && templates.length > 0" v-slot="f" :label="t('incidents.templateLabel')" help="incidents.template">
             <select :id="f.id" :value="selectedTemplateId" @change="onTemplateChange">
               <option value="">{{ t('incidents.noTemplatePlaceholder') }}</option>
               <option v-for="tpl in templates" :key="tpl.ID" :value="String(tpl.ID)">{{ tpl.Name }}</option>
             </select>
           </FormField>
 
-          <FormField v-slot="f" required :label="t('incidents.fieldTitle')" :error="onDefaultLang ? errors.Title || null : null">
+          <FormField v-slot="f" required :label="t('incidents.fieldTitle')" help="incidents.title" :error="onDefaultLang ? errors.Title || null : null">
             <input :id="f.id" v-model="titleModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('incidents.titlePlaceholder')" @input="clearError('Title')">
           </FormField>
 
-          <FormField v-slot="f" required :label="t('incidents.fieldMessage')" :error="onDefaultLang ? errors.Message || null : null">
+          <FormField v-slot="f" required :label="t('incidents.fieldMessage')" help="incidents.message" :error="onDefaultLang ? errors.Message || null : null">
             <RichTextEditor :id="f.id" v-model="messageModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('incidents.messagePlaceholder')" @input="clearError('Message')" />
           </FormField>
 
           <FormLanguageDone :trans="trans" />
 
-          <FormField v-if="currentEditId === null" v-slot="f" required :label="t('incidents.fieldStatus')">
+          <FormField v-if="currentEditId === null" v-slot="f" required :label="t('incidents.fieldStatus')" help="incidents.status">
             <select :id="f.id" v-model="formData.Status" :required="f.required">
               <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
@@ -379,17 +381,17 @@ const onMenuSelect = (item, key) => {
             <router-link :to="`/admin/incidents/${activeTenantId}/${currentEditId}`">{{ t('incidents.statusHintLink') }}</router-link>
           </div>
 
-          <FormField v-slot="f" :label="t('incidents.fieldSeverity')" :hint="t('incidents.fieldSeverityHint')">
+          <FormField v-slot="f" :label="t('incidents.fieldSeverity')" help="incidents.severity" :hint="t('incidents.fieldSeverityHint')">
             <select :id="f.id" v-model="formData.Severity" :aria-describedby="f.describedby" data-test="severity">
               <option v-for="opt in severityOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
           </FormField>
 
           <div class="form-grid">
-            <FormField v-slot="f" :label="t('incidents.fieldStartedAt')">
+            <FormField v-slot="f" :label="t('incidents.fieldStartedAt')" help="incidents.startedAt">
               <input :id="f.id" v-model="formData.StartedAt" type="datetime-local" data-test="started-at">
             </FormField>
-            <FormField v-slot="f" :label="t('incidents.fieldResolvedAt')">
+            <FormField v-slot="f" :label="t('incidents.fieldResolvedAt')" help="incidents.resolvedAt">
               <input :id="f.id" v-model="formData.ResolvedAt" type="datetime-local" data-test="resolved-at">
             </FormField>
           </div>
@@ -399,18 +401,19 @@ const onMenuSelect = (item, key) => {
           <FormMultiSelect
             v-model="formData.ComponentIDs"
             :label="t('incidents.fieldComponents')"
+            help="incidents.components"
             :options="componentOptions(components, formData.ComponentIDs)"
             required
             :error="errors.ComponentIDs || null"
             @update:model-value="clearError('ComponentIDs')"
           />
 
-          <TagField v-if="canSelectTags" :label="t('incidents.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
+          <TagField v-if="canSelectTags" v-help="'incidents.tags'" :label="t('incidents.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
 
           </fieldset>
           <div class="form-actions">
-            <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
-            <OnyxButton v-if="!formReadOnly" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
+            <OnyxButton v-help="'incidents.cancel'" :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
+            <OnyxButton v-if="!formReadOnly" v-help="'incidents.save'" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
       </FormPanel>

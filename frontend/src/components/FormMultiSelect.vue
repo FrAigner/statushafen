@@ -51,7 +51,10 @@ function syncAria() {
   // aria-required ist nur an Eingabe-Rollen erlaubt (Combobox), nicht am Gruppen-Stub der Tests.
   if (props.required && field.tagName === 'INPUT') field.setAttribute('aria-required', 'true')
   else field.removeAttribute('aria-required')
-  if (describedby.value) field.setAttribute('aria-describedby', describedby.value)
+  // Keep the help tooltip id set by v-help (FormField `help`); it is managed by the directive.
+  const helpIds = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(token => token.startsWith('help-'))
+  const ids = [describedby.value, ...helpIds].filter(Boolean)
+  if (ids.length) field.setAttribute('aria-describedby', ids.join(' '))
   else field.removeAttribute('aria-describedby')
 }
 

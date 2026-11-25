@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../i18n'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
@@ -10,6 +11,9 @@ import { onyxFormStubs } from '../test-support/onyxStubs'
 import { vueSources, lookup } from '../test-support/templateScan.js'
 import AdminComponents from './admin/AdminComponents.vue'
 import AdminExternalSources from './admin/AdminExternalSources.vue'
+import AdminOverview from './admin/AdminOverview.vue'
+import AdminIncidents from './admin/AdminIncidents.vue'
+import AdminIncidentDetail from './admin/AdminIncidentDetail.vue'
 
 // Abdeckungs-Test für Hilfetexte (Was / Auswirkung / Beispiel).
 //
@@ -52,14 +56,22 @@ function jsonResponse(body) {
   return { ok: true, status: 200, json: async () => body }
 }
 
-async function mountAdminView(component, routes) {
+// Views with router-links or route params get a memory router: `route` is the
+// path pattern the view is mounted under, `path` the URL it starts at.
+async function mountAdminView(component, routes, { route = '/', path = '/' } = {}) {
   useAuth().setAuth('jwt-1', { permissions: '*', is_global_admin: true })
   useTenant().setActiveTenant('1')
   global.fetch = vi.fn(async (url) => {
     const hit = Object.entries(routes).find(([pattern]) => new RegExp(pattern).test(url))
     return jsonResponse(hit ? hit[1] : [])
   })
-  const wrapper = mount(component, { attachTo: document.body, global: { plugins: [i18n], stubs: onyxFormStubs } })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: route, component }, { path: '/:rest(.*)*', component: { template: '<div/>' } }],
+  })
+  router.push(path)
+  await router.isReady()
+  const wrapper = mount(component, { attachTo: document.body, global: { plugins: [i18n, router], stubs: onyxFormStubs } })
   wrappers.push(wrapper)
   await flushPromises()
   return wrapper
@@ -103,6 +115,62 @@ export const HELP_COMPLETE_VIEWS = [
       await wrapper.find('.ext-import__row input').setValue(true)
       await wrapper.find('.ext-import .tag-chips__add')?.setValue('5')
       await check('Bausteine übernehmen: Auswahl')
+    },
+  },
+  {
+    file: 'views/admin/AdminOverview.vue',
+    async states(check) {
+      await mountAdminView(AdminOverview, {
+        '/api/admin/overview$': {
+          total_pages: 1, total_open_incidents: 1, total_subscribers: 12, worst_status: 'partial_outage',
+          pages: [{ id: 1, name: 'Acme Corp', slug: 'acme', status: 'partial_outage', components: 5, subscribers: 12, open_incidents: 1 }],
+        },
+      })
+      await check('Liste')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidents.vue',
+    async states(check) {
+      // A full first batch (ADMIN_PAGE_SIZE) shows "Load more".
+      const incidents = Array.from({ length: 200 }, (_, i) => ({
+        ID: i + 1, Title: `Vorfall ${i + 1}`, Message: 'API antwortet nicht', Status: i ? 'resolved' : 'investigating',
+        Severity: 'partial_outage', Components: [{ ID: 10, Name: 'API' }], Tags: [{ ID: 5, Name: 'EU' }], CreatedAt: '2026-07-01T10:00:00Z',
+      }))
+      const wrapper = await mountAdminView(AdminIncidents, {
+        '/incident-templates$': [{ ID: 1, Name: 'Standard-Ausfall', Kind: 'incident', Title: 'X ist gestört', Message: 'Wir untersuchen.', DefaultStatus: 'monitoring', ComponentIDs: '10' }],
+        '/incidents\\?limit=200$': incidents,
+        '/components$': [{ ID: 10, Name: 'API', Status: 'operational' }],
+        '/api/tags': [{ ID: 5, Name: 'EU' }],
+      }, { route: '/admin/incidents', path: '/admin/incidents' })
+      await check('Liste')
+      await wrapper.find('[role="menuitem"]').trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('incidents.newButton'))).trigger('click')
+      await check('Neu')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidentDetail.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminIncidentDetail, {
+        '/api/pages/1/incidents/1$': {
+          ID: 1, Title: 'API down', Status: 'identified', CreatedAt: '2026-07-01T10:00:00Z', Components: [{ ID: 10, Name: 'API' }], Tags: [],
+          updates: [{ id: 1, status: 'investigating', message: 'Untersuchung läuft', created_at: '2026-07-01T10:05:00Z', author_email: 'ops@example.com' }],
+          post_mortem: {
+            summary: 'Zertifikat abgelaufen', root_cause: 'Ablauf übersehen', impact: 'Login', resolution: 'Erneuert', detection: 'Monitoring',
+            published_at: null, actions: [{ id: 1, text: 'Ablauf überwachen', owner: 'Ops', state: 'open' }],
+          },
+        },
+      }, { route: '/admin/incidents/:pageId/:id', path: '/admin/incidents/1/1' })
+      await check('Detail')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('incidentDetail.addActionButton')).trigger('click')
+      await check('Folgemaßnahme hinzugefügt')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('incidentDetail.saveDraftButton')).trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.alert-success').exists()).toBe(true)
+      await check('Entwurf gespeichert')
     },
   },
 ]

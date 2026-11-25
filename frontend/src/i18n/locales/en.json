@@ -1832,6 +1832,192 @@
       "effect": "Effect",
       "example": "Example"
     },
+    "overview": {
+      "search": {
+        "what": "Filters the “All status pages” table by the status page’s name or short name (slug), ignoring case.",
+        "effect": "Applies as you type and only to this table: the figures at the top stay the totals across all status pages. Clicking a row opens that page’s incidents.",
+        "example": "Type “acme” to see only the status page “Acme Corp” (/acme) and check its open incidents."
+      }
+    },
+    "incidents": {
+      "newIncident": {
+        "what": "Opens an empty form for a new incident on the currently selected status page.",
+        "effect": "Nothing is created until you click “Save”. Then the incident appears on the public status page right away, and internal users as well as subscribers of the affected components are notified.",
+        "example": "Sign-in is failing: create an incident “Login not possible” for the component “Web app”."
+      },
+      "filter": {
+        "what": "Limits the list to all, only open or only resolved incidents.",
+        "effect": "Incidents in “Investigating”, “Identified” or “Monitoring” are open, those in “Resolved” are resolved. The filter only affects this list and can be combined with the search.",
+        "example": "Choose “Open” to see only the ongoing ones during several outages."
+      },
+      "search": {
+        "what": "Searches the loaded incidents by title, message and the names of the affected components.",
+        "effect": "Applies as you type, together with the status filter, and changes nothing about the incidents. Older incidents that are not loaded yet are only found after “Load more”.",
+        "example": "Type “payment” to find all incidents of the payments API."
+      },
+      "rowActions": {
+        "what": "The “…” menu in the row offers “Edit” (“View” without edit permission), “Post update” (jumps to the update form in the detail view), “Translations” when there are several languages, and “Delete” (after a confirmation).",
+        "effect": "A deleted incident disappears from the public status page together with its history and post-mortem, and from the availability calculation; this cannot be undone in the interface. Subscribers are not notified when deleting, but they are for an update.",
+        "example": "Delete an incident that was accidentally created twice; set a real, finished incident to “Resolved” with an update instead."
+      },
+      "loadMore": {
+        "what": "Loads the next 200 older incidents and appends them to the list.",
+        "effect": "The list first shows the 200 newest incidents; only after loading more do search and filter cover the older ones too. The button disappears once everything is loaded.",
+        "example": "Looking for an incident from last year: click “Load more” until it shows up in the list."
+      },
+      "template": {
+        "what": "Picks an incident template whose title, message, status and affected components are copied into the form. Only shown when creating and when templates exist.",
+        "effect": "The values are copied once when you choose the template and overwrite what you entered; afterwards they stay freely editable, and later changes to the template do not affect the incident. With several languages, the template’s translations are copied too.",
+        "example": "Choose the template “Standard outage” and only add the affected service to the title."
+      },
+      "title": {
+        "what": "The headline of the incident. Required.",
+        "effect": "Shown on the public status page, in the list here and in the notifications to subscribers and internal users.",
+        "example": "“Login not possible” or “API outage in region EU-West”."
+      },
+      "message": {
+        "what": "The description of the incident for visitors, with simple formatting (bold, italic, lists, links). Required.",
+        "effect": "Shown on the public status page as the initial report at the bottom of the history and included in the notifications. Later updates do not overwrite it.",
+        "example": "“We are investigating errors when signing in. Users who are already signed in are not affected.”"
+      },
+      "status": {
+        "what": "The initial state of the incident: Investigating, Identified, Monitoring or Resolved. Only when creating; afterwards you change it with an update in the detail view.",
+        "effect": "As long as the incident is not “Resolved”, it is open: it is listed under “Current incidents”, and its components show at least the status of its severity. “Resolved” lists it under “Past incidents” and records the end time.",
+        "example": "Outage reported, cause unknown: “Investigating”. Adding an outage that is already fixed: “Resolved” with start and end."
+      },
+      "severity": {
+        "what": "How badly the incident hits the components: Degraded Performance (default), Partial Outage or Major Outage. Can be changed later.",
+        "effect": "While the incident is open, the status page shows its components with at least this status. In the availability, its duration counts 30 %, 60 % or 100 % as downtime.",
+        "example": "Some payments fail: “Partial Outage”. Nothing works any more: “Major Outage”."
+      },
+      "startedAt": {
+        "what": "When the incident actually began, in your local time. Optional.",
+        "effect": "Sets the start in the availability calculation and the order of incidents; without it, the time of creation counts. The end must not be earlier.",
+        "example": "The outage had been running since 09:40 and is reported at 10:15: set the start to 09:40."
+      },
+      "resolvedAt": {
+        "what": "When the incident was resolved, in your local time. Only allowed with status “Resolved”.",
+        "effect": "Ends the incident in the availability calculation. If the field stays empty with “Resolved”, Statushafen records the time it was closed; an update to an open status clears the end again.",
+        "example": "Adding yesterday’s outage afterwards: status “Resolved”, start 14:00, end 14:45."
+      },
+      "components": {
+        "what": "The components of this status page that are affected by the incident. Multiple choice, at least one.",
+        "effect": "The status page shows the incident for these components and, while it is open, their status at least according to the severity. Subscribers who subscribed to at least one of them are notified.",
+        "example": "Sign-in is broken: select “Web app” and “API”, but not “Email delivery”."
+      },
+      "tags": {
+        "what": "Assigns tags to the incident, such as regions. Multiple choice; with nothing selected it has no tag.",
+        "effect": "Visitors of the status page can filter by these tags, and internal emails only go to users with a matching tag. Users who have tags of their own may only edit incidents that share a tag with them (or carry “global”).",
+        "example": "Set the tag “EU”: visitors filtering by “US” do not see the incident, and an editor who only has “US” cannot change it."
+      },
+      "save": {
+        "what": "Saves the form.",
+        "effect": "Creates the incident or applies the changes. Both take effect on the public status page right away, are recorded in the audit log and notify internal users and subscribers of the affected components. Without title, message and a component nothing is saved.",
+        "example": "Change the title from “API slow” to “API outage in EU-West” and save."
+      },
+      "cancel": {
+        "what": "Closes the form without saving.",
+        "effect": "Unsaved input is lost, the incident stays as it was, and no notification is sent.",
+        "example": "Clicked “New incident” by mistake: “Cancel” takes you back to the list without a report."
+      }
+    },
+    "incidentDetail": {
+      "newStatus": {
+        "what": "The state the new update reports: Investigating, Identified, Monitoring or Resolved. Pre-filled with the current status. Required.",
+        "effect": "With “Add update”, the incident takes over this status. “Resolved” closes it and records the end time; an open status reopens it and clears the end.",
+        "example": "The cause has been found: switch from “Investigating” to “Identified”."
+      },
+      "updateMessage": {
+        "what": "The text of the new update for visitors, with simple formatting. Required.",
+        "effect": "Shown publicly in the history as the newest entry (“Latest update”) and included in the notification to subscribers and internal users. The incident’s initial report stays unchanged.",
+        "example": "“An expired certificate is the cause; the new one is being deployed.”"
+      },
+      "addUpdate": {
+        "what": "Posts the update with status and message.",
+        "effect": "The update appears in the public history right away, the incident takes over the status, the action is recorded in the audit log, and subscribers of the affected components are notified (for “Resolved” with the template “Incident resolved”). A posted update cannot be deleted.",
+        "example": "After deploying the fix, post “Monitoring” with “No errors for 10 minutes.”"
+      },
+      "translations": {
+        "what": "Opens an editor at the history entry for the translations of this update message. Only when the page has several languages.",
+        "effect": "Does not change the original. Visitors only see a translation once it is saved and marked as done; until then, the default language.",
+        "example": "Add an English version to an update that was posted in German."
+      },
+      "translationMessage": {
+        "what": "The update message in the language selected above. Read-only in the default language.",
+        "effect": "Only applied with “Save translations” and shown publicly once the language is marked as done.",
+        "example": "For German: “Die Ursache ist gefunden; ein Fix wird eingespielt.”"
+      },
+      "saveTranslations": {
+        "what": "Saves the translations of this update message in all edited languages.",
+        "effect": "Languages marked as done apply on the status page right away; no new notification is sent. The editor closes afterwards.",
+        "example": "Add English and French, mark both as done and save."
+      },
+      "cancelTranslations": {
+        "what": "Closes the translation editor without saving.",
+        "effect": "Unsaved translations are lost; the ones saved before stay as they were.",
+        "example": "Opened the wrong entry: “Cancel” and choose “Translations” at the right one."
+      },
+      "summary": {
+        "what": "A short summary of the incident for the post-mortem.",
+        "effect": "Shown at the top of the post-mortem. It is only saved with “Save as draft” or “Publish”.",
+        "example": "“On July 1, about 20 % of users could not sign in for 45 minutes.”"
+      },
+      "rootCause": {
+        "what": "The actual cause of the incident.",
+        "effect": "Shown in the post-mortem under “Root cause”; saved with “Save as draft” or “Publish”.",
+        "example": "“The login server’s TLS certificate had expired; automatic renewal was switched off.”"
+      },
+      "impact": {
+        "what": "Who or what was affected, and how badly.",
+        "effect": "Shown in the post-mortem under “Impact”; saved with “Save as draft” or “Publish”.",
+        "example": "“New sign-ins failed; existing sessions kept working.”"
+      },
+      "resolution": {
+        "what": "How the incident was resolved.",
+        "effect": "Shown in the post-mortem under “Resolution”; saved with “Save as draft” or “Publish”.",
+        "example": "“Deployed a new certificate and restarted the service.”"
+      },
+      "detection": {
+        "what": "How and when the incident was noticed.",
+        "effect": "Shown in the post-mortem under “Detection”; saved with “Save as draft” or “Publish”.",
+        "example": "“Monitoring reported rising login error rates at 09:42.”"
+      },
+      "actionText": {
+        "what": "What should be done as a follow-up action.",
+        "effect": "Listed among the post-mortem’s follow-up actions. An action without text is dropped when saving.",
+        "example": "“Monitor the expiry date of all certificates”."
+      },
+      "actionOwner": {
+        "what": "Who is responsible for the action (free text). Optional.",
+        "effect": "Shown next to the action in the post-mortem. Nobody is notified by it.",
+        "example": "“Platform team” or “Anna K.”."
+      },
+      "actionState": {
+        "what": "The state of the action: Planned, In progress or Done.",
+        "effect": "Shown as the status next to the action in the post-mortem once saved.",
+        "example": "The monitoring is set up: set it to “Done”."
+      },
+      "removeAction": {
+        "what": "Removes this follow-up action from the form.",
+        "effect": "It only disappears from the saved post-mortem with “Save as draft” or “Publish”; without saving, it stays there.",
+        "example": "Remove an action that was entered twice and save the draft."
+      },
+      "addAction": {
+        "what": "Adds an empty row for another follow-up action (action, owner, state).",
+        "effect": "The row is only saved with “Save as draft” or “Publish”; if the action stays empty, it is dropped.",
+        "example": "Add “Set up an alert for certificate expiry” for the platform team."
+      },
+      "saveDraft": {
+        "what": "Saves the post-mortem with all fields and follow-up actions without publishing it.",
+        "effect": "A draft is only visible to users who may edit the incident. If the post-mortem is already published, it stays published and the changes are visible right away. Saving is recorded in the audit log.",
+        "example": "The cause is still unclear: save summary and impact as a draft and complete them later."
+      },
+      "publish": {
+        "what": "Saves the post-mortem and publishes it.",
+        "effect": "Afterwards everyone who may view the incident sees it, even without edit permission; the publication date is recorded the first time. It cannot be turned back into a draft. The action is recorded in the audit log; nobody is notified.",
+        "example": "After the team’s review meeting, check all fields and publish."
+      }
+    },
     "components": {
       "newComponent": {
         "what": "Opens an empty form for a new component on the currently selected status page.",

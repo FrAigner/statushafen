@@ -1832,6 +1832,192 @@
       "effect": "Auswirkung",
       "example": "Beispiel"
     },
+    "overview": {
+      "search": {
+        "what": "Filtert die Tabelle „Alle Statusseiten“ nach Name oder Kurzname (Slug) der Statusseite, Groß- und Kleinschreibung egal.",
+        "effect": "Wirkt sofort beim Tippen und nur auf diese Tabelle: Die Kennzahlen oben bleiben die Summen über alle Statusseiten. Ein Klick auf eine Zeile öffnet die Vorfälle dieser Seite.",
+        "example": "„acme“ eingeben, um nur die Statusseite „Acme Corp“ (/acme) zu sehen und ihre offenen Vorfälle zu prüfen."
+      }
+    },
+    "incidents": {
+      "newIncident": {
+        "what": "Öffnet ein leeres Formular für einen neuen Vorfall auf der gerade gewählten Statusseite.",
+        "effect": "Angelegt wird erst mit „Speichern“. Dann erscheint der Vorfall sofort auf der öffentlichen Statusseite, und interne Nutzer sowie Abonnenten der betroffenen Komponenten werden benachrichtigt.",
+        "example": "Die Anmeldung schlägt fehl: einen Vorfall „Login nicht möglich“ für die Komponente „Web-App“ anlegen."
+      },
+      "filter": {
+        "what": "Schränkt die Liste auf alle, nur offene oder nur behobene Vorfälle ein.",
+        "effect": "Offen sind Vorfälle in „Untersuchung“, „Identifiziert“ oder „Beobachtung“, behoben die mit „Behoben“. Der Filter wirkt nur auf diese Liste und lässt sich mit der Suche kombinieren.",
+        "example": "„Offen“ wählen, um bei mehreren Störungen nur die noch laufenden zu sehen."
+      },
+      "search": {
+        "what": "Durchsucht die geladenen Vorfälle nach Titel, Nachricht und Namen der betroffenen Komponenten.",
+        "effect": "Wirkt sofort beim Tippen, zusammen mit dem Statusfilter, und ändert nichts an den Vorfällen. Ältere Vorfälle, die noch nicht geladen sind, findet die Suche erst nach „Weitere laden“.",
+        "example": "„Zahlung“ eingeben, um alle Vorfälle der Zahlungs-API zu finden."
+      },
+      "rowActions": {
+        "what": "Das Menü „…“ in der Zeile bietet „Bearbeiten“ (ohne Änderungsrecht „Ansehen“), „Update posten“ (springt zum Update-Formular in der Detailansicht), „Übersetzungen“ bei mehreren Sprachen und „Löschen“ (nach einer Rückfrage).",
+        "effect": "Ein gelöschter Vorfall verschwindet samt Verlauf und Post-Mortem von der öffentlichen Statusseite und aus der Verfügbarkeitsberechnung; das lässt sich in der Oberfläche nicht rückgängig machen. Abonnenten werden beim Löschen nicht benachrichtigt, bei einem Update schon.",
+        "example": "Einen versehentlich doppelt angelegten Vorfall löschen; einen echten, abgeschlossenen Vorfall stattdessen per Update auf „Behoben“ setzen."
+      },
+      "loadMore": {
+        "what": "Lädt die nächsten 200 älteren Vorfälle und hängt sie unten an die Liste an.",
+        "effect": "Die Liste zeigt zunächst die 200 neuesten Vorfälle; erst danach erfassen Suche und Filter auch die älteren. Der Knopf verschwindet, wenn alle geladen sind.",
+        "example": "Einen Vorfall vom letzten Jahr suchen: „Weitere laden“ klicken, bis er in der Liste steht."
+      },
+      "template": {
+        "what": "Wählt eine Vorfall-Vorlage, aus der Titel, Nachricht, Status und betroffene Komponenten übernommen werden. Nur beim Anlegen sichtbar, wenn es Vorlagen gibt.",
+        "effect": "Die Werte werden beim Auswählen einmalig ins Formular kopiert und überschreiben die bisherigen Eingaben; danach bleiben sie frei änderbar, spätere Änderungen an der Vorlage wirken nicht auf den Vorfall. Bei mehreren Sprachen kommen auch die Übersetzungen der Vorlage mit.",
+        "example": "Vorlage „Standard-Ausfall“ wählen und nur noch den betroffenen Dienst im Titel ergänzen."
+      },
+      "title": {
+        "what": "Die Überschrift des Vorfalls. Pflichtfeld.",
+        "effect": "Steht auf der öffentlichen Statusseite, in der Liste hier und in den Benachrichtigungen an Abonnenten und interne Nutzer.",
+        "example": "„Login nicht möglich“ oder „API-Ausfall in Region EU-West“."
+      },
+      "message": {
+        "what": "Die Beschreibung des Vorfalls für Besucher, mit einfacher Formatierung (fett, kursiv, Listen, Links). Pflichtfeld.",
+        "effect": "Erscheint auf der öffentlichen Statusseite als Erstmeldung ganz unten im Verlauf und steht in den Benachrichtigungen. Spätere Updates überschreiben sie nicht.",
+        "example": "„Wir untersuchen Fehler beim Anmelden. Bereits angemeldete Nutzer sind nicht betroffen.“"
+      },
+      "status": {
+        "what": "Der Anfangsstand des Vorfalls: Untersuchung, Identifiziert, Beobachtung oder Behoben. Nur beim Anlegen; danach ändert man ihn per Update in der Detailansicht.",
+        "effect": "Solange der Vorfall nicht „Behoben“ ist, gilt er als offen: Er steht unter „Aktuelle Vorfälle“, und seine Komponenten zeigen mindestens den Status seines Schweregrads. „Behoben“ führt ihn unter „Vergangene Vorfälle“ und hält das Ende fest.",
+        "example": "Störung gemeldet, Ursache unklar: „Untersuchung“. Einen schon behobenen Ausfall nachtragen: „Behoben“ mit Beginn und Ende."
+      },
+      "severity": {
+        "what": "Wie schwer der Vorfall die Komponenten trifft: Beeinträchtigt (Standard), Teilausfall oder Großstörung. Auch nachträglich änderbar.",
+        "effect": "Solange der Vorfall offen ist, zeigt die Statusseite seine Komponenten mindestens mit diesem Status. In der Verfügbarkeit zählt seine Dauer zu 30 %, 60 % bzw. 100 % als Ausfall.",
+        "example": "Ein Teil der Zahlungen scheitert: „Teilausfall“. Nichts geht mehr: „Großstörung“."
+      },
+      "startedAt": {
+        "what": "Wann der Vorfall tatsächlich begonnen hat, in deiner Ortszeit. Optional.",
+        "effect": "Bestimmt den Beginn in der Verfügbarkeitsberechnung und die Reihenfolge der Vorfälle; ohne Angabe zählt der Zeitpunkt des Anlegens. Das Ende darf nicht davor liegen.",
+        "example": "Die Störung lief schon seit 09:40, gemeldet wird sie um 10:15: Beginn auf 09:40 setzen."
+      },
+      "resolvedAt": {
+        "what": "Wann der Vorfall behoben war, in deiner Ortszeit. Nur bei Status „Behoben“ erlaubt.",
+        "effect": "Beendet den Vorfall in der Verfügbarkeitsberechnung. Bleibt das Feld bei „Behoben“ leer, hält Statushafen den Zeitpunkt des Schließens fest; ein Update auf einen offenen Status löscht das Ende wieder.",
+        "example": "Einen Ausfall von gestern nachtragen: Status „Behoben“, Beginn 14:00, Ende 14:45."
+      },
+      "components": {
+        "what": "Die Komponenten dieser Statusseite, die vom Vorfall betroffen sind. Mehrfachauswahl, mindestens eine.",
+        "effect": "Die Statusseite zeigt den Vorfall bei diesen Komponenten und, solange er offen ist, ihren Status mindestens gemäß Schweregrad. Benachrichtigt werden Abonnenten, die mindestens eine davon abonniert haben.",
+        "example": "Der Login ist gestört: „Web-App“ und „API“ auswählen, nicht aber „E-Mail-Versand“."
+      },
+      "tags": {
+        "what": "Ordnet dem Vorfall Tags zu, etwa Regionen. Mehrfachauswahl; ohne Auswahl hat er keinen Tag.",
+        "effect": "Besucher der Statusseite können nach diesen Tags filtern, und interne Mails gehen nur an Nutzer mit passendem Tag. Außerdem dürfen Nutzer mit eigenen Tags nur Vorfälle mit gemeinsamem Tag (oder „global“) bearbeiten.",
+        "example": "Tag „EU“ setzen: Wer nach „US“ filtert, sieht den Vorfall nicht, und ein Bearbeiter nur mit „US“ kann ihn nicht ändern."
+      },
+      "save": {
+        "what": "Speichert das Formular.",
+        "effect": "Legt den Vorfall an oder übernimmt die Änderungen. Beides gilt sofort auf der öffentlichen Statusseite, steht im Audit-Log und benachrichtigt interne Nutzer und Abonnenten der betroffenen Komponenten. Ohne Titel, Nachricht und Komponente wird nicht gespeichert.",
+        "example": "Den Titel von „API langsam“ auf „API-Ausfall in EU-West“ ändern und speichern."
+      },
+      "cancel": {
+        "what": "Schließt das Formular, ohne zu speichern.",
+        "effect": "Ungespeicherte Eingaben gehen verloren, der Vorfall bleibt, wie er war, und es geht keine Benachrichtigung raus.",
+        "example": "Versehentlich „Neuer Vorfall“ geklickt: „Abbrechen“ führt ohne Meldung zurück zur Liste."
+      }
+    },
+    "incidentDetail": {
+      "newStatus": {
+        "what": "Der Stand, den das neue Update meldet: Untersuchung, Identifiziert, Beobachtung oder Behoben. Vorbelegt mit dem aktuellen Status. Pflichtfeld.",
+        "effect": "Mit „Update hinzufügen“ übernimmt der Vorfall diesen Status. „Behoben“ schließt ihn und hält das Ende fest, ein offener Status öffnet ihn wieder und löscht das Ende.",
+        "example": "Die Ursache ist gefunden: von „Untersuchung“ auf „Identifiziert“ wechseln."
+      },
+      "updateMessage": {
+        "what": "Der Text des neuen Updates für Besucher, mit einfacher Formatierung. Pflichtfeld.",
+        "effect": "Erscheint öffentlich im Verlauf als neuester Eintrag („Letztes Update“) und steht in der Benachrichtigung an Abonnenten und interne Nutzer. Die Erstmeldung des Vorfalls bleibt unverändert.",
+        "example": "„Ein abgelaufenes Zertifikat ist die Ursache; das neue wird gerade eingespielt.“"
+      },
+      "addUpdate": {
+        "what": "Postet das Update mit Status und Nachricht.",
+        "effect": "Das Update steht sofort im öffentlichen Verlauf, der Vorfall übernimmt den Status, der Vorgang steht im Audit-Log, und Abonnenten der betroffenen Komponenten werden benachrichtigt (bei „Behoben“ mit dem Template „Vorfall behoben“). Ein gepostetes Update lässt sich nicht löschen.",
+        "example": "Nach dem Einspielen des Fixes „Beobachtung“ mit „Seit 10 Minuten keine Fehler mehr.“ posten."
+      },
+      "translations": {
+        "what": "Öffnet am Eintrag im Verlauf einen Editor für die Übersetzungen dieser Update-Nachricht. Nur bei mehreren Sprachen der Seite.",
+        "effect": "Ändert nichts am Original. Besucher sehen eine Übersetzung erst, wenn sie gespeichert und als fertig markiert ist; bis dahin die Standardsprache.",
+        "example": "Ein auf Deutsch gepostetes Update nachträglich auf Englisch ergänzen."
+      },
+      "translationMessage": {
+        "what": "Die Update-Nachricht in der oben gewählten Sprache. In der Standardsprache nur zur Ansicht.",
+        "effect": "Wird erst mit „Übersetzungen speichern“ übernommen und gilt öffentlich, sobald die Sprache als fertig markiert ist.",
+        "example": "Für Englisch: „The cause has been identified; a fix is being deployed.“"
+      },
+      "saveTranslations": {
+        "what": "Speichert die Übersetzungen dieser Update-Nachricht in allen bearbeiteten Sprachen.",
+        "effect": "Als fertig markierte Sprachen gelten sofort auf der Statusseite; es geht keine neue Benachrichtigung raus. Danach schließt sich der Editor.",
+        "example": "Englisch und Französisch ergänzen, beide als fertig markieren und speichern."
+      },
+      "cancelTranslations": {
+        "what": "Schließt den Übersetzungs-Editor, ohne zu speichern.",
+        "effect": "Ungespeicherte Übersetzungen gehen verloren; die bisher gespeicherten bleiben, wie sie waren.",
+        "example": "Falschen Eintrag geöffnet: „Abbrechen“ und beim richtigen „Übersetzungen“ wählen."
+      },
+      "summary": {
+        "what": "Kurze Zusammenfassung des Vorfalls für das Post-Mortem.",
+        "effect": "Steht ganz oben im Post-Mortem. Gespeichert wird erst mit „Als Entwurf speichern“ oder „Veröffentlichen“.",
+        "example": "„Am 1. Juli war die Anmeldung 45 Minuten lang für etwa 20 % der Nutzer nicht möglich.“"
+      },
+      "rootCause": {
+        "what": "Die eigentliche Ursache des Vorfalls.",
+        "effect": "Erscheint im Post-Mortem unter „Grundursache“; gespeichert mit „Als Entwurf speichern“ oder „Veröffentlichen“.",
+        "example": "„Das TLS-Zertifikat des Login-Servers war abgelaufen, die automatische Verlängerung war abgeschaltet.“"
+      },
+      "impact": {
+        "what": "Wer oder was betroffen war und wie stark.",
+        "effect": "Erscheint im Post-Mortem unter „Auswirkung“; gespeichert mit „Als Entwurf speichern“ oder „Veröffentlichen“.",
+        "example": "„Neue Anmeldungen scheiterten; bestehende Sitzungen liefen weiter.“"
+      },
+      "resolution": {
+        "what": "Wie der Vorfall behoben wurde.",
+        "effect": "Erscheint im Post-Mortem unter „Behebung“; gespeichert mit „Als Entwurf speichern“ oder „Veröffentlichen“.",
+        "example": "„Neues Zertifikat eingespielt und den Dienst neu gestartet.“"
+      },
+      "detection": {
+        "what": "Wie und wann der Vorfall bemerkt wurde.",
+        "effect": "Erscheint im Post-Mortem unter „Erkennung“; gespeichert mit „Als Entwurf speichern“ oder „Veröffentlichen“.",
+        "example": "„Das Monitoring meldete um 09:42 steigende Fehlerraten beim Login.“"
+      },
+      "actionText": {
+        "what": "Was als Folgemaßnahme getan werden soll.",
+        "effect": "Steht in der Liste der Folgemaßnahmen des Post-Mortems. Eine Maßnahme ohne Text wird beim Speichern verworfen.",
+        "example": "„Ablaufdatum aller Zertifikate überwachen“."
+      },
+      "actionOwner": {
+        "what": "Wer für die Maßnahme verantwortlich ist (freier Text). Optional.",
+        "effect": "Steht neben der Maßnahme im Post-Mortem. Benachrichtigt wird dadurch niemand.",
+        "example": "„Team Plattform“ oder „Anna K.“."
+      },
+      "actionState": {
+        "what": "Der Stand der Maßnahme: Geplant, In Arbeit oder Erledigt.",
+        "effect": "Wird nach dem Speichern als Status neben der Maßnahme im Post-Mortem angezeigt.",
+        "example": "Die Überwachung ist eingerichtet: auf „Erledigt“ setzen."
+      },
+      "removeAction": {
+        "what": "Entfernt diese Folgemaßnahme aus dem Formular.",
+        "effect": "Erst mit „Als Entwurf speichern“ oder „Veröffentlichen“ verschwindet sie auch aus dem gespeicherten Post-Mortem; ohne Speichern bleibt sie dort erhalten.",
+        "example": "Eine doppelt erfasste Maßnahme entfernen und den Entwurf speichern."
+      },
+      "addAction": {
+        "what": "Fügt eine leere Zeile für eine weitere Folgemaßnahme hinzu (Maßnahme, Verantwortlich, Status).",
+        "effect": "Gespeichert wird die Zeile erst mit „Als Entwurf speichern“ oder „Veröffentlichen“; bleibt die Maßnahme leer, wird sie verworfen.",
+        "example": "„Alarm bei Zertifikatsablauf einrichten“ für das Team Plattform ergänzen."
+      },
+      "saveDraft": {
+        "what": "Speichert das Post-Mortem mit allen Feldern und Folgemaßnahmen, ohne es zu veröffentlichen.",
+        "effect": "Ein Entwurf ist nur für Nutzer sichtbar, die den Vorfall ändern dürfen. Ist das Post-Mortem schon veröffentlicht, bleibt es das, und die Änderungen sind sofort sichtbar. Die Speicherung steht im Audit-Log.",
+        "example": "Die Ursache ist noch unklar: Zusammenfassung und Auswirkung als Entwurf speichern und später ergänzen."
+      },
+      "publish": {
+        "what": "Speichert das Post-Mortem und veröffentlicht es.",
+        "effect": "Danach sieht es jeder, der den Vorfall aufrufen darf, auch ohne Änderungsrecht; das Veröffentlichungsdatum wird beim ersten Mal festgehalten. Zurück zum Entwurf geht es nicht. Der Vorgang steht im Audit-Log, benachrichtigt wird niemand.",
+        "example": "Nach der Nachbesprechung im Team alle Felder prüfen und veröffentlichen."
+      }
+    },
     "components": {
       "newComponent": {
         "what": "Öffnet ein leeres Formular für eine neue Komponente auf der gerade gewählten Statusseite.",
