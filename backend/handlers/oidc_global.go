@@ -172,7 +172,7 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	if st.LinkUserID != 0 {
 		action, next = "auth.sso_linked", "&next=profile"
 	}
-	origin := h.loginReturnOrigin(st)
+	origin, returnTo := h.loginDelivery(st, user.ID)
 	detail := "provider=" + p.ID
 	if origin.pageID != 0 {
 		detail += " page=" + strconv.FormatUint(uint64(origin.pageID), 10)
@@ -185,9 +185,9 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	// On a custom domain the session is limited to its page (see login_origin.go).
 	token, _ := middleware.GenerateTokenFull(user, user.Role.Permissions, claims.name, models.SSOProtocolOIDC)
 	if origin.pageID != 0 {
-		token, _ = middleware.GeneratePageSSOToken(user, claims.name, models.SSOProtocolOIDC, origin.pageID)
+		token, _ = middleware.GeneratePageSSOToken(user, claims.name, models.SSOProtocolOIDC, origin.pageID, middleware.WithCustomDomain(origin.host))
 	}
-	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
+	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host)+next)
 	return nil
 }
 

@@ -47,6 +47,11 @@ type Claims struct {
 	// und nie mit Global-Admin-Rechten. Fehlt bei Passwort- und
 	// globalen SSO-Logins.
 	SSOPageID uint `json:"sso_page_id,omitempty"`
+	// CustomDomain: the verified custom domain the session was handed to
+	// (always with SSOPageID of that domain's page). Whoever controls the
+	// domain's DNS can read the session there, so it never reaches the
+	// account itself (RejectCustomDomainSession).
+	CustomDomain string `json:"custom_domain,omitempty"`
 	// TokenVersion: Stand von users.token_version bei der Ausstellung. Weicht
 	// er vom Konto ab, wurde das Token widerrufen (siehe sessionStillValid).
 	TokenVersion uint `json:"tv"`
@@ -97,6 +102,12 @@ func WithSSOPageID(pageID uint) TokenOption {
 	return func(c *Claims) { c.SSOPageID = pageID }
 }
 
+// WithCustomDomain marks the session as handed to a custom domain (see
+// Claims.CustomDomain); "" leaves it unmarked.
+func WithCustomDomain(host string) TokenOption {
+	return func(c *Claims) { c.CustomDomain = host }
+}
+
 // GenerateTokenFull ist die zentrale Token-Factory für SSO-Logins, inkl. Name und
 // SSO-Provider als Zusatz-Claims (ersetzt die frühere Inline-Signierung in auth_sso.go).
 func GenerateTokenFull(u models.User, permissions, name, sso string) (string, error) {
@@ -109,8 +120,11 @@ func GenerateTokenFull(u models.User, permissions, name, sso string) (string, er
 // ID-Tokens für jeden dort verknüpften Nutzer fälschen. Die Rechte werden je
 // Request frisch aus der DB gelesen; ohne Seitenbezug bekäme das Token sofort
 // jede Rolle, die der Nutzer später anderswo erhält (auch Global Admin).
-func GeneratePageSSOToken(u models.User, name, protocol string, pageID uint) (string, error) {
+func GeneratePageSSOToken(u models.User, name, protocol string, pageID uint, opts ...TokenOption) (string, error) {
 	claims := fullClaims(u, u.Role.Permissions, name, protocol)
+	for _, opt := range opts {
+		opt(claims)
+	}
 	claims.SSOPageID = pageID
 	claims.IsGlobalAdmin = false
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(getJWTSecret())
@@ -165,6 +179,34 @@ func setUserContext(c *gin.Context, claims *Claims) {
 	c.Set("role", claims.Role)
 	c.Set("permissions", claims.Permissions)
 	c.Set(ssoPageIDKey, claims.SSOPageID)
+	c.Set(customDomainKey, claims.CustomDomain)
+}
+
+// customDomainKey: context key for Claims.CustomDomain.
+const customDomainKey = "customDomain"
+
+// CustomDomainSession reports whether the request's session was handed to a
+// custom domain.
+func CustomDomainSession(c *gin.Context) bool {
+	return c.GetString(customDomainKey) != ""
+}
+
+// RejectCustomDomainSession answers 403 custom_domain_session for a session
+// handed to a custom domain. It guards the routes that act on the account
+// itself (delete, export, link and unlink sign-ins): the tenant who controls
+// the domain's DNS can read such a session. The same account signs in on the
+// main address for these.
+func RejectCustomDomainSession() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if CustomDomainSession(c) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error": "Auf einer eigenen Domain nicht möglich. Melde dich dafür unter der Hauptadresse an.",
+				"code":  "custom_domain_session",
+			})
+			return
+		}
+		c.Next()
+	}
 }
 
 // subscriberAudience trennt Subscriber-Tokens von Login-Tokens:

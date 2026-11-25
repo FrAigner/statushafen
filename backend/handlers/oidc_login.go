@@ -732,6 +732,7 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	// HS256 mit gesetztem JWT_SECRET kann nicht fehlschlagen; ohne Secret
 	// beendet getJWTSecret den Prozess schon vorher. Das Token
 	// gilt nur für pageID (sso_page_id-Claim).
-	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID)
-	c.Redirect(http.StatusTemporaryRedirect, h.loginReturnOrigin(st).frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
+	origin, returnTo := h.loginDelivery(st, user.ID)
+	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID, middleware.WithCustomDomain(origin.host))
+	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host)+next)
 }

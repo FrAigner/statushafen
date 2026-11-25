@@ -357,18 +357,21 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	// --- Geschützte Routen ---
 	authGroup := r.Group("/api")
 	authGroup.Use(middleware.AuthMiddleware())
+	// A session handed to a custom domain never acts on the account itself
+	// (see middleware.RejectCustomDomainSession).
+	noCustomDomain := middleware.RejectCustomDomainSession()
 	authGroup.GET("/me", h.MeHandler)
-	authGroup.POST("/auth/oidc/link", h.OIDCLinkHandler)
-	authGroup.POST("/auth/provider/:id/link", h.ProviderLinkHandler)
+	authGroup.POST("/auth/oidc/link", noCustomDomain, h.OIDCLinkHandler)
+	authGroup.POST("/auth/provider/:id/link", noCustomDomain, h.ProviderLinkHandler)
 	// eigene SSO-Verknüpfungen anzeigen und lösen (Profil).
 	authGroup.GET("/me/sso", h.GetMySSOHandler)
-	authGroup.DELETE("/me/sso/:id", h.DeleteMySSOHandler)
+	authGroup.DELETE("/me/sso/:id", noCustomDomain, h.DeleteMySSOHandler)
 	authGroup.PATCH("/me", h.UpdateMeHandler)
 	// DSGVO-Datenexport: eigene Daten als JSON-Download,
 	// niemals Daten anderer Nutzer - siehe handlers/me_export.go.
-	authGroup.GET("/me/export", h.MeExportHandler)
+	authGroup.GET("/me/export", noCustomDomain, h.MeExportHandler)
 	// Konto löschen - siehe handlers/me_delete.go.
-	authGroup.DELETE("/me", h.DeleteMeHandler)
+	authGroup.DELETE("/me", noCustomDomain, h.DeleteMeHandler)
 	authGroup.GET("/me/pages", h.GetMyPagesHandler)
 	authGroup.GET("/me/subscription", h.GetMySubscriptionHandler)
 	authGroup.PUT("/me/subscription", h.UpdateMySubscriptionHandler)

@@ -49,6 +49,14 @@ func customDomainPages(t *testing.T, db *gorm.DB) map[string]models.StatusPage {
 	return pages
 }
 
+// grantPageRole gives the account a role on the page.
+func grantPageRole(t *testing.T, db *gorm.DB, userID, pageID uint) {
+	t.Helper()
+	role := models.Role{Name: "Leser " + strconv.FormatUint(uint64(pageID), 10), Permissions: "incidents:read"}
+	require.NoError(t, db.Create(&role).Error)
+	require.NoError(t, db.Create(&models.UserStatusPageRole{UserID: userID, StatusPageID: pageID, RoleID: role.ID}).Error)
+}
+
 func TestAcceptReturnHost_OnlyExactVerifiedDomains(t *testing.T) {
 	f := newGlobalOIDCFixture(t)
 	t.Setenv("FRONTEND_URL", "https://app.example.org")
@@ -177,7 +185,7 @@ func TestLoginStartOnCustomDomain_HostWinsOverTheQuery(t *testing.T) {
 // An unverified or unknown host never triggers the move (no redirect from an
 // arbitrary host to the BASE_URL either); the login starts as before.
 func TestLoginStartOnUnverifiedHost_StartsNormally(t *testing.T) {
-	for _, host := range []string{"status.pending.example", "status.example.org", "evil.example", acmeHost + ":8443"} {
+	for _, host := range []string{"status.pending.example", "status.example.org", "evil.example", acmeHost + ".evil.example"} {
 		t.Run(host, func(t *testing.T) {
 			f := newGlobalOIDCFixture(t)
 			customDomainPages(t, f.db)
@@ -185,6 +193,22 @@ func TestLoginStartOnUnverifiedHost_StartsNormally(t *testing.T) {
 			require.Equal(t, http.StatusTemporaryRedirect, w.Code)
 			assert.Contains(t, w.Header().Get("Location"), f.idp.srv.URL+"/authorize")
 			assert.NotNil(t, stateCookie(w))
+		})
+	}
+}
+
+// The Host header is normalised before the lookup (case, port, trailing dot);
+// the move always names the domain as stored.
+func TestLoginStartOnCustomDomain_HostIsNormalised(t *testing.T) {
+	for _, host := range []string{"STATUS.ACME.EXAMPLE", acmeHost + ":443", acmeHost + ":8443", acmeHost + ".", "Status.Acme.Example.:443"} {
+		t.Run(host, func(t *testing.T) {
+			f := newGlobalOIDCFixture(t)
+			customDomainPages(t, f.db)
+			w := serveOnHost(f.h.ProviderLoginHandler, host, "/api/auth/provider/corp/login", "corp")
+			loc, err := url.Parse(w.Header().Get("Location"))
+			require.NoError(t, err)
+			assert.Equal(t, "status.example.org", loc.Host)
+			assert.Equal(t, acmeHost, loc.Query().Get("return_host"))
 		})
 	}
 }
@@ -251,11 +275,15 @@ func TestProviderLoginFromCustomDomain_ReturnsThereWithAPageSession(t *testing.T
 	f := newGlobalOIDCFixture(t)
 	t.Setenv("SSO_BOOTSTRAP_ADMIN_EMAILS", "neu@example.org")
 	pages := customDomainPages(t, f.db)
+	member := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
+	require.NoError(t, f.db.Create(&member).Error)
+	grantPageRole(t, f.db, member.ID, pages[acmeHost].ID)
 
 	returnTo, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://"+acmeHost)
 
 	assert.Equal(t, "/", returnTo)
 	assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID)
+	assert.Equal(t, acmeHost, claims.CustomDomain)
 	assert.False(t, claims.IsGlobalAdmin, "a bootstrap admin gets no global rights on a tenant's domain")
 	var user models.User
 	require.NoError(t, f.db.Where("email = ?", "neu@example.org").First(&user).Error)
@@ -263,6 +291,32 @@ func TestProviderLoginFromCustomDomain_ReturnsThereWithAPageSession(t *testing.T
 	var audit models.AuditLog
 	require.NoError(t, f.db.Where("action = ?", "auth.sso_login").First(&audit).Error)
 	assert.Equal(t, "provider=corp page="+strconv.FormatUint(uint64(pages[acmeHost].ID), 10), audit.Details)
+}
+
+// Abuse case: a tenant verifies a domain for their own page and sends a victim
+// a login link with that domain as return_host. With a running IdP session
+// the code would reach the tenant without any click. A session goes to a
+// custom domain only for an account with a role on its page; anyone else
+// signs in on the main domain (full session) and lands on the page there.
+// The auto-join e-mail domains do not count: the tenant sets them.
+func TestProviderLoginFromOtherTenantsDomain_WithoutARoleEndsOnTheMainDomain(t *testing.T) {
+	for name, bootstrap := range map[string]string{"new account": "", "global admin": "neu@example.org"} {
+		t.Run(name, func(t *testing.T) {
+			f := newGlobalOIDCFixture(t)
+			t.Setenv("FRONTEND_URL", "https://app.example.org")
+			t.Setenv("SSO_BOOTSTRAP_ADMIN_EMAILS", bootstrap)
+			pages := customDomainPages(t, f.db)
+			require.NoError(t, f.db.Model(&models.StatusPage{}).Where("id = ?", pages[acmeHost].ID).
+				Updates(map[string]any{"auto_join_email_domains": "example.org"}).Error)
+
+			returnTo, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://app.example.org")
+
+			assert.Equal(t, "/status/"+pages[acmeHost].Slug, returnTo, "back to the same page, on the main domain")
+			assert.Zero(t, claims.SSOPageID)
+			assert.Empty(t, claims.CustomDomain)
+			assert.Equal(t, bootstrap != "", claims.IsGlobalAdmin)
+		})
+	}
 }
 
 func TestProviderLoginFromRejectedHost_EndsOnTheMainDomain(t *testing.T) {
@@ -355,12 +409,27 @@ func (f *oidcFixture) pageLoginFrom(t *testing.T, returnHost string) *httptest.R
 func TestPageSSOLoginFromItsCustomDomain_ReturnsThere(t *testing.T) {
 	f := newOIDCFixture(t)
 	f.linkIdentity(t, f.user.ID)
+	grantPageRole(t, f.db, f.user.ID, f.page.ID)
 	require.NoError(t, f.db.Model(&f.page).Updates(map[string]any{"custom_domain": acmeHost, "custom_domain_status": "verified"}).Error)
 
 	returnTo, claims := callbackClaims(t, f.pageLoginFrom(t, acmeHost), "https://"+acmeHost)
 
 	assert.Equal(t, "/", returnTo)
 	assert.Equal(t, f.page.ID, claims.SSOPageID)
+	assert.Equal(t, acmeHost, claims.CustomDomain)
+}
+
+func TestPageSSOLoginFromItsCustomDomain_WithoutARoleEndsOnTheMainDomain(t *testing.T) {
+	f := newOIDCFixture(t)
+	t.Setenv("FRONTEND_URL", "https://app.example.org")
+	f.linkIdentity(t, f.user.ID)
+	require.NoError(t, f.db.Model(&f.page).Updates(map[string]any{"custom_domain": acmeHost, "custom_domain_status": "verified"}).Error)
+
+	returnTo, claims := callbackClaims(t, f.pageLoginFrom(t, acmeHost), "https://app.example.org")
+
+	assert.Equal(t, "/status/oidc-seite", returnTo)
+	assert.Equal(t, f.page.ID, claims.SSOPageID, "a page SSO session stays limited to its page")
+	assert.Empty(t, claims.CustomDomain)
 }
 
 // The page SSO of one tenant can never hand its session to the domain of
@@ -385,6 +454,58 @@ func TestPageSSOLoginWithOtherTenantsDomain_EndsOnTheMainDomain(t *testing.T) {
 	assert.Equal(t, f.page.ID, claims.SSOPageID)
 }
 
+// exchangeOn redeems a one-time code as the frontend on host does.
+func exchangeOn(h *Handler, code, host, origin string) (int, map[string]string) {
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/auth/sso-exchange", strings.NewReader(`{"code":"`+code+`"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Request.Host = host
+	if origin != "" {
+		c.Request.Header.Set("Origin", origin)
+	}
+	h.SSOExchangeHandler(c)
+	body := map[string]string{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	return rec.Code, body
+}
+
+func codeOf(t *testing.T, w *httptest.ResponseRecorder) string {
+	t.Helper()
+	loc, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	return loc.Query().Get("code")
+}
+
+// A code is bound to the origin it was sent to: a code for a custom domain is
+// not redeemed on the main domain and the other way round. (This is no
+// boundary against a server-side attacker, who sets any header; that is what
+// the page limit and the role check are for.)
+func TestSSOCode_IsBoundToItsOrigin(t *testing.T) {
+	f := newGlobalOIDCFixture(t)
+	pages := customDomainPages(t, f.db)
+	member := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
+	require.NoError(t, f.db.Create(&member).Error)
+	grantPageRole(t, f.db, member.ID, pages[acmeHost].ID)
+
+	code := codeOf(t, f.providerLoginFrom(t, acmeHost))
+	status, body := exchangeOn(f.h, code, "status.example.org", "https://status.example.org")
+	assert.Equal(t, http.StatusUnauthorized, status)
+	assert.Equal(t, "login_code_invalid", body["code"])
+	status, _ = exchangeOn(f.h, code, acmeHost, "https://"+acmeHost)
+	assert.Equal(t, http.StatusUnauthorized, status, "a refused code is gone")
+
+	status, _ = exchangeOn(f.h, codeOf(t, f.providerLoginFrom(t, acmeHost)), acmeHost, "https://"+acmeHost)
+	assert.Equal(t, http.StatusOK, status)
+	status, _ = exchangeOn(f.h, codeOf(t, f.providerLoginFrom(t, acmeHost)), "backend:8080", "https://"+acmeHost)
+	assert.Equal(t, http.StatusOK, status, "the browser's Origin counts when the proxy rewrites Host")
+
+	status, _ = exchangeOn(f.h, codeOf(t, f.login(t)), acmeHost, "https://"+acmeHost)
+	assert.Equal(t, http.StatusUnauthorized, status, "a main domain code is not redeemed on a custom domain")
+	status, _ = exchangeOn(f.h, codeOf(t, f.login(t)), "status.example.org", "")
+	assert.Equal(t, http.StatusOK, status)
+}
+
 // Even if the BASE_URL host were registered as a verified custom domain, the
 // login start must not redirect to itself in a loop; a broken BASE_URL never
 // moves the login either.
@@ -404,9 +525,19 @@ func TestLoginStartOnBaseHost_NeverMovesInALoop(t *testing.T) {
 // host does (same-origin POST).
 func loginOnHost(t *testing.T, e passwordEnv, host, email string) (*middleware.Claims, map[string]any) {
 	t.Helper()
+	return loginWithOrigin(t, e, host, "", email)
+}
+
+// loginWithOrigin is loginOnHost with an Origin header (sent by browsers on
+// every POST, also same-origin).
+func loginWithOrigin(t *testing.T, e passwordEnv, host, origin, email string) (*middleware.Claims, map[string]any) {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/login",
 		strings.NewReader(`{"email":"`+email+`","password":"`+passwordEnvSecret+`"}`))
 	req.Header.Set("Content-Type", "application/json")
+	if origin != "" {
+		req.Header.Set("Origin", origin)
+	}
 	req.Host = host
 	w := httptest.NewRecorder()
 	e.r.ServeHTTP(w, req)
@@ -430,6 +561,7 @@ func TestPasswordLoginOnCustomDomain_GetsAPageSession(t *testing.T) {
 
 	claims, body := loginOnHost(t, e, acmeHost, e.admin.Email)
 	assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID)
+	assert.Equal(t, acmeHost, claims.CustomDomain)
 	assert.False(t, claims.IsGlobalAdmin)
 	assert.Equal(t, false, body["is_global_admin"], "the frontend must not show global admin features")
 
@@ -441,10 +573,39 @@ func TestPasswordLoginOnOtherHosts_KeepsTheFullSession(t *testing.T) {
 	t.Setenv("PASSWORD_LOGIN_ENABLED", "true")
 	e := newPasswordEnv(t)
 	customDomainPages(t, e.db)
-	for _, host := range []string{"status.example.org", "status.pending.example", acmeHost + ":8443", "evil.example"} {
+	for _, host := range []string{"status.example.org", "status.pending.example", acmeHost + ".evil.example", "evil.example"} {
 		claims, body := loginOnHost(t, e, host, e.admin.Email)
 		assert.Zero(t, claims.SSOPageID, host)
 		assert.True(t, claims.IsGlobalAdmin, host)
 		assert.Equal(t, true, body["is_global_admin"], host)
+	}
+	claims, _ := loginWithOrigin(t, e, "status.example.org", "https://status.example.org", e.admin.Email)
+	assert.True(t, claims.IsGlobalAdmin)
+	claims, _ = loginWithOrigin(t, e, "status.example.org", "null", e.admin.Email)
+	assert.True(t, claims.IsGlobalAdmin, "an opaque origin is no custom domain")
+}
+
+// Abuse case: a full session (even global admin) must not end up in the
+// storage of a tenant's origin because Host differs in case, port or trailing
+// dot, or because the proxy rewrote it. Host and the browser's Origin are
+// both normalised and either one on a custom domain limits the session.
+func TestPasswordLoginOnCustomDomain_HostVariantsAndRewrittenHost(t *testing.T) {
+	t.Setenv("PASSWORD_LOGIN_ENABLED", "true")
+	e := newPasswordEnv(t)
+	pages := customDomainPages(t, e.db)
+	for _, tc := range []struct{ host, origin string }{
+		{"STATUS.ACME.EXAMPLE", ""},
+		{acmeHost + ":443", ""},
+		{acmeHost + ":8443", ""},
+		{acmeHost + ".", ""},
+		{"backend:8080", "https://" + acmeHost},
+		{"backend:8080", "https://STATUS.ACME.EXAMPLE:443"},
+		{"status.example.org", "https://" + acmeHost},
+		{acmeHost, "https://status.example.org"},
+	} {
+		claims, body := loginWithOrigin(t, e, tc.host, tc.origin, e.admin.Email)
+		assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID, "%+v", tc)
+		assert.False(t, claims.IsGlobalAdmin, "%+v", tc)
+		assert.Equal(t, false, body["is_global_admin"], "%+v", tc)
 	}
 }

@@ -71,10 +71,10 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 
 	// On a verified custom domain the session is limited to its page, like an
 	// OIDC session handed to a custom domain (see login_origin.go).
-	origin := h.customDomainOrigin(c.Request.Host)
+	origin := h.browserOrigin(c)
 	isGlobalAdmin := user.IsGlobalAdmin && origin.pageID == 0
 	token, err := middleware.GenerateToken(user.ID, user.Email, user.Role.Name, user.Role.Permissions, isGlobalAdmin,
-		middleware.WithTokenVersion(user.TokenVersion), middleware.WithSSOPageID(origin.pageID))
+		middleware.WithTokenVersion(user.TokenVersion), middleware.WithSSOPageID(origin.pageID), middleware.WithCustomDomain(origin.host))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate JWT token"})
 		return

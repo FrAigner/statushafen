@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/fraigner/statushafen/models"
 
@@ -25,12 +27,22 @@ import (
 //     a page SSO it must be the domain of that same page.
 //  3. The callback checks the domain again and redirects the one-time code to
 //     https://<domain>/auth/sso-callback; the frontend there redeems it with
-//     a same-origin request. Anything else ends on FRONTEND_URL as before.
+//     a same-origin request (the code is bound to that origin). Anything else
+//     ends on FRONTEND_URL as before.
 //
 // Whoever controls the DNS of a custom domain (the tenant) can serve own code
-// on it and read what the domain's localStorage holds. A session handed to a
-// custom domain is therefore always limited to the page of that domain
-// (sso_page_id, never global admin rights), see completeProviderLogin.
+// on it and read what the domain's localStorage holds, and can send anyone a
+// login link with their domain as return_host. Therefore:
+//
+//   - The code goes to a custom domain only for an account with a role on the
+//     domain's page (loginDelivery); anyone else signs in on FRONTEND_URL.
+//   - A session handed to a custom domain (OIDC or password) is limited to the
+//     domain's page (sso_page_id, never global admin rights) and marked
+//     (custom_domain claim): it never acts on the account itself, see
+//     middleware.RejectCustomDomainSession.
+//   - Host and Origin of a request are normalised (case, port, trailing dot)
+//     before deciding whether it comes from a custom domain (browserOrigin),
+//     so a variant never yields a full session there.
 
 // returnHostParam names the custom domain a login started on.
 const returnHostParam = "return_host"
@@ -40,6 +52,7 @@ const returnHostParam = "return_host"
 type loginOrigin struct {
 	host   string
 	pageID uint
+	slug   string
 }
 
 // frontendURL is the frontend base URL of the origin. Custom domains are
@@ -63,7 +76,52 @@ func (h *Handler) customDomainOrigin(host string) loginOrigin {
 	if h.DB.Where("custom_domain = ? AND custom_domain_status IN ('verified','active')", host).First(&page).Error != nil {
 		return loginOrigin{}
 	}
-	return loginOrigin{host: page.CustomDomain, pageID: page.ID}
+	return loginOrigin{host: page.CustomDomain, pageID: page.ID, slug: page.Slug}
+}
+
+// requestHostname normalises a Host header value: lower case, without port
+// and trailing dot. Only for deciding whether a request comes from a custom
+// domain, never as a redirect target.
+func requestHostname(raw string) string {
+	host := strings.ToLower(strings.TrimSpace(raw))
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return strings.TrimSuffix(host, ".")
+}
+
+// browserOrigin is the custom domain a request comes from: the browser's
+// Origin header (sent on every POST, also same-origin, and left alone by
+// proxies) or else the Host header, both normalised. Either one on a custom
+// domain counts; the zero value means none.
+func (h *Handler) browserOrigin(c *gin.Context) loginOrigin {
+	if u, err := url.Parse(c.GetHeader("Origin")); err == nil && u.Host != "" {
+		if o := h.customDomainOrigin(requestHostname(u.Host)); o.host != "" {
+			return o
+		}
+	}
+	return h.customDomainOrigin(requestHostname(c.Request.Host))
+}
+
+// loginDelivery decides where the one-time code of a finished login goes and
+// with which return path: to the custom domain of the state only for an
+// account with a role on its page. Anyone else signs in on FRONTEND_URL and
+// lands on the same page there (/status/<slug>). The auto-join e-mail
+// domains of a page do not count, its tenant sets them.
+func (h *Handler) loginDelivery(st models.OIDCLoginState, userID uint) (loginOrigin, string) {
+	o := h.loginReturnOrigin(st)
+	if o.pageID == 0 || h.hasPageRole(userID, o.pageID) {
+		return o, st.ReturnTo
+	}
+	return loginOrigin{}, sanitizeReturnTo("/status/" + o.slug)
+}
+
+// hasPageRole reports whether the account has a role on the page; false on a
+// database error (fail closed: the login then ends on FRONTEND_URL).
+func (h *Handler) hasPageRole(userID, pageID uint) bool {
+	var n int64
+	err := h.DB.Model(&models.UserStatusPageRole{}).Where(whereUserIDAndStatusPageID, userID, pageID).Count(&n).Error
+	return err == nil && n > 0
 }
 
 // acceptReturnHost validates a return_host. pageID != 0 (page SSO) accepts
@@ -88,11 +146,12 @@ func (h *Handler) loginReturnOrigin(st models.OIDCLoginState) loginOrigin {
 // return_host, and reports true. Any other host (unknown, unverified, the
 // BASE_URL host itself) is left alone.
 func (h *Handler) moveLoginToBaseHost(c *gin.Context) bool {
+	host := requestHostname(c.Request.Host)
 	base, err := url.Parse(getBaseURL())
-	if err != nil || c.Request.Host == base.Host {
+	if err != nil || host == requestHostname(base.Host) {
 		return false
 	}
-	o := h.customDomainOrigin(c.Request.Host)
+	o := h.customDomainOrigin(host)
 	if o.host == "" {
 		return false
 	}
