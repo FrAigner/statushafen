@@ -26,6 +26,8 @@ import ListCard from '../../components/ListCard.vue'
 import SearchBox from '../../components/SearchBox.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { useListQuery } from '../../composables/useListQuery'
+// Help tooltip on the search box (the only control on this page).
+import { vHelp } from '../../directives/vHelp'
 
 const { apiFetch } = useApi()
 const { t } = useI18n()
@@ -87,7 +89,7 @@ const columns = computed(() => [
     <!-- Tabelle: Status je Mandant -->
     <ListCard :title="t('overview.cardTitle')">
       <template #tools>
-        <SearchBox v-model="query" :label="t('overview.searchLabel')" :placeholder="t('overview.searchPlaceholder')" />
+        <SearchBox v-model="query" v-help="'overview.search'" :label="t('overview.searchLabel')" :placeholder="t('overview.searchPlaceholder')" />
       </template>
       <p v-if="searching" class="sr-only" role="status">{{ t('patterns.searchResult', { n: rows.length }, rows.length) }}</p>
       <ResponsiveTable v-if="rows.length" data-table :columns="columns" :items="rows">

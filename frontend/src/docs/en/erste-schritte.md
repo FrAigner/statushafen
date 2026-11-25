@@ -59,7 +59,9 @@ address in the admin area directly, you also end up there after signing in.
 - **User menu:** shows your email and role on the selected page and contains the switch "Show
   help tooltips", "Profile", "Public View" and "Logout".
 - **Help tooltips:** if you pause on a field or button, a hint explains what the field does, what
-  follows from it, and gives an example. Every user can switch this off in the user menu.
+  follows from it, and gives an example. The hints are available on every page of the "Operations"
+  area (Overview, Components, External sources, Incidents, Maintenance windows, Notices,
+  Templates, Subscribers). Every user can switch this off in the user menu.
 - **Outage banner:** if an [external source](/docs/externe-quellen#outage-of-a-source) fails, a
   notice with a link to the sources page appears at the top of the content area.
 - **Documentation:** the "Documentation" item in the System area opens this page.
