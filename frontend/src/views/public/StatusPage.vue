@@ -301,9 +301,8 @@ const loadMoreIncidents = async () => {
 // zuletzt im Admin-Bereich gewählten Mandanten richten, sondern nach der
 // gerade angezeigten Statusseite. Deshalb wird activeTenantId hier immer auf
 // die aktuell geladene Seite synchronisiert, sobald ein User eingeloggt ist.
-// Betreiber-Entscheidung: Der Dashboard-Link erscheint trotzdem
-// auch ohne Admin-Recht auf DIESER Seite, sobald der Nutzer es auf irgendeiner
-// Seite hat (PublicLayout); der Klick schaltet dann auf diese Seite um.
+// The Dashboard link in PublicLayout is decided by the role on THIS page
+// (matched via currentPageSlug), never by a role on another page.
 watch(() => [pageInfo.value?.ID, isLoggedIn.value], async ([pageId, loggedIn]) => {
   if (!pageId || !loggedIn) return
   try {
@@ -1284,8 +1283,8 @@ const closeHistory = () => {
 /* Hilfe-Icon + Tooltip am Suchfeld */
 .search-help-btn {
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: var(--search-help-size);
+  height: var(--search-help-size);
   margin-left: var(--sp-2);
   border: 1px solid var(--border-strong);
   border-radius: 50%;
@@ -1312,7 +1311,10 @@ const closeHistory = () => {
 .search-help ul { margin: 0; padding-left: 18px; }
 
 /* Search box (icon + clear button) */
+/* --search-help-size is shared by the help button and the clear button
+   offset, so the clear button stays inside the input. */
 .search-wrapper {
+  --search-help-size: 24px;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -1326,14 +1328,20 @@ const closeHistory = () => {
   pointer-events: none;
 }
 
+/* min-width: 0 overrides the global 180px minimum, so the input shrinks to
+   the wrapper and the help button stays inside the viewport at 320px. */
 .search-wrapper .search-input {
+  flex: 1 1 auto;
+  min-width: 0;
   padding-left: 32px;
   padding-right: 30px;
 }
 
+/* The wrapper also holds the help button: skip its width, the wrapper
+   gap and its margin, then keep the usual inset inside the input. */
 .search-clear {
   position: absolute;
-  right: var(--sp-2);
+  right: calc(var(--search-help-size) + 3 * var(--sp-2));
   display: inline-flex;
   align-items: center;
   justify-content: center;
