@@ -1,0 +1,26 @@
+// Code that runs in Node: Vitest unit tests (happy-dom, so the DOM types stay), test helpers,
+// Playwright e2e specs and the Vite/Vitest/Playwright/ESLint configuration. Same compiler options as
+// the app, plus Node types (many tests read source files with node:fs).
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    // Tests index into mocks and query results all the time (fetch.mock.calls[0][1], findAll('li')[2]).
+    // A wrong index already fails the test at runtime, so the check would only add noise there.
+    "noUncheckedIndexedAccess": false,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
+  },
+  "include": [
+    "env.d.ts",
+    "src/**/*.test.*",
+    "src/**/*.spec.*",
+    "src/test-support/**/*",
+    "e2e/**/*",
+    "vite-plugins/**/*",
+    "vite.config.*",
+    "vitest.config.*",
+    "playwright.config.*",
+    "eslint.config.*"
+  ],
+  "exclude": []
+}

@@ -7,7 +7,8 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const MAKRO = /\b(defineProps|defineEmits|defineModel)\(/
+// `[<(]` also matches TypeScript type arguments such as `defineProps<Props>()`.
+const MAKRO = /\b(defineProps|defineEmits|defineModel|withDefaults)\s*[<(]/
 
 function vueDateien(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -38,6 +39,21 @@ describe('Stryker-Schutz für Vue-Makros', () => {
     ).toEqual([])
     expect(ungeschuetzteMakros("// Stryker disable next-line all: x\nconst e = defineEmits(['a'])")).toEqual([])
     expect(ungeschuetzteMakros("// nur ein Hinweis\nconst e = defineEmits(['a'])")).toEqual([2])
+  })
+
+  // TypeScript SFCs declare macros with type arguments (`defineProps<Props>()`), and `withDefaults`
+  // hoists its defaults object as well, so Stryker must not instrument those lines either.
+  it('detects unprotected macros with TypeScript type arguments and withDefaults', () => {
+    expect(ungeschuetzteMakros('const props = defineProps<{ slug: string }>()')).toEqual([1])
+    expect(ungeschuetzteMakros("const emit = defineEmits<{ (e: 'save'): void }>()")).toEqual([1])
+    expect(ungeschuetzteMakros('const model = defineModel<string>()')).toEqual([1])
+    expect(
+      ungeschuetzteMakros("const props = withDefaults(defineProps<Props>(), {\n  size: 'm',\n})"),
+    ).toEqual([1])
+    expect(ungeschuetzteMakros('const props = withDefaults(\n  defineProps<Props>(),\n  { size: 1 },\n)')).toEqual([1, 2])
+    expect(
+      ungeschuetzteMakros('// Stryker disable next-line all: hoisted macro\nconst props = defineProps<Props>()'),
+    ).toEqual([])
   })
 
   it('schützt jedes Makro in src/**/*.vue vor der Stryker-Instrumentierung', () => {
