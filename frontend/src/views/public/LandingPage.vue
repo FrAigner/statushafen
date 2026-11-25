@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '../../composables/useApi'
-import { useLandingChrome } from '../../composables/useLandingChrome'
+import { useLandingChrome, loadOrdersEnabled } from '../../composables/useLandingChrome'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '../../components/AppIcon.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -59,12 +59,7 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-  try {
-    const flag = await apiFetch('/api/public/orders/enabled')
-    ordersEnabled.value = flag.enabled
-  } catch (err) {
-    console.error("Failed to load orders flag", err)
-  }
+  await loadOrdersEnabled(apiFetch)
 })
 </script>
 

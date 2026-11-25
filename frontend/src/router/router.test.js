@@ -224,6 +224,16 @@ describe('Router Navigation Guards', () => {
       expect(router.currentRoute.value.params.section).toBe('vorfaelle')
     })
 
+    // In the admin area the docs open inside the admin layout (login required, no extra permission).
+    it('shows the docs inside the admin area with the admin docs base', async () => {
+      mockIsLoggedIn.value = true
+      await router.push('/admin/docs/vorfaelle')
+      expect(router.currentRoute.value.path).toBe('/admin/docs/vorfaelle')
+      expect(router.currentRoute.value.params.section).toBe('vorfaelle')
+      expect(router.currentRoute.value.meta.requiresAuth).toBe(true)
+      expect(router.currentRoute.value.meta.docsBase).toBe('/admin/docs')
+    })
+
     // Bestätigungslink des Double-Opt-in, ohne Login erreichbar.
     it('erlaubt den Abo-Bestätigungslink öffentlich', async () => {
       await router.push('/subscribe/confirm?token=abc')

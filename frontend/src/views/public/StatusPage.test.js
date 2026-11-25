@@ -15,13 +15,14 @@ import { contrastRatio, parseHex } from '../../utils/contrast'
 import { axe } from '../../test-support/axe.js'
 
 let openEditAboMock = vi.fn()
+let revealEditAboMock = vi.fn()
 let refreshMock = vi.fn()
 
 const SubscriptionManagerStub = {
   props: ['isLoggedIn', 'currentUser', 'components', 'slug'],
   emits: ['open-wizard', 'subscription-state'],
   setup(_props, { expose }) {
-    expose({ openEditAbo: openEditAboMock, refresh: (...a) => refreshMock(...a) })
+    expose({ openEditAbo: openEditAboMock, revealEditAbo: (...a) => revealEditAboMock(...a), refresh: (...a) => refreshMock(...a) })
   },
   template: '<div class="subscription-manager-stub" />',
 }
@@ -116,6 +117,7 @@ describe('StatusPage', () => {
     useTenant().setMyPages([])
     localStorage.clear()
     openEditAboMock = vi.fn()
+    revealEditAboMock = vi.fn()
     refreshMock = vi.fn()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
@@ -1426,7 +1428,8 @@ describe('StatusPage', () => {
     window.dispatchEvent(new CustomEvent('statushafen:open-subscription-manager'))
     await flushPromises()
 
-    expect(openEditAboMock).toHaveBeenCalledTimes(1)
+    // The manager opens, scrolls and focuses itself: the section may not exist before it opens.
+    expect(revealEditAboMock).toHaveBeenCalledTimes(1)
   })
 
   it('formatiert Zeitstempel im englischen Format, wenn die UI-Sprache Englisch ist (Datum blieb bei Sprachumschaltung deutsch)', async () => {

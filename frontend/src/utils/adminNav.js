@@ -46,8 +46,8 @@ export const NAV_GROUPS = [
       { resource: 'monitoring', to: '/admin/monitoring', icon: 'activity', labelKey: 'monitoring' },
       { resource: 'sso', to: '/admin/sso', icon: 'shield', labelKey: 'sso' },
       { resource: 'system_settings', to: '/admin/system-settings', icon: 'settings', labelKey: 'systemSettings' },
-      // Doku für alle Angemeldeten; führt aus dem Admin-Bereich auf /docs.
-      { resource: null, to: '/docs', icon: 'book', labelKey: 'docs' },
+      // Docs for every signed-in user, shown inside the admin frame.
+      { resource: null, to: '/admin/docs', icon: 'book', labelKey: 'docs' },
     ],
   },
 ]

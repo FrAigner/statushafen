@@ -262,10 +262,6 @@ const deleteConfig = async () => {
 </template>
 
 <style scoped>
-.admin-sso {
-  max-width: 760px;
-}
-
 .sso-form .form-actions {
   margin-top: var(--sp-4);
 }

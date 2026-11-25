@@ -636,6 +636,9 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-input,
 .form-select,
 .form-textarea {
+  /* width: 100% includes padding and border; otherwise the fields stick out of their card on the
+     right (the global reset only reaches pseudo-elements, see the app-reset layer above). */
+  box-sizing: border-box;
   padding: var(--space-sm) var(--space-md);
   font-size: 16px;
   font-family: var(--font-sans);
@@ -1065,6 +1068,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-field__control input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
 .form-field__control select,
 .form-field__control textarea {
+  /* Full width including padding and border, see .form-input above. */
+  box-sizing: border-box;
   inline-size: 100%;
   min-block-size: var(--ctl-h);
   padding: 0 var(--sp-3);
@@ -1278,10 +1283,9 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
   font-size: var(--fs-base);
 }
 .comp-filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-/* Hohe Formulare (viele Abschnitte) scrollen in der klebenden Karte statt unten abgeschnitten zu werden. */
-@media (min-width: 860px) {
-  .form-panel--scroll { max-block-size: calc(100dvh - 2 * var(--sp-4)); overflow-y: auto; }
-}
+/* Tall forms (many sections) scroll with the whole page instead of inside their own frame;
+   they are not sticky, otherwise their end could not be reached. */
+.form-panel--tall { position: static; }
 /* Zeilenhinweise in Tabellenzellen. */
 .tag-pill--accent { border-color: transparent; background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
 .cell-contact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }

@@ -55,6 +55,7 @@ const lazyRoutePaths = [
   '/admin/notices/:noticeId/translations',
   '/admin/sso',
   '/admin/profile',
+  '/admin/docs/:section?',
 ]
 
 describe('Lazy-Loading der Views', () => {

@@ -180,7 +180,10 @@ const routes = [
       // Minimale Profilseite - für alle eingeloggten User, nicht
       // nur Global Admins, da hier (vorerst nur) die eigene UI-Sprache
       // eingestellt wird.
-      { path: 'profile', component: ProfileView }
+      { path: 'profile', component: ProfileView },
+      // The docs inside the admin frame (sidebar link "Documentation"): same page as /docs,
+      // every docs link stays below this base. Login only, no extra permission.
+      { path: 'docs/:section?', component: DocsPage, meta: { docsBase: '/admin/docs' } }
     ]
   }
 ]
