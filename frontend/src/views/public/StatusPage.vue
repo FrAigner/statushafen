@@ -1326,7 +1326,11 @@ const closeHistory = () => {
   pointer-events: none;
 }
 
+/* min-width: 0 overrides the global 180px minimum, so the input shrinks to
+   the wrapper and the help button stays inside the viewport at 320px. */
 .search-wrapper .search-input {
+  flex: 1 1 auto;
+  min-width: 0;
   padding-left: 32px;
   padding-right: 30px;
 }
