@@ -68,6 +68,7 @@ delete. Special actions are assigned to one action (see the "Routes" column).
 | System | System Settings | `system_settings` | global | `system_settings:create`, `system_settings:read`, `system_settings:update`, `system_settings:delete` | /settings |
 
 There is also `admin_dashboard`: the "Dashboard" entry in the user menu of the public page.
+It only counts on the page the role is assigned for.
 
 **Create, update and delete include read:** whoever has `components:update` may also read, without
 `components:read` being listed. Update does not include create or delete. This applies to every

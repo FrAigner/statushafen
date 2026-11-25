@@ -62,4 +62,5 @@ Die Anmeldung liegt unter `/login` (Knopf „Login“ oben rechts).
 - **Dokumentation:** Der Menüpunkt „Dokumentation“ im Bereich System öffnet diese Seite.
 
 Auf der öffentlichen Statusseite führt im Benutzermenü der Eintrag „Dashboard“ in den Admin-Bereich.
-Er erscheint nur für Rollen mit dem Recht `admin_dashboard`.
+Er erscheint nur, wenn deine Rolle auf genau dieser Statusseite das Recht `admin_dashboard` hat;
+eine Rolle auf einer anderen Seite genügt nicht (Global Admins sehen ihn immer).
