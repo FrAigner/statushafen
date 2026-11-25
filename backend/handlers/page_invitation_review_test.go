@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -248,6 +249,35 @@ func TestPageInvitationReview_PruneExpired(t *testing.T) {
 	})
 }
 
+// A plain substring check for an ID is flaky: timestamps with nanoseconds (e.g. "42.424242Z")
+// contain arbitrary digit runs. containsJSONNumber only matches the number as a whole JSON value.
+func TestContainsJSONNumber(t *testing.T) {
+	cases := []struct {
+		body string
+		want bool
+	}{
+		{`{"invited_by_id":4242}`, true},
+		{`{"ids":[1,4242,3]}`, true},
+		{`{"by": 4242 }`, true},
+		{`{"expires_at":"2026-11-25T15:46:42.424242Z"}`, false},
+		{`{"id":14242}`, false},
+		{`{"id":42420}`, false},
+		{`{"note":"4242"}`, false},
+	}
+	for _, tc := range cases {
+		if got := containsJSONNumber(tc.body, 4242); got != tc.want {
+			t.Errorf("containsJSONNumber(%s, 4242) = %v, want %v", tc.body, got, tc.want)
+		}
+	}
+}
+
+// containsJSONNumber reports whether n appears in body as a whole JSON number value
+// (after ':', ',' or '[' and before ',', ']' or '}').
+func containsJSONNumber(body string, n int) bool {
+	re := regexp.MustCompile(`[:,\[]\s*` + strconv.Itoa(n) + `\s*[,\]}]`)
+	return re.MatchString(body)
+}
+
 // Fund 2: Datenexport enthält eigene offene Einladungen (ohne Token/Einladenden).
 func TestPageInvitationReview_ExportContainsOwnInvitations(t *testing.T) {
 	db := testutils.SetupTestDB()
@@ -271,10 +301,14 @@ func TestPageInvitationReview_ExportContainsOwnInvitations(t *testing.T) {
 			t.Errorf("Export ohne %s: %s", want, body)
 		}
 	}
-	for _, leak := range []string{"fremd@x.example", hashToken("geheim-export"), "4242", "TokenHash", "invited"} {
+	for _, leak := range []string{"fremd@x.example", hashToken("geheim-export"), "TokenHash", "invited"} {
 		if strings.Contains(body, leak) {
 			t.Errorf("Export enthält %q", leak)
 		}
+	}
+	// The inviter's ID must not leak under any key; a substring check also hit timestamps.
+	if containsJSONNumber(body, 4242) {
+		t.Errorf("export contains the inviter ID 4242: %s", body)
 	}
 }
 
