@@ -1,11 +1,11 @@
 module github.com/fraigner/statushafen
 
-go 1.26.10
+go 1.26.11
 
 require (
 	github.com/beevik/etree v1.8.1
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/crewjam/saml v0.5.1
+	github.com/crewjam/saml v0.5.2
 	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-contrib/cors v1.7.10
