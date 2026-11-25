@@ -46,30 +46,5 @@ services:
       - "127.0.0.1:8090:8090"
     restart: unless-stopped
 
-  # Mock-SAML-IdP für lokale Tests der SAML-Anmeldung je
-  # Statusseite. Nur mit Profil: docker compose --profile sso up -d mock-saml
-  # Kein fertiges Image: Bestehende Test-IdPs (SimpleSAMLphp u. a.) kennen nur
-  # fest eingetragene Service Provider, die Entity-ID hängt hier aber an der
-  # Seiten-ID. Der Mock (backend/cmd/mocksamlidp) nimmt jeden SP an, dessen
-  # ACS-URL mit MOCK_SAML_ACS_PREFIX beginnt. Gleiche Go-Version wie das
-  # Dockerfile; der Quellcode wird nur gelesen. Anleitung: README, Abschnitt
-  # "Lokale SSO-Tests mit Mock-SAML".
-  mock-saml:
-    image: golang:1.26.11-alpine
-    container_name: statushafen_mock_saml
-    profiles: ["sso"]
-    working_dir: /src
-    volumes:
-      - ./backend:/src:ro
-    environment:
-      MOCK_SAML_ADDR: ":8091"
-      MOCK_SAML_URL: "http://localhost:8091"
-      MOCK_SAML_ACS_PREFIX: "http://localhost:8080/api/auth/saml/"
-      GOFLAGS: "-buildvcs=false"
-    command: ["go", "run", "./cmd/mocksamlidp"]
-    ports:
-      - "127.0.0.1:8091:8091"
-    restart: unless-stopped
-
 volumes:
   postgres_data:

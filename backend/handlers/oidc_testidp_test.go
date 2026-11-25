@@ -58,11 +58,14 @@ const testIdPClientID = "statuspage-client"
 func newTestIdP(t *testing.T) *testIdP {
 	t.Helper()
 	idp := newTestIdPServer(t, httptest.NewTLSServer)
-	prevClient := oidcHTTPClient
+	prevClient, prevTrusted := oidcHTTPClient, oidcTrustedHTTPClient
 	oidcHTTPClient = idp.srv.Client()
+	// The global providers use the trusted client; it gets the test
+	// server's TLS client as well.
+	oidcTrustedHTTPClient = idp.srv.Client()
 	resetOIDCProviderCache()
 	t.Cleanup(func() {
-		oidcHTTPClient = prevClient
+		oidcHTTPClient, oidcTrustedHTTPClient = prevClient, prevTrusted
 		resetOIDCProviderCache()
 	})
 	return idp

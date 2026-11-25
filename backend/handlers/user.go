@@ -45,8 +45,10 @@ type PageRoleInput struct {
 
 func (h *Handler) CreateUserHandler(c *gin.Context) {
 	type CreateUserReq struct {
-		Email         string          `json:"email" binding:"required"`
-		Password      string          `json:"password" binding:"required"`
+		Email string `json:"email" binding:"required"`
+		// Password is required while the password login is on and refused
+		// while it is off (the account then signs in via OIDC).
+		Password      string          `json:"password"`
 		TagIDs        []uint          `json:"tag_ids"`
 		IsGlobalAdmin bool            `json:"is_global_admin"`
 		PageRoles     []PageRoleInput `json:"page_roles"`
@@ -57,7 +59,11 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	if rejectInvalidPassword(c, req.Password) {
+	if req.Password == "" && passwordLoginEnabled() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request fields", "code": "invalid_request"})
+		return
+	}
+	if req.Password != "" && (rejectDisabledPasswordLogin(c) || rejectInvalidPassword(c, req.Password)) {
 		return
 	}
 
@@ -80,10 +86,12 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	hash, err := hashPassword(req.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "code": "server_error"})
-		return
+	hash := ""
+	if req.Password != "" {
+		if hash, err = hashPassword(req.Password); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user", "code": "server_error"})
+			return
+		}
 	}
 	user := models.User{
 		Email:         req.Email,
@@ -253,7 +261,7 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 		return
 	}
 	// leer = Passwort unverändert, sonst gilt die Mindestlänge.
-	if req.Password != "" && rejectInvalidPassword(c, req.Password) {
+	if req.Password != "" && (rejectDisabledPasswordLogin(c) || rejectInvalidPassword(c, req.Password)) {
 		return
 	}
 

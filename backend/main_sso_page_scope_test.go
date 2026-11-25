@@ -34,19 +34,23 @@ const (
 	// ssoUnchanged: eigenes Konto, öffentliche Routen und Routen ohne
 	// Rechteprüfung - Antwort wie mit einem Token ohne Seitenbezug.
 	ssoUnchanged
+	// ssoOwnAccountNoPageSession: own account, but refused (403) for a page
+	// SSO session, e.g. linking a global provider.
+	ssoOwnAccountNoPageSession
 )
 
 var ssoRouteKinds = map[string]ssoRouteKind{
-	"GET /healthz":                                       ssoUnchanged,
-	"GET /api/auth/oidc/login":                           ssoUnchanged,
-	"GET /api/auth/oidc/callback":                        ssoUnchanged,
-	"GET /api/auth/saml/login":                           ssoUnchanged,
-	"GET /api/auth/sso/login":                            ssoUnchanged,
-	"GET /api/auth/saml/:page_id/metadata":               ssoUnchanged,
-	"POST /api/auth/saml/:page_id/acs":                   ssoUnchanged,
-	"GET /api/auth/:provider":                            ssoUnchanged,
-	"GET /api/auth/:provider/callback":                   ssoUnchanged,
-	"POST /api/auth/sso-exchange":                        ssoUnchanged,
+	"GET /healthz":                        ssoUnchanged,
+	"GET /api/auth/oidc/login":            ssoUnchanged,
+	"GET /api/auth/oidc/callback":         ssoUnchanged,
+	"GET /api/auth/sso/login":             ssoUnchanged,
+	"POST /api/auth/sso-exchange":         ssoUnchanged,
+	"GET /api/auth/provider/:id/login":    ssoUnchanged,
+	"GET /api/auth/provider/:id/callback": ssoUnchanged,
+	"GET /api/public/auth-config":         ssoUnchanged,
+	// A page SSO session must not link a global provider (it would become a
+	// full session on the next login); the handler answers 403.
+	"POST /api/auth/provider/:id/link":                   ssoOwnAccountNoPageSession,
 	"POST /api/login":                                    ssoUnchanged,
 	"POST /api/subscribe":                                ssoUnchanged,
 	"POST /api/subscribe/test-webhook":                   ssoUnchanged,
@@ -70,7 +74,6 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"GET /api/me/sso":                                    ssoUnchanged,
 	"DELETE /api/me/sso/:id":                             ssoUnchanged,
 	"POST /api/auth/oidc/link":                           ssoUnchanged,
-	"POST /api/auth/saml/link":                           ssoUnchanged,
 	"GET /api/me/subscription":                           ssoUnchanged,
 	"PUT /api/me/subscription":                           ssoUnchanged,
 	"DELETE /api/me/subscription":                        ssoUnchanged,
@@ -143,7 +146,6 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"DELETE /api/admin/pages/:page_id/sso":                                                 ssoPageRoute,
 	"POST /api/pages/:page_id/translate":                                                   ssoPageRoute,
 	"POST /api/admin/pages/:page_id/sso/test":                                              ssoPageRoute,
-	"POST /api/admin/pages/:page_id/sso/saml-test":                                         ssoPageRoute,
 	"POST /api/pages/:page_id/components":                                                  ssoPageRoute,
 	"PUT /api/pages/:page_id/components/:id":                                               ssoPageRoute,
 	"DELETE /api/pages/:page_id/components/:id":                                            ssoPageRoute,
@@ -367,6 +369,13 @@ func TestRouter_SSOSessionIsLimitedToItsPage(t *testing.T) {
 				}
 				if got := serveFresh(t, m, p, pageA, plain); got == http.StatusForbidden || got == http.StatusUnauthorized {
 					t.Errorf("normales Token (Global Admin) auf globaler Route: %d, want erlaubt", got)
+				}
+			case ssoOwnAccountNoPageSession:
+				if got := serveFresh(t, m, p, pageA, scoped); got != http.StatusForbidden {
+					t.Errorf("page SSO token: %d, want 403", got)
+				}
+				if got := serveFresh(t, m, p, pageA, plain); got == http.StatusForbidden || got == http.StatusUnauthorized {
+					t.Errorf("plain token: %d, want allowed", got)
 				}
 			case ssoUnchanged:
 				if s, n := serveFresh(t, m, p, pageA, scoped), serveFresh(t, m, p, pageA, plain); s != n {

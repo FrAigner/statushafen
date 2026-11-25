@@ -33,4 +33,3 @@ mit Beispielen je Anbieter. Die App-Doku fasst sie unter „SSO“ zusammen.
 
 - [SSO-Guides](../sso/README.md)
 - [OIDC-Anmeldung je Statusseite einrichten](./sso-oidc.md)
-- [SAML-Anmeldung je Statusseite einrichten](./sso-saml.md)

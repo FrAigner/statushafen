@@ -127,16 +127,7 @@ func CORSMiddleware() gin.HandlerFunc {
 		},
 		AllowCredentials: true,
 	}
-	withCORS := cors.New(cfg)
-	return func(c *gin.Context) {
-		// Den SAML-ACS ruft der Browser per Formular-POST von der
-		// Origin des IdP auf; gin-contrib/cors bräche das mit 403 ab. Er läuft
-		// ohne CORS-Header, eine fremde Seite kann die Antwort also nicht lesen.
-		if c.Request.Method == http.MethodPost && handlers.IsSAMLACSPath(c.Request.URL.Path) {
-			return
-		}
-		withCORS(c)
-	}
+	return cors.New(cfg)
 }
 
 // initLogging lädt optional eine .env-Datei (nur zur lokalen Entwicklung, in
@@ -176,20 +167,13 @@ func registerHealthcheck(r *gin.Engine, h *handlers.Handler) {
 // halten (SonarCloud go:S3776) - die einzelnen register*-Funktionen
 // enthalten fast ausschließlich lineare Routenregistrierungen ohne eigene
 // Verzweigungslogik.
-// Größengrenzen für Request-Bodys. Der Standard deckt alle JSON-Eingaben (die
-// größte legitime ist eine SAML-IdP-Metadaten-Konfiguration mit 256 KiB). Die
-// SAML-Antwort des IdP kommt formularkodiert und darf laut
-// handlers.samlMaxResponseBytes bis 1 MiB groß sein; der ACS-Pfad bekommt
-// deshalb Platz für die Formularkodierung.
-const (
-	defaultMaxBodyBytes = 1 << 20
-	samlACSMaxBodyBytes = 2 << 20
-)
+// defaultMaxBodyBytes limits request bodies; it covers every JSON input of
+// the API.
+const defaultMaxBodyBytes = 1 << 20
 
-// bodyLimitOverrides: Routen-Templates mit eigener Body-Grenze.
-var bodyLimitOverrides = map[string]int64{
-	"/api/auth/saml/:page_id/acs": samlACSMaxBodyBytes,
-}
+// bodyLimitOverrides: route templates with their own body limit (none at the
+// moment).
+var bodyLimitOverrides = map[string]int64{}
 
 func newRouter(h *handlers.Handler) *gin.Engine {
 	// gin.New() + eigener RequestLogger/Recovery statt
@@ -250,23 +234,19 @@ func registerRoutesInMetrics(r *gin.Engine, reg *metrics.Registry) {
 
 func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// --- SSO (öffentlich) ---
-	// OIDC je Statusseite. Statische Pfade gehen in gin vor
-	// /api/auth/:provider.
+	// OIDC per status page.
 	r.GET("/api/auth/oidc/login", middleware.NewRateLimiter(20, time.Minute), h.OIDCLoginHandler)
 	// Einstieg über den Slug für Besucher einer privaten Seite (Seiten-ID und
 	// SSO-Art nennt die Auskunft /api/public/pages/:slug/sso ihnen nicht).
 	r.GET("/api/auth/sso/login", middleware.NewRateLimiter(20, time.Minute), h.SSOLoginBySlugHandler)
 	r.GET("/api/auth/oidc/callback", middleware.NewRateLimiter(20, time.Minute), h.OIDCCallbackHandler)
-	// SAML je Statusseite. Metadaten und ACS hängen an der
-	// Seite im Pfad, weil der Admin sie beim IdP einträgt.
-	r.GET("/api/auth/saml/login", middleware.NewRateLimiter(20, time.Minute), h.SAMLLoginHandler)
-	r.GET("/api/auth/saml/:page_id/metadata", middleware.NewRateLimiter(60, time.Minute), h.SAMLMetadataHandler)
-	r.POST("/api/auth/saml/:page_id/acs", middleware.NewRateLimiter(20, time.Minute), h.SAMLACSHandler)
-	// Google und GitHub: wie die OIDC-Routen 20/min je IP. Der Callback löst
-	// einen ausgehenden Aufruf beim Anbieter aus.
-	r.GET("/api/auth/:provider", middleware.NewRateLimiter(20, time.Minute), h.OAuthBeginHandler)
-	r.GET("/api/auth/:provider/callback", middleware.NewRateLimiter(20, time.Minute), h.OAuthCallbackHandler)
+	// Global OIDC providers (OIDC_PROVIDERS), 20/min per IP like the page
+	// OIDC routes; the callback triggers an outgoing call to the provider.
+	r.GET("/api/auth/provider/:id/login", middleware.NewRateLimiter(20, time.Minute), h.ProviderLoginHandler)
+	r.GET("/api/auth/provider/:id/callback", middleware.NewRateLimiter(20, time.Minute), h.ProviderCallbackHandler)
 	r.POST("/api/auth/sso-exchange", middleware.NewRateLimiter(10, time.Minute), h.SSOExchangeHandler)
+	// Sign-in methods for the login page (password switch, providers).
+	r.GET("/api/public/auth-config", middleware.NewRateLimiter(60, time.Minute), h.GetAuthConfigHandler)
 
 	// --- Öffentliche Routen ---
 	// 20/Minute statt 5: schützt weiterhin wirksam vor Brute-Force, kollidiert aber
@@ -379,7 +359,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	authGroup.Use(middleware.AuthMiddleware())
 	authGroup.GET("/me", h.MeHandler)
 	authGroup.POST("/auth/oidc/link", h.OIDCLinkHandler)
-	authGroup.POST("/auth/saml/link", h.SAMLLinkHandler)
+	authGroup.POST("/auth/provider/:id/link", h.ProviderLinkHandler)
 	// eigene SSO-Verknüpfungen anzeigen und lösen (Profil).
 	authGroup.GET("/me/sso", h.GetMySSOHandler)
 	authGroup.DELETE("/me/sso/:id", h.DeleteMySSOHandler)
@@ -436,7 +416,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	guarded(authGroup, http.MethodPut, "/admin/pages/:page_id/custom-domain", need("pages", permissions.Update), h.SetCustomDomainHandler)
 	guarded(authGroup, http.MethodDelete, "/admin/pages/:page_id/custom-domain", need("pages", permissions.Update), h.DeleteCustomDomainHandler)
 	guarded(authGroup, http.MethodPost, "/admin/pages/:page_id/custom-domain/verify", need("pages", permissions.Update), handlers.CustomDomainVerifyLimit(), h.VerifyCustomDomainHandler)
-	// SSO-Konfiguration pro Statusseite: OIDC + SAML (Ressource sso)
+	// SSO-Konfiguration pro Statusseite: OIDC (Ressource sso)
 	guarded(authGroup, http.MethodGet, "/admin/pages/:page_id/sso", need("sso", permissions.Read), h.GetSSO)
 	guarded(authGroup, http.MethodPut, "/admin/pages/:page_id/sso", need("sso", permissions.Update), h.UpdateSSO)
 	guarded(authGroup, http.MethodDelete, "/admin/pages/:page_id/sso", need("sso", permissions.Delete), h.DeleteSSO)
@@ -444,7 +424,6 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	// OIDC-Login, weil jeder Aufruf Discovery und einen Login-State auslöst.
 	// Sonderaktion: schaltet die Testanmeldung der Konfiguration (sso:update).
 	guarded(authGroup, http.MethodPost, "/admin/pages/:page_id/sso/test", need("sso", permissions.Update), middleware.NewRateLimiter(20, time.Minute), h.StartSSOTestHandler)
-	guarded(authGroup, http.MethodPost, "/admin/pages/:page_id/sso/saml-test", need("sso", permissions.Update), middleware.NewRateLimiter(20, time.Minute), h.StartSAMLTestHandler)
 
 	// Components – scoped under /pages/:page_id
 	guarded(authGroup, http.MethodPost, "/pages/:page_id/components", need("components", permissions.Create), h.CreateComponentHandler)
@@ -792,6 +771,7 @@ func newHTTPServer(addr string, h http.Handler, t serverTimeouts) *http.Server {
 // SIGINT/SIGTERM eintrifft, um dann einen Graceful-Shutdown durchzuführen.
 func runServer(r *gin.Engine) {
 	handlers.WarnIfCustomDomainCheckUnprotected()
+	handlers.WarnAuthConfig()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

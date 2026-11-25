@@ -22,6 +22,9 @@ type LoginRequest struct {
 }
 
 func (h *Handler) LoginHandler(c *gin.Context) {
+	if rejectDisabledPasswordLogin(c) {
+		return
+	}
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters", "code": "invalid_request"})

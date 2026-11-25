@@ -60,9 +60,9 @@ info:
 
     ### Sitzungen aus einem Seiten-SSO-Login
 
-    Ein Login-Token aus dem OIDC- oder SAML-SSO einer Statusseite trägt den
+    Ein Login-Token aus dem OIDC-SSO einer Statusseite trägt den
     Claim `sso_page_id` (die Seite, deren IdP die Anmeldung bestätigt hat).
-    Passwort- und Google/GitHub-Logins haben ihn nicht. Mit
+    Passwort-Logins und Logins über globale OIDC-Anbieter haben ihn nicht. Mit
     `sso_page_id` gilt:
 
     - Seitengebundene Rechte (`<bereich>:<recht>`, `page-role`) nur für diese
@@ -102,10 +102,10 @@ info:
 
     | Endpunkt | Limit |
     |---|---|
-    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `GET /api/auth/{provider}`, `GET /api/auth/{provider}/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `GET /api/auth/saml/login`, `POST /api/auth/saml/{page_id}/acs`, `POST /api/admin/pages/{page_id}/sso/saml-test`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test` | 20/min |
+    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test`, `GET /api/auth/provider/{id}/login`, `GET /api/auth/provider/{id}/callback` | 20/min |
     | `POST /api/subscribe`, `POST /api/subscribe/test-webhook`, `POST /api/auth/sso-exchange`, `POST /api/public/orders/set-password` | 10/min |
     | `POST /api/public/orders` | 5/min |
-    | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso`, `GET /api/auth/saml/{page_id}/metadata` | 60/min |
+    | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso`, `GET /api/public/auth-config` | 60/min |
     | `GET /api/public/pages/{slug}/dashboard`, `GET /api/pages/{page_id}/incidents`, `GET /api/pages/{page_id}/incidents/{id}`, `GET /api/pages/slug/{slug}`, `GET /api/pages/{page_id}/components`, `GET /api/pages/{page_id}/notices`, `GET /api/public/pages`, `GET /api/public/ui-overrides`, `GET /api/incidents/{incident_id}/translations`, `GET /api/components/{component_id}/translations`, `GET /api/notices/{notice_id}/translations` | 120/min je Route |
     | `POST /api/admin/pages/{page_id}/custom-domain/verify` (löst eine DNS-Abfrage aus) | 10/min je Seite, 10/min je Nutzer |
     | `POST /api/pages/{page_id}/incidents`, `POST /api/pages/{page_id}/notices` (lösen Benachrichtigungen aus) | 30/Stunde je Seite, 60/Stunde je Nutzer |
@@ -133,14 +133,13 @@ info:
       ist ein Text für Menschen (teils deutsch, teils englisch) und kann sich
       ändern. Das Frontend übersetzt den Code. Noch nicht jeder Fehler trägt
       einen `code`; ältere Antworten haben nur `error`.
-    - Request-Bodys sind auf 1 MiB begrenzt (SAML-ACS: 2 MiB, einzelne Routen
+    - Request-Bodys sind auf 1 MiB begrenzt (einzelne Routen
       enger, z. B. Komponenten-Webhooks 4 KiB). Eine größere Anfrage beantwortet
       der Server mit `413` und dem Code `request_too_large`.
     - Ein NUL-Byte (rohes Byte oder JSON-Escape `\u0000`, auch in Schlüsseln und
       verschachtelten Werten) sowie ungültiges UTF-8 im Body, in Query-Parametern
       oder im Pfad lehnt der Server bei jeder Route vor dem Handler mit
-      `400` und dem Code `input_invalid_characters` ab. Formularkodierte Bodys
-      (SAML-Rückkanal) sind davon ausgenommen.
+      `400` und dem Code `input_invalid_characters` ab.
     - Nachrichten und Beschreibungen (Vorfall, Vorfall-Update, Wartung,
       Ankündigung, Vorlagen und deren Übersetzungen) sind eingeschränktes
       Markdown, höchstens 5000 Zeichen (`message_too_long`), siehe Schema
@@ -192,7 +191,7 @@ tags:
   - name: Public
     description: Öffentliche Lese-API der Statusseiten (optional mit Login-Token).
   - name: Auth
-    description: Anmeldung per Passwort, OAuth (Google/GitHub) und OIDC je Statusseite.
+    description: Anmeldung per Passwort, über globale OIDC-Anbieter und per OIDC je Statusseite.
   - name: Subscriptions
     description: Abonnieren, Bestätigen (Double-Opt-in) und Abbestellen.
   - name: Webhooks
@@ -298,6 +297,10 @@ paths:
       tags: [Auth]
       operationId: login
       summary: Anmeldung mit E-Mail und Passwort
+      description: |
+        Nur mit `PASSWORD_LOGIN_ENABLED=true` (bzw. `1`, `yes`). Standardmäßig
+        aus: dann `403` mit Code `password_login_disabled`, ohne Prüfung der
+        Zugangsdaten; angemeldet wird über die globalen OIDC-Anbieter.
       security: []
       x-rate-limit: 20/min pro IP
       requestBody:
@@ -313,62 +316,104 @@ paths:
               schema: { $ref: "#/components/schemas/LoginResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /api/auth/{provider}:
+  /api/auth/provider/{id}/login:
     parameters:
-      - $ref: "#/components/parameters/OAuthProvider"
+      - $ref: "#/components/parameters/ProviderId"
     get:
       tags: [Auth]
-      operationId: oauthBegin
-      summary: OAuth-Login bei Google/GitHub starten
+      operationId: providerLogin
+      summary: Login über einen globalen OIDC-Anbieter starten
       description: |
-        Setzt das Cookie `oauth_state` (5 min, HttpOnly, Secure, SameSite=Lax) und
-        leitet zum Anbieter weiter. Das Cookie ist mit `JWT_SECRET` signiert und
-        trägt State und PKCE-Verifier; die Authorize-URL enthält die
-        `code_challenge` (S256). Für Browser-Navigation gedacht.
-      security: []
-      x-rate-limit: 20/min pro IP
-      responses:
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "307":
-          description: Weiterleitung zum Anbieter.
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "503":
-          description: Anbieter nicht konfiguriert (Client-ID fehlt).
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-  /api/auth/{provider}/callback:
-    parameters:
-      - $ref: "#/components/parameters/OAuthProvider"
-    get:
-      tags: [Auth]
-      operationId: oauthCallback
-      summary: OAuth-Callback des Anbieters
-      description: |
-        Prüft `state` gegen das signierte Cookie (Signatur, Anbieter, höchstens
-        5 Minuten alt, einmal verwendbar), bevor der Anbieter aufgerufen wird;
-        sonst `400 oauth_state_invalid`. Tauscht dann den Code (mit dem
-        PKCE-Verifier aus dem Cookie), legt den Nutzer bei Bedarf an und leitet auf
-        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter. Der kurzlebige `code` wird per `POST /api/auth/sso-exchange`
-        gegen einen Login-Token getauscht.
+        Browser-Navigation. Anbieter aus `OIDC_PROVIDERS` (Konfiguration per
+        Umgebungsvariablen `OIDC_<ID>_*`). Leitet zum Identity Provider weiter
+        (State/Nonce/PKCE, Cookie `oidc_state` mit Pfad `/api/auth/provider`,
+        10 Minuten). Die Discovery läuft beim ersten Login, nicht beim Start.
+        Fehler führen zur Weiterleitung auf
+        `<FRONTEND_URL>/login?oidc_error=<code>` (unbekannte ID:
+        `provider_unknown`; außerdem `provider_unreachable`, `internal`).
       security: []
       x-rate-limit: 20/min pro IP
       parameters:
-        - { name: code, in: query, required: true, schema: { type: string } }
-        - { name: state, in: query, required: true, schema: { type: string } }
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
-        "429": { $ref: "#/components/responses/TooManyRequests" }
         "307":
-          description: Weiterleitung ins Frontend mit Einmal-Code.
+          description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
           headers:
             Location: { $ref: "#/components/headers/Location" }
-        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /api/auth/provider/{id}/callback:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    get:
+      tags: [Auth]
+      operationId: providerCallback
+      summary: Callback eines globalen OIDC-Anbieters
+      description: |
+        Redirect-URI beim Anbieter: `<BASE_URL>/api/auth/provider/<id>/callback`.
+        Löst den State genau einmal ein (nur ein State dieses Anbieters), tauscht
+        den Code mit PKCE, prüft ID-Token (Signatur, Issuer, Zielgruppe, Ablauf)
+        und Nonce. Das Konto wird über (Issuer, Subject) gefunden. Ohne
+        Verknüpfung entscheidet die E-Mail: Ein bestehendes Konto mit derselben
+        Adresse wird nur bei `email_verified=true` verknüpft, sonst
+        `email_unverified`; ohne Konto entsteht ein neues (Rolle Viewer;
+        `SSO_ALLOWED_DOMAINS` gilt, `email_verified=false` wird abgelehnt).
+        `SSO_BOOTSTRAP_ADMIN_EMAILS` macht ein Konto mit bestätigter E-Mail zum
+        Global Admin. Erfolg: `<FRONTEND_URL>/auth/sso-callback?code=…` (bei
+        Verknüpfung mit `&next=profile`); Fehler:
+        `<FRONTEND_URL>/login?oidc_error=<code>` bzw. bei Verknüpfung
+        `/admin/profile?oidc_error=<code>`. Codes: `provider_unknown`,
+        `state_invalid`, `provider_denied`, `provider_unreachable`,
+        `token_exchange`, `no_id_token`, `id_token_invalid`, `email_missing`,
+        `email_unverified`, `domain_not_allowed`, `not_linked`,
+        `already_linked`, `internal`.
+      security: []
+      x-rate-limit: 20/min pro IP
+      parameters:
+        - { name: code, in: query, required: false, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        "307":
+          description: Weiterleitung ins Frontend.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /api/auth/provider/{id}/link:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    post:
+      tags: [Me]
+      operationId: providerLink
+      summary: Eigenes Konto mit einem globalen OIDC-Anbieter verknüpfen
+      description: |
+        Wie `POST /api/auth/oidc/link`: liefert die Authorize-URL als JSON.
+        Auch für Global Admins. Eine Sitzung aus einem Seiten-SSO
+        (`sso_page_id`) darf keinen globalen Anbieter verknüpfen (`403`).
+        Unbekannte Anbieter-ID: `404`.
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Authorize-URL, im Browser zu öffnen.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UrlResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+        "502": { $ref: "#/components/responses/BadGateway" }
   /api/auth/sso-exchange:
     post:
       tags: [Auth]
@@ -392,9 +437,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token]
+                required: [token, return_to]
                 properties:
-                  token: { type: string, description: "JWT für `X-Auth-Token` (oder `Authorization: Bearer`). Nach OIDC/SAML einer Statusseite mit Claim `sso_page_id`: Das Token gilt nur für diese Seite und nie mit Global-Admin-Rechten." }
+                  return_to: { type: string, description: "Geprüfter Rücksprungpfad aus dem Login-Start (`return_to`), sonst leer. Nach einer Verknüpfung immer leer (dort gilt `next=profile`)." }
+                  token: { type: string, description: "JWT für `X-Auth-Token` (oder `Authorization: Bearer`). Nach OIDC einer Statusseite mit Claim `sso_page_id`: Das Token gilt nur für diese Seite und nie mit Global-Admin-Rechten." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -416,6 +462,17 @@ paths:
           required: true
           description: ID der Statusseite.
           schema: { type: integer, minimum: 1 }
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -430,14 +487,24 @@ paths:
       description: |
         Browser-Navigation für Besucher einer privaten Seite, denen
         `GET /api/public/pages/{slug}/sso` Seiten-ID und SSO-Art nicht nennt. Der
-        Server wählt das Verfahren (OIDC, wenn aktiv, sonst SAML) und leitet zum
-        Identity Provider weiter. Eine unbekannte Seite, eine Seite ohne aktives SSO
+        Server leitet zum Identity Provider der Seite weiter. Eine unbekannte Seite, eine Seite ohne aktives SSO
         und ein fehlender `slug` enden gleich in der Weiterleitung auf
         `<FRONTEND_URL>/login?oidc_error=not_configured`.
       security: []
       x-rate-limit: 20/min pro IP
       parameters:
         - { name: slug, in: query, required: true, description: Slug der Statusseite., schema: { type: string } }
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -451,8 +518,8 @@ paths:
       summary: OIDC-Callback des Identity Providers
       description: |
         Löst den State ein, prüft ID-Token und Nonce und leitet auf
-        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter (Code wie bei
-        OAuth per `POST /api/auth/sso-exchange` tauschen). Bei
+        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter (Code per
+        `POST /api/auth/sso-exchange` tauschen). Bei
         Verknüpfungen geht es ins Profil, bei Testanmeldungen auf die
         SSO-Seite des Admin-Bereichs; Fehler immer als Weiterleitung mit
         Fehlercode.
@@ -467,128 +534,6 @@ paths:
           headers:
             Location: { $ref: "#/components/headers/Location" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
-  /api/auth/saml/login:
-    get:
-      tags: [Auth]
-      operationId: samlLogin
-      summary: Login über das SAML-SSO einer Statusseite starten
-      description: |
-        Browser-Navigation. Erzeugt einen signierten AuthnRequest
-        (HTTP-Redirect-Binding), setzt das Cookie `saml_state`
-        (`Secure`, `HttpOnly`, `SameSite=None`, 10 Minuten) und leitet zum
-        IdP weiter. Fehler führen wie bei OIDC zur Weiterleitung auf
-        `<FRONTEND_URL>/login?oidc_error=<code>` (z. B. `bad_page`,
-        `not_configured`, `metadata_invalid`, `provider_unreachable`).
-      security: []
-      x-rate-limit: 20/min pro IP
-      parameters:
-        - name: page
-          in: query
-          required: true
-          description: ID der Statusseite.
-          schema: { type: integer, minimum: 1 }
-      responses:
-        "307":
-          description: Weiterleitung zum IdP bzw. bei Fehlern ins Frontend.
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-  /api/auth/saml/{page_id}/metadata:
-    parameters:
-      - $ref: "#/components/parameters/PageId"
-    get:
-      tags: [Auth]
-      operationId: samlMetadata
-      summary: SAML-SP-Metadaten der Statusseite
-      description: |
-        EntityDescriptor des Service Providers (Entity-ID = diese URL,
-        ACS = `/api/auth/saml/{page_id}/acs` mit HTTP-POST-Binding,
-        SP-Signaturzertifikat). Zum Import beim IdP. Verfügbar, sobald für
-        die Seite ein SP-Schlüssel erzeugt wurde (beim ersten Speichern der
-        SAML-Konfiguration), auch wenn SAML noch nicht aktiv ist. Auch für
-        private Seiten (IdPs laden die Metadaten per URL), für gelöschte 404.
-        Nur Signaturzertifikat, NameID-Format persistent (bzw. unspecified,
-        wenn freigegeben); verschlüsselte Assertions werden nicht angeboten.
-      security: []
-      x-rate-limit: 60/min pro IP
-      responses:
-        "200":
-          description: SP-Metadaten.
-          content:
-            application/samlmetadata+xml:
-              schema: { type: string }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "500": { $ref: "#/components/responses/InternalError" }
-  /api/auth/saml/{page_id}/acs:
-    parameters:
-      - $ref: "#/components/parameters/PageId"
-    post:
-      tags: [Auth]
-      operationId: samlACS
-      summary: Assertion Consumer Service (Formular-POST des IdP)
-      description: |
-        Der Browser schickt die SAML-Antwort per HTTP-POST-Binding von der
-        Origin des IdP; die Route läuft deshalb ohne CORS-Prüfung (und ohne
-        CORS-Header). `RelayState` muss zum Cookie `saml_state` passen und
-        der Login-State zur Seite im Pfad. Geprüft werden Signatur,
-        Audience, Recipient/Destination, Gültigkeit, `InResponseTo`,
-        Einmaligkeit der Assertion (Replay-Schutz) und eine dauerhafte
-        NameID. Body höchstens 1 MB.
-
-        Ergebnis ist immer eine 303-Weiterleitung: Erfolg auf
-        `<FRONTEND_URL>/auth/sso-callback?code=…` (Code per
-        `POST /api/auth/sso-exchange` tauschen; bei Verknüpfung mit
-        `&next=profile`), Testanmeldung auf `/admin/sso?oidc_test=ok&sso=saml…`,
-        Fehler auf `/login?oidc_error=<code>` (Verknüpfung:
-        `/admin/profile?oidc_error=`, Test: `/admin/sso?oidc_test=`).
-        Fehlercodes: `saml_response_invalid`, `saml_replay`, `saml_nameid_format`, `metadata_invalid`, `provider_unreachable`, `provider_denied`, `state_invalid`, `not_linked`, `already_linked`, `not_configured`, `test_disabled`, `internal`.
-      security: []
-      x-rate-limit: 20/min pro IP
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required: [SAMLResponse, RelayState]
-              properties:
-                SAMLResponse: { type: string, description: Base64-kodierte samlp:Response. }
-                RelayState: { type: string, description: State aus dem Login-Start. }
-      responses:
-        "303":
-          description: Weiterleitung ins Frontend (Erfolg oder Fehlercode).
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-  /api/auth/saml/link:
-    post:
-      tags: [Me]
-      operationId: samlLink
-      summary: Eigenes Konto mit dem SAML-SSO einer Statusseite verknüpfen
-      description: |
-        Wie `POST /api/auth/oidc/link`: liefert die IdP-URL als JSON. Für
-        Global Admins und Konten mit Rolle auf einer anderen Seite gesperrt.
-        Eine OIDC-Verknüpfung derselben Seite zählt für SAML nicht.
-      x-required-permission: authenticated
-      parameters:
-        - name: page
-          in: query
-          required: true
-          schema: { type: integer, minimum: 1 }
-      responses:
-        "200":
-          description: URL zum IdP, im Browser zu öffnen.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/UrlResponse" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "500": { $ref: "#/components/responses/InternalError" }
-        "502": { $ref: "#/components/responses/BadGateway" }
   /api/auth/oidc/link:
     post:
       tags: [Me]
@@ -619,6 +564,35 @@ paths:
   # ------------------------------------------------------------------
   # Public
   # ------------------------------------------------------------------
+  /api/public/auth-config:
+    get:
+      tags: [Public]
+      operationId: getAuthConfig
+      summary: Anmeldemethoden für die Login-Seite
+      description: |
+        Ob der Passwort-Login an ist und welche globalen OIDC-Anbieter aktiv
+        sind (Reihenfolge wie in `OIDC_PROVIDERS`, nur ID und Anzeigename).
+      security: []
+      x-rate-limit: 60/min pro IP
+      responses:
+        "200":
+          description: Anmeldemethoden.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [password_login, providers]
+                properties:
+                  password_login: { type: boolean }
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
+                        name: { type: string }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /api/public/pages:
     get:
       tags: [Public]
@@ -823,8 +797,8 @@ paths:
       operationId: getPublicPageSSO
       summary: Ist das Seiten-SSO aktiv?
       description: |
-        Liefert nur die Schalter je Protokoll und die Seiten-ID für den Login-Link
-        (`/api/auth/oidc/login?page=<page_id>` bzw. `/api/auth/saml/login?page=<page_id>`),
+        Liefert nur den OIDC-Schalter und die Seiten-ID für den Login-Link
+        (`/api/auth/oidc/login?page=<page_id>`),
         keine Konfiguration. Bei einer privaten Seite nur mit Rolle auf der Seite
         oder als Global Admin (Login-Token); für alle anderen antwortet die Route
         wie bei einer nicht vorhandenen Seite mit `404`. Besucher einer privaten
@@ -838,10 +812,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [oidc_enabled, saml_enabled, page_id]
+                required: [oidc_enabled, page_id]
                 properties:
                   oidc_enabled: { type: boolean }
-                  saml_enabled: { type: boolean }
                   page_id: { type: integer }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -1835,7 +1808,7 @@ paths:
                 type: object
                 required: [set_password_token, slug]
                 properties:
-                  set_password_token: { type: string }
+                  set_password_token: { type: string, description: "Leer bei abgeschaltetem Passwort-Login: Die Bestellung ist dann sofort aktiv, das Konto hat kein Passwort und meldet sich über einen globalen OIDC-Anbieter mit der bestellten E-Mail an." }
                   slug: { type: string }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1847,6 +1820,7 @@ paths:
       tags: [Orders]
       operationId: setOrderPassword
       summary: Passwort für das neue Konto setzen (Schritt 3/3)
+      description: Bei abgeschaltetem Passwort-Login (`PASSWORD_LOGIN_ENABLED`) immer `403` mit Code `password_login_disabled`.
       security: []
       x-rate-limit: 10/min pro IP
       requestBody:
@@ -1866,6 +1840,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SlugResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "410": { $ref: "#/components/responses/Gone" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -2195,9 +2170,10 @@ paths:
                         id: { type: integer }
                         status_page_id: { type: integer }
                         page_name: { type: string }
-                        protocol: { type: string, enum: [oidc, saml] }
+                        protocol: { type: string, enum: [oidc] }
                         email: { type: string }
                         created_at: { type: string, format: date-time }
+                        provider: { type: string, description: "ID des globalen Anbieters bei `status_page_id` 0 (`page_name` ist dann sein Anzeigename; leer, wenn nicht mehr konfiguriert), sonst leer." }
                   linkable:
                     type: array
                     items:
@@ -2205,7 +2181,8 @@ paths:
                       properties:
                         status_page_id: { type: integer }
                         page_name: { type: string }
-                        protocol: { type: string, enum: [oidc, saml] }
+                        protocol: { type: string, enum: [oidc] }
+                        provider: { type: string, description: "Bei `status_page_id` 0 die ID eines globalen Anbieters (Verknüpfen über `POST /api/auth/provider/{id}/link`), sonst leer." }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /api/me/sso/{id}:
     parameters:
@@ -2558,8 +2535,8 @@ paths:
     get:
       tags: [Admin – Pages]
       operationId: getPageSSO
-      summary: SSO-Konfiguration der Seite (OIDC und SAML)
-      description: Das OIDC-Client-Secret und der SAML-SP-Schlüssel werden nie geliefert (nur `oidc_client_secret_set` bzw. das öffentliche `saml_sp_certificate`).
+      summary: SSO-Konfiguration der Seite (OIDC)
+      description: Das OIDC-Client-Secret wird nie geliefert (nur `oidc_client_secret_set`).
       x-required-permission: sso:read
       responses:
         "200":
@@ -2574,8 +2551,8 @@ paths:
     put:
       tags: [Admin – Pages]
       operationId: updatePageSSO
-      summary: SSO-Konfiguration speichern (OIDC und SAML)
-      description: Leeres `oidc_client_secret` behält das gespeicherte Secret. Beim ersten Speichern entstehen SAML-SP-Schlüssel und -Zertifikat. Ungültige SAML-Angaben (URL und XML zugleich, http-URL, unlesbares XML, aktiv ohne Metadaten) ergeben 400. Wechselt der OIDC-Issuer bzw. die Quelle der SAML-Metadaten oder Entity-ID/Signaturzertifikat des IdP, werden die Verknüpfungen der Seite für dieses Protokoll gelöscht (Audit `sso.oidc_identities_reset` bzw. `sso.saml_identities_reset`). Anfragen über 256 KB ergeben 413, `saml_idp_metadata_xml` über 128 KB 400.
+      summary: SSO-Konfiguration speichern (OIDC)
+      description: Leeres `oidc_client_secret` behält das gespeicherte Secret. Wechselt der OIDC-Issuer, werden die OIDC-Verknüpfungen der Seite gelöscht (Audit `sso.oidc_identities_reset`). Anfragen über 64 KB ergeben 413. Felder `saml_*` aus früheren Versionen werden ignoriert.
       x-required-permission: sso:update
       requestBody:
         required: true
@@ -2592,7 +2569,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "413": { description: Anfrage größer als 256 KB. }
+        "413": { description: Anfrage größer als 64 KB. }
         "500": { $ref: "#/components/responses/InternalError" }
     delete:
       tags: [Admin – Pages]
@@ -2606,33 +2583,6 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /api/admin/pages/{page_id}/sso/saml-test:
-    parameters:
-      - $ref: "#/components/parameters/PageId"
-    post:
-      tags: [Admin – Pages]
-      operationId: startPageSAMLTest
-      summary: SAML-Testanmeldung gegen den IdP starten
-      description: |
-        Nur mit `test_login_enabled` (sonst 403 `test_disabled`) und
-        hinterlegten IdP-Metadaten (sonst 400 `saml_test_incomplete`); SAML
-        muss dafür noch nicht aktiv sein. Liefert die IdP-URL; das Ergebnis
-        landet ohne Sitzung auf der SSO-Seite des Admin-Bereichs.
-      x-required-permission: sso:update
-      x-rate-limit: 20/min pro IP
-      responses:
-        "200":
-          description: URL zum IdP.
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/UrlResponse" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "500": { $ref: "#/components/responses/InternalError" }
-        "502": { $ref: "#/components/responses/BadGateway" }
   /api/admin/pages/{page_id}/sso/test:
     parameters:
       - $ref: "#/components/parameters/PageId"
@@ -4187,15 +4137,17 @@ paths:
       tags: [Admin – Platform]
       operationId: createUser
       summary: Nutzer anlegen
+      description: |
+        Mit eingeschaltetem Passwort-Login ist `password` Pflicht. Bei
+        abgeschaltetem Passwort-Login entsteht das Konto ohne Passwort (Anmeldung
+        über einen globalen OIDC-Anbieter mit derselben, bestätigten E-Mail);
+        ein mitgeschicktes `password` ergibt `403 password_login_disabled`.
       x-required-permission: global-admin
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              allOf:
-                - $ref: "#/components/schemas/UserWrite"
-                - required: [password]
+            schema: { $ref: "#/components/schemas/UserWrite" }
       responses:
         "201":
           description: Angelegt.
@@ -4217,6 +4169,7 @@ paths:
       tags: [Admin – Platform]
       operationId: updateUser
       summary: Nutzer ändern (leeres Passwort = unverändert)
+      description: Ein neues `password` bei abgeschaltetem Passwort-Login ergibt `403 password_login_disabled`.
       x-required-permission: global-admin
       requestBody:
         required: true
@@ -4661,6 +4614,12 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    ProviderId:
+      name: id
+      in: path
+      required: true
+      description: ID des globalen OIDC-Anbieters aus `OIDC_PROVIDERS`.
+      schema: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
     Slug:
       name: slug
       in: path
@@ -4692,11 +4651,6 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
-    OAuthProvider:
-      name: provider
-      in: path
-      required: true
-      schema: { type: string, enum: [google, github] }
     LanguageCodeQuery:
       name: language_code
       in: query
@@ -4913,16 +4867,6 @@ components:
         oidc_acs_url: { type: string, description: Beim IdP einzutragende Redirect-URI. }
         test_login_enabled: { type: boolean }
         oidc_client_secret_set: { type: boolean }
-        saml_enabled: { type: boolean }
-        saml_idp_metadata_url: { type: string }
-        saml_idp_metadata_xml: { type: string }
-        saml_attribute_email: { type: string, default: email }
-        saml_attribute_name: { type: string, default: name }
-        saml_allow_unspecified_nameid: { type: boolean, default: false, description: "NameID-Format unspecified zulassen (sonst nur persistent)." }
-        saml_sp_certificate: { type: string, description: "SP-Zertifikat (PEM), öffentlich; der Schlüssel wird nie geliefert." }
-        saml_entity_id: { type: string, description: SP-Entity-ID (= Metadaten-URL). }
-        saml_metadata_url: { type: string }
-        saml_acs_url: { type: string }
     SSOConfigWrite:
       type: object
       properties:
@@ -4935,12 +4879,6 @@ components:
         oidc_attribute_name: { type: string }
         oidc_attribute_role: { type: string }
         test_login_enabled: { type: boolean }
-        saml_enabled: { type: boolean, description: Verlangt IdP-Metadaten (URL oder XML). }
-        saml_idp_metadata_url: { type: string, format: uri, description: "Nur https; nicht zusammen mit saml_idp_metadata_xml." }
-        saml_idp_metadata_xml: { type: string, description: Wird beim Speichern geprüft. }
-        saml_attribute_email: { type: string, description: "Leer = email." }
-        saml_attribute_name: { type: string, description: "Leer = name." }
-        saml_allow_unspecified_nameid: { type: boolean, description: "Standard false: nur persistente NameIDs; emailAddress wird immer abgelehnt." }
 
     # --- Komponenten ---
     ComponentStatus:

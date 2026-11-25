@@ -39,13 +39,3 @@ func TestRouter_BodyAtLimitReachesHandler(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":"invalid_request"`)
 }
-
-// Die SAML-Antwort darf bis 1 MiB groß sein (samlMaxResponseBytes) und kommt
-// formularkodiert; der ACS-Pfad hat deshalb eine höhere Grenze.
-func TestRouter_SAMLACSAllowsLargerBody(t *testing.T) {
-	const acs = "/api/auth/saml/1/acs"
-	w := postBody(t, acs, defaultMaxBodyBytes+10)
-	assert.NotEqual(t, http.StatusRequestEntityTooLarge, w.Code, "ACS-Body über dem Standard bleibt zulässig")
-	w = postBody(t, acs, samlACSMaxBodyBytes+1)
-	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
-}

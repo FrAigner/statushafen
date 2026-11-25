@@ -139,14 +139,7 @@ func errorOf(t *testing.T, w *httptest.ResponseRecorder) string {
 // JSON, sondern als Redirect auf eine feste Frontend-Seite mit Fehlercode.
 func assertOIDCError(t *testing.T, w *httptest.ResponseRecorder, path, code string) {
 	t.Helper()
-	assertSSOError(t, w, http.StatusTemporaryRedirect, path, code)
-}
-
-// assertSSOError prüft den Fehler-Redirect mit dem erwarteten
-// Status (307 bei GET, 303 nach dem POST an den SAML-ACS).
-func assertSSOError(t *testing.T, w *httptest.ResponseRecorder, status int, path, code string) {
-	t.Helper()
-	require.Equal(t, status, w.Code, w.Body.String())
+	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, getFrontendURL()+path, loc.Scheme+"://"+loc.Host+loc.Path)
@@ -170,8 +163,9 @@ func jwtFromRedirectStatus(t *testing.T, w *httptest.ResponseRecorder, status in
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, getFrontendURL()+"/auth/sso-callback", loc.Scheme+"://"+loc.Host+loc.Path)
-	token, ok := consumeSSOCode(loc.Query().Get("code"))
+	login, ok := consumeSSOCode(loc.Query().Get("code"))
 	require.True(t, ok)
+	token := login.token
 	claims := &middleware.Claims{}
 	_, err = jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
 		return []byte("test-jwt-secret-not-for-production"), nil
@@ -826,7 +820,7 @@ func TestDiscoverOIDCProvider_UsesFreshCacheEntry(t *testing.T) {
 		oidcProviderMu.Unlock()
 	})
 
-	got := discoverOIDCProvider(issuer)
+	got := discoverOIDCProvider(issuer, false)
 
 	assert.Equal(t, want.err, got.err)
 }

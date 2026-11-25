@@ -7,6 +7,11 @@ SKRIPTE="$(cd "$(dirname "$0")" && pwd)"
 cd "$SKRIPTE/../backend" || exit 1
 # Seed (SEED_DB=true in backend/.env) läuft nur mit Entwicklungs-APP_ENV; eine gesetzte Variable bleibt.
 export APP_ENV="${APP_ENV:-development}"
+# Local development signs in with the seeded password accounts; the backend
+# default is off. A value set in the environment or backend/.env wins.
+if ! grep -qs '^PASSWORD_LOGIN_ENABLED=' .env; then
+  export PASSWORD_LOGIN_ENABLED="${PASSWORD_LOGIN_ENABLED:-true}"
+fi
 # Das Backend startet nur mit starkem JWT_SECRET: lokal ein zufälliges erzeugen (backend/.jwt-secret.local).
 # shellcheck source=scripts/dev-jwt-secret.sh
 source "$SKRIPTE/dev-jwt-secret.sh"

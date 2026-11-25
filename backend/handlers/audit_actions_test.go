@@ -33,7 +33,7 @@ var auditActionVariablen = map[string]string{
 	"handlers/maintenance_scheduler.go":       "auditAction je nach Zweig",
 	"handlers/notification_template_admin.go": "auditAction je nach Zweig",
 	"handlers/oidc_login.go":                  "action je nach Ergebnis",
-	"handlers/statuspage_sso.go":              "r.action aus einer Tabelle",
+	"handlers/oidc_global.go":                 "action depends on login or link",
 }
 
 var auditActionShape = regexp.MustCompile(`^[a-z_]+\.[a-z_]+$`)
