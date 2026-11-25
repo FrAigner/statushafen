@@ -25,7 +25,9 @@ export function useContentLanguages() {
       pageLanguages.value = []
       return pageLanguages.value
     }
-    pageLanguages.value = await apiFetch(`/api/pages/${pageId}/languages`)
+    // An empty response (null) counts as "no languages" right away: views compute
+    // their translation menus from this list on the next render.
+    pageLanguages.value = (await apiFetch(`/api/pages/${pageId}/languages`)) ?? []
     return pageLanguages.value
   }
 

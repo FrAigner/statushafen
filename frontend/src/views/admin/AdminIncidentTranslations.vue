@@ -36,6 +36,7 @@ const {
   resource: 'incidents',
   contentField: 'message',
   translationsApi: useIncidentTranslations(),
+  overviewPath: '/admin/incidents',
 })
 
 const incidentTitle = computed(() => incident.value?.Title ?? `#${props.incidentId}`)

@@ -29,9 +29,11 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-function makeFetchRouter({ catalogOverride, pageLanguagesOverride, writeOk = true, deleteResponse } = {}) {
+function makeFetchRouter({ catalogOverride, pageLanguagesOverride, writeOk = true, deleteResponse, translationEnabled = true } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Switch for translations (system setting); on unless a test turns it off.
+    if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: translationEnabled })
     if (method === 'DELETE' && /\/api\/languages\/\d+$/.test(url)) {
       return deleteResponse ?? { ok: true, status: 204, json: async () => ({}) }
     }
@@ -75,6 +77,33 @@ async function mountAdminLanguages({ fetchImpl, tenantId = '1', pagePerms = 'lan
   activeWrapper = wrapper
   return { wrapper }
 }
+
+// Translation switched off: a page has its default language only. The page section
+// offers a single choice (radio buttons) and saves exactly that code.
+describe('AdminLanguages with translation switched off', () => {
+  beforeEach(() => {
+    useAuth().logout()
+    i18n.global.locale.value = 'de'
+  })
+  afterEach(() => { activeWrapper?.unmount(); activeWrapper = null; vi.restoreAllMocks() })
+
+  it('offers only the default language and saves a single code', async () => {
+    const fetchMock = makeFetchRouter({ translationEnabled: false, pageLanguagesOverride: [{ ID: 10, LanguageCode: 'de', IsDefault: true }] })
+    const { wrapper } = await mountAdminLanguages({ fetchImpl: fetchMock })
+    const section = wrapper.find('.edit-card')
+    expect(section.find('[data-test="page-languages-single"]').text()).toContain('Systemeinstellungen')
+    expect(section.findAll('input[type="checkbox"]')).toHaveLength(0)
+    const radios = section.findAll('input[type="radio"]')
+    expect(radios.map(r => r.element.value)).toEqual(['de', 'en'])
+    expect(radios[0].element.checked).toBe(true)
+
+    await radios[1].setValue(true)
+    await section.find('button').trigger('click')
+    await flushPromises()
+    const put = fetchMock.mock.calls.find(([u, o]) => o?.method === 'PUT' && u === '/api/pages/1/languages')
+    expect(JSON.parse(put[1].body)).toEqual({ codes: ['en'], default: 'en' })
+  })
+})
 
 describe('AdminLanguages', () => {
   beforeEach(() => {

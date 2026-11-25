@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
@@ -32,9 +33,11 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-function makeFetchRouter({ incidentOverride, translationsOverride, catalogOverride, writeOk = true, pageId = '1' } = {}) {
+function makeFetchRouter({ incidentOverride, translationsOverride, catalogOverride, writeOk = true, pageId = '1', translationEnabled = true } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Switch for translations (system setting); on unless a test turns it off.
+    if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: translationEnabled })
     if (method === 'GET' && new RegExp(`/api/pages/${pageId}/incidents/\\d+$`).test(url)) {
       return jsonResponse(incidentOverride ?? incidentFixture())
     }
@@ -72,6 +75,26 @@ async function mountComponent({ fetchImpl, incidentId = '1', pageId = '1' } = {}
   activeWrapper = wrapper
   return { wrapper }
 }
+
+// Translation switched off: the pure translation page sends the user back to the
+// overview and loads no translations.
+describe('AdminIncidentTranslations with translation switched off', () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('redirects to the overview', async () => {
+    const { useTenant } = await import('../../composables/useTenant')
+    useTenant().setActiveTenant('1')
+    const fetchMock = makeFetchRouter({ translationEnabled: false })
+    global.fetch = fetchMock
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:p(.*)*', component: { template: '<div/>' } }] })
+    await router.push('/admin/x/1/translations')
+    const wrapper = mount(AdminIncidentTranslations, { global: { plugins: [i18n, router], stubs: onyxFormStubs }, props: { incidentId: '1' } })
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/admin/incidents')
+    expect(fetchMock.mock.calls.some(([u]) => u.includes('/translations'))).toBe(false)
+    wrapper.unmount()
+  })
+})
 
 describe('AdminIncidentTranslations', () => {
   beforeEach(() => {
@@ -160,7 +183,9 @@ describe('AdminIncidentTranslations', () => {
   })
 
   it('handles load error gracefully', async () => {
-    const errorFetch = vi.fn(async () => {
+    // Only the switch answers (on); every other request fails.
+    const errorFetch = vi.fn(async (url) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       throw new Error('Network error')
     })
     const { wrapper } = await mountComponent({ fetchImpl: errorFetch })
@@ -306,6 +331,7 @@ describe('AdminIncidentTranslations', () => {
 
   it('handles confirm error gracefully', async () => {
     const errorFetch = vi.fn(async (url, opts) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       if (opts?.method === 'PATCH' && /confirm/.test(url)) {
         throw new Error('Confirm failed')
       }
@@ -323,6 +349,7 @@ describe('AdminIncidentTranslations', () => {
 
   it('handles delete error gracefully', async () => {
     const errorFetch = vi.fn(async (url, opts) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       if (opts?.method === 'DELETE') {
         throw new Error('Delete failed')
       }
