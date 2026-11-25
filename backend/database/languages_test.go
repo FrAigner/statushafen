@@ -51,47 +51,34 @@ func TestSeedLanguageCatalog_IdempotentAndPreservesEdits(t *testing.T) {
 	}
 }
 
-// Die Betreiber-Liste (31.10.2026): alle 30 Sprachen mit Eigenbezeichnung und ISO-639-1-Code,
-// jeweils aktiv; ein vorhandener Katalog (nur de/en wie in Prod) wird nur ergänzt.
-func TestSeedLanguageCatalog_ContainsOperatorList(t *testing.T) {
-	want := map[string]string{
-		"bs": "bosanski", "bg": "български", "da": "dansk", "de": "Deutsch", "en": "English", "et": "eesti",
-		"fi": "suomi", "fr": "Français", "el": "ελληνικά", "ga": "Gaeilge", "it": "Italiano", "hr": "hrvatski",
-		"lv": "latviešu", "lt": "lietuvių", "lb": "Lëtzebuergesch", "mt": "Malti", "mk": "македонски",
-		"nl": "Nederlands", "pl": "polski", "pt": "português", "rm": "rumantsch", "ro": "română", "sv": "svenska",
-		"sr": "српски", "sk": "slovenčina", "sl": "slovenščina", "es": "español", "cs": "čeština", "tr": "Türkçe", "hu": "magyar",
-	}
+// Inhaltssprachen gibt es nur noch auf Deutsch und Englisch: der Seed legt genau
+// diese beiden an, beide aktiv und mit Eigenbezeichnung.
+func TestSeedLanguageCatalog_NurDeutschUndEnglisch(t *testing.T) {
 	db := setupLanguageTestDB(t)
-	require.NoError(t, db.Create(&models.Language{Code: "de", Name: "Deutsch", IsActive: true}).Error)
-	require.NoError(t, db.Create(&models.Language{Code: "en", Name: "English", IsActive: true}).Error)
 
 	seedLanguageCatalog(db)
 
 	var langs []models.Language
-	require.NoError(t, db.Find(&langs).Error)
-	got := map[string]models.Language{}
-	for _, l := range langs {
-		got[l.Code] = l
-	}
-	require.Len(t, got, len(want))
-	for code, name := range want {
-		l, ok := got[code]
-		require.True(t, ok, "Sprache %s fehlt im Katalog", code)
-		require.Equal(t, name, l.Name, code)
-		require.True(t, l.IsActive, code)
-	}
+	require.NoError(t, db.Order("code").Find(&langs).Error)
+	require.Len(t, langs, 2)
+	require.Equal(t, "de", langs[0].Code)
+	require.Equal(t, "Deutsch", langs[0].Name)
+	require.True(t, langs[0].IsActive)
+	require.Equal(t, "en", langs[1].Code)
+	require.Equal(t, "English", langs[1].Name)
+	require.True(t, langs[1].IsActive)
 }
 
 // Eine vom Admin abgeschaltete Sprache wird beim Start nicht wieder eingeschaltet.
 func TestSeedLanguageCatalog_KeepsDisabledLanguageDisabled(t *testing.T) {
 	db := setupLanguageTestDB(t)
 	seedLanguageCatalog(db)
-	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "fi").Update("is_active", false).Error)
+	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "en").Update("is_active", false).Error)
 
 	seedLanguageCatalog(db)
 
 	var l models.Language
-	require.NoError(t, db.Where("code = ?", "fi").First(&l).Error)
+	require.NoError(t, db.Where("code = ?", "en").First(&l).Error)
 	require.False(t, l.IsActive)
 }
 
@@ -148,14 +135,14 @@ func TestSeedDefaultStatusPageLanguages(t *testing.T) {
 func TestSeedLanguageCatalog_BringtGeloeschteSpracheNichtZurueck(t *testing.T) {
 	db := setupLanguageTestDB(t)
 	seedLanguageCatalog(db)
-	require.NoError(t, db.Where("code = ?", "tr").Delete(&models.Language{}).Error)
+	require.NoError(t, db.Where("code = ?", "en").Delete(&models.Language{}).Error)
 
 	seedLanguageCatalog(db)
 
 	var active int64
-	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "tr").Count(&active).Error)
+	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "en").Count(&active).Error)
 	require.Zero(t, active, "gelöschte Sprache darf nicht wiederkehren")
 	var all int64
-	require.NoError(t, db.Unscoped().Model(&models.Language{}).Where("code = ?", "tr").Count(&all).Error)
+	require.NoError(t, db.Unscoped().Model(&models.Language{}).Where("code = ?", "en").Count(&all).Error)
 	require.EqualValues(t, 1, all, "keine zweite Zeile")
 }

@@ -20,42 +20,12 @@ func createLanguageUniqueIndexes(db *gorm.DB) {
 	}
 }
 
-// defaultLanguages ist der Standard-Sprachkatalog: Name = Eigenbezeichnung (Native), Code =
-// ISO 639-1. Neben Deutsch und Englisch die europäischen Sprachen, die
-// Betreiber typischerweise brauchen (Betreiber-Liste vom 31.10.2026). Welche Sprachen
-// eine Statusseite wirklich anbietet, wählt der Admin je Seite; die automatische
-// Übersetzung kann je nach Dienst nur einen Teil davon.
+// defaultLanguages ist der Standard-Sprachkatalog: Name = Eigenbezeichnung, Code =
+// ISO 639-1. Inhaltssprachen gibt es nur noch auf Deutsch und Englisch; die
+// früher zusätzlich geseedeten europäischen Sprachen entfallen.
 var defaultLanguages = []models.Language{
 	{Code: "en", Name: "English", IsActive: true},
 	{Code: "de", Name: "Deutsch", IsActive: true},
-	{Code: "bs", Name: "bosanski", IsActive: true},
-	{Code: "bg", Name: "български", IsActive: true},
-	{Code: "da", Name: "dansk", IsActive: true},
-	{Code: "et", Name: "eesti", IsActive: true},
-	{Code: "fi", Name: "suomi", IsActive: true},
-	{Code: "fr", Name: "Français", IsActive: true},
-	{Code: "el", Name: "ελληνικά", IsActive: true},
-	{Code: "ga", Name: "Gaeilge", IsActive: true},
-	{Code: "it", Name: "Italiano", IsActive: true},
-	{Code: "hr", Name: "hrvatski", IsActive: true},
-	{Code: "lv", Name: "latviešu", IsActive: true},
-	{Code: "lt", Name: "lietuvių", IsActive: true},
-	{Code: "lb", Name: "Lëtzebuergesch", IsActive: true},
-	{Code: "mt", Name: "Malti", IsActive: true},
-	{Code: "mk", Name: "македонски", IsActive: true},
-	{Code: "nl", Name: "Nederlands", IsActive: true},
-	{Code: "pl", Name: "polski", IsActive: true},
-	{Code: "pt", Name: "português", IsActive: true},
-	{Code: "rm", Name: "rumantsch", IsActive: true},
-	{Code: "ro", Name: "română", IsActive: true},
-	{Code: "sv", Name: "svenska", IsActive: true},
-	{Code: "sr", Name: "српски", IsActive: true},
-	{Code: "sk", Name: "slovenčina", IsActive: true},
-	{Code: "sl", Name: "slovenščina", IsActive: true},
-	{Code: "es", Name: "español", IsActive: true},
-	{Code: "cs", Name: "čeština", IsActive: true},
-	{Code: "tr", Name: "Türkçe", IsActive: true},
-	{Code: "hu", Name: "magyar", IsActive: true},
 }
 
 // seedLanguageCatalog legt den globalen Sprachkatalog an (defaultLanguages).
