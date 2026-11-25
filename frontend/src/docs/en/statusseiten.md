@@ -97,8 +97,9 @@ use".
 
 **Signing in on the custom domain:** whoever has a role on the page (by invitation, not by auto-join)
 and signs in on its verified or active custom domain (global provider, SSO of the page or password)
-lands back on this page and this domain afterwards and is signed in there. Everyone else lands on the
-landing page under the main address of the application after signing in. On the custom domain the sign-in is valid only for this status page,
+lands back on this page and this domain afterwards and is signed in there. Whoever joined by auto-join
+gets there once they have accepted an invitation to the page. Everyone else lands under the main
+address of the application after signing in, global admins directly on this page. On the custom domain the sign-in is valid only for this status page,
 never with global admin rights: the DNS of the domain belongs to the owner of the domain, not to the
 operator. Deleting the account, the data export and linking or unlinking sign-ins therefore only work
 through the main address; the administration of all pages is reached there too.

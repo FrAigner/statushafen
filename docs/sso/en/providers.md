@@ -127,8 +127,11 @@ domain. This applies to global providers, page SSO and the password login.
 3. The callback checks the domain again. If the account agreed to a role on the domain's page
    (invitation, assignment by a global admin, order), it redirects to
    `https://<domain>/auth/sso-callback?code=…`. Otherwise the login ends under `FRONTEND_URL` on the
-   landing page (global providers: full session). A role from the auto-join never counts, because the
-   tenant maintains its e-mail domains; such roles are marked (`joined_via`). Roles from before this
+   landing page (global providers: full session), for global admins on `/status/<slug>` of the same
+   page (they never trigger an auto-join). A role from the auto-join never counts, because the tenant
+   maintains its e-mail domains; such roles are marked (`joined_via`). If the account then accepts an
+   invitation to the same page, the membership becomes an agreed one (with the invited role). If only a
+   page admin changes the role, the marking stays. Roles from before this
    marking count only if the page has no auto-join set up now and the audit log knows no auto-join of
    this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
    start (without any account) go to the custom domain.
@@ -141,7 +144,8 @@ what the browser stores for that domain. A session on a custom domain (OIDC and 
 valid only for the status page of that domain, never has global admin rights and must not act on the
 account itself: deleting the account (`DELETE /api/me`), the data export (`GET /api/me/export`),
 linking or unlinking sign-ins (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
-`DELETE /api/me/sso/<id>`) answer `403 custom_domain_session`. For these, sign in under
+`DELETE /api/me/sso/<id>`) answer `403 custom_domain_session`; the list of linked sign-ins
+(`GET /api/me/sso`) is empty there. For these, sign in under
 `FRONTEND_URL`. A private page needs a role on that page; global admins administer under
 `FRONTEND_URL`.
 

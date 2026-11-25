@@ -2178,6 +2178,9 @@ paths:
       tags: [Me]
       operationId: listMySSO
       summary: Eigene SSO-Verknüpfungen und verknüpfbare Seiten
+      description: |
+        Für eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
+        `custom_domain`), sind beide Listen leer.
       x-required-permission: authenticated
       responses:
         "200":
@@ -4657,7 +4660,8 @@ components:
         Domain derselben Seite, und wird beim Callback erneut geprüft; sonst
         verworfen (Ziel `FRONTEND_URL`). Der Code geht nur an die Domain, wenn
         das Konto einer Rolle auf ihrer Seite zugestimmt hat (nicht per
-        Auto-Join); sonst endet der Login unter `FRONTEND_URL` auf der Startseite. Die Sitzung gilt dann nur für die
+        Auto-Join); sonst endet der Login unter `FRONTEND_URL` auf der Startseite
+        (Global Admins: `/status/<slug>`). Die Sitzung gilt dann nur für die
         Seite der Domain (`sso_page_id`, keine Global-Admin-Rechte, Claim
         `custom_domain`: kein Löschen, Export oder Verknüpfen des Kontos). Kommt der
         Login-Start selbst auf einer verifizierten eigenen Domain an, leitet er
