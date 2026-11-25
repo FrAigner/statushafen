@@ -13,7 +13,8 @@
     "lint": "eslint . --fix",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:mutation": "stryker run"
+    "test:mutation": "stryker run",
+    "typecheck": "vue-tsc --build --force"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
@@ -36,6 +37,7 @@
     "@playwright/test": "^1.64.1",
     "@stryker-mutator/core": "^10.1.1",
     "@stryker-mutator/vitest-runner": "^10.1.1",
+    "@types/node": "24.19.2",
     "@typescript-eslint/parser": "^8.72.1",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vitest/coverage-v8": "^5.1.0",
