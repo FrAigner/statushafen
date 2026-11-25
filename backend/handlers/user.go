@@ -165,6 +165,12 @@ func replaceUserPageRoles(tx *gorm.DB, userID uint, pageRoles []PageRoleInput) (
 	if err := deleteSSOIdentitiesForRoles(tx, dropped); err != nil {
 		return false, err
 	}
+	// Rows whose role is unchanged keep their origin (an auto-join stays an
+	// auto-join); new or changed rows get the default (assigned).
+	origin := map[[2]uint]string{}
+	for _, b := range before {
+		origin[[2]uint{b.StatusPageID, b.RoleID}] = b.JoinedVia
+	}
 	for _, pr := range pageRoles {
 		if pr.RoleID == 0 {
 			continue
@@ -173,6 +179,7 @@ func replaceUserPageRoles(tx *gorm.DB, userID uint, pageRoles []PageRoleInput) (
 			UserID:       userID,
 			StatusPageID: pr.StatusPageID,
 			RoleID:       pr.RoleID,
+			JoinedVia:    origin[[2]uint{pr.StatusPageID, pr.RoleID}],
 		}).Error; err != nil {
 			return false, err
 		}
