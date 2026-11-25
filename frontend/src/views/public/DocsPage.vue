@@ -1,8 +1,10 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppIcon from '../../components/AppIcon.vue'
+import { useApi } from '../../composables/useApi'
+import { useLandingChrome, loadOrdersEnabled } from '../../composables/useLandingChrome'
 import {
   SECTION_IDS,
   extractTitle,
@@ -18,6 +20,12 @@ import {
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
+
+// Public docs live below /docs; inside the admin area (route meta.docsBase) every docs link
+// stays below that base so the admin frame is kept.
+const docsBase = route.meta.docsBase || '/docs'
+const embedded = docsBase !== '/docs'
+const docsPath = (id) => `${docsBase}/${id}`
 
 const sections = computed(() => SECTION_IDS.map(id => {
   const resolved = resolveSection(id, locale.value)
@@ -62,14 +70,43 @@ const scrollToHash = async () => {
 const redirectSectionHash = () => {
   const id = route.hash.slice(1)
   if (!route.params.section && SECTION_IDS.includes(id)) {
-    router.replace({ path: `/docs/${id}` })
+    router.replace({ path: docsPath(id) })
     return true
   }
   return false
 }
 
+// The public docs share the landing page's header and footer (navigation, login, order button).
+const { isLanding, ordersEnabled } = useLandingChrome()
+const { apiFetch } = useApi()
+if (!embedded) {
+  isLanding.value = true
+  ordersEnabled.value = true
+  onBeforeUnmount(() => {
+    isLanding.value = false
+    ordersEnabled.value = true
+  })
+}
+
+// Inside the admin frame the sticky admin top bar covers the top of the window; anchors and the
+// sticky sidebar are offset by its height (it changes with the window width), not the landing header's.
+const topbarHeight = ref(null)
+const docsStyle = computed(() => (topbarHeight.value === null ? undefined : { '--lp-header-height': `${topbarHeight.value}px` }))
+let topbarObserver
+const watchTopbar = () => {
+  const bar = document.querySelector('.admin-topbar')
+  if (!bar) return
+  topbarHeight.value = bar.offsetHeight
+  if (typeof ResizeObserver === 'undefined') return
+  topbarObserver = new ResizeObserver(() => { topbarHeight.value = bar.offsetHeight })
+  topbarObserver.observe(bar)
+}
+onBeforeUnmount(() => topbarObserver?.disconnect())
+
 onMounted(() => {
+  if (embedded) watchTopbar()
   if (!redirectSectionHash()) scrollToHash()
+  if (!embedded) loadOrdersEnabled(apiFetch)
 })
 
 watch(() => route.fullPath, () => {
@@ -88,7 +125,8 @@ const onContentClick = (event) => {
     router.push({ path: route.path, hash: href })
   } else if (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/api/')) {
     event.preventDefault()
-    router.push(href)
+    // Docs links in the Markdown are written as /docs/...; keep them below the current base.
+    router.push(href.startsWith('/docs/') || href === '/docs' ? docsBase + href.slice('/docs'.length) : href)
   }
 }
 
@@ -101,7 +139,7 @@ const backToTop = () => {
 </script>
 
 <template>
-  <div class="docs" :class="{ 'is-nav-open': navOpen }">
+  <div class="docs" :class="{ 'is-nav-open': navOpen, 'docs--embedded': embedded }" :style="docsStyle">
     <button
       type="button"
       class="docs-nav-toggle"
@@ -128,7 +166,7 @@ const backToTop = () => {
         <ul>
           <li v-for="s in filteredSections" :key="s.id">
             <router-link
-              :to="`/docs/${s.id}`"
+              :to="docsPath(s.id)"
               class="docs-nav-link"
               :class="{ active: s.id === currentId }"
               :aria-current="s.id === currentId ? 'page' : undefined"
@@ -162,11 +200,11 @@ const backToTop = () => {
         <div class="docs-markdown" @click="onContentClick" v-html="rendered.html" />
 
         <nav class="docs-pager" :aria-label="t('docs.pagerLabel')">
-          <router-link v-if="prev" :to="`/docs/${prev.id}`" class="docs-pager-link docs-pager-prev">
+          <router-link v-if="prev" :to="docsPath(prev.id)" class="docs-pager-link docs-pager-prev">
             <AppIcon name="arrow-left" :size="14" /> {{ prev.title }}
           </router-link>
           <span v-else />
-          <router-link v-if="next" :to="`/docs/${next.id}`" class="docs-pager-link docs-pager-next">
+          <router-link v-if="next" :to="docsPath(next.id)" class="docs-pager-link docs-pager-next">
             {{ next.title }} <AppIcon name="arrow-right" :size="14" />
           </router-link>
         </nav>
@@ -178,18 +216,32 @@ const backToTop = () => {
       <div v-else class="docs-not-found" role="alert">
         <h1>{{ t('docs.notFoundTitle') }}</h1>
         <p>{{ t('docs.notFoundText') }}</p>
-        <router-link to="/docs">{{ t('docs.notFoundLink') }}</router-link>
+        <router-link :to="docsBase">{{ t('docs.notFoundLink') }}</router-link>
       </div>
     </article>
   </div>
 </template>
 
 <style scoped>
+/* The landing header makes the page container full width; the docs keep the header's
+   content width (--lp-max) and sit below the sticky header. */
 .docs {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
+  box-sizing: border-box;
+  max-width: var(--lp-max);
+  margin: 0 auto;
+  padding: 32px var(--sp-5);
+}
+
+/* Inside the admin frame: the admin content area brings its own padding and there is no
+   landing header above the sticky sidebar. */
+.docs--embedded {
+  --lp-header-height: 0px;
+  margin: 0;
+  padding: 0;
 }
 
 .docs-nav-toggle {
@@ -198,11 +250,11 @@ const backToTop = () => {
 
 .docs-sidebar {
   position: sticky;
-  top: 16px;
+  top: calc(var(--lp-header-height) + 16px);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - var(--lp-header-height) - 32px);
   overflow-y: auto;
 }
 
@@ -348,7 +400,7 @@ const backToTop = () => {
 
 .docs-markdown :deep(h2),
 .docs-markdown :deep(h3) {
-  scroll-margin-top: 16px;
+  scroll-margin-top: calc(var(--lp-header-height) + 16px);
 }
 
 .docs-markdown :deep(p),
@@ -469,6 +521,11 @@ const backToTop = () => {
   .docs {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
+    padding: 24px var(--sp-4);
+  }
+
+  .docs--embedded {
+    padding: 0;
   }
 
   .docs-nav-toggle {

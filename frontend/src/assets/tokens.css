@@ -89,6 +89,8 @@
 
   /* Startseite (Richtung A): Inhaltsbreite und grobe Segmentbalken der Beispielkarte */
   --lp-max: 1160px;
+  /* Height of the sticky landing header (one row, desktop); sticky elements below it offset by it. */
+  --lp-header-height: 64px;
   --bar-gap: 2px;
   --bar-h: 28px;
   --bar-r: 2px;
@@ -117,6 +119,14 @@
   --ctl-h: 36px;
   --row-h: 52px;
   --row-pad: 13px 16px;
+}
+
+/* Narrow screens: the landing header wraps its navigation into a second row
+   (PublicLayout.vue, max-width 640px), so anchors below it need the larger offset. */
+@media (max-width: 640px) {
+  :root {
+    --lp-header-height: 128px;
+  }
 }
 
 /* ── 2. Ebene „public“ = Richtung A „Leitstand“ (hell) ──────────────────── */

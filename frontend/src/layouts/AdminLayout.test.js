@@ -38,7 +38,7 @@ function makeRouter() {
       { path: '/admin/overview', component: Probe, meta: { permission: 'overview:read' } },
       { path: '/admin/components', component: Probe, meta: { permission: 'components:read' } },
       { path: '/admin/profile', component: Empty },
-      { path: '/docs', component: Empty },
+      { path: '/admin/docs/:section?', component: Empty },
       { path: '/admin/incidents/:incidentId/translations', component: Empty },
       { path: '/admin/components/:componentId/translations', component: Empty },
       { path: '/admin/notices/:noticeId/translations', component: Empty },
@@ -535,12 +535,13 @@ describe('AdminLayout', () => {
 
     const link = wrapper.findAll('.area-items a').find(a => a.text() === 'Dokumentation')
     expect(link).toBeTruthy()
-    expect(link.attributes('href')).toBe('/docs')
+    // The docs stay inside the admin frame instead of leaving for the public /docs page.
+    expect(link.attributes('href')).toBe('/admin/docs')
     expect(link.find('svg.app-icon').exists()).toBe(true)
 
     await link.trigger('click')
     await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/docs')
+    expect(router.currentRoute.value.path).toBe('/admin/docs')
     wrapper.unmount()
   })
 

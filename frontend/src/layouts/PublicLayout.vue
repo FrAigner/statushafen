@@ -27,6 +27,8 @@ const { currentPageSlug } = useCurrentPageSlug()
 // Auf der Startseite zeigt der Kopf die Richtung-A-Variante (Logo mit
 // Marker, Navigation, Anmelden, Bestell-Knopf); LandingPage meldet sich dort an.
 const { isLanding, ordersEnabled } = useLandingChrome()
+// The section anchors live on the landing page; elsewhere (e.g. /docs) the links lead there.
+const landingAnchorBase = computed(() => (route.path === '/' ? '' : '/'))
 
 // The login button returns to the current page after sign-in (returnTo). On a
 // status page it also passes the page along, so the login page can show its
@@ -124,8 +126,8 @@ const goToDashboard = () => {
       </router-link>
 
       <nav v-if="isLanding" class="lp-nav" :aria-label="t('landing.navLabel')">
-        <a href="#features">{{ t('landing.navFeatures') }}</a>
-        <a href="#directory">{{ t('landing.navPages') }}</a>
+        <a :href="`${landingAnchorBase}#features`">{{ t('landing.navFeatures') }}</a>
+        <a :href="`${landingAnchorBase}#directory`">{{ t('landing.navPages') }}</a>
         <router-link to="/docs">{{ t('landing.navDocs') }}</router-link>
       </nav>
 
@@ -431,7 +433,7 @@ a.logo:focus-visible {
   box-sizing: border-box;
   width: 100%;
   max-width: var(--lp-max);
-  min-height: 64px;
+  min-height: var(--lp-header-height);
   margin: 0 auto;
   padding: 0 var(--sp-5);
 }

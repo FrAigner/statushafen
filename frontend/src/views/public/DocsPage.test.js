@@ -8,6 +8,8 @@ import i18n from '../../i18n'
 import DocsPage from './DocsPage.vue'
 import { SECTION_IDS, DOC_SOURCES, extractTitle } from '../../docs'
 import { axe } from '../../test-support/axe.js'
+import { useLandingChrome } from '../../composables/useLandingChrome'
+import docsSource from './DocsPage.vue?raw'
 
 function makeRouter() {
   return createRouter({
@@ -15,6 +17,7 @@ function makeRouter() {
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/docs/:section?', component: DocsPage },
+      { path: '/admin/docs/:section?', component: DocsPage, meta: { docsBase: '/admin/docs' } },
     ],
   })
 }
@@ -43,6 +46,96 @@ describe('DocsPage', () => {
   afterEach(() => {
     wrapper?.unmount()
     wrapper = undefined
+  })
+
+  // The docs page shows the same header and footer as the landing page (isLanding), and the
+  // order button there needs the real orders flag, not the optimistic default.
+  describe('landing header', () => {
+    beforeEach(() => {
+      useLandingChrome().isLanding.value = false
+      useLandingChrome().ordersEnabled.value = true
+    })
+
+    it('switches the layout to the landing header and back when leaving', async () => {
+      global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ enabled: true }) }))
+      ;({ wrapper } = await mountDocs('/docs'))
+      expect(useLandingChrome().isLanding.value).toBe(true)
+      wrapper.unmount()
+      wrapper = undefined
+      expect(useLandingChrome().isLanding.value).toBe(false)
+    })
+
+    it('loads the orders flag for the order button in the header', async () => {
+      global.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ enabled: false }) }))
+      ;({ wrapper } = await mountDocs('/docs'))
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/api/public/orders/enabled'))).toBe(true)
+      expect(useLandingChrome().ordersEnabled.value).toBe(false)
+    })
+
+    it('keeps the content as wide as the landing header and clear of the sticky header', () => {
+      const css = docsSource.split('<style scoped>')[1]
+      const docs = css.match(/\.docs \{([^}]*)\}/)?.[1] ?? ''
+      expect(docs).toMatch(/max-width:\s*var\(--lp-max\)/)
+      expect(docs).toMatch(/margin:\s*0 auto/)
+      const sidebar = css.match(/\.docs-sidebar \{([^}]*)\}/)?.[1] ?? ''
+      expect(sidebar).toMatch(/top:\s*calc\(var\(--lp-header-height\)/)
+    })
+
+    it('keeps the admin frame when shown inside the admin area', async () => {
+      global.fetch = vi.fn()
+      ;({ wrapper } = await mountDocs('/admin/docs'))
+      expect(useLandingChrome().isLanding.value).toBe(false)
+      expect(global.fetch).not.toHaveBeenCalled()
+      expect(wrapper.find('.docs').classes()).toContain('docs--embedded')
+    })
+
+    it('scrolls anchored headings below the sticky header', () => {
+      const css = docsSource.split('<style scoped>')[1]
+      const headings = css.match(/\.docs-markdown :deep\(h3\) \{\s*scroll-margin-top:([^;]*);/)?.[1] ?? ''
+      expect(headings).toMatch(/var\(--lp-header-height\)/)
+    })
+  })
+
+  // Inside the admin area every docs link stays below /admin/docs, so the admin frame stays.
+  describe('inside the admin area', () => {
+    it('points navigation and pager to /admin/docs', async () => {
+      ;({ wrapper } = await mountDocs('/admin/docs'))
+      expect(wrapper.findAll('.docs-nav a').map(a => a.attributes('href'))).toEqual(SECTION_IDS.map(id => `/admin/docs/${id}`))
+      expect(wrapper.find('.docs-pager-next').attributes('href')).toBe(`/admin/docs/${SECTION_IDS[1]}`)
+    })
+
+    it('opens /docs links in the content below /admin/docs', async () => {
+      let router
+      ;({ wrapper, router } = await mountDocs('/admin/docs/faq'))
+      await wrapper.find('.docs-markdown a[href="/docs/systemeinstellungen"]').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/admin/docs/systemeinstellungen')
+    })
+
+    it('redirects a section anchor to the admin section page', async () => {
+      let router
+      ;({ wrapper, router } = await mountDocs('/admin/docs#vorfaelle'))
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/admin/docs/vorfaelle')
+    })
+
+    it('offsets anchors by the height of the sticky admin top bar', async () => {
+      const bar = document.createElement('header')
+      bar.className = 'admin-topbar'
+      Object.defineProperty(bar, 'offsetHeight', { value: 125 })
+      document.body.appendChild(bar)
+      try {
+        ;({ wrapper } = await mountDocs('/admin/docs/faq'))
+        expect(wrapper.find('.docs').attributes('style')).toContain('--lp-header-height: 125px')
+      } finally {
+        bar.remove()
+      }
+    })
+
+    it('links the not-found page back to the admin docs', async () => {
+      ;({ wrapper } = await mountDocs('/admin/docs/gibt-es-nicht'))
+      expect(wrapper.find('.docs-not-found a').attributes('href')).toBe('/admin/docs')
+    })
   })
 
   it('zeigt alle Abschnitte in der Navigation und auf /docs den ersten Abschnitt', async () => {
