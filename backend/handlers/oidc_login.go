@@ -45,7 +45,7 @@ import (
 //
 // Fehler im Browser-Ablauf (Login-Start und Callback) leiten mit
 // einem festen Code ins Frontend um statt rohes JSON zu zeigen, siehe
-// oidcErrorURL. Dazu kommt die Testanmeldung eines Seiten-Admins
+// ssoErrorURL und callbackErrorURL. Dazu kommt die Testanmeldung eines Seiten-Admins
 // (OIDCLoginState.TestLogin, StartSSOTestHandler).
 
 const (
@@ -90,15 +90,11 @@ var (
 	errOIDCTestIncomplete      = &oidcError{http.StatusBadRequest, "test_incomplete", "Für die Testanmeldung fehlen Discovery URL, Client ID oder Secret"}
 )
 
-// oidcErrorURL ist das Frontend-Ziel eines Fehlers im
-// Browser-Ablauf: Testanmeldung zurück auf die SSO-Seite, Verknüpfung zurück
-// ins Profil, sonst die Login-Seite. Das Ziel setzt sich nur aus FRONTEND_URL,
-// einem festen Pfad und dem festen Code zusammen (kein Open Redirect).
-func oidcErrorURL(st models.OIDCLoginState, e *oidcError) string {
-	return ssoErrorURL(st.TestLogin, st.LinkUserID, e)
-}
-
-// ssoErrorURL is the frontend error target of the browser flows.
+// ssoErrorURL is the frontend error target of the browser flows on
+// FRONTEND_URL: test sign-in back to the SSO page, link back to the profile,
+// otherwise the login page. It consists of FRONTEND_URL, a fixed path and the
+// fixed code only (no open redirect). Logins from a custom domain use
+// callbackErrorURL / loginStartErrorURL (login_origin.go).
 func ssoErrorURL(testLogin bool, linkUserID uint, e *oidcError) string {
 	if testLogin {
 		return getFrontendURL() + "/admin/sso?oidc_test=" + e.code
@@ -374,6 +370,7 @@ func (h *Handler) beginOIDC(c *gin.Context, linkUserID uint) (string, *oidcError
 	st := models.OIDCLoginState{StatusPageID: cfg.StatusPageID, LinkUserID: linkUserID}
 	if linkUserID == 0 {
 		st.ReturnTo = sanitizeReturnTo(c.Query("return_to"))
+		st.ReturnHost = h.acceptReturnHost(c.Query(returnHostParam), cfg.StatusPageID).host
 	}
 	return h.startOIDCFlow(c, pageOIDCClient(cfg), st, oidcStateCookiePath)
 }
@@ -410,9 +407,12 @@ func oidcStateLifetime() time.Duration { return 10 * time.Minute }
 // navigiert hierher (Knopf „Mit SSO anmelden“), Fehler gehen deshalb wie im
 // Callback als Code auf die Login-Seite.
 func (h *Handler) OIDCLoginHandler(c *gin.Context) {
+	if h.moveLoginToBaseHost(c) {
+		return
+	}
 	target, e := h.beginOIDC(c, 0)
 	if e != nil {
-		target = oidcErrorURL(models.OIDCLoginState{}, e)
+		target = h.loginStartErrorURL(c, e)
 	}
 	c.Redirect(http.StatusTemporaryRedirect, target)
 }
@@ -650,7 +650,7 @@ func (h *Handler) OIDCCallbackHandler(c *gin.Context) {
 		e = h.completeOIDC(c, st)
 	}
 	if e != nil {
-		c.Redirect(http.StatusTemporaryRedirect, oidcErrorURL(st, e))
+		c.Redirect(http.StatusTemporaryRedirect, h.callbackErrorURL(st, e))
 	}
 }
 
@@ -733,5 +733,5 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	// beendet getJWTSecret den Prozess schon vorher. Das Token
 	// gilt nur für pageID (sso_page_id-Claim).
 	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID)
-	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
+	c.Redirect(http.StatusTemporaryRedirect, h.loginReturnOrigin(st).frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
 }

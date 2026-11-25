@@ -300,6 +300,10 @@ type OIDCLoginState struct {
 	// ReturnTo is the validated frontend path the login started from
 	// (handlers.sanitizeReturnTo); handed out with the one-time code.
 	ReturnTo string `gorm:"not null;default:''"`
+	// ReturnHost is the verified custom domain the login started on
+	// (handlers.acceptReturnHost), "" for FRONTEND_URL. Checked again on the
+	// callback.
+	ReturnHost string `gorm:"not null;default:''"`
 }
 
 // The tables saml_login_states and saml_assertion_uses from the SAML era stay

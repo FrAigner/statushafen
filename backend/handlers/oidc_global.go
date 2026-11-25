@@ -91,6 +91,7 @@ func (h *Handler) beginProviderFlow(c *gin.Context, linkUserID uint) (string, *o
 	st := models.OIDCLoginState{Provider: p.ID, LinkUserID: linkUserID}
 	if linkUserID == 0 {
 		st.ReturnTo = sanitizeReturnTo(c.Query("return_to"))
+		st.ReturnHost = h.acceptReturnHost(c.Query(returnHostParam), 0).host
 	}
 	return h.startOIDCFlow(c, p.client(), st, providerStateCookiePath)
 }
@@ -99,9 +100,12 @@ func (h *Handler) beginProviderFlow(c *gin.Context, linkUserID uint) (string, *o
 // GET /api/auth/provider/:id/login (public, rate-limited). The browser
 // navigates here, so errors end as a redirect to the login page.
 func (h *Handler) ProviderLoginHandler(c *gin.Context) {
+	if h.moveLoginToBaseHost(c) {
+		return
+	}
 	target, e := h.beginProviderFlow(c, 0)
 	if e != nil {
-		target = ssoErrorURL(false, 0, e)
+		target = h.loginStartErrorURL(c, e)
 	}
 	c.Redirect(http.StatusTemporaryRedirect, target)
 }
@@ -146,7 +150,7 @@ func (h *Handler) ProviderCallbackHandler(c *gin.Context) {
 		e = h.completeProviderLogin(c, p, st)
 	}
 	if e != nil {
-		c.Redirect(http.StatusTemporaryRedirect, ssoErrorURL(false, st.LinkUserID, e))
+		c.Redirect(http.StatusTemporaryRedirect, h.callbackErrorURL(st, e))
 	}
 }
 
@@ -168,13 +172,22 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	if st.LinkUserID != 0 {
 		action, next = "auth.sso_linked", "&next=profile"
 	}
+	origin := h.loginReturnOrigin(st)
+	detail := "provider=" + p.ID
+	if origin.pageID != 0 {
+		detail += " page=" + strconv.FormatUint(uint64(origin.pageID), 10)
+	}
 	c.Set("email", user.Email)
 	c.Set("userID", user.ID)
 	c.Set("role", user.Role.Name)
-	h.RecordAudit(c, action, "auth", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, "provider="+p.ID)
+	h.RecordAudit(c, action, "auth", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, detail)
 	// HS256 with a configured JWT_SECRET cannot fail (see finishSSOLogin).
+	// On a custom domain the session is limited to its page (see login_origin.go).
 	token, _ := middleware.GenerateTokenFull(user, user.Role.Permissions, claims.name, models.SSOProtocolOIDC)
-	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
+	if origin.pageID != 0 {
+		token, _ = middleware.GeneratePageSSOToken(user, claims.name, models.SSOProtocolOIDC, origin.pageID)
+	}
+	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
 	return nil
 }
 

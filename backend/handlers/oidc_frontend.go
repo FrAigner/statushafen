@@ -54,9 +54,12 @@ func (h *Handler) GetPublicOIDCHandler(c *gin.Context) {
 // nur, dass die Seite SSO nutzt; das ist der Mindestumfang, den eine Anmeldung
 // braucht.
 func (h *Handler) SSOLoginBySlugHandler(c *gin.Context) {
+	if h.moveLoginToBaseHost(c) {
+		return
+	}
 	target, e := h.beginSSOBySlug(c)
 	if e != nil {
-		target = ssoErrorURL(false, 0, e)
+		target = h.loginStartErrorURL(c, e)
 	}
 	c.Redirect(http.StatusTemporaryRedirect, target)
 }
@@ -67,7 +70,11 @@ func (h *Handler) beginSSOBySlug(c *gin.Context) (string, *oidcError) {
 		return "", errOIDCNotConfigured
 	}
 	if cfg, ok := h.activeOIDCConfig(uint64(page.ID)); ok {
-		st := models.OIDCLoginState{StatusPageID: cfg.StatusPageID, ReturnTo: sanitizeReturnTo(c.Query("return_to"))}
+		st := models.OIDCLoginState{
+			StatusPageID: cfg.StatusPageID,
+			ReturnTo:     sanitizeReturnTo(c.Query("return_to")),
+			ReturnHost:   h.acceptReturnHost(c.Query(returnHostParam), cfg.StatusPageID).host,
+		}
 		return h.startOIDCFlow(c, pageOIDCClient(cfg), st, oidcStateCookiePath)
 	}
 	return "", errOIDCNotConfigured
