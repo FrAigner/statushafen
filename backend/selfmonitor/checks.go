@@ -149,7 +149,7 @@ const maxMetricsFile = 64 << 10
 // openMetrics opens the metrics file; function variable as an injection seam for
 // testing the window between Lstat and Open.
 var openMetrics = func(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0) //nolint:gosec // Pfad aus der Betreiber-Konfiguration
+	return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0) //nolint:gosec // Path comes from the operator configuration
 }
 
 // readMetricsFile reads the metrics file hardened: only a regular

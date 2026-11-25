@@ -214,7 +214,7 @@ func runBaseline(args []string, stderr io.Writer) error {
 		FrontendLines:    Round2(cur.FrontendLines),
 		FrontendBranches: Round2(cur.FrontendBranches),
 	}, "", "  ")
-	return os.WriteFile(*out, append(data, '\n'), 0o644) //nolint:gosec // Baseline ist eine eingecheckte, lesbare Datei
+	return os.WriteFile(*out, append(data, '\n'), 0o644) //nolint:gosec // The baseline is a checked-in, readable file
 }
 
 func runMutateRanges(args []string, stdout, stderr io.Writer) error {

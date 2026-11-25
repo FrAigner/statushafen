@@ -28,11 +28,11 @@ func TestBackupCheck_FifoNachLstatUntergeschobenBlockiertNicht(t *testing.T) {
 	t.Cleanup(func() { openMetrics = alt })
 	var schreiber *os.File
 	openMetrics = func(string) (*os.File, error) {
-		f, err := os.OpenFile(fifo, os.O_RDONLY|syscall.O_NONBLOCK, 0) //nolint:gosec // Testpfad
+		f, err := os.OpenFile(fifo, os.O_RDONLY|syscall.O_NONBLOCK, 0) //nolint:gosec // Test path
 		if err != nil {
 			return nil, err
 		}
-		schreiber, err = os.OpenFile(fifo, os.O_WRONLY|syscall.O_NONBLOCK, 0) //nolint:gosec // Testpfad: stiller Schreiber
+		schreiber, err = os.OpenFile(fifo, os.O_WRONLY|syscall.O_NONBLOCK, 0) //nolint:gosec // Test path: silent writer
 		return f, err
 	}
 	t.Cleanup(func() {

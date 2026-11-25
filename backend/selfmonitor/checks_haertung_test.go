@@ -55,7 +55,7 @@ func TestBackupCheck_FifoBlockiertNicht(t *testing.T) {
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
 	require.NoError(t, syscall.Mkfifo(pfad, 0o600))
 	t.Cleanup(func() { // release the hanging reader (old state)
-		if f, err := os.OpenFile(pfad, os.O_RDWR, 0); err == nil { //nolint:gosec // Testpfad
+		if f, err := os.OpenFile(pfad, os.O_RDWR, 0); err == nil { //nolint:gosec // Test path
 			_ = f.Close()
 		}
 	})
@@ -77,7 +77,7 @@ func TestBackupCheck_ZuGrosseDateiWirdAbgelehnt(t *testing.T) {
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	writeProm(t, dir, "backup-prod", now.Unix(), now.Unix(), 0)
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
-	alt, err := os.ReadFile(pfad) //nolint:gosec // Testpfad
+	alt, err := os.ReadFile(pfad) //nolint:gosec // Test path
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(pfad, append(alt, []byte(strings.Repeat("# fuellung\n", 10000))...), 0o600))
 	res := backupCheckFuer(dir)(context.Background())
@@ -91,7 +91,7 @@ func TestBackupCheck_DateiAmLimitIstLesbar(t *testing.T) {
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	writeProm(t, dir, "backup-prod", now.Unix(), now.Unix(), 0)
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
-	alt, err := os.ReadFile(pfad) //nolint:gosec // Testpfad
+	alt, err := os.ReadFile(pfad) //nolint:gosec // Test path
 	require.NoError(t, err)
 	fuell := strings.Repeat("#", testMaxMetrics-len(alt)-1) + "\n"
 	require.NoError(t, os.WriteFile(pfad, append(alt, []byte(fuell)...), 0o600))

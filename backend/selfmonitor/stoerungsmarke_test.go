@@ -99,7 +99,7 @@ func TestOpenMetrics_FifoOhneSchreiberKehrtSofortZurueck(t *testing.T) {
 		_ = f.Close()
 	case <-time.After(3 * time.Second):
 		t.Cleanup(func() { // release the hanging open (error case)
-			if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil { //nolint:gosec // Testpfad
+			if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil { //nolint:gosec // Test path
 				_ = w.Close()
 			}
 		})
