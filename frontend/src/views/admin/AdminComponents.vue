@@ -315,7 +315,8 @@ const deleteLabel = (c) => {
 }
 const menuItems = (c) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
-  { key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/components/${c.ID}/translations` },
+  // Only with a second content language (switched off: the page lists its default only).
+  ...(trans.multilingual.value ? [{ key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/components/${c.ID}/translations` }] : []),
   ...(canUpdate.value ? [isArchived(c)
     ? { key: 'restore', label: t('components.restore'), icon: 'arrow-left' }
     : { key: 'archive', label: t('components.archive'), icon: 'folder' }] : []),

@@ -37,6 +37,7 @@ type ptEnv struct {
 func newPTEnv(t *testing.T) *ptEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	e := &ptEnv{t: t, db: db, now: time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)}
 	h.Now = func() time.Time { return e.now }
@@ -131,8 +132,11 @@ func TestPublicTranslations_ErsteSpracheVorStandardsprache(t *testing.T) {
 	e.compTr(c.ID, "en", "EN", "confirmed")
 	_, resp := e.get("/api/public/pages/pt/translations?lang=en")
 	assert.Equal(t, "EN", resp.Components[itoa(c.ID)]["title"])
-	_, resp = e.get("/api/public/pages/pt/translations?lang=fr")
-	assert.Equal(t, "DE", resp.Components[itoa(c.ID)]["title"], "fr fehlt: Rückfall auf Standardsprache, nicht auf en")
+	_, resp = e.get("/api/public/pages/pt/translations?lang=de")
+	assert.Equal(t, "DE", resp.Components[itoa(c.ID)]["title"], "the default language wins over en")
+	// fr is a legacy assignment of the page but no content language any more.
+	w, _ := e.get("/api/public/pages/pt/translations?lang=fr")
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 func TestPublicTranslations_UnsichtbareKomponentenUndGruppenKinder(t *testing.T) {

@@ -119,6 +119,10 @@ func TestFatalPaths(t *testing.T) {
 		{"backfillStatusPageLanguages: Create", "INSERT INTO `status_page_languages`", func(t *testing.T, db *gorm.DB) {
 			require.NoError(t, db.Create(&models.StatusPage{Name: "P", Slug: "p"}).Error)
 		}, backfillStatusPageLanguages, "Failed to backfill StatusPageLanguage"},
+		{"deactivateUnsupportedLanguages", "UPDATE `languages`", nil, deactivateUnsupportedLanguages, "Failed to deactivate unsupported languages"},
+		{"fallbackUnsupportedDefaultLanguages: Load", "FROM `status_page_languages`", nil, fallbackUnsupportedDefaultLanguages, "Failed to load unsupported default languages"},
+		{"fallbackUnsupportedDefaultLanguages: Reset default", "UPDATE `status_page_languages`", prepareUnsupportedDefault, fallbackUnsupportedDefaultLanguages, "Failed to fall back to German default language"},
+		{"fallbackUnsupportedDefaultLanguages: Find de", "language_code = ", prepareUnsupportedDefault, fallbackUnsupportedDefaultLanguages, "Failed to fall back to German default language"},
 		{"CreateUserStatusPageRoleUniqueIndex: Dedupe", "UPDATE user_status_page_roles", nil, CreateUserStatusPageRoleUniqueIndex, "Failed to dedupe user_status_page_roles"},
 		{"CreateUserStatusPageRoleUniqueIndex: Create", "idx_user_status_page_role_active", nil, CreateUserStatusPageRoleUniqueIndex, "Failed to create idx_user_status_page_role_active"},
 		{"CreateAdminNotificationIndexes", "idx_admin_notification_dedup", nil, CreateAdminNotificationIndexes, "Failed to create admin notification index"},
@@ -141,6 +145,14 @@ func TestFatalPaths(t *testing.T) {
 			assert.NotNil(t, got.Attrs["error"], "Fehler muss als Attribut geloggt werden")
 		})
 	}
+}
+
+// prepareUnsupportedDefault creates a page whose default language (fr) is no longer
+// a content language, so fallbackUnsupportedDefaultLanguages has work to do.
+func prepareUnsupportedDefault(t *testing.T, db *gorm.DB) {
+	p := models.StatusPage{Name: "P", Slug: "p"}
+	require.NoError(t, db.Create(&p).Error)
+	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: p.ID, LanguageCode: "fr", IsDefault: true}).Error)
 }
 
 // Der Erfolgsfall von migrateIncidentComponents (Postgres-SQL per Rewrite

@@ -19,6 +19,7 @@ const {
   entityId: computed(() => props.componentId),
   apiSegment: 'components',
   resource: 'components',
+  overviewPath: '/admin/components',
   findInList: true,
   contentField: 'description',
   translationsApi: useComponentTranslations(),

@@ -286,7 +286,8 @@ const menuItems = (item) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   // Schnellzugriff: springt zum Update-Formular des Vorfalls
   ...(canCreate.value ? [{ key: 'update', label: t('incidents.postUpdate'), icon: 'message-circle', to: `/admin/incidents/${activeTenantId.value}/${item.ID}#update` }] : []),
-  { key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/incidents/${item.ID}/translations` },
+  // Only with a second content language (switched off: the page lists its default only).
+  ...(trans.multilingual.value ? [{ key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/incidents/${item.ID}/translations` }] : []),
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === item.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === item.ID }] : []),
 ]
 const onMenuSelect = (item, key) => {

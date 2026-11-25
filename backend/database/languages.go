@@ -1,6 +1,9 @@
 package database
 
 import (
+	"log/slog"
+	"slices"
+
 	"github.com/fraigner/statushafen/logging"
 	"github.com/fraigner/statushafen/models"
 
@@ -20,42 +23,23 @@ func createLanguageUniqueIndexes(db *gorm.DB) {
 	}
 }
 
-// defaultLanguages ist der Standard-Sprachkatalog: Name = Eigenbezeichnung (Native), Code =
-// ISO 639-1. Neben Deutsch und Englisch die europäischen Sprachen, die
-// Betreiber typischerweise brauchen (Betreiber-Liste vom 31.10.2026). Welche Sprachen
-// eine Statusseite wirklich anbietet, wählt der Admin je Seite; die automatische
-// Übersetzung kann je nach Dienst nur einen Teil davon.
+// ContentLanguageCodes are the only content languages (incidents, maintenance,
+// notices, components, templates, notifications): German and English. Other
+// languages are neither created nor offered nor delivered. The UI language of the
+// interface (frontend/src/i18n, User.PreferredLanguage) is independent of this.
+var ContentLanguageCodes = []string{"de", "en"}
+
+// IsContentLanguage reports whether code is one of the content languages.
+func IsContentLanguage(code string) bool {
+	return slices.Contains(ContentLanguageCodes, code)
+}
+
+// defaultLanguages is the default language catalog: Name = native name, Code =
+// ISO 639-1. Content exists only in German and English; the additional European
+// languages that used to be seeded are gone.
 var defaultLanguages = []models.Language{
 	{Code: "en", Name: "English", IsActive: true},
 	{Code: "de", Name: "Deutsch", IsActive: true},
-	{Code: "bs", Name: "bosanski", IsActive: true},
-	{Code: "bg", Name: "български", IsActive: true},
-	{Code: "da", Name: "dansk", IsActive: true},
-	{Code: "et", Name: "eesti", IsActive: true},
-	{Code: "fi", Name: "suomi", IsActive: true},
-	{Code: "fr", Name: "Français", IsActive: true},
-	{Code: "el", Name: "ελληνικά", IsActive: true},
-	{Code: "ga", Name: "Gaeilge", IsActive: true},
-	{Code: "it", Name: "Italiano", IsActive: true},
-	{Code: "hr", Name: "hrvatski", IsActive: true},
-	{Code: "lv", Name: "latviešu", IsActive: true},
-	{Code: "lt", Name: "lietuvių", IsActive: true},
-	{Code: "lb", Name: "Lëtzebuergesch", IsActive: true},
-	{Code: "mt", Name: "Malti", IsActive: true},
-	{Code: "mk", Name: "македонски", IsActive: true},
-	{Code: "nl", Name: "Nederlands", IsActive: true},
-	{Code: "pl", Name: "polski", IsActive: true},
-	{Code: "pt", Name: "português", IsActive: true},
-	{Code: "rm", Name: "rumantsch", IsActive: true},
-	{Code: "ro", Name: "română", IsActive: true},
-	{Code: "sv", Name: "svenska", IsActive: true},
-	{Code: "sr", Name: "српски", IsActive: true},
-	{Code: "sk", Name: "slovenčina", IsActive: true},
-	{Code: "sl", Name: "slovenščina", IsActive: true},
-	{Code: "es", Name: "español", IsActive: true},
-	{Code: "cs", Name: "čeština", IsActive: true},
-	{Code: "tr", Name: "Türkçe", IsActive: true},
-	{Code: "hu", Name: "magyar", IsActive: true},
 }
 
 // seedLanguageCatalog legt den globalen Sprachkatalog an (defaultLanguages).
@@ -128,4 +112,52 @@ func SeedDefaultStatusPageLanguages(db *gorm.DB, statusPageID uint) error {
 		}
 	}
 	return nil
+}
+
+// deactivateUnsupportedLanguages switches off, at startup, every catalog language
+// that is no longer a content language (left over from the former 30-language
+// catalog or created by an admin). Non-destructive: the rows, their status page
+// assignments (StatusPageLanguage) and stored translations stay in the database but
+// are no longer offered anywhere. Idempotent (only active rows are updated).
+func deactivateUnsupportedLanguages(db *gorm.DB) {
+	res := db.Model(&models.Language{}).Where("code NOT IN ? AND is_active = ?", ContentLanguageCodes, true).Update("is_active", false)
+	if res.Error != nil {
+		logging.Fatal("Failed to deactivate unsupported languages", "error", res.Error)
+	}
+	if res.RowsAffected > 0 {
+		slog.Info("Language catalog: deactivated languages other than German and English", "count", res.RowsAffected)
+	}
+}
+
+// fallbackUnsupportedDefaultLanguages switches status pages whose default language
+// is no longer a content language to German. The previous assignment stays as an
+// additional (not offered) language; a missing de assignment is created. One
+// transaction per page so the "exactly one default" unique index is never violated.
+// Idempotent: afterwards every page has a de or en default.
+func fallbackUnsupportedDefaultLanguages(db *gorm.DB) {
+	var rows []models.StatusPageLanguage
+	if err := db.Where("is_default = ? AND language_code NOT IN ?", true, ContentLanguageCodes).Find(&rows).Error; err != nil {
+		logging.Fatal("Failed to load unsupported default languages", "error", err)
+	}
+	for _, row := range rows {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(&models.StatusPageLanguage{}).Where("id = ?", row.ID).Update("is_default", false).Error; err != nil {
+				return err
+			}
+			var de models.StatusPageLanguage
+			err := tx.Where("status_page_id = ? AND language_code = ?", row.StatusPageID, "de").Limit(1).Find(&de).Error
+			if err != nil {
+				return err
+			}
+			if de.ID == 0 {
+				return tx.Create(&models.StatusPageLanguage{StatusPageID: row.StatusPageID, LanguageCode: "de", IsDefault: true}).Error
+			}
+			return tx.Model(&de).Update("is_default", true).Error
+		})
+		if err != nil {
+			logging.Fatal("Failed to fall back to German default language", "status_page_id", row.StatusPageID, "error", err)
+		}
+		slog.Warn("Default language is no longer supported, status page falls back to German",
+			"status_page_id", row.StatusPageID, "previous_language", row.LanguageCode)
+	}
 }

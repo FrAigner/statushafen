@@ -24,9 +24,11 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-function makeFetchImpl({ ok = true, writeOk = true } = {}) {
+function makeFetchImpl({ ok = true, writeOk = true, languages } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Page languages (only when given).
+    if (languages && method === 'GET' && /\/api\/pages\/\d+\/languages$/.test(url)) return jsonResponse(languages)
     if (method === 'GET') {
       return ok ? jsonResponse(noticesFixture()) : jsonResponse({ error: 'kaputt' }, 500)
     }
@@ -68,12 +70,19 @@ describe('AdminNotices', () => {
     vi.restoreAllMocks()
   })
 
-  it('verlinkt je Ankündigung die Übersetzungsseite', async () => {
-    const { wrapper } = await mountAdminNotices()
+  it('links the translations page per notice when the page has a second language', async () => {
+    const { wrapper } = await mountAdminNotices({ fetchImpl: makeFetchImpl({ languages: [{ LanguageCode: 'de', IsDefault: true }, { LanguageCode: 'en', IsDefault: false }] }) })
 
     const link = wrapper.findComponent(RouterLinkStub)
     expect(link.props('to')).toBe('/admin/notices/1/translations')
     expect(link.text()).toContain('Übersetzungen')
+  })
+
+  // Translation switched off: the server lists only the default language.
+  it('offers no translations when the page has only its default language', async () => {
+    const { wrapper } = await mountAdminNotices({ fetchImpl: makeFetchImpl({ languages: [{ LanguageCode: 'de', IsDefault: true }] }) })
+
+    expect(wrapper.findAllComponents(RouterLinkStub).some(l => String(l.props('to')).endsWith('/translations'))).toBe(false)
   })
 
   it('lädt Ankündigungen und formatiert Zeitfenster + Erstellt-Zeitpunkt im deutschen Format', async () => {

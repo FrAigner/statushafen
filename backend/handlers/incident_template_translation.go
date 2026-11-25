@@ -46,7 +46,7 @@ func (h *Handler) GetIncidentTemplateTranslationsHandler(c *gin.Context) {
 		return
 	}
 	translations := []models.IncidentTemplateTranslation{}
-	if err := h.DB.Where("incident_template_id = ?", tmpl.ID).Order("language_code").Find(&translations).Error; err != nil {
+	if err := h.DB.Where("incident_template_id = ? AND language_code IN ?", tmpl.ID, h.deliveredTranslationCodes()).Order("language_code").Find(&translations).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return
 	}

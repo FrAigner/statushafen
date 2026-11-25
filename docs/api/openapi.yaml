@@ -1760,6 +1760,45 @@ paths:
                 required: [enabled]
                 properties:
                   enabled: { type: boolean }
+  /api/public/translation/enabled:
+    get:
+      tags: [Admin – Platform]
+      operationId: getPublicTranslationEnabled
+      summary: Ist die automatische Übersetzung eingeschaltet?
+      description: |
+        Meldet ohne Auth, ob der Schalter „Automatische Übersetzung“ der
+        Systemeinstellungen an ist. Nur dann haben Inhalte neben der
+        Standardsprache der Seite eine zweite Sprache (Deutsch/Englisch);
+        die Admin-Oberfläche blendet Sprachumschalter und Übersetzungen sonst
+        aus. Default (kein gespeicherter Wert): aus. Bei ausgeschaltetem Schalter
+        antworten alle schreibenden Übersetzungs-Endpunkte (Übersetzungen von
+        Vorfällen, Updates, Komponenten, Ankündigungen und Vorlagen sowie
+        `POST /api/pages/{page_id}/translate`) und Mail-Vorlagen in einer anderen
+        als der Standardsprache mit 409 `translation_disabled`; lesende Endpunkte
+        liefern nur die Standardsprache (Übersetzungslisten leer, `lang` wird
+        ignoriert). Gespeicherte Übersetzungen bleiben erhalten.
+        EN: Reports without auth whether the "Automatic translation" switch of
+        the system settings is on. Only then does content have a second
+        language (German/English) next to the page's default language; the
+        admin interface hides language switchers and translations otherwise.
+        Default (no stored value): off. With the switch off, every writing
+        translation endpoint (translations of incidents, updates, components,
+        notices and templates, and `POST /api/pages/{page_id}/translate`) and mail
+        templates in a language other than the default answer 409
+        `translation_disabled`; reading endpoints deliver the default language only
+        (translation lists empty, `lang` ignored). Stored translations are kept.
+      security: []
+      x-rate-limit: 60/min pro IP
+      responses:
+        "200":
+          description: Flag, ob die automatische Übersetzung an ist.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled: { type: boolean }
   /api/public/orders:
     post:
       tags: [Orders]
@@ -3784,6 +3823,11 @@ paths:
       tags: [Admin – Settings]
       operationId: listLanguages
       summary: Sprachkatalog
+      description: >
+        Nur die Inhaltssprachen Deutsch (`de`) und Englisch (`en`); andere
+        Katalogzeilen bleiben gespeichert, werden aber nicht geliefert.
+        EN: Only the content languages German (`de`) and English (`en`); other
+        catalog rows stay stored but are not returned.
       x-required-permission: authenticated
       responses:
         "200":
@@ -3799,6 +3843,11 @@ paths:
       tags: [Admin – Settings]
       operationId: createLanguage
       summary: Sprache in den Katalog aufnehmen
+      description: >
+        Nur `de` und `en` (z. B. nach dem Löschen wieder anlegen); jeder andere
+        gültige Code ergibt 400 `language_not_supported`.
+        EN: Only `de` and `en` (e.g. to re-create one after deleting it); any other
+        valid code yields 400 `language_not_supported`.
       x-required-permission: global-admin
       requestBody:
         required: true
@@ -3823,6 +3872,11 @@ paths:
       tags: [Admin – Settings]
       operationId: updateLanguage
       summary: Sprache ändern (Name, aktiv)
+      description: >
+        Eine andere Sprache als `de`/`en` lässt sich umbenennen, aber nicht
+        einschalten (400 `language_not_supported`).
+        EN: A language other than `de`/`en` can be renamed but not switched on
+        (400 `language_not_supported`).
       x-required-permission: global-admin
       requestBody:
         required: true
@@ -3867,6 +3921,11 @@ paths:
       tags: [Admin – Settings]
       operationId: listPageLanguages
       summary: Aktivierte Sprachen einer Seite
+      description: >
+        Nur Inhaltssprachen (`de`, `en`); ältere Zuordnungen anderer Sprachen
+        bleiben gespeichert, werden aber nicht geliefert.
+        EN: Only content languages (`de`, `en`); older assignments of other
+        languages stay stored but are not returned.
       x-required-permission: page-role
       responses:
         "200":
@@ -3897,6 +3956,14 @@ paths:
                   type: array
                   items: { type: string }
                 default: { type: string, description: Muss in `codes` enthalten sein. }
+      description: >
+        Erlaubt sind nur `de` und `en` (sonst 400 `language_codes_unknown`). Ist die
+        automatische Übersetzung ausgeschaltet, genau ein Code (die neue
+        Standardsprache, sonst 409 `translation_disabled`); die übrigen Zuordnungen
+        bleiben dann gespeichert.
+        EN: Only `de` and `en` are allowed (otherwise 400 `language_codes_unknown`).
+        With automatic translation switched off exactly one code (the new default,
+        otherwise 409 `translation_disabled`); the other assignments are kept.
       responses:
         "200":
           description: Neue Sprachliste.
@@ -4270,6 +4337,7 @@ paths:
             schema:
               type: object
               properties:
+                enabled: { type: boolean, description: "Schalter für automatische Übersetzung und zweite Inhaltssprache (Default aus). EN: switch for automatic translation and the second content language (default off)." }
                 provider: { type: string, enum: ["", libretranslate, deepl] }
                 url: { type: string }
                 api_key: { type: string, description: Schreibend; wird nie zurückgegeben. }
@@ -5730,6 +5798,7 @@ components:
         Einstellungen der automatischen Übersetzung. Der Schlüssel
         ist nie enthalten.
       properties:
+        enabled: { type: boolean, description: "Automatische Übersetzung und zweite Inhaltssprache an (Default aus, auch nach dem Update). EN: automatic translation and second content language on (default off, also after upgrading)." }
         provider: { type: string, description: 'Leer = Standard (LibreTranslate aus der Umgebung), sonst libretranslate oder deepl.' }
         url: { type: string, description: LibreTranslate-Adresse (nur https). }
         api_key_set: { type: boolean }

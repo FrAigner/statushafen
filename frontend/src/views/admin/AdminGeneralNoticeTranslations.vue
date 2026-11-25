@@ -22,6 +22,7 @@ const {
   findInList: true,
   contentField: 'message',
   translationsApi: useGeneralNoticeTranslations(),
+  overviewPath: '/admin/notices',
 })
 
 // Richtung C: Brotkrumen „Seite › Ankündigungen › Übersetzungen“.

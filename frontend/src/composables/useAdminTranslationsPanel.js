@@ -4,7 +4,9 @@ import { useApi } from './useApi'
 import { useTenant } from './useTenant'
 import { useResourcePerms } from './useResourcePerms'
 import { useContentLanguages } from './useContentLanguages'
+import { useTranslationEnabled } from './useTranslationEnabled'
 import { confirmDialog } from './useConfirm'
+import { useRouter } from 'vue-router'
 
 // Gemeinsame CRUD-Logik für die drei Admin-Übersetzungs-Views (Incident/
 // Component/GeneralNotice, Stage 5) - die Views waren bis auf
@@ -29,8 +31,11 @@ export function findEntityById(list, id) {
   return null
 }
 
-export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = false, contentField, translationsApi, resource }) {
+export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = false, contentField, translationsApi, resource, overviewPath }) {
   const { apiFetch } = useApi()
+  // Switched off translation: the page goes back to its overview (overviewPath).
+  const { load: loadTranslationEnabled } = useTranslationEnabled()
+  const router = useRouter()
   const { activeTenantId } = useTenant()
   const { catalog, loadCatalog } = useContentLanguages()
   const { t } = useI18n()
@@ -54,6 +59,10 @@ export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = f
   const showAlert = (msg, type = 'info') => { alertMsg.value = msg; alertType.value = type }
 
   const loadData = async () => {
+    if (!(await loadTranslationEnabled())) {
+      router.replace(overviewPath)
+      return
+    }
     try {
       const base = `/api/pages/${activeTenantId.value}/${apiSegment}`
       entity.value = findInList

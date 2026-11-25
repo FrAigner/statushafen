@@ -34,7 +34,7 @@ func listAllTranslations[T any](h *Handler, c *gin.Context, parse func(*gin.Cont
 		return
 	}
 	translations := []T{}
-	if err := h.DB.Where(parentColumn+" = ?", parentID).Order("language_code").Find(&translations).Error; err != nil {
+	if err := h.DB.Where(parentColumn+" = ?", parentID).Where("language_code IN ?", h.deliveredTranslationCodes()).Order("language_code").Find(&translations).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return
 	}

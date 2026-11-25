@@ -195,7 +195,8 @@ const formatDate = (d) => formatDateTimeShort(d, locale.value)
 // Zeilenmenü: „Übersetzungen“ ist ein Link, der Rest meldet seinen key.
 const menuItems = (item) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
-  { key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/notices/${item.ID}/translations` },
+  // Only with a second content language (switched off: the page lists its default only).
+  ...(trans.multilingual.value ? [{ key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/notices/${item.ID}/translations` }] : []),
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === item.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === item.ID }] : []),
 ]
 const onMenuSelect = (item, key) => {

@@ -92,21 +92,21 @@ func TestDeleteLanguageHandler_EntferntZuordnungUndSpracheUndSchreibtAudit(t *te
 
 func TestDeleteLanguageHandler_GleicherCodeLaesstSichNeuAnlegen(t *testing.T) {
 	db, r, langs, _ := langDeleteSetup(t)
-	code, _ := delLang(r, itoa(langs["fr"].ID))
+	code, _ := delLang(r, itoa(langs["en"].ID))
 	require.Equal(t, http.StatusNoContent, code)
 
-	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "fr", "name": "Français neu"})
+	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "English new"})
 	require.Equal(t, http.StatusCreated, w.Code)
 	var got models.Language
-	require.NoError(t, db.Where("code = ?", "fr").First(&got).Error)
-	assert.Equal(t, "Français neu", got.Name)
-	assert.Equal(t, langs["fr"].ID, got.ID, "die Grabstein-Zeile lebt wieder auf")
+	require.NoError(t, db.Where("code = ?", "en").First(&got).Error)
+	assert.Equal(t, "English new", got.Name)
+	assert.Equal(t, langs["en"].ID, got.ID, "die Grabstein-Zeile lebt wieder auf")
 	var n int64
-	db.Unscoped().Model(&models.Language{}).Where("code = ?", "fr").Count(&n)
+	db.Unscoped().Model(&models.Language{}).Where("code = ?", "en").Count(&n)
 	assert.EqualValues(t, 1, n)
 
 	// Und ein zweites Anlegen ist wieder ein Duplikat.
-	w = doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "fr", "name": "x"})
+	w = doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "x"})
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
 
@@ -149,24 +149,26 @@ func TestDeleteLanguageHandler_DatenbankfehlerLiefernFehler500(t *testing.T) {
 
 func TestCreateLanguageHandler_DatenbankfehlerBeiGrabsteinPruefung(t *testing.T) {
 	db, r, langs, _ := langDeleteSetup(t)
-	code, _ := delLang(r, itoa(langs["fr"].ID))
+	code, _ := delLang(r, itoa(langs["en"].ID))
 	require.Equal(t, http.StatusNoContent, code)
 	// Wiederbeleben scheitert: 500 statt stillem Verlust.
 	db.Exec("CREATE TRIGGER no_upd BEFORE UPDATE ON languages BEGIN SELECT RAISE(ABORT, 'gesperrt'); END")
-	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "fr", "name": "x"})
+	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "x"})
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 // Review-Fund: scheitert nur die Abfrage nach einer gelöschten Sprache (nicht die Duplikatprüfung davor),
 // antwortet Anlegen mit 500 statt eine zweite Zeile zu versuchen.
 func TestCreateLanguageHandler_DatenbankfehlerBeiAbfrageGeloeschterSprache(t *testing.T) {
-	db, r, _, _ := langDeleteSetup(t)
+	db, r, langs, _ := langDeleteSetup(t)
+	// Only de and en can be created: remove en entirely first, so the duplicate check passes.
+	require.NoError(t, db.Unscoped().Delete(&models.Language{}, langs["en"].ID).Error)
 	require.NoError(t, db.Callback().Query().Before("gorm:query").Register("test:tomb_fail", func(tx *gorm.DB) {
 		if tx.Statement.SQL.Len() == 0 && tx.Statement.Unscoped {
 			_ = tx.AddError(gorm.ErrInvalidDB)
 		}
 	}))
-	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "pl", "name": "polski"})
+	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "English"})
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	var body map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &body)

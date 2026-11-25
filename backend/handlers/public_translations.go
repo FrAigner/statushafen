@@ -136,8 +136,8 @@ func (h *Handler) GetPublicTranslationsHandler(c *gin.Context) {
 // Sprache) und liefert dann false. Gemeinsam genutzt von den Übersetzungen der
 // Seite und der Vorfall-Updates.
 func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) (lang, def string, ok bool) {
-	var langs []models.StatusPageLanguage
-	if err := h.DB.Where(whereStatusPageIDEquals, page.ID).Find(&langs).Error; err != nil {
+	langs, err := h.pageContentLanguages(page.ID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return "", "", false
 	}
@@ -149,7 +149,9 @@ func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) 
 		}
 	}
 	lang = strings.ToLower(c.Query("lang"))
-	if lang == "" {
+	// With the switch off there is only the default language: a requested other
+	// language is ignored instead of answered with 400 (no second round trip).
+	if lang == "" || !h.translationEnabled() {
 		lang = def
 	} else if !langCodePattern.MatchString(lang) || !allowed[lang] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Language not enabled for this page", "code": "invalid_request"})

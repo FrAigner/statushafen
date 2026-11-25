@@ -123,8 +123,8 @@ func TestUpdateRole_DuplicateNameReturns409(t *testing.T) {
 
 func TestUniqueRace_CreateLanguageCode(t *testing.T) {
 	db, r := setupUniqueRaceRouter(t)
-	forceConflictOnce(t, db, "languages", "INSERT INTO languages (code, name, is_active, created_at, updated_at) VALUES ('xx', 'X', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
-	w := doTagRequest(r, http.MethodPost, "/api/admin/languages", map[string]any{"code": "xx", "name": "Xx"})
+	forceConflictOnce(t, db, "languages", "INSERT INTO languages (code, name, is_active, created_at, updated_at) VALUES ('en', 'X', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+	w := doTagRequest(r, http.MethodPost, "/api/admin/languages", map[string]any{"code": "en", "name": "English"})
 	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
 }
 

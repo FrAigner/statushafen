@@ -180,6 +180,7 @@ func collectMailsByRecipient(t *testing.T, srv *fakeSMTPServer, n int, recipient
 
 func TestInterneNutzer_VorfallMailInIhrerSprache(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "l703-staff", "l703-staff-admin@example.com")
+	require.NoError(t, testutils.EnableTranslation(db))
 	require.NoError(t, db.Create(&models.User{Email: "l703-de@example.com", IsGlobalAdmin: true, PreferredLanguage: "de"}).Error)
 	require.NoError(t, db.Create(&models.User{Email: "l703-en@example.com", IsGlobalAdmin: true, PreferredLanguage: "en"}).Error)
 	inc := seedIncident(t, db, page.ID, "Latenz", "Wir prüfen.", "investigating")
@@ -196,6 +197,7 @@ func TestInterneNutzer_VorfallMailInIhrerSprache(t *testing.T) {
 
 func TestInterneNutzer_VorlageNachSpracheMitRueckfallAufEnglisch(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "l703-stafftpl", "l703-stafftpl-admin@example.com")
+	require.NoError(t, testutils.EnableTranslation(db))
 	require.NoError(t, db.Create(&models.User{Email: "l703-tpl-de@example.com", IsGlobalAdmin: true, PreferredLanguage: "de"}).Error)
 	// Nur die englische Staff-Vorlage gepflegt: gilt auch für den deutschen Nutzer (wie vor der Umstellung).
 	seedTemplate(t, db, page.ID, handlers.NotificationKindIncidentCreated, handlers.NotificationAudienceStaff, "en", "STAFF-EN {{.Language}}", "<p>X</p>")

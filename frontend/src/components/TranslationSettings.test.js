@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
-import { onyxFormStubs } from '../test-support/onyxStubs'
+import { onyxFormStubs, OnyxCheckboxStub } from '../test-support/onyxStubs'
+import { useTranslationEnabled } from '../composables/useTranslationEnabled'
 import TranslationSettings from './TranslationSettings.vue'
 
 // Abschnitt „Automatische Übersetzung“ der Systemeinstellungen.
@@ -17,7 +18,7 @@ async function mountSection(handler) {
   useAuth().setAuth('jwt', { email: 'a@x.de', is_global_admin: true })
   const fetchMock = vi.fn(handler)
   global.fetch = fetchMock
-  wrapper = mount(TranslationSettings, { global: { plugins: [i18n], stubs: onyxFormStubs } })
+  wrapper = mount(TranslationSettings, { global: { plugins: [i18n], stubs: { ...onyxFormStubs, OnyxCheckbox: OnyxCheckboxStub } } })
   await flushPromises()
   return fetchMock
 }
@@ -76,6 +77,25 @@ describe('TranslationSettings', () => {
     await wrapper.find('button.save-translation').trigger('click')
     await flushPromises()
     expect(JSON.parse(calls(fetchMock, 'PUT')[0][1].body)).toEqual({ provider: '' })
+  })
+
+  // The on/off switch: default off with a hint; switching on is only sent when it
+  // changed and updates the shared flag the admin views use.
+  it('shows the switch off with a hint and saves switching it on', async () => {
+    useTranslationEnabled().enabled.value = false
+    const fetchMock = await mountSection(async (url, o = {}) => (o.method === 'PUT'
+      ? json({ ...BASE, enabled: true })
+      : json({ ...BASE, enabled: false })))
+    const box = wrapper.find('[data-setting="translation"] input[type="checkbox"]')
+    expect(box.element.checked).toBe(false)
+    expect(wrapper.find('[data-test="translation-off-hint"]').text()).toContain('Standardsprache')
+    await box.setValue(true)
+    expect(wrapper.find('[data-test="translation-off-hint"]').exists()).toBe(false)
+    await wrapper.find('button.save-translation').trigger('click')
+    await flushPromises()
+    expect(JSON.parse(calls(fetchMock, 'PUT')[0][1].body)).toEqual({ enabled: true, provider: '' })
+    expect(useTranslationEnabled().enabled.value).toBe(true)
+    expect(wrapper.find('[data-setting="translation"] input[type="checkbox"]').element.checked).toBe(true)
   })
 
   it('meldet Ladefehler und Speicherfehler', async () => {

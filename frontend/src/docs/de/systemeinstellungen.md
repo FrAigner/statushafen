@@ -36,8 +36,17 @@ Schaltet die automatische Selbstüberwachung der Systemseite ein oder aus (siehe
 
 ## Automatische Übersetzung
 
-Legt fest, welcher Dienst den Knopf **Übersetzen** in den Formularen bedient (siehe
-[Sprachen](/docs/sprachen)). Der Vorschlag landet immer als Entwurf.
+Der Schalter **Automatische Übersetzung und zweite Sprache (Deutsch/Englisch) einschalten** ist ohne
+Eintrag **aus**. Solange er aus ist, haben Vorfälle, Wartungen, Ankündigungen, Komponenten,
+Vorlagen und Benachrichtigungen nur die Standardsprache der jeweiligen Statusseite: keine
+Sprachauswahl, keine Übersetzungen, auch keine Pflege einer zweiten Sprache von Hand. Ist er an,
+gibt es Deutsch und Englisch samt Übersetzungsvorschlag (siehe [Sprachen](/docs/sprachen)).
+Gespeicherte Übersetzungen bleiben beim Ausschalten erhalten. **Nach dem Update** ist der Schalter
+auch dort aus, wo bisher Übersetzungen genutzt wurden: einmal einschalten, damit sie wieder
+erscheinen. Jede Änderung steht im Audit-Log.
+
+Die übrigen Felder legen fest, welcher Dienst den Knopf **Übersetzen** in den Formularen bedient.
+Der Vorschlag landet immer als Entwurf.
 
 - **Standard des Betreibers (LibreTranslate):** Der Betreiber stellt den Dienst bereit
   (Umgebungsvariable `LIBRETRANSLATE_URL`). Die Texte verlassen den Betrieb nicht. Es gibt nur die

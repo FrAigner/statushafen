@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useContentLanguages } from '../../composables/useContentLanguages'
+import { useTranslationEnabled } from '../../composables/useTranslationEnabled'
 import { useAuth } from '../../composables/useAuth'
 import { useApi } from '../../composables/useApi'
 import { useDeleteAction } from '../../composables/useAdminCrudActions'
@@ -35,6 +36,8 @@ const { isGlobalAdmin, hasPerm } = useAuth()
 // Seitensprachen speichern verlangt im Backend languages:update
 // (PutPageLanguagesHandler); lesen darf jede Rolle der Seite.
 const canEditPageLanguages = computed(() => hasPerm('languages:update'))
+// Translation switched off: the page has its default language only (single choice).
+const { enabled: translationEnabled, load: loadTranslationEnabled } = useTranslationEnabled()
 const { apiFetch } = useApi()
 const { activeTenantId } = useTenant()
 const { t, locale } = useI18n()
@@ -77,6 +80,7 @@ const loadAll = async () => {
   loadFailed.value = false
   try {
     await loadCatalog()
+    await loadTranslationEnabled()
     if (activeTenantId.value) {
       await loadPageLanguages(activeTenantId.value)
       selectedCodes.value = pageLanguages.value.map(l => l.LanguageCode)
@@ -106,14 +110,16 @@ watch(selectedCodes, (codes) => {
 })
 
 const savePageSelection = async () => {
-  if (selectedCodes.value.length === 0) {
+  // Switched off: exactly the chosen default (the server keeps the other assignments).
+  const codes = translationEnabled.value ? selectedCodes.value : [selectedDefault.value]
+  if (codes.length === 0) {
     showAlert(t('languages.confirmMinOne'), 'warning')
     return
   }
   clearAlert()
   isSavingPageLanguages.value = true
   try {
-    await savePageLanguages(activeTenantId.value, selectedCodes.value, selectedDefault.value)
+    await savePageLanguages(activeTenantId.value, codes, selectedDefault.value)
     showAlert(t('languages.selectionSaved'), 'success')
   } catch (err) {
     showAlert(t('common.saveError') + err.message, 'error')
@@ -263,12 +269,16 @@ const onMenuSelect = (l, key) => {
         <section v-if="activeTenantId" class="edit-card">
           <h3>{{ t('languages.pageLanguagesHeading') }}</h3>
           <p class="panel-lead">{{ t('languages.pageLanguagesDescription') }}</p>
+          <p v-if="!translationEnabled" class="panel-lead" data-test="page-languages-single">{{ t('languages.singleLanguageHint') }}</p>
           <div class="stack-list">
             <div v-for="l in activeLanguages" :key="l.Code" class="stack-list__row">
-              <label class="checkbox-row">
+              <label v-if="translationEnabled" class="checkbox-row">
                 <input type="checkbox" :value="l.Code" v-model="selectedCodes" :disabled="!canEditPageLanguages" /> <span v-if="languageFlag(l.Code)" class="lang-flag" aria-hidden="true">{{ languageFlag(l.Code) }}</span> {{ l.Name }} ({{ l.Code }})
               </label>
-              <label v-if="selectedCodes.includes(l.Code)" class="checkbox-row checkbox-row--sub">
+              <label v-if="!translationEnabled" class="checkbox-row">
+                <input type="radio" name="default-lang" :value="l.Code" v-model="selectedDefault" :disabled="!canEditPageLanguages" /> <span v-if="languageFlag(l.Code)" class="lang-flag" aria-hidden="true">{{ languageFlag(l.Code) }}</span> {{ l.Name }} ({{ l.Code }})
+              </label>
+              <label v-else-if="selectedCodes.includes(l.Code)" class="checkbox-row checkbox-row--sub">
                 <input type="radio" name="default-lang" :value="l.Code" v-model="selectedDefault" :disabled="!canEditPageLanguages" /> {{ t('languages.defaultLabel') }}
               </label>
             </div>

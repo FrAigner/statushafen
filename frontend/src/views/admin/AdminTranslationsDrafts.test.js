@@ -43,6 +43,8 @@ function fakeBackend(view) {
   const collection = `/api/${view.segment}/1/translations`
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Switch for translations (system setting) is on.
+    if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
     const entity = method === 'GET' && view.entityRoute(url)
     if (entity) return jsonResponse(entity)
     if (method === 'GET' && url === '/api/languages') {

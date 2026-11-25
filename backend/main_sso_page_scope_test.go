@@ -63,6 +63,7 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"POST /api/public/subscribers/unsubscribe":           ssoUnchanged,
 	"POST /api/public/subscribers/confirm":               ssoUnchanged,
 	"GET /api/public/orders/enabled":                     ssoUnchanged,
+	"GET /api/public/translation/enabled":                ssoUnchanged,
 	"POST /api/public/orders":                            ssoUnchanged,
 	"POST /api/public/orders/confirm":                    ssoUnchanged,
 	"POST /api/public/orders/set-password":               ssoUnchanged,
