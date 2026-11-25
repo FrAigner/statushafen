@@ -9,6 +9,8 @@ import { useTenant } from '../composables/useTenant'
 import { HELP_PARTS } from '../composables/useHelpText'
 import { onyxFormStubs } from '../test-support/onyxStubs'
 import { vueSources, lookup } from '../test-support/templateScan.js'
+import { NAV_GROUPS } from '../utils/adminNav'
+import routerSource from '../router/index.js?raw'
 import AdminComponents from './admin/AdminComponents.vue'
 import AdminExternalSources from './admin/AdminExternalSources.vue'
 import AdminOverview from './admin/AdminOverview.vue'
@@ -274,6 +276,13 @@ export const HELP_COMPLETE_VIEWS = [
   },
 ]
 
+// Admin route path ("/admin/incidents") -> view file from router/index.js.
+export function viewFileFor(to) {
+  const path = to.replace(/^\/admin\//, '')
+  const route = routerSource.match(new RegExp(`path: '${path}', component: (\\w+)`))
+  return route ? `views/admin/${route[1]}.vue` : null
+}
+
 function describedByHelp(el) {
   const ids = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(id => id.startsWith('help-'))
   return ids.some(id => document.getElementById(id)?.getAttribute('role') === 'tooltip')
@@ -346,6 +355,19 @@ describe('Hilfetexte vollständig', () => {
       expect(keys.flatMap(incompleteEntries)).toEqual([])
     })
   }
+
+  // Every page of the "Operations" nav group shows help tooltips; a new page
+  // in that group must be added to HELP_COMPLETE_VIEWS.
+  it('jede Seite der Gruppe „Betrieb“ steht in HELP_COMPLETE_VIEWS', () => {
+    const items = NAV_GROUPS.find(g => g.key === 'operations').items
+    const files = items.map(item => viewFileFor(item.to))
+    expect(files.every(Boolean), JSON.stringify(files)).toBe(true)
+    const covered = HELP_COMPLETE_VIEWS.map(v => v.file)
+    expect(files.filter(f => !covered.includes(f))).toEqual([])
+    // Counter-check: the mapping resolves a route and rejects an unknown one.
+    expect(viewFileFor('/admin/incidents')).toBe('views/admin/AdminIncidents.vue')
+    expect(viewFileFor('/admin/does-not-exist')).toBeNull()
+  })
 
   it('der help-Katalog ist in de und en vollständig', () => {
     // parts sind die Überschriften des Tooltips selbst, kein Bereich.
