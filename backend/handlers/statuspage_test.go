@@ -486,9 +486,9 @@ func TestUpdateStatusPageHandler_IgnoresIDMassAssignment(t *testing.T) {
 // TestUpdateStatusPageHandler_SaveErrorReturns500:
 // h.DB.Save's error was silently ignored, so a failed update (e.g. the DB
 // rejecting the write) still answered 200 OK with the in-memory (unsaved)
-// data, hiding data loss from the client. The DB file is made read-only
-// after seeding to force a real write failure at Save time, since the
-// earlier First() (a read) must still succeed.
+// data, hiding data loss from the client. The DB file is reopened read-only
+// (SQLite mode=ro) after seeding to force a real write failure at Save time,
+// since the earlier First() (a read) must still succeed.
 func TestUpdateStatusPageHandler_SaveErrorReturns500(t *testing.T) {
 	if os.Getenv("JWT_SECRET") == "" {
 		_ = os.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
@@ -509,15 +509,9 @@ func TestUpdateStatusPageHandler_SaveErrorReturns500(t *testing.T) {
 	sqlWriteDB, _ := writeDB.DB()
 	_ = sqlWriteDB.Close()
 
-	if err := os.Chmod(dbPath, 0o444); err != nil {
-		t.Fatalf("failed to chmod db file read-only: %v", err)
-	}
-	defer func() {
-		_ = os.Chmod(dbPath, 0o644)
-		_ = os.Remove(dbPath)
-	}()
-
-	roDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	// Open the file in SQLite's read-only mode instead of relying on file
+	// permissions: chmod 0444 does not stop root, so the test failed there.
+	roDB, err := gorm.Open(sqlite.Open("file:"+dbPath+"?mode=ro"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open read-only DB: %v", err)
 	}

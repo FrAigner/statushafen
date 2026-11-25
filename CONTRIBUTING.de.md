@@ -36,8 +36,7 @@ Siehe den Schnellstart in der [README](README.de.md). Aufbau des Repositorys:
 (cd backend && go run ./cmd/workflowlint ../.github/workflows)  # bei Änderungen an Workflows
 ```
 
-Einige Tests nutzen Dateirechte (`chmod 0444`) und schlagen als root fehl; führe die Suite als normaler
-Nutzer aus. Der PostgreSQL-Migrationstest startet über `embedded-postgres` ein echtes PostgreSQL 16;
+Der PostgreSQL-Migrationstest startet über `embedded-postgres` ein echtes PostgreSQL 16;
 schalte ihn mit `MIGRATION_PG_TEST=1 go test ./database/ -run Postgres` ein (als normaler Nutzer, er
 lädt Binärdateien).
 

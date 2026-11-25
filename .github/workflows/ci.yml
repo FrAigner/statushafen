@@ -77,6 +77,25 @@ jobs:
         with:
           working-directory: backend
           args: --config .golangci.yml
+      # embedded-postgres downloads its binaries from Maven Central without retrying; one non-200
+      # answer fails every PostgreSQL test ("no version found matching ..."). Prefetch the archive
+      # with retries and its checksum into the cache embedded-postgres reads, so the tests never
+      # download. The version must match embeddedpostgres.V16 (ci_postgres_prefetch_test.go).
+      - name: PostgreSQL-Binärdateien vorab laden
+        env:
+          EMBEDDED_POSTGRES_VERSION: "16.9.0"
+        run: |
+          set -euo pipefail
+          v="$EMBEDDED_POSTGRES_VERSION"
+          dir="$HOME/.embedded-postgres-go"
+          url="https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-amd64/$v/embedded-postgres-binaries-linux-amd64-$v.jar"
+          target="$dir/embedded-postgres-binaries-linux-amd64-$v.txz"
+          mkdir -p "$dir"
+          tmp="$(mktemp -d)"
+          curl -fsSL --retry 6 --retry-all-errors --retry-delay 10 -o "$tmp/pg.jar" "$url"
+          echo "$(curl -fsSL --retry 6 --retry-all-errors --retry-delay 10 "$url.sha256")  $tmp/pg.jar" | sha256sum -c -
+          unzip -p "$tmp/pg.jar" '*.txz' > "$target"
+          test -s "$target"
       - name: Run Tests
         env:
           # Migrationen auf leerer Postgres-DB, zweimal hintereinander
