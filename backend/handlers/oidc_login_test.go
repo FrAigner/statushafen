@@ -819,7 +819,7 @@ func TestDiscoverOIDCProvider_UsesFreshCacheEntry(t *testing.T) {
 		oidcProviderMu.Unlock()
 	})
 
-	got := discoverOIDCProvider(issuer)
+	got := discoverOIDCProvider(issuer, false)
 
 	assert.Equal(t, want.err, got.err)
 }

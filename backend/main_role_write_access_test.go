@@ -45,6 +45,7 @@ var selfServiceWriteRoutes = map[string]bool{
 	"POST /api/public/orders/confirm":                    true,
 	"POST /api/public/orders/set-password":               true,
 	"POST /api/auth/oidc/link":                           true,
+	"POST /api/auth/provider/:id/link":                   true,
 	"PATCH /api/me":                                      true,
 	"DELETE /api/me":                                     true,
 	"DELETE /api/me/sso/:id":                             true,

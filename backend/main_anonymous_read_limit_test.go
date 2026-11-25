@@ -99,6 +99,9 @@ func TestRouter_FormerlyUnlimitedReadRoutesHaveTheirLimit(t *testing.T) {
 		{"/api/incidents/1/translations", 120},
 		{"/api/components/1/translations", 120},
 		{"/api/notices/1/translations", 120},
+		{"/api/auth/provider/corp/login", 20},
+		{"/api/auth/provider/corp/callback", 20},
+		{"/api/public/auth-config", 60},
 	}
 	for i, tc := range cases {
 		addr := "198.51.100." + strconv.Itoa(i+1) + ":5000" // eigene Adresse je Route

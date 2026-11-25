@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fraigner/statushafen/middleware"
 	"github.com/fraigner/statushafen/models"
 
 	"github.com/gin-gonic/gin"
@@ -66,7 +67,7 @@ func (h *Handler) beginSSOBySlug(c *gin.Context) (string, *oidcError) {
 		return "", errOIDCNotConfigured
 	}
 	if cfg, ok := h.activeOIDCConfig(uint64(page.ID)); ok {
-		return h.startOIDCFlow(c, cfg, models.OIDCLoginState{})
+		return h.startOIDCFlow(c, pageOIDCClient(cfg), models.OIDCLoginState{StatusPageID: cfg.StatusPageID}, oidcStateCookiePath)
 	}
 	return "", errOIDCNotConfigured
 }
@@ -110,7 +111,7 @@ func (h *Handler) StartSSOTestHandler(c *gin.Context) {
 		writeOIDCError(c, e)
 		return
 	}
-	target, e := h.startOIDCFlow(c, cfg, models.OIDCLoginState{TestLogin: true})
+	target, e := h.startOIDCFlow(c, pageOIDCClient(cfg), models.OIDCLoginState{StatusPageID: cfg.StatusPageID, TestLogin: true}, oidcStateCookiePath)
 	if e != nil {
 		writeOIDCError(c, e)
 		return
@@ -125,14 +126,22 @@ type mySSOIdentity struct {
 	Protocol     string    `json:"protocol"`
 	Email        string    `json:"email"`
 	CreatedAt    time.Time `json:"created_at"`
+	// Provider: ID of the global provider of an identity with
+	// StatusPageID 0 (derived from the issuer; "" if no longer configured),
+	// "" for page SSO identities.
+	Provider string `json:"provider"`
+	Issuer   string `json:"-"`
 }
 
-// mySSOLinkable: one entry per page with active OIDC; Protocol is always
-// "oidc" (link endpoint /api/auth/oidc/link).
+// mySSOLinkable: one entry per page with active OIDC (link endpoint
+// /api/auth/oidc/link?page=N) or per global provider (StatusPageID 0,
+// Provider set, PageName = provider name, link endpoint
+// /api/auth/provider/<Provider>/link). Protocol is always "oidc".
 type mySSOLinkable struct {
 	StatusPageID uint   `json:"status_page_id"`
 	PageName     string `json:"page_name"`
 	Protocol     string `json:"protocol"`
+	Provider     string `json:"provider"`
 }
 
 type mySSOResponse struct {
@@ -152,15 +161,45 @@ func (h *Handler) GetMySSOHandler(c *gin.Context) {
 	// LEFT JOIN: Auch die Verknüpfung einer inzwischen gelöschten Seite bleibt
 	// sichtbar und lösbar.
 	h.DB.Table("user_sso_identities AS i").
-		Select("i.id, i.status_page_id, p.name AS page_name, i.protocol, i.email, i.created_at").
+		Select("i.id, i.status_page_id, p.name AS page_name, i.protocol, i.email, i.created_at, i.issuer").
 		Joins("LEFT JOIN status_pages p ON p.id = i.status_page_id AND p.deleted_at IS NULL").
 		// OIDC only: links from the SAML era stay in the table but have no
 		// effect and are no longer listed.
 		Where("i.user_id = ? AND i.protocol = ?", user.ID, models.SSOProtocolOIDC).Order("i.id").Scan(&resp.Identities)
+	providers := globalOIDCProviders()
+	linkedIssuers := map[string]bool{}
+	for i, ident := range resp.Identities {
+		if ident.StatusPageID != 0 {
+			continue
+		}
+		linkedIssuers[ident.Issuer] = true
+		if p, ok := providerForIssuer(providers, ident.Issuer); ok {
+			resp.Identities[i].Provider, resp.Identities[i].PageName = p.ID, p.Name
+		}
+	}
+	// Global providers first (OIDC_PROVIDERS order), also for global admins;
+	// a page SSO session may not link them (see ProviderLinkHandler).
+	if middleware.SSOPageID(c) == 0 {
+		for _, p := range providers {
+			if !linkedIssuers[p.Issuer] {
+				resp.Linkable = append(resp.Linkable, mySSOLinkable{PageName: p.Name, Protocol: models.SSOProtocolOIDC, Provider: p.ID})
+			}
+		}
+	}
 	if !user.IsGlobalAdmin {
-		resp.Linkable = h.linkableSSOPages(user.ID)
+		resp.Linkable = append(resp.Linkable, h.linkableSSOPages(user.ID)...)
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// providerForIssuer returns the first configured provider with this issuer.
+func providerForIssuer(providers []globalOIDCProvider, issuer string) (globalOIDCProvider, bool) {
+	for _, p := range providers {
+		if p.Issuer == issuer {
+			return p, true
+		}
+	}
+	return globalOIDCProvider{}, false
 }
 
 // linkableSSOPages: pages with active OIDC that the account has not linked

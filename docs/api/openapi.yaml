@@ -62,7 +62,7 @@ info:
 
     Ein Login-Token aus dem OIDC-SSO einer Statusseite trägt den
     Claim `sso_page_id` (die Seite, deren IdP die Anmeldung bestätigt hat).
-    Passwort-Logins haben ihn nicht. Mit
+    Passwort-Logins und Logins über globale OIDC-Anbieter haben ihn nicht. Mit
     `sso_page_id` gilt:
 
     - Seitengebundene Rechte (`<bereich>:<recht>`, `page-role`) nur für diese
@@ -102,10 +102,10 @@ info:
 
     | Endpunkt | Limit |
     |---|---|
-    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test` | 20/min |
+    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test`, `GET /api/auth/provider/{id}/login`, `GET /api/auth/provider/{id}/callback` | 20/min |
     | `POST /api/subscribe`, `POST /api/subscribe/test-webhook`, `POST /api/auth/sso-exchange`, `POST /api/public/orders/set-password` | 10/min |
     | `POST /api/public/orders` | 5/min |
-    | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso` | 60/min |
+    | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso`, `GET /api/public/auth-config` | 60/min |
     | `GET /api/public/pages/{slug}/dashboard`, `GET /api/pages/{page_id}/incidents`, `GET /api/pages/{page_id}/incidents/{id}`, `GET /api/pages/slug/{slug}`, `GET /api/pages/{page_id}/components`, `GET /api/pages/{page_id}/notices`, `GET /api/public/pages`, `GET /api/public/ui-overrides`, `GET /api/incidents/{incident_id}/translations`, `GET /api/components/{component_id}/translations`, `GET /api/notices/{notice_id}/translations` | 120/min je Route |
     | `POST /api/admin/pages/{page_id}/custom-domain/verify` (löst eine DNS-Abfrage aus) | 10/min je Seite, 10/min je Nutzer |
     | `POST /api/pages/{page_id}/incidents`, `POST /api/pages/{page_id}/notices` (lösen Benachrichtigungen aus) | 30/Stunde je Seite, 60/Stunde je Nutzer |
@@ -191,7 +191,7 @@ tags:
   - name: Public
     description: Öffentliche Lese-API der Statusseiten (optional mit Login-Token).
   - name: Auth
-    description: Anmeldung per Passwort und OIDC je Statusseite.
+    description: Anmeldung per Passwort, über globale OIDC-Anbieter und per OIDC je Statusseite.
   - name: Subscriptions
     description: Abonnieren, Bestätigen (Double-Opt-in) und Abbestellen.
   - name: Webhooks
@@ -314,6 +314,89 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /api/auth/provider/{id}/login:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    get:
+      tags: [Auth]
+      operationId: providerLogin
+      summary: Login über einen globalen OIDC-Anbieter starten
+      description: |
+        Browser-Navigation. Anbieter aus `OIDC_PROVIDERS` (Konfiguration per
+        Umgebungsvariablen `OIDC_<ID>_*`). Leitet zum Identity Provider weiter
+        (State/Nonce/PKCE, Cookie `oidc_state` mit Pfad `/api/auth/provider`,
+        10 Minuten). Die Discovery läuft beim ersten Login, nicht beim Start.
+        Fehler führen zur Weiterleitung auf
+        `<FRONTEND_URL>/login?oidc_error=<code>` (unbekannte ID:
+        `provider_unknown`; außerdem `provider_unreachable`, `internal`).
+      security: []
+      x-rate-limit: 20/min pro IP
+      responses:
+        "307":
+          description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /api/auth/provider/{id}/callback:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    get:
+      tags: [Auth]
+      operationId: providerCallback
+      summary: Callback eines globalen OIDC-Anbieters
+      description: |
+        Redirect-URI beim Anbieter: `<BASE_URL>/api/auth/provider/<id>/callback`.
+        Löst den State genau einmal ein (nur ein State dieses Anbieters), tauscht
+        den Code mit PKCE, prüft ID-Token (Signatur, Issuer, Zielgruppe, Ablauf)
+        und Nonce. Das Konto wird über (Issuer, Subject) gefunden. Ohne
+        Verknüpfung entscheidet die E-Mail: Ein bestehendes Konto mit derselben
+        Adresse wird nur bei `email_verified=true` verknüpft, sonst
+        `email_unverified`; ohne Konto entsteht ein neues (Rolle Viewer;
+        `SSO_ALLOWED_DOMAINS` gilt, `email_verified=false` wird abgelehnt).
+        `SSO_BOOTSTRAP_ADMIN_EMAILS` macht ein Konto mit bestätigter E-Mail zum
+        Global Admin. Erfolg: `<FRONTEND_URL>/auth/sso-callback?code=…` (bei
+        Verknüpfung mit `&next=profile`); Fehler:
+        `<FRONTEND_URL>/login?oidc_error=<code>` bzw. bei Verknüpfung
+        `/admin/profile?oidc_error=<code>`. Codes: `provider_unknown`,
+        `state_invalid`, `provider_denied`, `provider_unreachable`,
+        `token_exchange`, `no_id_token`, `id_token_invalid`, `email_missing`,
+        `email_unverified`, `domain_not_allowed`, `not_linked`,
+        `already_linked`, `internal`.
+      security: []
+      x-rate-limit: 20/min pro IP
+      parameters:
+        - { name: code, in: query, required: false, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        "307":
+          description: Weiterleitung ins Frontend.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /api/auth/provider/{id}/link:
+    parameters:
+      - $ref: "#/components/parameters/ProviderId"
+    post:
+      tags: [Me]
+      operationId: providerLink
+      summary: Eigenes Konto mit einem globalen OIDC-Anbieter verknüpfen
+      description: |
+        Wie `POST /api/auth/oidc/link`: liefert die Authorize-URL als JSON.
+        Auch für Global Admins. Eine Sitzung aus einem Seiten-SSO
+        (`sso_page_id`) darf keinen globalen Anbieter verknüpfen (`403`).
+        Unbekannte Anbieter-ID: `404`.
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Authorize-URL, im Browser zu öffnen.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UrlResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "502": { $ref: "#/components/responses/BadGateway" }
   /api/auth/sso-exchange:
     post:
       tags: [Auth]
@@ -441,6 +524,35 @@ paths:
   # ------------------------------------------------------------------
   # Public
   # ------------------------------------------------------------------
+  /api/public/auth-config:
+    get:
+      tags: [Public]
+      operationId: getAuthConfig
+      summary: Anmeldemethoden für die Login-Seite
+      description: |
+        Ob der Passwort-Login an ist und welche globalen OIDC-Anbieter aktiv
+        sind (Reihenfolge wie in `OIDC_PROVIDERS`, nur ID und Anzeigename).
+      security: []
+      x-rate-limit: 60/min pro IP
+      responses:
+        "200":
+          description: Anmeldemethoden.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [password_login, providers]
+                properties:
+                  password_login: { type: boolean }
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
+                        name: { type: string }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /api/public/pages:
     get:
       tags: [Public]
@@ -2019,6 +2131,7 @@ paths:
                         protocol: { type: string, enum: [oidc] }
                         email: { type: string }
                         created_at: { type: string, format: date-time }
+                        provider: { type: string, description: "ID des globalen Anbieters bei `status_page_id` 0 (`page_name` ist dann sein Anzeigename; leer, wenn nicht mehr konfiguriert), sonst leer." }
                   linkable:
                     type: array
                     items:
@@ -2027,6 +2140,7 @@ paths:
                         status_page_id: { type: integer }
                         page_name: { type: string }
                         protocol: { type: string, enum: [oidc] }
+                        provider: { type: string, description: "Bei `status_page_id` 0 die ID eines globalen Anbieters (Verknüpfen über `POST /api/auth/provider/{id}/link`), sonst leer." }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /api/me/sso/{id}:
     parameters:
@@ -4455,6 +4569,12 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    ProviderId:
+      name: id
+      in: path
+      required: true
+      description: ID des globalen OIDC-Anbieters aus `OIDC_PROVIDERS`.
+      schema: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
     Slug:
       name: slug
       in: path

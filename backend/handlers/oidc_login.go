@@ -171,7 +171,12 @@ func oidcDevIssuerAllowed(issuer string) bool {
 
 var (
 	oidcHTTPClient = defaultOIDCHTTPClient()
-	oidcNow        = time.Now
+	// oidcTrustedHTTPClient talks to the global providers from
+	// OIDC_PROVIDERS. Their issuers come from the operator, not from a page
+	// admin, so a self-hosted IdP on an internal address (e.g. a GitLab in the
+	// company network) is allowed; there is no SSRF dial guard.
+	oidcTrustedHTTPClient = &http.Client{Timeout: 10 * time.Second}
+	oidcNow               = time.Now
 
 	// oidcProviderMu schützt nur die Map-Zugriffe, nie einen Netzwerkaufruf.
 	oidcProviderMu sync.Mutex
@@ -201,16 +206,29 @@ func cachedOIDCProvider(issuer string) (oidcProviderEntry, bool) {
 	return e, ok && oidcNow().Before(e.expires)
 }
 
-// oidcContext liefert den Kontext für alle Aufrufe an einen Issuer
-// (Discovery, JWKS, Token-Endpunkt). go-oidc merkt sich den Client für das
-// JWKS schon bei der Discovery.
-func oidcContext(issuer string) context.Context {
+// oidcContext returns the context for all calls to an issuer (discovery,
+// JWKS, token endpoint); go-oidc keeps the client for the JWKS from the
+// discovery. trusted selects the client for operator-configured issuers.
+func oidcContext(issuer string, trusted bool) context.Context {
 	client := oidcHTTPClient
-	if oidcDevIssuerAllowed(issuer) {
+	switch {
+	case oidcDevIssuerAllowed(issuer):
 		client = oidcDevHTTPClient()
+	case trusted:
+		client = oidcTrustedHTTPClient
 	}
 	ctx := oidc.ClientContext(context.Background(), client)
 	return context.WithValue(ctx, oauth2.HTTPClient, client)
+}
+
+// oidcCacheKey separates the provider cache of trusted (global) and page
+// issuers: a page admin entering the issuer of a global provider must not
+// reuse the provider discovered with the trusted client.
+func oidcCacheKey(issuer string, trusted bool) string {
+	if trusted {
+		return "trusted\x00" + issuer
+	}
+	return issuer
 }
 
 // oidcIssuer leitet den Issuer aus dem gespeicherten Discovery-URL ab. Das
@@ -221,44 +239,51 @@ func oidcIssuer(discoveryURL string) string {
 	return strings.TrimSuffix(strings.TrimSpace(discoveryURL), "/.well-known/openid-configuration")
 }
 
-// discoverOIDCProvider führt die Discovery aus und legt das Ergebnis (auch
-// einen Fehlschlag) im Cache ab. Ein Aufruf, der erst nach einem fertigen
-// Vorgänger in singleflight landet, nimmt dessen Cache-Eintrag.
-func discoverOIDCProvider(issuer string) oidcProviderEntry {
-	if e, ok := cachedOIDCProvider(issuer); ok {
+// discoverOIDCProvider runs the discovery and caches the result (a failure
+// too). A call that lands in singleflight only after a finished predecessor
+// takes its cache entry.
+func discoverOIDCProvider(issuer string, trusted bool) oidcProviderEntry {
+	key := oidcCacheKey(issuer, trusted)
+	if e, ok := cachedOIDCProvider(key); ok {
 		return e
 	}
-	p, err := oidc.NewProvider(oidcContext(issuer), issuer)
+	p, err := oidc.NewProvider(oidcContext(issuer, trusted), issuer)
 	e := oidcProviderEntry{provider: p, err: err, expires: oidcNow().Add(oidcProviderTTL)}
 	if err != nil {
 		e.expires = oidcNow().Add(oidcFailureTTL)
 	}
 	oidcProviderMu.Lock()
-	oidcProviders[issuer] = e
+	oidcProviders[key] = e
 	oidcProviderMu.Unlock()
 	return e
 }
 
-// oidcProviderFor liefert den (gecachten) Provider eines Issuers. go-oidc
-// prüft dabei, dass die Discovery denselben Issuer meldet.
+// oidcProviderFor returns the (cached) provider of a page SSO issuer.
 func oidcProviderFor(issuer string) (*oidc.Provider, error) {
+	return oidcProviderWith(issuer, false)
+}
+
+// oidcProviderWith returns the (cached) provider of an issuer; go-oidc checks
+// that the discovery reports the same issuer.
+func oidcProviderWith(issuer string, trusted bool) (*oidc.Provider, error) {
 	if !strings.HasPrefix(issuer, "https://") && !oidcDevIssuerAllowed(issuer) {
 		return nil, errOIDCInsecureIssuer
 	}
-	e, ok := cachedOIDCProvider(issuer)
+	key := oidcCacheKey(issuer, trusted)
+	e, ok := cachedOIDCProvider(key)
 	if !ok {
-		// Die Discovery läuft ohne Sperre; gleichzeitige Aufrufe für denselben
-		// Issuer teilen sich einen Netzwerkaufruf.
-		v, _, _ := oidcDiscoveries.Do(issuer, func() (interface{}, error) {
-			return discoverOIDCProvider(issuer), nil
+		// The discovery runs without a lock; concurrent calls for the same
+		// issuer share one network call.
+		v, _, _ := oidcDiscoveries.Do(key, func() (interface{}, error) {
+			return discoverOIDCProvider(issuer, trusted), nil
 		})
 		e = v.(oidcProviderEntry)
 	}
 	if e.err != nil {
 		return nil, e.err
 	}
-	// Die Prüfung läuft bei jedem Abruf (auch aus dem Cache), weil sie vom
-	// Entwicklungsmodus abhängt und nicht mitgecacht werden soll.
+	// Checked on every lookup (also from the cache) because it depends on
+	// the development mode, which must not be cached.
 	ep := e.provider.Endpoint()
 	if !oidcEndpointAllowed(issuer, ep.AuthURL) || !oidcEndpointAllowed(issuer, ep.TokenURL) {
 		return nil, errOIDCInsecureEndpoint
@@ -270,18 +295,61 @@ func oidcRedirectURL(pageID uint) string {
 	return getBaseURL() + "/api/auth/oidc/callback?page=" + strconv.FormatUint(uint64(pageID), 10)
 }
 
-func oidcOAuthConfig(cfg models.StatusPageSSOConfig, p *oidc.Provider) *oauth2.Config {
+// oidcClient is one OIDC relying-party configuration: the SSO of a status
+// page or a global provider. All flows (login, link, test sign-in) run
+// through it, so state, nonce, PKCE and ID token checks are shared.
+type oidcClient struct {
+	issuer       string
+	clientID     string
+	clientSecret string
+	scopes       []string
+	redirectURL  string
+	nameClaim    string
+	emailClaim   string
+	// trusted: operator-configured issuer (see oidcTrustedHTTPClient).
+	trusted bool
+	// logKey/logValue identify the configuration in log lines.
+	logKey   string
+	logValue any
+}
+
+// pageOIDCClient builds the client of a page SSO configuration.
+func pageOIDCClient(cfg models.StatusPageSSOConfig) oidcClient {
 	scopes := strings.Fields(cfg.OIDCScopes)
 	if !slices.Contains(scopes, oidc.ScopeOpenID) {
 		scopes = append([]string{oidc.ScopeOpenID}, scopes...)
 	}
+	return oidcClient{
+		issuer:       oidcIssuer(cfg.OIDCDiscoveryURL),
+		clientID:     cfg.OIDCClientID,
+		clientSecret: cfg.OIDCClientSecret,
+		scopes:       scopes,
+		redirectURL:  oidcRedirectURL(cfg.StatusPageID),
+		nameClaim:    orDefault(cfg.OIDCAttributeName, models.SSODefaultAttributeName),
+		emailClaim:   orDefault(cfg.OIDCAttributeEmail, models.SSODefaultAttributeEmail),
+		logKey:       "page",
+		logValue:     cfg.StatusPageID,
+	}
+}
+
+func (cl oidcClient) oauthConfig(p *oidc.Provider) *oauth2.Config {
 	return &oauth2.Config{
-		ClientID:     cfg.OIDCClientID,
-		ClientSecret: cfg.OIDCClientSecret,
-		RedirectURL:  oidcRedirectURL(cfg.StatusPageID),
-		Scopes:       scopes,
+		ClientID:     cl.clientID,
+		ClientSecret: cl.clientSecret,
+		RedirectURL:  cl.redirectURL,
+		Scopes:       cl.scopes,
 		Endpoint:     p.Endpoint(),
 	}
+}
+
+// provider runs (or reuses) the discovery and logs a failure.
+func (cl oidcClient) provider() (*oidc.Provider, bool) {
+	p, err := oidcProviderWith(cl.issuer, cl.trusted)
+	if err != nil {
+		slog.Error("OIDC discovery failed", cl.logKey, cl.logValue, "error", logging.SanitizeErr(err))
+		return nil, false
+	}
+	return p, true
 }
 
 func (h *Handler) activeOIDCConfig(pageID uint64) (models.StatusPageSSOConfig, bool) {
@@ -290,15 +358,6 @@ func (h *Handler) activeOIDCConfig(pageID uint64) (models.StatusPageSSOConfig, b
 		Where(&models.StatusPageSSOConfig{OIDCEnabled: true}).
 		First(&cfg).Error
 	return cfg, err == nil
-}
-
-func (h *Handler) oidcProviderForConfig(cfg models.StatusPageSSOConfig) (*oidc.Provider, bool) {
-	p, err := oidcProviderFor(oidcIssuer(cfg.OIDCDiscoveryURL))
-	if err != nil {
-		slog.Error("OIDC discovery failed", "page", cfg.StatusPageID, "error", logging.SanitizeErr(err))
-		return nil, false
-	}
-	return p, true
 }
 
 // beginOIDC legt den Login-State an und liefert die Authorize-URL des
@@ -312,29 +371,30 @@ func (h *Handler) beginOIDC(c *gin.Context, linkUserID uint) (string, *oidcError
 	if !ok {
 		return "", errOIDCNotConfigured
 	}
-	return h.startOIDCFlow(c, cfg, models.OIDCLoginState{LinkUserID: linkUserID})
+	return h.startOIDCFlow(c, pageOIDCClient(cfg), models.OIDCLoginState{StatusPageID: cfg.StatusPageID, LinkUserID: linkUserID}, oidcStateCookiePath)
 }
 
-// startOIDCFlow ergänzt st um State, Nonce und PKCE-Verifier, speichert ihn und
-// setzt das State-Cookie. Gemeinsam für Login, Verknüpfung und Testanmeldung.
-func (h *Handler) startOIDCFlow(c *gin.Context, cfg models.StatusPageSSOConfig, st models.OIDCLoginState) (string, *oidcError) {
-	p, ok := h.oidcProviderForConfig(cfg)
+// startOIDCFlow adds state, nonce and PKCE verifier to st, stores it and sets
+// the state cookie on cookiePath (the path of the matching callback). The
+// caller sets the target of st (page or provider). Shared by login, link
+// and test sign-in of page SSO and global providers.
+func (h *Handler) startOIDCFlow(c *gin.Context, cl oidcClient, st models.OIDCLoginState, cookiePath string) (string, *oidcError) {
+	p, ok := cl.provider()
 	if !ok {
 		return "", errOIDCProviderUnreachable
 	}
 
-	// Nie eingelöste States abgelaufener Logins gleich mit wegräumen.
+	// Remove never-redeemed states of expired logins on the way.
 	h.DB.Where("expires_at < ?", time.Now()).Delete(&models.OIDCLoginState{})
 	st.State = randomToken(32)
 	st.Nonce = randomToken(32)
 	st.CodeVerifier = oauth2.GenerateVerifier()
-	st.StatusPageID = cfg.StatusPageID
 	st.ExpiresAt = time.Now().Add(oidcStateLifetime())
 	if err := h.DB.Create(&st).Error; err != nil {
 		return "", errOIDCStartFailed
 	}
-	c.SetCookie(oidcStateCookie, st.State, int(oidcStateLifetime().Seconds()), oidcStateCookiePath, "", true, true)
-	return oidcOAuthConfig(cfg, p).AuthCodeURL(st.State, oidc.Nonce(st.Nonce), oauth2.S256ChallengeOption(st.CodeVerifier)), nil
+	c.SetCookie(oidcStateCookie, st.State, int(oidcStateLifetime().Seconds()), cookiePath, "", true, true)
+	return cl.oauthConfig(p).AuthCodeURL(st.State, oidc.Nonce(st.Nonce), oauth2.S256ChallengeOption(st.CodeVerifier)), nil
 }
 
 // oidcStateLifetime: So lange gilt ein Login-State. Als Funktion, weil gremlins
@@ -397,17 +457,16 @@ func writeOIDCError(c *gin.Context, e *oidcError) {
 	c.JSON(e.status, gin.H{"error": e.msg, "code": codeForStatus(e.status)})
 }
 
-// consumeOIDCState prüft den State gegen das Cookie und löst ihn atomar ein
-// (DELETE … RETURNING): Zwei gleichzeitige Callbacks mit demselben State
-// können so nicht beide durchkommen. Fehlt der Code (der Anbieter
-// meldet error=…, etwa nach einem Abbruch), wird der State trotzdem
-// eingelöst, damit der Fehler-Redirect weiß, ob Login, Verknüpfung oder
-// Testanmeldung lief.
-func (h *Handler) consumeOIDCState(c *gin.Context) (models.OIDCLoginState, *oidcError) {
+// consumeOIDCState checks the state against the cookie on cookiePath and
+// redeems it atomically (DELETE … RETURNING): two concurrent callbacks with
+// the same state cannot both pass. If the code is missing (the provider
+// reports error=…, e.g. after an abort), the state is still redeemed so that
+// the error redirect knows whether a login, a link or a test sign-in ran.
+func (h *Handler) consumeOIDCState(c *gin.Context, cookiePath string) (models.OIDCLoginState, *oidcError) {
 	var st models.OIDCLoginState
 	state := c.Query("state")
 	cookie, _ := c.Cookie(oidcStateCookie)
-	c.SetCookie(oidcStateCookie, "", -1, oidcStateCookiePath, "", true, true)
+	c.SetCookie(oidcStateCookie, "", -1, cookiePath, "", true, true)
 	if state == "" || subtle.ConstantTimeCompare([]byte(cookie), []byte(state)) != 1 {
 		return st, errOIDCStateInvalid
 	}
@@ -421,11 +480,13 @@ func (h *Handler) consumeOIDCState(c *gin.Context) (models.OIDCLoginState, *oidc
 	return st, nil
 }
 
-// oidcClaims sind die Werte der konfigurierten Claims (oidc_attribute_name
-// und, oidc_attribute_email) aus dem geprüften ID-Token.
+// oidcClaims are the values of the configured claims (name and e-mail) from
+// the verified ID token. emailVerified is nil when the token carries no
+// email_verified claim.
 type oidcClaims struct {
-	name  string
-	email string
+	name          string
+	email         string
+	emailVerified *bool
 }
 
 // claimString liest einen String-Claim; fehlt er oder ist er kein String,
@@ -435,31 +496,51 @@ func claimString(claims map[string]interface{}, key string) string {
 	return v
 }
 
-// verifyOIDCCode tauscht den Code (mit PKCE-Verifier) und prüft das
-// ID-Token samt Nonce. Liefert Token und die konfigurierten Claims; ein leerer
-// Claim-Name gilt als Standard (name bzw. email).
-func verifyOIDCCode(code string, cfg models.StatusPageSSOConfig, p *oidc.Provider, st models.OIDCLoginState) (*oidc.IDToken, oidcClaims, *oidcError) {
-	ctx := oidcContext(oidcIssuer(cfg.OIDCDiscoveryURL))
-	tok, err := oidcOAuthConfig(cfg, p).Exchange(ctx, code, oauth2.VerifierOption(st.CodeVerifier))
+// verifyOIDCCode exchanges the code (with the PKCE verifier) and verifies the
+// ID token: signature via the JWKS, issuer, audience (client ID), expiry and
+// the nonce of the state. An empty subject is rejected as well.
+func verifyOIDCCode(code string, cl oidcClient, p *oidc.Provider, st models.OIDCLoginState) (*oidc.IDToken, oidcClaims, *oidcError) {
+	ctx := oidcContext(cl.issuer, cl.trusted)
+	tok, err := cl.oauthConfig(p).Exchange(ctx, code, oauth2.VerifierOption(st.CodeVerifier))
 	if err != nil {
-		slog.Error("OIDC token exchange failed", "page", cfg.StatusPageID, "error", logging.SanitizeErr(err))
+		slog.Error("OIDC token exchange failed", cl.logKey, cl.logValue, "error", logging.SanitizeErr(err))
 		return nil, oidcClaims{}, errOIDCTokenExchange
 	}
 	raw, _ := tok.Extra("id_token").(string)
 	if raw == "" {
 		return nil, oidcClaims{}, errOIDCNoIDToken
 	}
-	idt, err := p.Verifier(&oidc.Config{ClientID: cfg.OIDCClientID}).Verify(ctx, raw)
-	if err != nil || subtle.ConstantTimeCompare([]byte(idt.Nonce), []byte(st.Nonce)) != 1 {
-		slog.Warn("OIDC ID token rejected", "page", cfg.StatusPageID, "error", err)
+	idt, err := p.Verifier(&oidc.Config{ClientID: cl.clientID}).Verify(ctx, raw)
+	if err != nil || subtle.ConstantTimeCompare([]byte(idt.Nonce), []byte(st.Nonce)) != 1 || idt.Subject == "" {
+		slog.Warn("OIDC ID token rejected", cl.logKey, cl.logValue, "error", err)
 		return nil, oidcClaims{}, errOIDCIDTokenInvalid
 	}
 	claims := map[string]interface{}{}
 	_ = idt.Claims(&claims)
 	return idt, oidcClaims{
-		name:  claimString(claims, orDefault(cfg.OIDCAttributeName, models.SSODefaultAttributeName)),
-		email: claimString(claims, orDefault(cfg.OIDCAttributeEmail, models.SSODefaultAttributeEmail)),
+		name:          claimString(claims, cl.nameClaim),
+		email:         claimString(claims, cl.emailClaim),
+		emailVerified: claimBool(claims, "email_verified"),
 	}, nil
+}
+
+// claimBool reads a boolean claim; some IdPs send "true"/"false" as strings.
+// A missing or unreadable claim is nil.
+func claimBool(claims map[string]interface{}, key string) *bool {
+	var v bool
+	switch raw := claims[key].(type) {
+	case bool:
+		v = raw
+	case string:
+		b, err := strconv.ParseBool(raw)
+		if err != nil {
+			return nil
+		}
+		v = b
+	default:
+		return nil
+	}
+	return &v
 }
 
 // linkSSOIdentity legt die Verknüpfung für linkUserID an. Gehört die
@@ -545,17 +626,22 @@ func (h *Handler) hasSSOIdentityOnOtherPage(userID, pageID uint) bool {
 
 // pageSSOIdentitiesElsewhere selects the account's effective page SSO links on
 // pages other than pageID. Rows from the SAML era (protocol "saml") stay in
-// the table but no longer count.
+// the table but no longer count; identities of global providers
+// (status_page_id 0) are no page links at all.
 func pageSSOIdentitiesElsewhere(db *gorm.DB, userID, pageID uint) *gorm.DB {
 	return db.Model(&models.UserSSOIdentity{}).
-		Where("user_id = ? AND status_page_id <> ? AND protocol = ?", userID, pageID, models.SSOProtocolOIDC)
+		Where("user_id = ? AND status_page_id <> ? AND status_page_id <> 0 AND protocol = ?", userID, pageID, models.SSOProtocolOIDC)
 }
 
-// OIDCCallbackHandler schließt Login, Verknüpfung oder Testanmeldung ab.
-// GET /api/auth/oidc/callback?page=N&state=…&code=… (öffentlich). Jeder
-// Fehler endet als Redirect mit festem Code ins Frontend.
+// OIDCCallbackHandler completes login, link or test sign-in of a page SSO.
+// GET /api/auth/oidc/callback?page=N&state=…&code=… (public). Every error
+// ends as a redirect with a fixed code into the frontend. A state of a global
+// provider login (Provider set) is never accepted here.
 func (h *Handler) OIDCCallbackHandler(c *gin.Context) {
-	st, e := h.consumeOIDCState(c)
+	st, e := h.consumeOIDCState(c, oidcStateCookiePath)
+	if e == nil && st.Provider != "" {
+		e = errOIDCStateInvalid
+	}
 	if e == nil {
 		e = h.completeOIDC(c, st)
 	}
@@ -583,11 +669,12 @@ func (h *Handler) completeOIDC(c *gin.Context, st models.OIDCLoginState) *oidcEr
 	if e != nil {
 		return e
 	}
-	p, ok := h.oidcProviderForConfig(cfg)
+	cl := pageOIDCClient(cfg)
+	p, ok := cl.provider()
 	if !ok {
 		return errOIDCProviderUnreachable
 	}
-	idt, claims, e := verifyOIDCCode(c.Query("code"), cfg, p, st)
+	idt, claims, e := verifyOIDCCode(c.Query("code"), cl, p, st)
 	if e != nil {
 		return e
 	}

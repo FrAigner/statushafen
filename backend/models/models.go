@@ -294,6 +294,9 @@ type OIDCLoginState struct {
 	TestLogin    bool      `gorm:"not null;default:false"`
 	ExpiresAt    time.Time `gorm:"not null;index"`
 	CreatedAt    time.Time
+	// Provider is the ID of the global OIDC provider (OIDC_PROVIDERS) of this
+	// login; empty for a page SSO login (StatusPageID is 0 otherwise).
+	Provider string `gorm:"not null;default:''"`
 }
 
 // The tables saml_login_states and saml_assertion_uses from the SAML era stay

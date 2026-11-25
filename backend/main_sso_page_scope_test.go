@@ -34,14 +34,23 @@ const (
 	// ssoUnchanged: eigenes Konto, öffentliche Routen und Routen ohne
 	// Rechteprüfung - Antwort wie mit einem Token ohne Seitenbezug.
 	ssoUnchanged
+	// ssoOwnAccountNoPageSession: own account, but refused (403) for a page
+	// SSO session, e.g. linking a global provider.
+	ssoOwnAccountNoPageSession
 )
 
 var ssoRouteKinds = map[string]ssoRouteKind{
-	"GET /healthz":                                       ssoUnchanged,
-	"GET /api/auth/oidc/login":                           ssoUnchanged,
-	"GET /api/auth/oidc/callback":                        ssoUnchanged,
-	"GET /api/auth/sso/login":                            ssoUnchanged,
-	"POST /api/auth/sso-exchange":                        ssoUnchanged,
+	"GET /healthz":                        ssoUnchanged,
+	"GET /api/auth/oidc/login":            ssoUnchanged,
+	"GET /api/auth/oidc/callback":         ssoUnchanged,
+	"GET /api/auth/sso/login":             ssoUnchanged,
+	"POST /api/auth/sso-exchange":         ssoUnchanged,
+	"GET /api/auth/provider/:id/login":    ssoUnchanged,
+	"GET /api/auth/provider/:id/callback": ssoUnchanged,
+	"GET /api/public/auth-config":         ssoUnchanged,
+	// A page SSO session must not link a global provider (it would become a
+	// full session on the next login); the handler answers 403.
+	"POST /api/auth/provider/:id/link":                   ssoOwnAccountNoPageSession,
 	"POST /api/login":                                    ssoUnchanged,
 	"POST /api/subscribe":                                ssoUnchanged,
 	"POST /api/subscribe/test-webhook":                   ssoUnchanged,
@@ -360,6 +369,13 @@ func TestRouter_SSOSessionIsLimitedToItsPage(t *testing.T) {
 				}
 				if got := serveFresh(t, m, p, pageA, plain); got == http.StatusForbidden || got == http.StatusUnauthorized {
 					t.Errorf("normales Token (Global Admin) auf globaler Route: %d, want erlaubt", got)
+				}
+			case ssoOwnAccountNoPageSession:
+				if got := serveFresh(t, m, p, pageA, scoped); got != http.StatusForbidden {
+					t.Errorf("page SSO token: %d, want 403", got)
+				}
+				if got := serveFresh(t, m, p, pageA, plain); got == http.StatusForbidden || got == http.StatusUnauthorized {
+					t.Errorf("plain token: %d, want allowed", got)
 				}
 			case ssoUnchanged:
 				if s, n := serveFresh(t, m, p, pageA, scoped), serveFresh(t, m, p, pageA, plain); s != n {

@@ -240,7 +240,13 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// SSO-Art nennt die Auskunft /api/public/pages/:slug/sso ihnen nicht).
 	r.GET("/api/auth/sso/login", middleware.NewRateLimiter(20, time.Minute), h.SSOLoginBySlugHandler)
 	r.GET("/api/auth/oidc/callback", middleware.NewRateLimiter(20, time.Minute), h.OIDCCallbackHandler)
+	// Global OIDC providers (OIDC_PROVIDERS), 20/min per IP like the page
+	// OIDC routes; the callback triggers an outgoing call to the provider.
+	r.GET("/api/auth/provider/:id/login", middleware.NewRateLimiter(20, time.Minute), h.ProviderLoginHandler)
+	r.GET("/api/auth/provider/:id/callback", middleware.NewRateLimiter(20, time.Minute), h.ProviderCallbackHandler)
 	r.POST("/api/auth/sso-exchange", middleware.NewRateLimiter(10, time.Minute), h.SSOExchangeHandler)
+	// Sign-in methods for the login page (password switch, providers).
+	r.GET("/api/public/auth-config", middleware.NewRateLimiter(60, time.Minute), h.GetAuthConfigHandler)
 
 	// --- Öffentliche Routen ---
 	// 20/Minute statt 5: schützt weiterhin wirksam vor Brute-Force, kollidiert aber
@@ -353,6 +359,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	authGroup.Use(middleware.AuthMiddleware())
 	authGroup.GET("/me", h.MeHandler)
 	authGroup.POST("/auth/oidc/link", h.OIDCLinkHandler)
+	authGroup.POST("/auth/provider/:id/link", h.ProviderLinkHandler)
 	// eigene SSO-Verknüpfungen anzeigen und lösen (Profil).
 	authGroup.GET("/me/sso", h.GetMySSOHandler)
 	authGroup.DELETE("/me/sso/:id", h.DeleteMySSOHandler)
@@ -764,6 +771,7 @@ func newHTTPServer(addr string, h http.Handler, t serverTimeouts) *http.Server {
 // SIGINT/SIGTERM eintrifft, um dann einen Graceful-Shutdown durchzuführen.
 func runServer(r *gin.Engine) {
 	handlers.WarnIfCustomDomainCheckUnprotected()
+	handlers.WarnAuthConfig()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

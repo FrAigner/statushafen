@@ -183,6 +183,11 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 		"GET /api/auth/oidc/login",
 		"GET /api/auth/oidc/callback",
 		"POST /api/auth/oidc/link",
+		// global OIDC providers
+		"GET /api/auth/provider/:id/login",
+		"GET /api/auth/provider/:id/callback",
+		"POST /api/auth/provider/:id/link",
+		"GET /api/public/auth-config",
 		// Frontend-Einstieg ins Seiten-SSO
 		"GET /api/public/pages/:slug/sso",
 		"GET /api/me/sso",
