@@ -389,7 +389,7 @@ func TestExternalIncidentsAPI_FormatUndFilter(t *testing.T) {
 	assert.Len(t, s.list(s.viewerTok, "source_id=999"), 0)
 
 	// Beendete außerhalb des Fensters entfallen, offene bleiben.
-	old := time.Now().AddDate(0, 0, -60)
+	old := s.clock.AddDate(0, 0, -60)
 	require.NoError(t, s.db.Model(&models.ExternalIncident{}).Where("external_id = ?", "done1").
 		Updates(map[string]any{"resolved_at": old, "external_updated_at": old}).Error)
 	assert.Len(t, s.list(s.viewerTok, ""), 2)
@@ -507,7 +507,7 @@ func TestPublicDashboard_ExternalIncidents(t *testing.T) {
 	assert.Equal(t, "open1", items[0].(map[string]any)["external_id"])
 	assert.Equal(t, "Example Cloud", items[0].(map[string]any)["source_name"])
 
-	old := time.Now().AddDate(0, 0, -20)
+	old := s.clock.AddDate(0, 0, -20)
 	require.NoError(t, s.db.Model(&models.ExternalIncident{}).Where("external_id = ?", "done1").
 		Updates(map[string]any{"resolved_at": old, "external_updated_at": old}).Error)
 	assert.Len(t, dash(), 1, "beendete nach 14 Tagen nicht mehr")

@@ -449,6 +449,15 @@ func (h *Handler) activeSourceIDs(pageID uint) *gorm.DB {
 	return h.DB.Model(&models.ExternalSource{}).Select("id").Where("status_page_id = ? AND active = ?", pageID, true)
 }
 
+// externalIncidentNow: reference time for the "recently closed" window; it
+// honours the injectable clock h.Now like the other handlers do.
+func (h *Handler) externalIncidentNow() time.Time {
+	if h.Now != nil {
+		return h.Now()
+	}
+	return time.Now()
+}
+
 // externalIncidentViews liefert die gespiegelten Meldungen der Seite, die
 // mindestens eine gekoppelte Komponente betreffen. Offene zuerst, dann nach
 // letzter Änderung; beendete nur innerhalb von q.days.
@@ -468,7 +477,7 @@ func (h *Handler) externalIncidentViews(pageID uint, q externalIncidentQuery) ([
 	}
 	now := q.now
 	if now.IsZero() {
-		now = time.Now()
+		now = h.externalIncidentNow()
 	}
 	cutoff := now.AddDate(0, 0, -q.days)
 	db = db.Where("closed = ? OR COALESCE(resolved_at, external_updated_at, last_seen_at) >= ?", false, cutoff)
