@@ -702,6 +702,18 @@ describe('PublicLayout', () => {
       expect(wrapper.find('.language-switcher').exists()).toBe(true)
     })
 
+    // /docs uses the landing header too; the section anchors only exist on the landing page,
+    // so off "/" the links must lead there instead of jumping within the current page.
+    it('points the section links to the landing page when shown off the landing page', async () => {
+      useLandingChrome().isLanding.value = true
+      const { wrapper, router } = await mountLayout()
+      await router.push('/docs')
+      await flushPromises()
+      const nav = wrapper.find('nav.lp-nav')
+      expect(nav.findAll('a').map(a => a.attributes('href'))).toEqual(['/#features', '/#directory', '/docs'])
+      expect(wrapper.find('a.order-button').exists()).toBe(true)
+    })
+
     it('blendet den Bestell-Knopf der Kopfzeile aus, wenn die Bestellung deaktiviert ist', async () => {
       useLandingChrome().isLanding.value = true
       useLandingChrome().ordersEnabled.value = false

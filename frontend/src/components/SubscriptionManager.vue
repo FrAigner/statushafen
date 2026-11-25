@@ -130,9 +130,23 @@ watch(() => props.isLoggedIn, (loggedIn) => {
   if (loggedIn) loadSubscription()
 }, { immediate: true })
 
+// Header menu "Manage subscription": without a subscription the section is not rendered until it
+// opens, so it opens first and only then scrolls into view and takes the focus. The scroll starts
+// before the subscription has loaded; the panel grows downwards, so the section top stays put.
+const sectionRef = ref(null)
+const revealEditAbo = async () => {
+  if (!props.isLoggedIn) return
+  const loading = openEditAbo()
+  await nextTick()
+  sectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  bodyPanelRef.value?.focus({ preventScroll: true })
+  await loading
+}
+
 // Erlaubt der übergeordneten StatusPage, den Editor direkt aus dem CTA heraus
-// zu öffnen (openEditAbo) und den Zustand nach dem Abonnieren neu zu holen (refresh).
-defineExpose({ openEditAbo, refresh: loadSubscription })
+// zu öffnen (openEditAbo), ihn aus dem Kopfmenü anzuspringen (revealEditAbo) und den Zustand
+// nach dem Abonnieren neu zu holen (refresh).
+defineExpose({ openEditAbo, revealEditAbo, refresh: loadSubscription })
 
 const saveEditAbo = async () => {
   editLoading.value = true
@@ -178,7 +192,7 @@ const confirmEndSubscription = async () => {
 </script>
 
 <template>
-  <div class="edit-abo-section" v-if="isLoggedIn && (!noSubscription || showEditAbo)">
+  <div ref="sectionRef" class="edit-abo-section" v-if="isLoggedIn && (!noSubscription || showEditAbo)">
     <button
       type="button"
       class="edit-abo-header"

@@ -315,6 +315,44 @@ describe('SubscriptionManager', () => {
     })
   })
 
+  // Header menu "Manage subscription": on the first click the section may not be rendered yet
+  // (no subscription yet), so it has to open first and then scroll and move focus into it.
+  describe('revealEditAbo (header menu)', () => {
+    let scrollSpy
+    beforeEach(() => {
+      scrollSpy = vi.fn()
+      Element.prototype.scrollIntoView = scrollSpy
+    })
+
+    it('opens the section, scrolls it into view and focuses it on the first call, even without a subscription', async () => {
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'Kein Abonnement gefunden' }, 404))
+      const wrapper = mountManager()
+      await flushPromises()
+      expect(wrapper.find('.edit-abo-section').exists()).toBe(false)
+      const focusSpy = vi.spyOn(HTMLElement.prototype, 'focus')
+
+      await wrapper.vm.revealEditAbo()
+      await flushPromises()
+
+      const section = wrapper.find('.edit-abo-section')
+      expect(section.exists()).toBe(true)
+      expect(wrapper.find('.edit-abo-header').attributes('aria-expanded')).toBe('true')
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      expect(scrollSpy.mock.contexts[0]).toBe(section.element)
+      expect(focusSpy.mock.contexts).toContain(wrapper.find('#edit-abo-body-panel').element)
+      focusSpy.mockRestore()
+    })
+
+    it('does nothing when logged out', async () => {
+      global.fetch = vi.fn()
+      const wrapper = mountManager({ isLoggedIn: false })
+      await wrapper.vm.revealEditAbo()
+      await flushPromises()
+      expect(scrollSpy).not.toHaveBeenCalled()
+      expect(global.fetch).not.toHaveBeenCalled()
+    })
+  })
+
   // "Abonnement beenden" - Bestätigung läuft als eigener
   // Zustand auf der Seite (kein window.confirm), löscht per DELETE und führt
   // zurück in Zustand B ("kein Abonnement").

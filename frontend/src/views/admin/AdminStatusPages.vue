@@ -571,7 +571,7 @@ const removeUser = async (assignment) => {
       </ListCard>
 
       <!-- Formular -->
-      <FormPanel v-if="isEditing" class="form-panel--scroll" :title="formTitle" @close="cancelEdit">
+      <FormPanel v-if="isEditing" class="form-panel--tall" :title="formTitle" @close="cancelEdit">
         <!-- Name/Slug prüft saveItem selbst (Meldung am Feld), der Submit-Wächter
              soll nicht dazwischenfunken. -->
         <form ref="formEl" novalidate data-self-validates class="edit-form" @submit.prevent="saveItem">
@@ -770,7 +770,7 @@ const removeUser = async (assignment) => {
       </FormPanel>
 
       <!-- Benutzerverwaltung -->
-      <FormPanel v-else-if="showUsers" class="form-panel--scroll" :title="t('statusPages.permissionsTitle', { name: showUsers.Name })" :show-required-hint="false" @close="showUsers = null">
+      <FormPanel v-else-if="showUsers" class="form-panel--tall" :title="t('statusPages.permissionsTitle', { name: showUsers.Name })" :show-required-hint="false" @close="showUsers = null">
         <!-- Benutzer zuweisen -->
         <div class="edit-form assign-block">
           <h4 class="adm-subhead">{{ t('statusPages.addUserHeading') }}</h4>
