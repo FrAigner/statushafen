@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Review A: Ein zwischen Lstat und Open untergeschobener FIFO
-// mit stillem Schreiber darf den Monitor nicht hängen (Go meldet O_NONBLOCK-Dateien
-// beim Netpoller an, Read wartet dann statt mit EAGAIN zu scheitern).
+// Review A: a FIFO planted between Lstat and Open
+// with a silent writer must not hang the monitor (Go registers O_NONBLOCK files
+// with the netpoller, Read then waits instead of failing with EAGAIN).
 func TestBackupCheck_FifoNachLstatUntergeschobenBlockiertNicht(t *testing.T) {
 	dir := t.TempDir()
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
-	require.NoError(t, os.WriteFile(pfad, []byte("x"), 0o600)) // Lstat sieht eine reguläre Datei
+	require.NoError(t, os.WriteFile(pfad, []byte("x"), 0o600)) // Lstat sees a regular file
 	fifo := filepath.Join(t.TempDir(), "fifo")
 	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
 
@@ -53,7 +53,7 @@ func TestBackupCheck_FifoNachLstatUntergeschobenBlockiertNicht(t *testing.T) {
 	}
 }
 
-// Review B: Jobnamen ohne Pfadanteile.
+// Review B: job names without path parts.
 func TestValidJobName(t *testing.T) {
 	for _, ok := range []string{"backup-prod", "backup2"} {
 		assert.True(t, ValidJobName(ok), ok)
@@ -63,8 +63,8 @@ func TestValidJobName(t *testing.T) {
 	}
 }
 
-// Review D: Eine soft-gelöschte Marke zählt als vorhanden (ON CONFLICT
-// greift auch auf sie), sonst liefe jeder Takt in den stillen Rollback.
+// Review D: a soft-deleted marker counts as present (ON CONFLICT
+// also hits it), otherwise every tick would run into the silent rollback.
 func TestReadValue_SiehtAuchSoftGeloeschteMarken(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, setValue(f.db, incidentKeyPrefix+testSlug, "7"))
@@ -75,8 +75,8 @@ func TestReadValue_SiehtAuchSoftGeloeschteMarken(t *testing.T) {
 	assert.Equal(t, "7", v)
 }
 
-// Review D: Scheitert das Anlegen an einer vorhandenen Marke, steht
-// das als Warnung im Log (fester Text, kein Geheimnis).
+// Review D: if creation fails because of an existing marker, this appears
+// as a warning in the log (fixed text, no secret).
 func TestMonitor_VorfallMarkeExistiertWirdGeloggt(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -89,8 +89,8 @@ func TestMonitor_VorfallMarkeExistiertWirdGeloggt(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Review C: Wurde die Störungs-Marke zwischenzeitlich entfernt (Erholung
-// einer anderen Replika), legt openIncident keinen Vorfall mehr an.
+// Review C: if the outage marker was removed in the meantime (recovery
+// by another replica), openIncident no longer creates an incident.
 func TestMonitor_VorfallAnlegenOhneStoerungsMarkeRollback(t *testing.T) {
 	f := newFixture(t)
 	f.m.openIncident(f.page.ID, f.m.Checks[0], f.comp, f.now, "x")
@@ -99,7 +99,7 @@ func TestMonitor_VorfallAnlegenOhneStoerungsMarkeRollback(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", incidentKeyPrefix+"%"))
 }
 
-// Review C: Lesefehler der Störungs-Marke in der Transaktion = kein Vorfall, Log.
+// Review C: read error of the outage marker in the transaction = no incident, log.
 func TestMonitor_VorfallAnlegenStoerungsMarkeLesefehler(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -113,8 +113,8 @@ func TestMonitor_VorfallAnlegenStoerungsMarkeLesefehler(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Review E: Das Audit der Aufräumung nennt die echte Komponente und
-// den geschlossenen Vorfall.
+// Review E: the audit of the cleanup names the real component and
+// the closed incident.
 func TestMonitor_AufraeumenAuditNenntKomponenteUndVorfall(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -127,8 +127,8 @@ func TestMonitor_AufraeumenAuditNenntKomponenteUndVorfall(t *testing.T) {
 	assert.Equal(t, "Komponente gelöscht; Vorfall 1 geschlossen", a.Details)
 }
 
-// Review E: Ohne Vorfall bzw. wenn der Admin ihn schon schloss, steht
-// kein "Vorfall" im Audit; ist die Komponente hart gelöscht, dient der Slug.
+// Review E: without an incident, or if the admin already closed it, there is
+// no "incident" in the audit; if the component is hard-deleted, the slug serves.
 func TestMonitor_AufraeumenAuditOhneGeschlossenenVorfall(t *testing.T) {
 	f := newFixture(t)
 	f.fail()

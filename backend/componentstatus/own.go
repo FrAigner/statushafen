@@ -6,13 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// FromIncidentSeverity bildet den Schweregrad eines offenen, zugeordneten
-// Vorfalls (Incident.Severity) auf einen Komponentenstatus ab
-// Die Schweregrad-Werte sind absichtlich identisch mit den
-// Komponentenstatus (degraded_performance/partial_outage/major_outage); die
-// Verfügbarkeitsbalken (handlers/availability.go) und die Anzeige nutzen
-// DIESE eine Zuordnung, damit sie sich nicht widersprechen. Leere oder
-// unbekannte Werte (Altdaten) zählen vorsichtig wie bisher als
+// FromIncidentSeverity maps the severity of an open, assigned
+// incident (Incident.Severity) to a component status.
+// The severity values are intentionally identical to the
+// component statuses (degraded_performance/partial_outage/major_outage); the
+// availability bars (handlers/availability.go) and the display use
+// THIS one mapping so they do not contradict each other. Empty or
+// unknown values (legacy data) are conservatively treated as before as
 // degraded_performance.
 func FromIncidentSeverity(severity string) string {
 	if models.IsValidIncidentSeverity(severity) {
@@ -21,12 +21,12 @@ func FromIncidentSeverity(severity string) string {
 	return DegradedPerformance
 }
 
-// FromOpenIncident bildet einen offenen, zugeordneten Vorfall auf einen
-// Komponentenstatus ab: incidentSeverity ist der schlimmste
-// Schweregrad der offenen Vorfälle der Komponente, leer = kein offener
-// Vorfall (-> "operational"). Seit der Umstellung wirkt der Schweregrad statt
-// pauschal "degraded_performance". Seit der Umstellung hier statt in
-// handlers/component.go, siehe Paketdoku.
+// FromOpenIncident maps an open, assigned incident to a
+// component status: incidentSeverity is the worst
+// severity of the component's open incidents, empty = no open
+// incident (-> "operational"). Since the switch the severity applies instead of
+// a blanket "degraded_performance". Since the switch here instead of in
+// handlers/component.go, see package doc.
 func FromOpenIncident(incidentSeverity string) string {
 	if incidentSeverity == "" {
 		return Operational
@@ -34,26 +34,26 @@ func FromOpenIncident(incidentSeverity string) string {
 	return FromIncidentSeverity(incidentSeverity)
 }
 
-// Own kombiniert den manuell gesetzten Status einer Komponente mit dem aus
-// offenen, zugeordneten Vorfällen abgeleiteten Status: der
-// schlechtere Wert gewinnt (Rangfolge: Severity). So verschluckt ein offener
-// Vorfall keinen bereits schlechteren manuellen Status, und ein gelöster
-// Vorfall überschreibt umgekehrt nicht den manuellen Status - der bleibt
-// unverändert in der DB und wird nur für die Anzeige überlagert.
-// incidentSeverity: Wert aus OpenIncidentComponentIDs, leer = kein Vorfall.
+// Own combines the manually set status of a component with the status derived
+// from open, assigned incidents: the
+// worse value wins (ranking: Severity). So an open
+// incident does not swallow an already worse manual status, and a resolved
+// incident conversely does not overwrite the manual status - it stays
+// unchanged in the DB and is only overlaid for display.
+// incidentSeverity: value from OpenIncidentComponentIDs, empty = no incident.
 func Own(manualStatus, incidentSeverity string) string {
 	return Worst(manualStatus, FromOpenIncident(incidentSeverity))
 }
 
-// OpenIncidentComponentIDs liefert je Komponente einer Statusseite, die
-// mindestens einem offenen (Status nicht resolved, models.IsResolvedIncidentStatus), normalen
-// (nicht Wartungsfenster-) Vorfall zugeordnet ist, den SCHLIMMSTEN
-// Schweregrad dieser Vorfälle; Komponenten ohne offenen
-// Vorfall fehlen in der Map. Wartungs-
-// fenster bleiben außen vor, da sie ihren Komponentenstatus bereits über
-// eine eigene, destruktive Logik setzen (CreateIncidentHandler/
-// maintenance_scheduler.go, "under_maintenance" direkt in die DB
-// geschrieben) - diese Ableitung soll das nicht überlagern.
+// OpenIncidentComponentIDs returns, for each component of a status page that is
+// assigned to at least one open (status not resolved, models.IsResolvedIncidentStatus), normal
+// (not maintenance-window) incident, the WORST
+// severity of those incidents; components without an open
+// incident are missing from the map. Maintenance
+// windows are left out, since they already set their component status via
+// their own, destructive logic (CreateIncidentHandler/
+// maintenance_scheduler.go, "under_maintenance" written directly to the DB)
+// - this derivation must not overlay that.
 func OpenIncidentComponentIDs(db *gorm.DB, pageID uint) map[uint]string {
 	var rows []struct {
 		ComponentID uint

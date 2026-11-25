@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// erholt lässt die Störung regulär enden (Erholung, Texte bleiben original):
-// der Altfall, den die frühere Korrektur nicht erfasst, weil die Komponente erst später
-// ausgeblendet wird.
+// erholt lets the outage end regularly (recovery, texts stay original):
+// the legacy case that the earlier fix does not capture because the component is only later
+// hidden.
 func erholt(t *testing.T, f *fixture) {
 	t.Helper()
 	offeneStoerung(t, f)
@@ -54,13 +54,13 @@ func neutral(t *testing.T, f *fixture) {
 	assert.Zero(t, f.count(t, &models.IncidentUpdateTranslation{}, "1 = 1"))
 }
 
-// 1: Wird die Komponente während der Störung gelöscht oder
-// verschoben, schließt releaseOrphan den Vorfall; er bleibt öffentlich und darf
-// weder Prüfungsnamen noch Fehlerdetail nennen.
+// 1: if the component is deleted or moved during the outage,
+// releaseOrphan closes the incident; it stays public and must
+// name neither check name nor error detail.
 func TestMonitor_WaiseNeutralisiertVorfalltexte(t *testing.T) {
 	for name, weg := range verstecktOderWeg() {
 		if name == "archiviert" || name == "unsichtbar" {
-			continue // kein Waisen-Pfad, wird an anderer Stelle geprüft
+			continue // not an orphan path, checked elsewhere
 		}
 		t.Run(name, func(t *testing.T) {
 			f := newFixture(t)
@@ -76,7 +76,7 @@ func TestMonitor_WaiseNeutralisiertVorfalltexte(t *testing.T) {
 	}
 }
 
-// 1: Auch beim Abschalten der Überwachung (releaseAll -> Waise).
+// 1: also when monitoring is switched off (releaseAll -> orphan).
 func TestMonitor_WaiseBeimAbschaltenNeutralisiert(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -87,7 +87,7 @@ func TestMonitor_WaiseBeimAbschaltenNeutralisiert(t *testing.T) {
 	assert.Equal(t, neutralTitle, inc.Title)
 }
 
-// 1: Texte des Admins bleiben auch im Waisen-Pfad stehen.
+// 1: texts by the admin also stay in the orphan path.
 func TestMonitor_WaiseLaesstAdminTexteStehen(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -100,8 +100,8 @@ func TestMonitor_WaiseLaesstAdminTexteStehen(t *testing.T) {
 	assert.Equal(t, "Wir prüfen die API.", inc.Message)
 }
 
-// 1: Scheitert das Neutralisieren, wird die Freigabe zurückgerollt
-// (Marken bleiben, Vorfall offen) und beim nächsten Takt wiederholt.
+// 1: if neutralizing fails, the release is rolled back
+// (markers stay, incident open) and repeated on the next tick.
 func TestMonitor_WaiseNeutralisierenFehlerWirdWiederholt(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -118,8 +118,8 @@ func TestMonitor_WaiseNeutralisierenFehlerWirdWiederholt(t *testing.T) {
 	assert.Equal(t, neutralTitle, inc.Title)
 }
 
-// 2: Altfälle (regulär erholt, Komponente später ausgeblendet,
-// gelöscht oder verschoben) werden beim Backfill neutralisiert.
+// 2: legacy cases (regularly recovered, component later hidden,
+// deleted or moved) are neutralized in the backfill.
 func TestNeutralizeHiddenIncidents_Altfaelle(t *testing.T) {
 	for name, weg := range verstecktOderWeg() {
 		t.Run(name, func(t *testing.T) {
@@ -128,15 +128,15 @@ func TestNeutralizeHiddenIncidents_Altfaelle(t *testing.T) {
 			weg(t, f)
 			require.NoError(t, NeutralizeHiddenIncidents(f.db))
 			neutral(t, f)
-			// Idempotent: zweiter Lauf ändert nichts mehr.
+			// Idempotent: second run changes nothing more.
 			require.NoError(t, NeutralizeHiddenIncidents(f.db))
 			neutral(t, f)
 		})
 	}
 }
 
-// 2: Ohne Zuordnung (Komponente samt Verknüpfung entfernt) gilt der
-// Vorfall als verwaist und wird neutralisiert (konservativ).
+// 2: without an assignment (component removed together with its link) the
+// incident counts as orphaned and is neutralized (conservative).
 func TestNeutralizeHiddenIncidents_OhneZuordnung(t *testing.T) {
 	f := newFixture(t)
 	erholt(t, f)
@@ -145,8 +145,8 @@ func TestNeutralizeHiddenIncidents_OhneZuordnung(t *testing.T) {
 	neutral(t, f)
 }
 
-// 2: Sichtbare Komponente, offener Vorfall, Admin-Texte und fremde
-// Seiten bleiben unangetastet.
+// 2: visible component, open incident, admin texts and foreign
+// pages remain untouched.
 func TestNeutralizeHiddenIncidents_LaesstAnderesStehen(t *testing.T) {
 	t.Run("sichtbare Komponente", func(t *testing.T) {
 		f := newFixture(t)
@@ -212,15 +212,15 @@ func TestNeutralizeHiddenIncidents_LaesstAnderesStehen(t *testing.T) {
 	})
 }
 
-// 2: Ohne Systemseite ist nichts zu tun.
+// 2: without a system page there is nothing to do.
 func TestNeutralizeHiddenIncidents_SystemseiteFehlt(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Unscoped().Delete(&f.page).Error)
 	require.NoError(t, NeutralizeHiddenIncidents(f.db))
 }
 
-// 2: Fail closed: Jeder Fehler gibt einen Fehler zurück und
-// schreibt nichts (eine Transaktion); der nächste Start wiederholt den Backfill.
+// 2: fail closed: every error returns an error and
+// writes nothing (one transaction); the next start repeats the backfill.
 func TestNeutralizeHiddenIncidents_FehlerRolltZurueck(t *testing.T) {
 	trigger := func(sql string) func(*testing.T, *fixture) func() {
 		return func(t *testing.T, f *fixture) func() {
@@ -262,8 +262,8 @@ func TestNeutralizeHiddenIncidents_FehlerRolltZurueck(t *testing.T) {
 	}
 }
 
-// 2: Die Komponente ist per ID nicht lesbar (Lesefehler, nicht
-// "nicht gefunden"): Fehler statt Raten.
+// 2: the component is not readable by ID (read error, not
+// "not found"): error instead of guessing.
 func TestNeutralizeHiddenIncidents_KomponenteNichtLesbar(t *testing.T) {
 	f := newFixture(t)
 	erholt(t, f)
@@ -272,7 +272,7 @@ func TestNeutralizeHiddenIncidents_KomponenteNichtLesbar(t *testing.T) {
 	require.NoError(t, f.db.Callback().Query().Before("gorm:query").Register("test:lesefehler829c", func(d *gorm.DB) {
 		if d.Statement.Table == "components" {
 			n++
-			if n == 2 { // 1. Liste der Seite, 2. Einzelabfrage
+			if n == 2 { // 1. list of the page, 2. single query
 				_ = d.AddError(errors.New("lesefehler"))
 			}
 		}
@@ -283,16 +283,16 @@ func TestNeutralizeHiddenIncidents_KomponenteNichtLesbar(t *testing.T) {
 	assert.Equal(t, "Störung: API", inc.Title)
 }
 
-// Review Wird die Komponente erst NACH regulärer Erholung ausgeblendet,
-// gelöscht oder verschoben, gehört der Vorfall dem Monitor nicht mehr. Der Takt
-// neutralisiert ihn deshalb regelmäßig (alle neutralizeEvery Takte), nicht nur
-// beim Start, und unabhängig vom Schalter (die Texte sind öffentlich).
+// Review: if the component is only hidden AFTER regular recovery,
+// deleted or moved, the incident no longer belongs to the monitor. The tick
+// therefore neutralizes it regularly (every neutralizeEvery ticks), not only
+// at start, and independent of the switch (the texts are public).
 func TestMonitor_TaktNeutralisiertNachtraeglichAusgeblendeteVorfaelle(t *testing.T) {
 	for name, weg := range verstecktOderWeg() {
 		for _, an := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/an=%v", name, an), func(t *testing.T) {
 				f := newFixture(t)
-				erholt(t, f) // Takte bis hier: neutralizeEvery ist nicht erreicht
+				erholt(t, f) // ticks up to here: neutralizeEvery is not reached
 				weg(t, f)
 				f.m.Enabled = func() (bool, error) { return an, nil }
 				f.res = &Result{OK: true}
@@ -308,8 +308,8 @@ func TestMonitor_TaktNeutralisiertNachtraeglichAusgeblendeteVorfaelle(t *testing
 	}
 }
 
-// Review Scheitert die Bereinigung im Takt, wird geloggt, nichts
-// geschrieben und der Takt läuft weiter; der nächste fällige Takt wiederholt sie.
+// Review: if the cleanup in the tick fails, it is logged, nothing
+// written and the tick continues; the next due tick repeats it.
 func TestMonitor_TaktBereinigungFehlerIstFailClosed(t *testing.T) {
 	f := newFixture(t)
 	erholt(t, f)

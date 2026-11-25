@@ -23,8 +23,8 @@ func verstecke(t *testing.T, f *fixture) {
 	require.NoError(t, f.db.Model(&models.Component{}).Where("id = ?", f.comp.ID).Update("visible", false).Error)
 }
 
-// Eine archivierte oder unsichtbare Funktions-Komponente wird nicht
-// ausgewertet: kein Statuswechsel, kein Marker, kein öffentlicher Vorfall mit Namen.
+// An archived or invisible function component is not
+// evaluated: no status change, no marker, no public incident with names.
 func TestMonitor_ArchivierteOderUnsichtbareKomponenteWirdNichtAusgewertet(t *testing.T) {
 	for name, hide := range map[string]func(*testing.T, *fixture){"archiviert": archiviere, "unsichtbar": verstecke} {
 		t.Run(name, func(t *testing.T) {
@@ -42,8 +42,8 @@ func TestMonitor_ArchivierteOderUnsichtbareKomponenteWirdNichtAusgewertet(t *tes
 	}
 }
 
-// Wird die Komponente während einer Störung archiviert/versteckt,
-// gibt der Monitor sie frei; der Abschlusstext nennt den Namen nicht.
+// If the component is archived/hidden during an outage,
+// the monitor releases it; the closing text does not name the name.
 func TestMonitor_ArchivierenWaehrendStoerungGibtFrei(t *testing.T) {
 	for name, hide := range map[string]func(*testing.T, *fixture){"archiviert": archiviere, "unsichtbar": verstecke} {
 		t.Run(name, func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestMonitor_ArchivierenWaehrendStoerungGibtFrei(t *testing.T) {
 	}
 }
 
-// Wiederherstellen: die Überwachung läuft normal weiter.
+// Restore: monitoring continues normally.
 func TestMonitor_WiederherstellenUeberwachtWeiter(t *testing.T) {
 	f := newFixture(t)
 	archiviere(t, f)
@@ -75,8 +75,8 @@ func TestMonitor_WiederherstellenUeberwachtWeiter(t *testing.T) {
 	assert.Equal(t, "major_outage", f.status(t))
 }
 
-// Der Zähler läuft nicht im Verborgenen weiter: nach dem
-// Wiederherstellen braucht es wieder die volle Entprellung.
+// The counter does not keep running in secret: after
+// restoring, the full debouncing is needed again.
 func TestMonitor_ArchivierungSetztZaehlerZurueck(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -88,8 +88,8 @@ func TestMonitor_ArchivierungSetztZaehlerZurueck(t *testing.T) {
 	assert.Equal(t, "operational", f.status(t))
 }
 
-// gruppeUeber hängt die überwachte Komponente unter eine neue Gruppe (wie die
-// Funktions-Komponenten der Systemseite unter gruppe-<Key>) und liefert deren ID.
+// gruppeUeber hangs the monitored component under a new group (like the
+// function components of the system page under gruppe-<Key>) and returns its ID.
 func gruppeUeber(t *testing.T, f *fixture) uint {
 	t.Helper()
 	g := models.Component{StatusPageID: f.page.ID, Name: "Plattform", Slug: "gruppe-plattform", Status: "group"}
@@ -103,8 +103,8 @@ func gruppeAendern(t *testing.T, f *fixture, id uint, col string, val any) {
 	require.NoError(t, f.db.Model(&models.Component{}).Where("id = ?", id).Update(col, val).Error)
 }
 
-// Review: Öffentlich gilt auch ein Nachfahre einer unsichtbaren oder
-// archivierten Gruppe als ausgeblendet (models.HiddenComponentIDs).
+// Review: publicly, a descendant of an invisible or
+// archived group also counts as hidden (models.HiddenComponentIDs).
 func TestMonitor_KindEinerVersteckenGruppeWirdNichtAusgewertet(t *testing.T) {
 	for name, hide := range map[string]func(*testing.T, *fixture, uint){
 		"unsichtbar": func(t *testing.T, f *fixture, g uint) { gruppeAendern(t, f, g, "visible", false) },
@@ -125,8 +125,8 @@ func TestMonitor_KindEinerVersteckenGruppeWirdNichtAusgewertet(t *testing.T) {
 	}
 }
 
-// Review: Gruppe während der Störung ausgeblendet: Freigabe; beim
-// Wiedereinblenden läuft die Überwachung normal weiter.
+// Review: group hidden during the outage: release; when
+// shown again, monitoring continues normally.
 func TestMonitor_GruppeWaehrendStoerungAusgeblendetGibtFreiUndBlendetWiederEin(t *testing.T) {
 	f := newFixture(t)
 	g := gruppeUeber(t, f)
@@ -142,8 +142,8 @@ func TestMonitor_GruppeWaehrendStoerungAusgeblendetGibtFreiUndBlendetWiederEin(t
 	assert.Equal(t, "major_outage", f.status(t))
 }
 
-// Review: Auch ein Ergebnis "nicht prüfbar" (Skip) gibt eine
-// laufende Störung frei, sobald die Komponente ausgeblendet ist.
+// Review: a result "not checkable" (Skip) also releases an
+// ongoing outage as soon as the component is hidden.
 func TestMonitor_VerstecktMitSkipGibtFrei(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -155,8 +155,8 @@ func TestMonitor_VerstecktMitSkipGibtFrei(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.Incident{}, "status <> ?", "resolved"))
 }
 
-// Review: Lesefehler beim Laden der Komponentenliste: Takt entfällt,
-// nichts wird verändert, das Geheimnis steht nicht im Log.
+// Review: read error when loading the component list: tick is skipped,
+// nothing is changed, the secret does not appear in the log.
 func TestMonitor_KomponentenlisteLesefehlerUeberspringtPruefung(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)

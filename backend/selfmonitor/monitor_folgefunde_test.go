@@ -14,8 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// lesefehlerAb lässt die n-te Abfrage auf system_settings (und alle folgenden)
-// scheitern; die Fehlermeldung trägt ein Geheimnis (Logging-Regel: keine Geheimnisse im Log).
+// lesefehlerAb makes the n-th query on system_settings (and all following) fail;
+// the error message carries a secret (logging rule: no secrets in the log).
 func lesefehlerAb(t *testing.T, db *gorm.DB, n int) {
 	t.Helper()
 	zaehler := 0
@@ -29,19 +29,19 @@ func lesefehlerAb(t *testing.T, db *gorm.DB, n int) {
 	}))
 }
 
-// lesefehlerAus nimmt den Lesefehler zurück (die Zähl-Abfragen des Tests zählen mit).
+// lesefehlerAus withdraws the read error (the test's count queries count too).
 func lesefehlerAus(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	require.NoError(t, db.Callback().Query().Remove("test:lesefehler_ab"))
 }
 
-// 1: Ein Lesefehler auf der Vorfall-Marke darf nicht als "keine
-// Marke" gelten, sonst entsteht ein zweiter Vorfall und der erste bleibt offen.
+// 1: a read error on the incident marker must not count as "no
+// marker", otherwise a second incident arises and the first stays open.
 func TestMonitor_VorfallMarkeLesefehlerLegtKeinenZweitenVorfallAn(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
 	offeneStoerung(t, f)
-	lesefehlerAb(t, f.db, 2) // 1. Abfrage: Störungs-Zeit, 2.: Vorfall-Marke
+	lesefehlerAb(t, f.db, 2) // 1st query: outage time, 2nd: incident marker
 	comp := f.comp
 	comp.Status = f.m.Checks[0].FailedStatus
 	f.m.fail(f.page.ID, f.m.Checks[0], comp, "x")
@@ -50,8 +50,8 @@ func TestMonitor_VorfallMarkeLesefehlerLegtKeinenZweitenVorfallAn(t *testing.T) 
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// 1: Auch das Lesen der Störungs-Zeit kann scheitern; dann entfällt
-// der Schritt (nächster Takt wiederholt ihn).
+// 1: reading the outage time can also fail; then the step is skipped
+// (the next tick repeats it).
 func TestMonitor_StoerungsMarkeLesefehlerUeberspringtSchritt(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -65,8 +65,8 @@ func TestMonitor_StoerungsMarkeLesefehlerUeberspringtSchritt(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// 1: Zweite Replika (oder verlorene Lesung): Existiert die
-// Vorfall-Marke beim Anlegen schon, wird die Transaktion zurückgerollt.
+// 1: second replica (or lost read): if the incident
+// marker already exists on creation, the transaction is rolled back.
 func TestMonitor_VorfallAnlegenRollbackWennMarkeSchonExistiert(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -80,8 +80,8 @@ func TestMonitor_VorfallAnlegenRollbackWennMarkeSchonExistiert(t *testing.T) {
 	assert.Equal(t, vorher.Value, nachher.Value, "Marke zeigt weiter auf den ersten Vorfall")
 }
 
-// 2: Die Erholung schließt nur Vorfälle der Systemseite, auch wenn
-// die Marke auf einen fremden Vorfall zeigt.
+// 2: recovery only closes incidents of the system page, even if
+// the marker points to a foreign incident.
 func TestMonitor_ErholungSchliesstKeinenVorfallEinerAnderenSeite(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -99,8 +99,8 @@ func TestMonitor_ErholungSchliesstKeinenVorfallEinerAnderenSeite(t *testing.T) {
 	assert.Equal(t, "operational", f.status(t))
 }
 
-// Löscht ein Admin die Komponente, räumt der Monitor Marker und den
-// eigenen offenen Vorfall auf.
+// If an admin deletes the component, the monitor cleans up markers and its
+// own open incident.
 func TestMonitor_KomponenteGeloeschtRaeumtMarkerUndVorfallAuf(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -112,8 +112,8 @@ func TestMonitor_KomponenteGeloeschtRaeumtMarkerUndVorfallAuf(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.AuditLog{}, "action = ?", "selfmonitor.component_released"))
 }
 
-// dasselbe beim Abschalten der Überwachung (releaseAll); ohne
-// Vorfall genügt das Löschen der Störungs-Marke.
+// the same when monitoring is switched off (releaseAll); without an
+// incident, deleting the outage marker suffices.
 func TestMonitor_AbschaltenMitGeloeschterKomponenteRaeumtAuf(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -124,7 +124,7 @@ func TestMonitor_AbschaltenMitGeloeschterKomponenteRaeumtAuf(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Ohne Besitz-Marke bleibt eine fehlende Komponente ein Noop.
+// Without an ownership marker, a missing component stays a no-op.
 func TestMonitor_GeloeschteKomponenteOhneMarkeIstNoop(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Delete(&f.comp).Error)
@@ -133,8 +133,8 @@ func TestMonitor_GeloeschteKomponenteOhneMarkeIstNoop(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.AuditLog{}, "1 = 1"))
 }
 
-// Scheitert das Aufräumen, bleibt alles stehen (Rollback), der Fehler
-// steht ohne Geheimnis im Log und der nächste Takt versucht es erneut.
+// If the cleanup fails, everything stays (rollback), the error
+// appears without a secret in the log and the next tick tries again.
 func TestMonitor_AufraeumenScheitertRollbackUndLog(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -151,7 +151,7 @@ func TestMonitor_AufraeumenScheitertRollbackUndLog(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Lesefehler beim Aufräumen bricht ab (kein Löschen auf Verdacht).
+// A read error during cleanup aborts (no deleting on suspicion).
 func TestMonitor_AufraeumenLesefehlerBrichtAb(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -165,8 +165,8 @@ func TestMonitor_AufraeumenLesefehlerBrichtAb(t *testing.T) {
 	assert.EqualValues(t, 2, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Auch ein Lesefehler erst auf der Vorfall-Marke, ein Fehler beim
-// Schließen und beim Löschen der Vorfall-Marke brechen das Aufräumen ab.
+// Also a read error only on the incident marker, an error when
+// closing and when deleting the incident marker abort the cleanup.
 func TestMonitor_AufraeumenFehlerpfade(t *testing.T) {
 	faelle := map[string]func(f *fixture, t *testing.T){
 		"Vorfall-Marke nicht lesbar": func(f *fixture, t *testing.T) { lesefehlerAb(t, f.db, 2) },
@@ -193,8 +193,8 @@ func TestMonitor_AufraeumenFehlerpfade(t *testing.T) {
 	}
 }
 
-// Lesefehler der Besitz-Marke in releaseAll (Abschalten) und recover
-// geben nichts frei.
+// Read errors of the ownership marker in releaseAll (switch-off) and recover
+// release nothing.
 func TestMonitor_BesitzMarkeLesefehlerGibtNichtsFrei(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -215,8 +215,8 @@ func TestMonitor_BesitzMarkeLesefehlerGibtNichtsFrei(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Die Abschalt-Freigabe ist im Audit von einer echten Erholung
-// unterscheidbar; die Fehlermeldung nennt die Vorfall-ID.
+// The switch-off release is distinguishable in the audit from a real recovery;
+// the error message names the incident ID.
 func TestMonitor_AbschaltAuditUnterscheidbar(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -238,10 +238,10 @@ func TestMonitor_ErholungFehlerlogNenntVorfallID(t *testing.T) {
 	assert.Contains(t, buf.String(), "incident=1 ")
 }
 
-// Die Kennung kommt aus einer Marke in der Datenbank. Eine Zahl außerhalb des
-// uint-Bereichs (auf 32-Bit-Systemen ab 2^32) wird verworfen, statt beim
-// Umwandeln abgeschnitten zu werden und einen anderen Vorfall zu treffen.
-// Auf 64-Bit-Systemen ist das Verhalten gleich geblieben; der Test beschreibt es.
+// The identifier comes from a marker in the database. A number outside the
+// uint range (on 32-bit systems from 2^32) is discarded instead of being
+// truncated on conversion and hitting a different incident.
+// On 64-bit systems the behavior stayed the same; the test describes it.
 func TestResolveIncident_KennungAusserhalbDesBereichsSchliesstNichts(t *testing.T) {
 	db := testutils.SetupTestDB()
 	page := models.StatusPage{Name: "Sys", Slug: "sys-kennung"}
@@ -259,7 +259,7 @@ func TestResolveIncident_KennungAusserhalbDesBereichsSchliesstNichts(t *testing.
 	require.NoError(t, db.First(&after, inc.ID).Error)
 	assert.Equal(t, "investigating", after.Status, "der offene Vorfall bleibt unberührt")
 
-	// Gegenprobe: die richtige Kennung schließt.
+	// Control sample: the correct identifier closes.
 	closed, err := resolveIncident(db, page.ID, now, strconv.FormatUint(uint64(inc.ID), 10), "behoben")
 	require.NoError(t, err)
 	assert.True(t, closed)

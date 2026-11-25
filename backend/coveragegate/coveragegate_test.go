@@ -84,8 +84,8 @@ func TestParseGoProfile_MapptModulPfadeUndFuehrtDuplikateZusammen(t *testing.T) 
 	p, err := ParseGoProfile(strings.NewReader(sampleProfile), "github.com/fraigner/statushafen", "backend")
 	require.NoError(t, err)
 
-	// Duplikat 12.3,14.4 ist einmal mit 1 abgedeckt -> zählt als abgedeckt.
-	// Abgedeckt: 2 + 1 + 4 = 7 von 10 Statements.
+	// Duplicate 12.3,14.4 is covered once with 1 -> counts as covered.
+	// Covered: 2 + 1 + 4 = 7 of 10 statements.
 	require.InDelta(t, 70.0, p.Percent(), 0.001)
 }
 
@@ -155,8 +155,8 @@ func TestParseLCOV_BerechnetZeilenUndZweigquote(t *testing.T) {
 	l, err := ParseLCOV(strings.NewReader(sampleLCOV), "frontend")
 	require.NoError(t, err)
 
-	require.InDelta(t, 75.0, l.LinePercent(), 0.001)   // 3 von 4 Zeilen
-	require.InDelta(t, 50.0, l.BranchPercent(), 0.001) // 2 von 4 Zweigen
+	require.InDelta(t, 75.0, l.LinePercent(), 0.001)   // 3 of 4 lines
+	require.InDelta(t, 50.0, l.BranchPercent(), 0.001) // 2 of 4 branches
 }
 
 func TestLCOV_UncoveredMeldetZeilenUndZweige(t *testing.T) {
@@ -292,8 +292,8 @@ func TestGoProfile_UncoveredBlockgrenzen(t *testing.T) {
 
 	findings := p.Uncovered(ChangedLines{"backend/a.go": {9: true, 10: true, 12: true, 13: true, 20: true}})
 
-	// Erste und letzte Blockzeile zählen, Nachbarzeilen und Blöcke ohne
-	// Statements nicht.
+	// First and last block line count, neighboring lines and blocks without
+	// statements do not.
 	require.Equal(t, []Finding{
 		{File: "backend/a.go", Line: 10, Reason: "Statement nicht ausgeführt"},
 		{File: "backend/a.go", Line: 12, Reason: "Statement nicht ausgeführt"},
@@ -326,8 +326,8 @@ func TestParseGremlinsReport_MeldetUeberlebendeUndUnabgedeckteMutanten(t *testin
 	survivors, total, err := ParseGremlinsReport(strings.NewReader(sampleGremlins), "backend")
 	require.NoError(t, err)
 
-	// SKIPPED (außerhalb des Diffs) und NOT VIABLE (kompiliert nicht)
-	// zählen nicht mit.
+	// SKIPPED (outside the diff) and NOT VIABLE (does not compile)
+	// do not count.
 	require.Equal(t, 4, total)
 	require.Equal(t, []Finding{
 		{File: "backend/handlers/a.go", Line: 9, Reason: "Mutant überlebt (ARITHMETIC_BASE, Spalte 5)"},
@@ -359,8 +359,8 @@ func TestParseDiff_InhaltszeileMitPlusPlusIstKeinDateikopf(t *testing.T) {
 }
 
 func TestParseDiff_MitKontextzeilenUndSonderfaellen(t *testing.T) {
-	// git diff mit Kontext (-U1), "\ No newline"-Marker und einer leeren
-	// Kontextzeile (manche Tools kürzen " " zu "").
+	// git diff with context (-U1), "\ No newline" marker and an empty
+	// context line (some tools shorten " " to "").
 	d := "+++ b/a.js\n@@ -1,4 +1,5 @@\n kontext\n-alt\n+neu\n+++ plusplus\n\n\\ No newline at end of file\n eins\n" +
 		"+++ b/b.js\n@@ -1 +1 @@\n+x\n"
 	changed, err := ParseDiff(strings.NewReader(d))
@@ -372,8 +372,8 @@ func TestParseDiff_MitKontextzeilenUndSonderfaellen(t *testing.T) {
 }
 
 func TestParseDiff_UnerwarteteZeileBeendetHunk(t *testing.T) {
-	// Abgeschnittener Hunk: Der Kopf verspricht 3 Zeilen, danach folgt
-	// schon die nächste Datei.
+	// Truncated hunk: the header promises 3 lines, after which
+	// the next file already follows.
 	d := "+++ b/a.js\n@@ -0,0 +1,3 @@\n+eins\ndiff --git a/b.js b/b.js\n+++ b/b.js\n@@ -0,0 +7 @@\n+x\n"
 	changed, err := ParseDiff(strings.NewReader(d))
 	require.NoError(t, err)
@@ -390,8 +390,8 @@ func TestParseDiff_KaputteAlteSeiteIstFehler(t *testing.T) {
 	}
 }
 
-// Die Frontend-Quoten (v8) schwanken zwischen
-// identischen Läufen; die Toleranz gilt nur fürs Frontend, Go bleibt exakt.
+// The frontend rates (v8) fluctuate between
+// identical runs; the tolerance only applies to the frontend, Go stays exact.
 func TestCompareBaseline_FrontendToleranz(t *testing.T) {
 	base := Baseline{GoStatements: 70, FrontendLines: 93.5, FrontendBranches: 83.75}
 

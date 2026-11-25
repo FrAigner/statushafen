@@ -97,7 +97,7 @@ func TestCheck_BaselineUnterschrittenIstRot(t *testing.T) {
 
 func TestCheck_BaselineNurFuerGemesseneQuoten(t *testing.T) {
 	dir := t.TempDir()
-	// Ohne lcov-Report darf die Frontend-Baseline nicht als 0 % zählen.
+	// Without an lcov report the frontend baseline must not count as 0 %.
 	code, out, _ := runCmd("check",
 		"-diff", writeFile(t, dir, "d.diff", ""),
 		"-go-profile", writeFile(t, dir, "go.out", goProfile),

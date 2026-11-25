@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// C: Ein Lesefehler beim Schalter ist nicht "aus": Status, Marker
-// und Vorfall bleiben unverändert, auch der Zähler läuft nicht weiter.
+// C: a read error on the switch is not "off": status, marker
+// and incident stay unchanged, and the counter does not keep running either.
 func TestMonitor_SchalterLesefehlerGibtNichtsFrei(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)

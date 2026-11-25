@@ -1,6 +1,6 @@
 package coveragegate
 
-// CLI des Gates (Aufruf siehe cmd/coveragegate).
+// CLI of the gate (for invocation see cmd/coveragegate).
 
 import (
 	"encoding/json"
@@ -20,10 +20,10 @@ const usage = `Aufruf:
   coveragegate mutation-report -gremlins <datei> [-go-dir backend]
 `
 
-// Run führt einen Unterbefehl aus und liefert den Exit-Code. Die Logik steckt
-// bewusst hier und nicht in cmd/coveragegate (package main): gremlins v0.5.1
-// ordnet Mutanten in package main dem falschen Paket zu und führt dann die
-// falschen Tests aus (siehe CONTRIBUTING.md).
+// Run executes a subcommand and returns the exit code. The logic deliberately
+// lives here and not in cmd/coveragegate (package main): gremlins v0.5.1
+// assigns mutants in package main to the wrong package and then runs the
+// wrong tests (see CONTRIBUTING.md).
 func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprint(stderr, usage)
@@ -52,7 +52,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	return code
 }
 
-// reportFlags sind die Report-Angaben, die check und baseline teilen.
+// reportFlags are the report arguments that check and baseline share.
 type reportFlags struct {
 	goProfile, goModule, goDir string
 	lcov, lcovDir              string
@@ -66,7 +66,7 @@ func (r *reportFlags) register(fs *flag.FlagSet) {
 	fs.StringVar(&r.lcovDir, "lcov-dir", "frontend", "Verzeichnis, relativ zu dem die lcov-Pfade stehen")
 }
 
-// reports enthält die eingelesenen Reports; nil heißt "nicht angegeben".
+// reports contains the parsed reports; nil means "not specified".
 type reports struct {
 	goProfile *GoProfile
 	lcov      *LCOV
@@ -99,7 +99,7 @@ func (r *reportFlags) load() (reports, error) {
 	return rep, nil
 }
 
-// current liefert die gemessenen Quoten.
+// current returns the measured rates.
 func (rep reports) current() Baseline {
 	var b Baseline
 	if rep.goProfile != nil {
@@ -151,8 +151,8 @@ func runCheck(args []string, stdout, stderr io.Writer) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		// Nicht gemessene Quoten nicht vergleichen (sonst zählte ein
-		// fehlender Report als 0 %).
+		// Do not compare unmeasured rates (otherwise a
+		// missing report would count as 0 %).
 		if rep.goProfile == nil {
 			base.GoStatements = 0
 		}

@@ -44,7 +44,7 @@ func TestHTTPCheck(t *testing.T) {
 	assert.Equal(t, "nicht erreichbar", run(srv.URL).Detail)
 }
 
-// fakeSMTP lauscht lokal und sendet den Gruß; leerer Gruß schließt sofort.
+// fakeSMTP listens locally and sends the greeting; an empty greeting closes immediately.
 func fakeSMTP(t *testing.T, greeting string) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -99,7 +99,7 @@ func TestBackupCheck(t *testing.T) {
 
 	assert.True(t, check().Skip, "Datei fehlt (z. B. Staging ohne Timer): nicht prüfbar")
 
-	// Lesefehler (hier: Pfad ist ein Verzeichnis) sind kein Skip
+	// Read errors (here: path is a directory) are not a skip
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "job_backup-prod.prom"), 0o750))
 	res0 := check()
 	assert.False(t, res0.Skip)
@@ -118,7 +118,7 @@ func TestBackupCheck(t *testing.T) {
 	writeProm(t, dir, "backup-prod", 0, hoursAgo(2), 1)
 	assert.Equal(t, "noch kein erfolgreiches Backup", check().Detail)
 
-	// Nur der Offsite-Upload scheiterte (Exit 3): lokales Backup liegt vor
+	// Only the offsite upload failed (exit 3): local backup exists
 	writeProm(t, dir, "backup-prod", hoursAgo(60), hoursAgo(9), BackupExitOffsiteFailed)
 	assert.True(t, check().OK)
 	writeProm(t, dir, "backup-prod", hoursAgo(60), hoursAgo(50), BackupExitOffsiteFailed)
@@ -148,7 +148,7 @@ func TestHTTPCheck_StatusgrenzenUndZeitueberschreitung(t *testing.T) {
 	}
 }
 
-// Die vom Betreiber festgelegten Werte.
+// The values set by the operator.
 func TestStandardwerte(t *testing.T) {
 	assert.Equal(t, 3, DefaultThreshold)
 	assert.Equal(t, 15*time.Minute, DefaultIncidentAfter)
@@ -189,7 +189,7 @@ func TestFrontendCheck(t *testing.T) {
 	res = run(frontendServer(t, write("<html>Maintenance</html>"), 200))
 	assert.Equal(t, "Startseite ist kein Frontend-HTML", res.Detail)
 
-	// fehlende Asset-Datei -> Router liefert index.html mit 200
+	// missing asset file -> router returns index.html with 200
 	htmlAsset := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(page))
@@ -199,7 +199,7 @@ func TestFrontendCheck(t *testing.T) {
 	assert.False(t, res.OK)
 	assert.Equal(t, "Frontend-Datei fehlt (HTML statt Datei)", res.Detail)
 
-	// 401/403 bleiben Fehler (nicht aufgeweicht)
+	// 401/403 remain errors (not softened)
 	for _, code := range []int{401, 403, 503} {
 		res = run(frontendServer(t, func(w http.ResponseWriter) { w.WriteHeader(code) }, 200))
 		assert.False(t, res.OK)
