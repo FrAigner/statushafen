@@ -343,6 +343,15 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 		order.ConfirmTokenExpiry = nil
 		order.SetPasswordTokenHash = models.HashToken(setPasswordToken)
 		order.SetPasswordTokenExpiry = &setPasswordExpiry
+		// Without password login there is no set-password step: the account
+		// stays without a password and its owner signs in through a global
+		// OIDC provider with the ordered (and now confirmed) e-mail address.
+		if !passwordLoginEnabled() {
+			order.Status = "active"
+			order.SetPasswordTokenHash = ""
+			order.SetPasswordTokenExpiry = nil
+			setPasswordToken = ""
+		}
 		return tx.Save(&order).Error
 	})
 
@@ -371,6 +380,9 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 // Login-Pfad wird stattdessen wiederverwendet, statt an einer neuen,
 // ungeprüften Stelle vorbei eine Session zu erzeugen.
 func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
+	if rejectDisabledPasswordLogin(c) {
+		return
+	}
 	var in setOrderPasswordRequest
 	if err := c.ShouldBindJSON(&in); err != nil {
 		respondInvalidInput(c)

@@ -122,10 +122,14 @@ func globalOIDCProviderByID(id string) (globalOIDCProvider, bool) {
 	return globalOIDCProvider{}, false
 }
 
-// WarnAuthConfig logs every disabled OIDC provider once at start-up.
+// WarnAuthConfig logs every disabled OIDC provider once at start-up and a
+// clear warning when no sign-in method is active at all.
 func WarnAuthConfig() {
-	_, warnings := parseOIDCProviders()
+	providers, warnings := parseOIDCProviders()
 	for _, w := range warnings {
 		slog.Warn(w)
+	}
+	if len(providers) == 0 && !passwordLoginEnabled() {
+		slog.Warn("No sign-in method is active: no valid OIDC provider in OIDC_PROVIDERS and PASSWORD_LOGIN_ENABLED is off. Only the create-admin CLI can create an account; nobody can sign in.")
 	}
 }

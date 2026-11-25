@@ -68,9 +68,6 @@ type authConfigProvider struct {
 	Name string `json:"name"`
 }
 
-// passwordLoginEnabled reports whether POST /api/login accepts passwords.
-func passwordLoginEnabled() bool { return true }
-
 // GetAuthConfigHandler — GET /api/public/auth-config (public, rate-limited).
 // Lists the sign-in methods for the login page: whether the password login is
 // on and the active global providers in OIDC_PROVIDERS order (ID and name

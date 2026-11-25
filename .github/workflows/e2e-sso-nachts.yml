@@ -82,6 +82,8 @@ jobs:
           DB_DSN: host=localhost user=postgres password=localpassword dbname=statushafen port=5432 sslmode=disable TimeZone=UTC
           APP_ENV: test
           SEED_DB: "true"
+          # The specs sign in with the seeded password accounts (off by default).
+          PASSWORD_LOGIN_ENABLED: "true"
           OIDC_DEV_INSECURE_ISSUERS: http://localhost:8090/statushafen
         run: |
           cd backend

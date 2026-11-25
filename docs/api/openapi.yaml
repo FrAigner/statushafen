@@ -297,6 +297,10 @@ paths:
       tags: [Auth]
       operationId: login
       summary: Anmeldung mit E-Mail und Passwort
+      description: |
+        Nur mit `PASSWORD_LOGIN_ENABLED=true` (bzw. `1`, `yes`). Standardmäßig
+        aus: dann `403` mit Code `password_login_disabled`, ohne Prüfung der
+        Zugangsdaten; angemeldet wird über die globalen OIDC-Anbieter.
       security: []
       x-rate-limit: 20/min pro IP
       requestBody:
@@ -312,6 +316,7 @@ paths:
               schema: { $ref: "#/components/schemas/LoginResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
   /api/auth/provider/{id}/login:
@@ -1768,7 +1773,7 @@ paths:
                 type: object
                 required: [set_password_token, slug]
                 properties:
-                  set_password_token: { type: string }
+                  set_password_token: { type: string, description: "Leer bei abgeschaltetem Passwort-Login: Die Bestellung ist dann sofort aktiv, das Konto hat kein Passwort und meldet sich über einen globalen OIDC-Anbieter mit der bestellten E-Mail an." }
                   slug: { type: string }
         "400": { $ref: "#/components/responses/BadRequest" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1780,6 +1785,7 @@ paths:
       tags: [Orders]
       operationId: setOrderPassword
       summary: Passwort für das neue Konto setzen (Schritt 3/3)
+      description: Bei abgeschaltetem Passwort-Login (`PASSWORD_LOGIN_ENABLED`) immer `403` mit Code `password_login_disabled`.
       security: []
       x-rate-limit: 10/min pro IP
       requestBody:
@@ -1799,6 +1805,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/SlugResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "410": { $ref: "#/components/responses/Gone" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
@@ -4095,15 +4102,17 @@ paths:
       tags: [Admin – Platform]
       operationId: createUser
       summary: Nutzer anlegen
+      description: |
+        Mit eingeschaltetem Passwort-Login ist `password` Pflicht. Bei
+        abgeschaltetem Passwort-Login entsteht das Konto ohne Passwort (Anmeldung
+        über einen globalen OIDC-Anbieter mit derselben, bestätigten E-Mail);
+        ein mitgeschicktes `password` ergibt `403 password_login_disabled`.
       x-required-permission: global-admin
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              allOf:
-                - $ref: "#/components/schemas/UserWrite"
-                - required: [password]
+            schema: { $ref: "#/components/schemas/UserWrite" }
       responses:
         "201":
           description: Angelegt.
@@ -4125,6 +4134,7 @@ paths:
       tags: [Admin – Platform]
       operationId: updateUser
       summary: Nutzer ändern (leeres Passwort = unverändert)
+      description: Ein neues `password` bei abgeschaltetem Passwort-Login ergibt `403 password_login_disabled`.
       x-required-permission: global-admin
       requestBody:
         required: true
