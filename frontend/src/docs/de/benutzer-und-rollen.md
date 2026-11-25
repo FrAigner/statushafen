@@ -71,6 +71,7 @@ zugeordnet (siehe Spalte „Routen“).
 | System | Systemeinstellungen | `system_settings` | global | `system_settings:create`, `system_settings:read`, `system_settings:update`, `system_settings:delete` | /settings |
 
 Zusätzlich gibt es `admin_dashboard`: Menüpunkt „Dashboard“ im Benutzermenü der öffentlichen Seite.
+Er zählt nur auf der Seite, für die die Rolle vergeben ist.
 
 **Anlegen, Ändern und Löschen schließen Lesen ein:** Wer `components:update` hat, darf auch lesen,
 ohne dass `components:read` eingetragen sein muss. Ändern schließt Anlegen oder Löschen nicht ein.

@@ -301,9 +301,8 @@ const loadMoreIncidents = async () => {
 // zuletzt im Admin-Bereich gewählten Mandanten richten, sondern nach der
 // gerade angezeigten Statusseite. Deshalb wird activeTenantId hier immer auf
 // die aktuell geladene Seite synchronisiert, sobald ein User eingeloggt ist.
-// Betreiber-Entscheidung: Der Dashboard-Link erscheint trotzdem
-// auch ohne Admin-Recht auf DIESER Seite, sobald der Nutzer es auf irgendeiner
-// Seite hat (PublicLayout); der Klick schaltet dann auf diese Seite um.
+// The Dashboard link in PublicLayout is decided by the role on THIS page
+// (matched via currentPageSlug), never by a role on another page.
 watch(() => [pageInfo.value?.ID, isLoggedIn.value], async ([pageId, loggedIn]) => {
   if (!pageId || !loggedIn) return
   try {

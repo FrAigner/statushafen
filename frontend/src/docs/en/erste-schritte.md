@@ -60,4 +60,5 @@ Login lives under `/login` ("Login" button at the top right).
 - **Documentation:** the "Documentation" item in the System area opens this page.
 
 On the public status page, the entry "Dashboard" in the user menu leads to the admin area. It only
-appears for roles with the `admin_dashboard` permission.
+appears when your role on exactly this status page has the `admin_dashboard` permission; a role on
+another page is not enough (global admins always see it).

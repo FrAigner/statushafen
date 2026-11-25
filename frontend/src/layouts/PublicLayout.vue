@@ -52,10 +52,10 @@ const openSubscriptionSettings = () => {
   window.dispatchEvent(new CustomEvent('statushafen:open-subscription-manager'))
 }
 
-// Den Dashboard-Link soll zeigen, wer auf irgendeiner Seite
-// admin_dashboard hat, nicht nur, wer gerade einen Tenant aktiv hat (den setzt
-// sonst nur StatusPage.vue). Deshalb lädt das Layout die eigenen Seiten selbst,
-// sobald jemand angemeldet ist und noch keine bekannt sind (Logout setzt sie zurück).
+// The Dashboard link needs the user's page roles even where StatusPage.vue
+// has not loaded them (landing, order page). The layout therefore loads its
+// own pages as soon as someone is logged in and none are known yet (logout
+// resets them). Which page counts is decided by dashboardPage below.
 watch(currentUser, async (user) => {
   if (!user || myPages.value.length > 0) return
   try {
@@ -68,16 +68,25 @@ watch(currentUser, async (user) => {
   }
 }, { immediate: true })
 
-const dashboardPage = computed(() =>
-  myPages.value.find(p => grants(p.Permissions, ADMIN_DASHBOARD)))
+// The page the Dashboard link opens. On a status page only the role on THAT
+// page counts: admin_dashboard on another page, or a stale active tenant from
+// the admin area (localStorage), must not offer this page's dashboard. Off a
+// status page (landing, order page) the first page granting it is used.
+const isGlobalAdmin = computed(() => !!currentUser.value?.is_global_admin)
+const grantsDashboard = (page) => isGlobalAdmin.value || grants(page.Permissions, ADMIN_DASHBOARD)
+const dashboardPage = computed(() => (currentPageSlug.value
+  ? myPages.value.find(p => p.Slug === currentPageSlug.value && grantsDashboard(p))
+  : myPages.value.find(grantsDashboard)))
 const showDashboard = computed(() =>
-  hasPerm(ADMIN_DASHBOARD) || (!!currentUser.value && !!dashboardPage.value))
+  !!currentUser.value && (isGlobalAdmin.value || !!dashboardPage.value))
 
 const goToDashboard = () => {
   isUserMenuOpen.value = false
-  // Aktive Seite ohne Dashboard-Recht (oder keine aktiv): erste passende Seite
-  // aktivieren, damit /admin mit deren Rechten öffnet.
-  if (!hasPerm(ADMIN_DASHBOARD)) setActiveTenant(dashboardPage.value.ID)
+  // Activate the page whose dashboard is offered, so /admin opens with its
+  // permissions. Off a status page an active tenant that already grants the
+  // dashboard is kept.
+  const keepActive = !currentPageSlug.value && hasPerm(ADMIN_DASHBOARD)
+  if (dashboardPage.value && !keepActive) setActiveTenant(dashboardPage.value.ID)
   router.push('/admin') // erster lesbarer Tab statt fest Komponenten
 }
 </script>
