@@ -20,7 +20,8 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT license](LICENSE)
   influence your components.
 - **Subscribers:** e-mail with double opt-in or Google Chat webhook, editable mail templates per
   language and audience.
-- **Roles and permissions**, audit log, per-page single sign-on with OIDC.
+- **Sign-in through OIDC** (GitLab, Google, Keycloak and others), password optional; roles and
+  permissions, audit log, plus per-page single sign-on with OIDC.
 - **Multilingual** interface and content (30 languages in the catalog), optional automatic
   translation (LibreTranslate or DeepL).
 - **Formatted texts** in a restricted Markdown subset, rendered safely in pages and mails.
@@ -47,7 +48,9 @@ With `SEED_DB="true"` the database is reset (tables are dropped!) and filled wit
 only works with `APP_ENV=development`, `dev`, `test` or `local` (`./start.sh` sets `development` by
 default); any other or empty `APP_ENV` makes the backend ignore `SEED_DB` and log a warning. The
 demo data contains three accounts: `admin@statushafen.local` / `admin123`, `editor@statushafen.local` /
-`editor123` and `viewer@statushafen.local` / `viewer123`. Use them for local development only.
+`editor123` and `viewer@statushafen.local` / `viewer123`. Use them for local development only. The
+password login is off by default in the backend; `./start.sh` switches it on locally
+(`PASSWORD_LOGIN_ENABLED=true`, unless `backend/.env` sets something else).
 
 ## Configuration
 
@@ -63,7 +66,9 @@ The backend reads environment variables (a `backend/.env` file is loaded if pres
 | `FRONTEND_URL`, `BASE_URL`, `CORS_ORIGINS` | Public addresses and allowed origins |
 | `TRUSTED_PROXIES` | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` is trusted (none by default). Only list your own reverse proxy: networks wider than /8 (IPv4) or /16 (IPv6), including `0.0.0.0/0` and `::/0`, let any client forge its address and defeat all IP limits; the backend refuses to start with them unless `APP_ENV` is `development`, `dev`, `test` or `local` (warning only) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Outgoing mail (default: local Mailpit). `SMTP_FROM` is the sender address of all mails; status pages only add their name and an optional reply-to |
-| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS` | Allowed e-mail domains for new SSO accounts and bootstrap admins |
+| `OIDC_PROVIDERS`, `OIDC_<ID>_ISSUER`, `OIDC_<ID>_CLIENT_ID`, `OIDC_<ID>_CLIENT_SECRET`, `OIDC_<ID>_NAME`, `OIDC_<ID>_SCOPES` | Global OIDC providers for signing in (e.g. GitLab, Google), redirect URI `<BASE_URL>/api/auth/provider/<id>/callback`; see [`docs/sso/en/providers.md`](docs/sso/en/providers.md) |
+| `PASSWORD_LOGIN_ENABLED` | Password login: `true`, `1` or `yes` = on, otherwise **off** (default) |
+| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS` | Allowed e-mail domains for new accounts through global providers and bootstrap admins |
 | `CUSTOM_DOMAIN_CNAME_TARGET`, `CADDY_INTERNAL_TOKEN` | Custom domains (see below) |
 | `METRICS_BASIC_AUTH_USER`, `METRICS_BASIC_AUTH_PASSWORD` | Enable `/metrics` (off unless both are set) |
 | `LOG_FORMAT`, `LOG_LEVEL` | Logging (`json`/`text`, `debug`…`error`) |
@@ -94,7 +99,11 @@ Checklist for production:
 
   In Docker use `docker exec -i <container> ./server create-admin --email you@example.org --password-stdin`.
   Alternatively `SSO_BOOTSTRAP_ADMIN_EMAILS` (e-mail addresses that become global admin on their next
-  platform login via Google or GitHub) works too.
+  login through a global OIDC provider with a verified e-mail) works too. The account created by the
+  command signs in through a global provider with the same, verified e-mail or with
+  `PASSWORD_LOGIN_ENABLED=true`.
+- Set up at least one global OIDC provider (`OIDC_PROVIDERS`, see
+  [`docs/sso/en/providers.md`](docs/sso/en/providers.md)); the password login is off by default.
 - Set `FRONTEND_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES` and your SMTP settings. The backend sends
   `Strict-Transport-Security` when the request comes from a proxy listed in `TRUSTED_PROXIES` that sets
   `X-Forwarded-Proto: https` (the header is ignored from any other sender).
@@ -112,6 +121,13 @@ Checklist for production:
   non-members (they see the landing page). The endpoint is limited to 120 requests per minute per IP
   (429 afterwards); Caddy only asks for hosts without a certificate.
 - Back up the database regularly: [`docs/backup-restore.en.md`](docs/backup-restore.en.md).
+
+## Upgrade note: sign-in
+
+The built-in Google/GitHub login and SAML have been removed, and the password login is off by
+default. Before updating, set up a global OIDC provider (Google keeps working as an OIDC provider) or
+set `PASSWORD_LOGIN_ENABLED=true`; `GOOGLE_*`/`GITHUB_*` are gone. SAML data stays in the database but
+has no effect. Steps: [`docs/sso/en/providers.md`](docs/sso/en/providers.md#upgrading-from-older-versions).
 
 ## Documentation
 

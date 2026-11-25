@@ -33,3 +33,23 @@ Read the [general OIDC guide](oidc.md) first. This page contains only the Keyclo
    ```
 
 6. Link an account and test, see [Accounts and linking](oidc.md#accounts-and-linking).
+
+## As global provider
+
+The same application (or a second one) can serve as a [global provider](providers.md) for signing in
+to the whole instance. Redirect URI at the provider:
+`https://status.example.org/api/auth/provider/keycloak/callback`.
+
+```bash
+OIDC_PROVIDERS=keycloak
+OIDC_KEYCLOAK_ISSUER=https://keycloak.example.org/realms/REALM
+OIDC_KEYCLOAK_CLIENT_ID=CLIENT-ID
+OIDC_KEYCLOAK_CLIENT_SECRET=CLIENT-SECRET
+OIDC_KEYCLOAK_NAME=Keycloak
+```
+
+Keycloak sends `email_verified` (the "Email verified" switch of the user). If the realm
+allows self-registration without e-mail verification, `email_verified` is `false` there and no
+link by e-mail takes place.
+
+Back to the [overview](README.md).

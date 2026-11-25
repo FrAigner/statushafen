@@ -99,7 +99,8 @@ instead.
 
 ### `GET /api/auth/sso/login`
 
-Public, limited to 20 calls per minute. Query: `slug` (slug of the status page). Entry into the page
+Public, limited to 20 calls per minute. Query: `slug` (slug of the status page), optional
+`return_to`. Entry into the page
 SSO without the page ID: the server starts the
 flow like `oidc/login` and redirects to the IdP with `307`. An unknown page, a page
 without active SSO and a missing `slug` all end the same way: a redirect to the login page with the
@@ -111,7 +112,8 @@ visitor (missing or private).
 
 ### `GET /api/auth/oidc/login`
 
-Public, limited to 20 calls per minute. Query: `page` (ID of the status page, mandatory). Creates
+Public, limited to 20 calls per minute. Query: `page` (ID of the status page, mandatory),
+`return_to` (optional, see [returning](providers.md#returning-after-the-login)). Creates
 state, nonce and PKCE verifier (valid for 10 minutes), sets the cookie `oidc_state` (HttpOnly,
 Secure) and redirects to the IdP with `307`. Errors redirect to the login page (codes `bad_page`,
 `not_configured`, `provider_unreachable`, `internal`).
@@ -138,14 +140,54 @@ einer anderen Seite nutzen dieses Seiten-SSO nicht` (accounts with a role on ano
 use this page SSO)), `400` (`Ungültige Seite`), `404` (`SSO für diese Seite nicht eingerichtet`),
 `502` (`OIDC-Anbieter nicht erreichbar`), `500`.
 
+## Global OIDC providers
+
+Providers from `OIDC_PROVIDERS` (see [Global providers](providers.md)); `:id` is the provider ID.
+
+### `GET /api/public/auth-config`
+
+Public, limited to 60 calls per minute. Sign-in methods for the login page. Response `200`:
+
+```json
+{"password_login": false, "providers": [{"id": "gitlab", "name": "GitLab"}]}
+```
+
+`providers` contains only active providers, in the order of `OIDC_PROVIDERS`, without issuer or
+client data.
+
+### `GET /api/auth/provider/:id/login`
+
+Public, limited to 20 calls per minute. Query: `return_to` (optional, see
+[returning](providers.md#returning-after-the-login)). Creates state, nonce and PKCE verifier (valid for
+10 minutes), sets the cookie `oidc_state` (path `/api/auth/provider`, HttpOnly, Secure) and redirects
+to the provider with `307`. Errors redirect to the login page (`provider_unknown`,
+`provider_unreachable`, `internal`).
+
+### `GET /api/auth/provider/:id/callback`
+
+Public, limited to 20 calls per minute. Redirect URI at the provider
+(`<BASE_URL>/api/auth/provider/<id>/callback`). Query: `state`, `code`; only a state of this provider
+is accepted. On success `307` to `<FRONTEND_URL>/auth/sso-callback?code=<one-time code>` (when
+linking with `&next=profile`). Errors redirect with a code (`provider_unknown`, `state_invalid`,
+`provider_denied`, `provider_unreachable`, `token_exchange`, `no_id_token`, `id_token_invalid`,
+`email_missing`, `email_unverified`, `domain_not_allowed`, `not_linked`, `already_linked`,
+`internal`). Audit log: `auth.sso_login` or `auth.sso_linked` with `provider=<id>`.
+
+### `POST /api/auth/provider/:id/link`
+
+Needs a JWT, no query and no body. Starts linking the signed-in account (also global admins).
+Response `200`: `{"url": "<authorize URL of the provider>"}`. Errors (JSON): `401`, `403` (session from
+a page SSO), `404` (unknown ID), `502` (provider not reachable), `500`.
+
 ## Session and links
 
 ### `POST /api/auth/sso-exchange`
 
 Public, limited to 10 calls per minute. Exchanges the one-time code from the redirect for the JWT.
-Body: `{"code": "<one-time code>"}`. Response `200`: `{"token": "<JWT>"}`. The code is valid only
-once and only briefly. The JWT is valid only for the page whose IdP confirmed the sign-in
-().
+Body: `{"code": "<one-time code>"}`. Response `200`: `{"token": "<JWT>", "return_to": "/path"}`
+(`return_to` is the checked return path from the login start, otherwise `""`). The code is valid only
+once and only briefly. After a page SSO the JWT is valid only for the page whose IdP confirmed the
+sign-in; after a global provider for the whole account.
 
 Errors: `400` (`Code erforderlich`, code required), `401` (`Ungültiger oder abgelaufener Code`,
 invalid or expired code).
@@ -156,10 +198,21 @@ Needs a JWT. Returns the own links and the pages the account may still link:
 
 ```json
 {
-  "identities": [{"id": 7, "status_page_id": 1, "page_name": "Demo", "protocol": "oidc", "email": "user@example.org", "created_at": "…"}],
-  "linkable": [{"status_page_id": 1, "page_name": "Demo", "protocol": "oidc"}]
+  "identities": [
+    {"id": 7, "status_page_id": 1, "page_name": "Demo", "protocol": "oidc", "provider": "", "email": "user@example.org", "created_at": "…"},
+    {"id": 8, "status_page_id": 0, "page_name": "GitLab", "protocol": "oidc", "provider": "gitlab", "email": "user@example.org", "created_at": "…"}
+  ],
+  "linkable": [
+    {"status_page_id": 0, "page_name": "Google", "protocol": "oidc", "provider": "google"},
+    {"status_page_id": 2, "page_name": "Other", "protocol": "oidc", "provider": ""}
+  ]
 }
 ```
+
+Entries with `status_page_id` `0` belong to a global provider: `provider` is its ID, `page_name` its
+display name (link via [`POST /api/auth/provider/:id/link`](#post-apiauthprovideridlink)). If the
+provider is no longer configured, the link stays visible and removable with an empty `provider`.
+Global providers appear for global admins too, never in a session from a page SSO.
 
 Errors: `401` (`Nicht angemeldet`).
 

@@ -22,7 +22,7 @@ import (
 const ssoDocsDir = "../docs/sso"
 
 var ssoDocFiles = []string{
-	"README.md", "oidc.md", "google.md", "keycloak.md",
+	"README.md", "providers.md", "oidc.md", "gitlab.md", "google.md", "keycloak.md",
 	"okta.md", "azure-ad.md", "api.md", "architecture.md",
 }
 
@@ -142,6 +142,29 @@ func TestSSODocs_AnchorCheck(t *testing.T) {
 func TestSSODocs_RelativeLinksResolve(t *testing.T) {
 	for _, name := range ssoDocFiles {
 		checkRelativeLinks(t, ssoDocsDir, name)
+		// Every guide exists in English as well, with working links.
+		checkRelativeLinks(t, ssoDocsDir+"/en", name)
+	}
+}
+
+// The guide for global providers names every variable, the redirect URI and
+// the switch of the password login, in both languages.
+func TestSSODocs_ProvidersGuideNamesTheConfiguration(t *testing.T) {
+	for _, dir := range []string{ssoDocsDir, ssoDocsDir + "/en"} {
+		b, err := os.ReadFile(filepath.Join(dir, "providers.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{
+			"OIDC_PROVIDERS", "OIDC_<ID>_ISSUER", "OIDC_<ID>_CLIENT_ID", "OIDC_<ID>_CLIENT_SECRET",
+			"OIDC_<ID>_NAME", "OIDC_<ID>_SCOPES", "PASSWORD_LOGIN_ENABLED", "SSO_ALLOWED_DOMAINS",
+			"SSO_BOOTSTRAP_ADMIN_EMAILS", "/api/auth/provider/<id>/callback", "email_verified",
+			"password_login_disabled", "return_to",
+		} {
+			if !strings.Contains(string(b), want) {
+				t.Errorf("%s/providers.md: %q missing", dir, want)
+			}
+		}
 	}
 }
 
@@ -229,11 +252,15 @@ func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 		"GET /api/admin/pages/:page_id/sso",
 		"GET /api/auth/oidc/callback",
 		"GET /api/auth/oidc/login",
+		"GET /api/auth/provider/:id/callback",
+		"GET /api/auth/provider/:id/login",
 		"GET /api/auth/sso/login",
 		"GET /api/me/sso",
+		"GET /api/public/auth-config",
 		"GET /api/public/pages/:slug/sso",
 		"POST /api/admin/pages/:page_id/sso/test",
 		"POST /api/auth/oidc/link",
+		"POST /api/auth/provider/:id/link",
 		"POST /api/auth/sso-exchange",
 		"PUT /api/admin/pages/:page_id/sso",
 	}
@@ -258,25 +285,27 @@ func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 	}
 }
 
-// isSSORoute erkennt die Routen des Seiten-SSO. Der globale Google-/GitHub-
-// Login (/api/auth/google, /api/auth/github) gehört nicht dazu.
+// isSSORoute recognizes the routes of the page SSO and of the global OIDC
+// providers (including the auth config of the login page).
 func isSSORoute(route string) bool {
 	_, path, _ := strings.Cut(route, " ")
-	return strings.HasPrefix(path, "/api/auth/oidc/") || strings.HasPrefix(path, "/api/auth/saml/") ||
-		path == "/api/auth/sso-exchange" || strings.HasSuffix(path, "/sso") ||
+	return strings.HasPrefix(path, "/api/auth/oidc/") || strings.HasPrefix(path, "/api/auth/provider/") ||
+		path == "/api/auth/sso-exchange" || path == "/api/public/auth-config" || strings.HasSuffix(path, "/sso") ||
 		strings.Contains(path, "/sso/")
 }
 
 func TestSSODocs_IsSSORoute(t *testing.T) {
 	cases := map[string]bool{
 		"GET /api/auth/oidc/login":                true,
-		"POST /api/auth/saml/:page_id/acs":        true,
+		"POST /api/auth/saml/:page_id/acs":        false, // removed with SAML
 		"POST /api/auth/sso-exchange":             true,
 		"GET /api/me/sso":                         true,
 		"DELETE /api/me/sso/:id":                  true,
 		"POST /api/admin/pages/:page_id/sso/test": true,
-		"GET /api/auth/google":                    false,
-		"GET /api/auth/github/callback":           false,
+		"GET /api/auth/provider/:id/login":        true,
+		"POST /api/auth/provider/:id/link":        true,
+		"GET /api/public/auth-config":             true,
+		"POST /api/login":                         false,
 		"GET /api/admin/pages/:page_id":           false,
 	}
 	for route, want := range cases {

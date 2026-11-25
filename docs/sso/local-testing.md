@@ -18,8 +18,11 @@ im Compose-Profil `sso`. Ohne das Profil startet er nicht mit.
    ```
    APP_ENV="development"
    SEED_DB="true"
+   PASSWORD_LOGIN_ENABLED="true"
    OIDC_DEV_INSECURE_ISSUERS="http://localhost:8090/statushafen"
    ```
+   `PASSWORD_LOGIN_ENABLED` erlaubt die Anmeldung mit den Seed-Konten (Standard: aus;
+   `scripts/dev-backend.sh` setzt es lokal auf `true`, solange `backend/.env` nichts anderes sagt).
    Ohne `OIDC_DEV_INSECURE_ISSUERS` lehnt das Backend den Mock ab (https-Pflicht und
    SSRF-Schutz für Issuer). Die Ausnahme gilt nur für exakt genannte Issuer und nur
    mit `APP_ENV` `development`, `dev`, `test` oder `local`.
@@ -47,3 +50,21 @@ wenn der Mock nicht erreichbar ist: `cd frontend && npx playwright test sso-oidc
 Mit `E2E_REQUIRE_SSO_MOCK=1` schlägt er statt zu überspringen fehl; so läuft er jede Nacht
 in `.github/workflows/e2e-sso-nachts.yml` (GitHub-gehosteter Runner, Postgres und Mock als
 Service-Container, auch manuell per `workflow_dispatch`).
+
+## Mock-OIDC als globaler Anbieter
+
+Derselbe Mock dient auch als [globaler Anbieter](providers.md). In `backend/.env` zusätzlich:
+
+```
+OIDC_PROVIDERS="mock"
+OIDC_MOCK_ISSUER="http://localhost:8090/statushafen"
+OIDC_MOCK_CLIENT_ID="statushafen"
+OIDC_MOCK_CLIENT_SECRET="beliebig"
+OIDC_MOCK_NAME="Mock-OIDC"
+```
+
+Der Issuer muss in `OIDC_DEV_INSECURE_ISSUERS` stehen. Die Login-Seite zeigt dann „Mock-OIDC“
+(`GET /api/public/auth-config`). Im Formular des Mocks unter „username“ das `sub` wählen und im
+Textfeld z. B. `{"email": "admin@statushafen.local", "email_verified": true}` setzen: Dann wird das
+Seed-Konto mit dieser Adresse verknüpft. Ohne passendes Konto entsteht ein neues mit der Rolle
+„Viewer“.

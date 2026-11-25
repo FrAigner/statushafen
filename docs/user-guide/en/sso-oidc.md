@@ -25,7 +25,7 @@ This guide describes the state of the backend (`backend/handlers/oidc_login.go`,
    the provider's JWKS, `iss`, `aud` (= client ID), expiry and nonce.
 5. The account is found exclusively through the triple *(status page, issuer, `sub`)*, never
    through the email address. No new accounts are created in this step.
-6. As with the Google/GitHub login, the backend redirects with a one-time code to
+6. As with the [global providers](../../sso/en/providers.md), the backend redirects with a one-time code to
    `<FRONTEND_URL>/auth/sso-callback`; the frontend exchanges it for the session.
 
 If a step fails, the backend redirects to `<FRONTEND_URL>/login?oidc_error=<code>` (after linking
@@ -122,7 +122,7 @@ status page ("Login" → "Sign in with SSO"). Details on errors are in the backe
 
 The page SSO creates **no** new accounts. An account must already exist and is linked once:
 
-1. The user signs in the usual way (password, Google, GitHub).
+1. The user signs in the usual way (global OIDC provider or, if switched on, password).
 2. In the profile (`/admin/profile`), the section "SSO sign-in" shows the pages they may link, and
    they choose "Link with SSO" there. Behind it is `POST /api/auth/oidc/link?page=<page ID>` (login
    token in the header `X-Auth-Token`); the response contains `{"url": "…"}`, the
@@ -246,7 +246,7 @@ In all cases: redirect URI `<BASE_URL>/api/auth/oidc/callback?page=<page ID>`, c
 - In the Google Cloud Console create an *OAuth client ID* of type **Web application** and enter
   the redirect URI under *Authorized redirect URIs*.
 - Issuer: `https://accounts.google.com`.
-- This page SSO is independent of the system's global Google login; links apply only to the
+- This page SSO is independent of Google as a [global provider](../../sso/en/google.md); links apply only to the
   respective status page.
 
 ## Local testing with the mock

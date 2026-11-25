@@ -35,4 +35,20 @@ Statushafen spricht mit Okta ausschließlich über OpenID Connect; SAML wird nic
 8. Testanmeldung starten, OIDC einschalten und Konten verknüpfen, siehe
    [Konten und Verknüpfung](oidc.md#konten-und-verknüpfung).
 
+## Als globaler Anbieter
+
+Dieselbe Anwendung (oder eine zweite) kann als [globaler Anbieter](providers.md) für die Anmeldung an
+der ganzen Instanz dienen. Redirect-URI beim Anbieter:
+`https://status.example.org/api/auth/provider/okta/callback`.
+
+```bash
+OIDC_PROVIDERS=okta
+OIDC_OKTA_ISSUER=https://okta.example.org/oauth2/default
+OIDC_OKTA_CLIENT_ID=CLIENT-ID
+OIDC_OKTA_CLIENT_SECRET=CLIENT-SECRET
+OIDC_OKTA_NAME=Okta
+```
+
+Okta liefert `email_verified`.
+
 Zurück zur [Übersicht](README.md).

@@ -18,8 +18,11 @@ Without the profile it does not start.
    ```
    APP_ENV="development"
    SEED_DB="true"
+   PASSWORD_LOGIN_ENABLED="true"
    OIDC_DEV_INSECURE_ISSUERS="http://localhost:8090/statushafen"
    ```
+   `PASSWORD_LOGIN_ENABLED` allows signing in with the seed accounts (default: off;
+   `scripts/dev-backend.sh` sets it to `true` locally unless `backend/.env` says otherwise).
    Without `OIDC_DEV_INSECURE_ISSUERS` the backend rejects the mock (https is required and issuers
    are protected against SSRF). The exception only applies to exactly the listed issuers and only
    with `APP_ENV` set to `development`, `dev`, `test` or `local`.
@@ -44,3 +47,21 @@ error page for an unlinked identity) and skips itself if the mock is not reachab
 `E2E_BACKEND_URL` / `MOCK_OIDC_URL`). With `E2E_REQUIRE_SSO_MOCK=1` it fails instead of skipping; that
 is how it runs every night in `.github/workflows/e2e-sso-nachts.yml` (GitHub-hosted runner, Postgres
 and mock as service containers, also manually via `workflow_dispatch`).
+
+## Mock OIDC as global provider
+
+The same mock also serves as a [global provider](providers.md). Add to `backend/.env`:
+
+```
+OIDC_PROVIDERS="mock"
+OIDC_MOCK_ISSUER="http://localhost:8090/statushafen"
+OIDC_MOCK_CLIENT_ID="statushafen"
+OIDC_MOCK_CLIENT_SECRET="anything"
+OIDC_MOCK_NAME="Mock OIDC"
+```
+
+The issuer must be listed in `OIDC_DEV_INSECURE_ISSUERS`. The login page then shows "Mock OIDC"
+(`GET /api/public/auth-config`). In the mock's form, choose the `sub` as "username" and set e.g.
+`{"email": "admin@statushafen.local", "email_verified": true}` in the text field: the seed account
+with this address is then linked. Without a matching account a new one with the role "Viewer" is
+created.

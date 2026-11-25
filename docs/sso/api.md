@@ -92,7 +92,8 @@ erkennen lässt, welche Slugs private Seiten sind. Den Einstieg für diese Besuc
 
 ### `GET /api/auth/sso/login`
 
-Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `slug` (Slug der Statusseite). Einstieg ins
+Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `slug` (Slug der Statusseite), optional
+`return_to`. Einstieg ins
 Seiten-SSO ohne Seiten-ID: Der Server startet
 den Ablauf wie `oidc/login` und leitet mit `307` zum IdP weiter. Eine unbekannte
 Seite, eine Seite ohne aktives SSO und ein fehlender `slug` enden gleich: Weiterleitung auf die
@@ -104,7 +105,8 @@ wenn sie für den Besucher nicht erreichbar ist (nicht vorhanden oder privat).
 
 ### `GET /api/auth/oidc/login`
 
-Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `page` (ID der Statusseite, Pflicht). Legt
+Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `page` (ID der Statusseite, Pflicht),
+`return_to` (optional, siehe [Rücksprung](providers.md#rücksprung-nach-dem-login)). Legt
 State, Nonce und PKCE-Verifier an (10 Minuten gültig), setzt das Cookie `oidc_state` (HttpOnly,
 Secure) und leitet mit `307` zum IdP weiter. Fehler leiten auf die Login-Seite um (Codes
 `bad_page`, `not_configured`, `provider_unreachable`, `internal`).
@@ -130,13 +132,54 @@ Seiten-SSO an`, `Konten mit Rolle auf einer anderen Seite nutzen dieses Seiten-S
 (`Ungültige Seite`), `404` (`SSO für diese Seite nicht eingerichtet`), `502`
 (`OIDC-Anbieter nicht erreichbar`), `500`.
 
+## Globale OIDC-Anbieter
+
+Anbieter aus `OIDC_PROVIDERS` (siehe [Globale Anbieter](providers.md)); `:id` ist die Anbieter-ID.
+
+### `GET /api/public/auth-config`
+
+Öffentlich, begrenzt auf 60 Aufrufe pro Minute. Anmeldemethoden für die Login-Seite. Antwort `200`:
+
+```json
+{"password_login": false, "providers": [{"id": "gitlab", "name": "GitLab"}]}
+```
+
+`providers` enthält nur aktive Anbieter, in der Reihenfolge von `OIDC_PROVIDERS`, ohne Issuer oder
+Client-Daten.
+
+### `GET /api/auth/provider/:id/login`
+
+Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `return_to` (optional, siehe
+[Rücksprung](providers.md#rücksprung-nach-dem-login)). Legt State, Nonce und PKCE-Verifier an (10
+Minuten gültig), setzt das Cookie `oidc_state` (Pfad `/api/auth/provider`, HttpOnly, Secure) und leitet
+mit `307` zum Anbieter weiter. Fehler leiten auf die Login-Seite um (`provider_unknown`,
+`provider_unreachable`, `internal`).
+
+### `GET /api/auth/provider/:id/callback`
+
+Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Redirect-URI beim Anbieter
+(`<BASE_URL>/api/auth/provider/<id>/callback`). Query: `state`, `code`; nur ein State dieses Anbieters
+wird angenommen. Bei Erfolg `307` auf `<FRONTEND_URL>/auth/sso-callback?code=<Einmal-Code>` (bei
+Verknüpfung mit `&next=profile`). Fehler leiten mit Code um (`provider_unknown`, `state_invalid`,
+`provider_denied`, `provider_unreachable`, `token_exchange`, `no_id_token`, `id_token_invalid`,
+`email_missing`, `email_unverified`, `domain_not_allowed`, `not_linked`, `already_linked`,
+`internal`). Audit-Log: `auth.sso_login` bzw. `auth.sso_linked` mit `provider=<id>`.
+
+### `POST /api/auth/provider/:id/link`
+
+Braucht ein JWT, ohne Query und Body. Startet die Verknüpfung des angemeldeten Kontos (auch Global
+Admins). Antwort `200`: `{"url": "<Authorize-URL des Anbieters>"}`. Fehler (JSON): `401`, `403`
+(Sitzung aus einem Seiten-SSO), `404` (unbekannte ID), `502` (Anbieter nicht erreichbar), `500`.
+
 ## Sitzung und Verknüpfungen
 
 ### `POST /api/auth/sso-exchange`
 
 Öffentlich, begrenzt auf 10 Aufrufe pro Minute. Tauscht den Einmal-Code aus dem Redirect gegen das
-JWT. Body: `{"code": "<Einmal-Code>"}`. Antwort `200`: `{"token": "<JWT>"}`. Der Code gilt nur einmal
-und nur kurz. Das JWT gilt nur für die Seite, deren IdP die Anmeldung bestätigt hat.
+JWT. Body: `{"code": "<Einmal-Code>"}`. Antwort `200`: `{"token": "<JWT>", "return_to": "/pfad"}`
+(`return_to` ist der geprüfte Rücksprungpfad aus dem Login-Start, sonst `""`). Der Code gilt nur einmal
+und nur kurz. Nach einem Seiten-SSO gilt das JWT nur für die Seite, deren IdP die Anmeldung bestätigt
+hat; nach einem globalen Anbieter für das ganze Konto.
 
 Fehler: `400` (`Code erforderlich`), `401` (`Ungültiger oder abgelaufener Code`).
 
@@ -147,10 +190,22 @@ darf:
 
 ```json
 {
-  "identities": [{"id": 7, "status_page_id": 1, "page_name": "Demo", "protocol": "oidc", "email": "user@example.org", "created_at": "…"}],
-  "linkable": [{"status_page_id": 1, "page_name": "Demo", "protocol": "oidc"}]
+  "identities": [
+    {"id": 7, "status_page_id": 1, "page_name": "Demo", "protocol": "oidc", "provider": "", "email": "user@example.org", "created_at": "…"},
+    {"id": 8, "status_page_id": 0, "page_name": "GitLab", "protocol": "oidc", "provider": "gitlab", "email": "user@example.org", "created_at": "…"}
+  ],
+  "linkable": [
+    {"status_page_id": 0, "page_name": "Google", "protocol": "oidc", "provider": "google"},
+    {"status_page_id": 2, "page_name": "Andere", "protocol": "oidc", "provider": ""}
+  ]
 }
 ```
+
+Einträge mit `status_page_id` `0` gehören zu einem globalen Anbieter: `provider` ist seine ID,
+`page_name` sein Anzeigename (verknüpfen über
+[`POST /api/auth/provider/:id/link`](#post-apiauthprovideridlink)). Ist der Anbieter nicht mehr
+konfiguriert, bleibt die Verknüpfung mit leerem `provider` sichtbar und lösbar. Globale Anbieter
+erscheinen auch für Global Admins, nie in einer Sitzung aus einem Seiten-SSO.
 
 Fehler: `401` (`Nicht angemeldet`).
 

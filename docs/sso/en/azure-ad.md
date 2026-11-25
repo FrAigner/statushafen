@@ -37,4 +37,24 @@ Statushafen talks to Entra ID via OpenID Connect only; SAML is no longer support
 7. Start the test sign-in, switch OIDC on and link accounts, see
    [Accounts and linking](oidc.md#accounts-and-linking).
 
+## As global provider
+
+The same application (or a second one) can serve as a [global provider](providers.md) for signing in
+to the whole instance. Redirect URI at the provider:
+`https://status.example.org/api/auth/provider/entra/callback`.
+
+```bash
+OIDC_PROVIDERS=entra
+OIDC_ENTRA_ISSUER=https://login.microsoftonline.com/TENANT-ID/v2.0
+OIDC_ENTRA_CLIENT_ID=CLIENT-ID
+OIDC_ENTRA_CLIENT_SECRET=CLIENT-SECRET
+OIDC_ENTRA_NAME=Microsoft
+```
+
+Entra ID sends **no** `email_verified`. Existing accounts are therefore never linked by
+e-mail; they link the provider in the profile (for that, temporarily
+`PASSWORD_LOGIN_ENABLED=true`). New accounts are created as usual. Always use the issuer with your
+tenant ID, never `common`: with multi-tenant applications the `email` claim can be set by
+outsiders.
+
 Back to the [overview](README.md).

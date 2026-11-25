@@ -31,3 +31,23 @@ Lies zuerst den [allgemeinen OIDC-Guide](oidc.md). Hier stehen nur die Keycloak-
    ```
 
 6. Konto verknüpfen und testen, siehe [Konten und Verknüpfung](oidc.md#konten-und-verknüpfung).
+
+## Als globaler Anbieter
+
+Dieselbe Anwendung (oder eine zweite) kann als [globaler Anbieter](providers.md) für die Anmeldung an
+der ganzen Instanz dienen. Redirect-URI beim Anbieter:
+`https://status.example.org/api/auth/provider/keycloak/callback`.
+
+```bash
+OIDC_PROVIDERS=keycloak
+OIDC_KEYCLOAK_ISSUER=https://keycloak.example.org/realms/REALM
+OIDC_KEYCLOAK_CLIENT_ID=CLIENT-ID
+OIDC_KEYCLOAK_CLIENT_SECRET=CLIENT-SECRET
+OIDC_KEYCLOAK_NAME=Keycloak
+```
+
+Keycloak liefert `email_verified` (Haken „Email verified“ am Nutzer). Erlaubt der Realm die
+Selbstregistrierung ohne E-Mail-Bestätigung, ist `email_verified` dort `false` und eine Verknüpfung
+über die E-Mail findet nicht statt.
+
+Zurück zur [Übersicht](README.md).

@@ -37,4 +37,20 @@ Statushafen talks to Okta via OpenID Connect only; SAML is no longer supported.
 8. Start the test sign-in, switch OIDC on and link accounts, see
    [Accounts and linking](oidc.md#accounts-and-linking).
 
+## As global provider
+
+The same application (or a second one) can serve as a [global provider](providers.md) for signing in
+to the whole instance. Redirect URI at the provider:
+`https://status.example.org/api/auth/provider/okta/callback`.
+
+```bash
+OIDC_PROVIDERS=okta
+OIDC_OKTA_ISSUER=https://okta.example.org/oauth2/default
+OIDC_OKTA_CLIENT_ID=CLIENT-ID
+OIDC_OKTA_CLIENT_SECRET=CLIENT-SECRET
+OIDC_OKTA_NAME=Okta
+```
+
+Okta sends `email_verified`.
+
 Back to the [overview](README.md).
