@@ -21,8 +21,9 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT license](LICENSE)
 - **Subscribers:** e-mail with double opt-in or Google Chat webhook, editable mail templates per
   language and audience.
 - **Roles and permissions**, audit log, per-page single sign-on with OIDC and SAML 2.0.
-- **Multilingual** interface and content (30 languages in the catalog), optional automatic
-  translation (LibreTranslate or DeepL).
+- **German and English** interface and content; a second content language with optional
+  automatic translation (LibreTranslate or DeepL) is a switch in the system settings (off by
+  default).
 - **Formatted texts** in a restricted Markdown subset, rendered safely in pages and mails.
 - **Self-monitoring** with a system page, Prometheus metrics, structured logs without secrets.
 - Documented REST API ([OpenAPI](docs/api/openapi.yaml)) and in-app help.
@@ -112,6 +113,18 @@ Checklist for production:
   non-members (they see the landing page). The endpoint is limited to 120 requests per minute per IP
   (429 afterwards); Caddy only asks for hosts without a certificate.
 - Back up the database regularly: [`docs/backup-restore.en.md`](docs/backup-restore.en.md).
+
+### Upgrade notes
+
+- **Content languages and automatic translation:** content (incidents, maintenance, notices,
+  components, templates, notifications) now exists in German and English only, and the second
+  language including automatic translation is a switch under *System settings → Automatic
+  translation*, **off by default**. Installations that used translations before start with the
+  switch **off**: until a global admin switches it on, every status page shows and sends its content
+  in its default language only. Stored translations are kept and reappear once it is on. At startup
+  catalog languages other than `de` and `en` are deactivated (rows and translations stay in the
+  database but are no longer offered or delivered), and status pages with such a default language
+  fall back to German (logged).
 
 ## Documentation
 

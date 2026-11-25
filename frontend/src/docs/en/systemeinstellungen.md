@@ -36,8 +36,17 @@ Turns the automatic self-monitoring of the system page on or off (see
 
 ## Automatic translation
 
-Sets which service handles the **Translate** button in the forms (see
-[Languages](/docs/sprachen)). The suggestion always lands as a draft.
+The switch **Switch on automatic translation and a second language (German/English)** is **off**
+without an entry. While it is off, incidents, maintenance, notices, components, templates and
+notifications have only the default language of each status page: no language selection, no
+translations, and no maintaining of a second language by hand either. When it is on, German and
+English are available including translation suggestions (see [Languages](/docs/sprachen)). Stored
+translations are kept when you switch it off. **After upgrading** the switch is off even where
+translations were used so far: switch it on once to show them again. Every change is recorded in
+the audit log.
+
+The other fields set which service handles the **Translate** button in the forms. The suggestion
+always lands as a draft.
 
 - **Operator default (LibreTranslate):** The operator provides the service (environment variable
   `LIBRETRANSLATE_URL`). The texts do not leave the operator's infrastructure. Only the languages

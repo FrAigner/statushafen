@@ -3,34 +3,55 @@
 Statushafen trennt drei Dinge: die Sprache der **Oberfläche**, die Sprachen der **Inhalte** einer
 Statusseite und **eigene UI-Texte**.
 
+## Nur Deutsch und Englisch, zweite Sprache nur mit Schalter
+
+Inhalte (Vorfälle, Wartungen, Ankündigungen, Komponenten, Vorlagen und Benachrichtigungen) gibt es
+auf **Deutsch und Englisch**. Ob eine Statusseite neben ihrer Standardsprache die zweite Sprache
+anbietet, hängt am Schalter **Automatische Übersetzung** in den
+[Systemeinstellungen](/docs/systemeinstellungen) (nur Global Admins). Er ist **standardmäßig aus**.
+
+- **Aus:** Jede Statusseite hat nur ihre Standardsprache. Es gibt keine Sprachreiter in den
+  Formularen, keine Übersetzungsseiten und keinen Knopf „Übersetzen“; man kann auch keine zweite
+  Sprache von Hand pflegen. Die öffentliche Statusseite zeigt alle Inhalte in der Standardsprache,
+  Mails an Abonnenten und interne Nutzer gehen ebenfalls in der Standardsprache hinaus. Der
+  Sprachwähler oben schaltet dann nur die Oberfläche um.
+- **An:** Deutsch und Englisch wie unten beschrieben, inklusive Übersetzungsvorschlag, sofern ein
+  Dienst eingerichtet ist.
+
+Bereits gespeicherte Übersetzungen gehen beim Ausschalten nicht verloren: Sie erscheinen wieder,
+sobald der Schalter an ist.
+
+**Nach dem Update:** Installationen, die vorher Übersetzungen genutzt haben, starten mit
+ausgeschaltetem Schalter. Ein Global Admin muss die automatische Übersetzung in den
+Systemeinstellungen einmal einschalten, damit die zweite Sprache und die Übersetzungen wieder
+angezeigt werden. Sprachen außer Deutsch und Englisch aus dem früheren Katalog werden beim Start
+abgeschaltet und nirgends mehr angeboten; ihre Übersetzungen bleiben in der Datenbank. Hatte eine
+Statusseite eine solche Sprache als Standardsprache, ist es danach Deutsch.
+
 ## Oberflächensprache
 
 Die Oberfläche gibt es auf Deutsch und Englisch. Die Sprache wählt man oben rechts in der
 Sprachauswahl. Angemeldete Nutzer speichern sie im Profil, anonyme Besucher im Browser.
 
-Auf einer öffentlichen Statusseite zeigt die Sprachauswahl **alle für diese Seite aktivierten
-Sprachen** (mit ihrer Eigenbezeichnung), nicht nur Deutsch und Englisch. Die Inhalte erscheinen in
-der gewählten Sprache. Gibt es für eine Sprache keine Oberflächentexte (etwa Kroatisch), bleiben
-Beschriftungen wie Knöpfe und Überschriften auf Deutsch; die Texte der Vorfälle, Komponenten und
-Ankündigungen sind trotzdem übersetzt.
+Bietet eine öffentliche Statusseite beide Sprachen an, wählt die Sprachauswahl zugleich die Sprache
+der Inhalte. Hat sie nur ihre Standardsprache (etwa bei ausgeschalteter automatischer Übersetzung),
+schaltet die Auswahl nur die Oberfläche um; die Inhalte bleiben in der Standardsprache.
 
 ## Sprachen einer Statusseite
 
-Unter **Sprachen** legt man fest, in welchen Sprachen eine Statusseite Inhalte anbietet (Recht
+Unter **Sprachen** legt man fest, in welcher Sprache eine Statusseite ihre Inhalte pflegt (Recht
 `languages:update`):
 
-- Mindestens eine Sprache muss aktiv sein, eine davon ist die Standardsprache.
+- Bei ausgeschalteter automatischer Übersetzung wählst du nur die **Standardsprache** (Deutsch oder
+  Englisch). Eine früher aktivierte zweite Sprache bleibt gespeichert.
+- Bei eingeschalteter automatischer Übersetzung aktivierst du Deutsch, Englisch oder beide; eine
+  davon ist die Standardsprache.
 - Neue Statusseiten starten mit Deutsch (Standard) und Englisch.
-- Global Admins pflegen zusätzlich den **Sprachkatalog**: Code, Anzeigename und ob die Sprache
-  aktiv ist. Nur Sprachen aus dem Katalog lassen sich einer Seite zuweisen.
-  Der Katalog enthält von Anfang an 30 Sprachen (Deutsch, Englisch und viele weitere europäische
-  Sprachen, mit ihrer Eigenbezeichnung). Was der Betreiber ändert oder abschaltet, bleibt erhalten.
-  Bei vielen Sprachen zeigt das Bearbeiten-Formular statt der Reiter eine Auswahlliste.
-- Die Tabelle zeigt vor dem Code die Landesflagge (sofern bekannt) und die Spalte **Sprache** mit dem
-  Namen in der Oberflächensprache (etwa „Bulgarisch“ bzw. „Bulgarian“); **Name** ist die Eigenbezeichnung.
-- **Format des Codes:** 2 bis 3 Buchstaben, optional mit Untertags aus 2 bis 8 Buchstaben oder
-  Ziffern, durch Bindestrich getrennt (`fr`, `en-us`, `zh-hant-tw`). Großbuchstaben werden zu
-  Kleinbuchstaben; alles andere (`FRA!`, `e`) lehnt Statushafen ab. Name und Code sind Pflicht.
+- Global Admins sehen zusätzlich den **Sprachkatalog** mit Deutsch und Englisch: Anzeigename und ob
+  die Sprache aktiv ist. Andere Sprachen lassen sich nicht anlegen oder einschalten (Meldung
+  „Inhalte gibt es nur auf Deutsch und Englisch“).
+- Die Tabelle zeigt vor dem Code die Landesflagge und die Spalte **Sprache** mit dem Namen in der
+  Oberflächensprache; **Name** ist die Eigenbezeichnung.
 
 ## Sprache aus dem Katalog löschen
 
@@ -49,8 +70,9 @@ nehmen will, schaltet sie stattdessen auf **inaktiv**.
 
 ## Inhalte übersetzen
 
-Vorfälle (Titel und Nachricht), deren Updates (nur Nachricht), Komponenten (Name und Beschreibung)
-und Ankündigungen lassen sich je Sprache übersetzen. Jede Übersetzung ist zunächst ein **Entwurf** und muss **bestätigt**
+Nur bei eingeschalteter automatischer Übersetzung: Vorfälle (Titel und Nachricht), deren Updates
+(nur Nachricht), Komponenten (Name und Beschreibung) und Ankündigungen lassen sich in die zweite
+Sprache übersetzen. Jede Übersetzung ist zunächst ein **Entwurf** und muss **bestätigt**
 werden; nur bestätigte Übersetzungen gibt die öffentliche API aus.
 
 Die öffentliche Statusseite zeigt Namen und Beschreibungen von Komponenten und Gruppen sowie Titel
@@ -89,12 +111,7 @@ Meldungen im Verwaltungsbereich (z. B. „gespeichert“) stehen oben im Inhalts
 Scrollen sichtbar. Erfolgsmeldungen blenden sich nach wenigen Sekunden von selbst aus; Fehler und
 Warnungen bleiben stehen, bis man sie schließt.
 
-Der Standarddienst (LibreTranslate) unterstützt **23 der 30** Katalogsprachen: Bulgarisch, Dänisch, Deutsch,
-Englisch, Estnisch, Finnisch, Französisch, Griechisch, Irisch, Italienisch, Lettisch, Litauisch, Niederländisch,
-Polnisch, Portugiesisch, Rumänisch, Schwedisch, Slowakisch, Slowenisch, Spanisch, Tschechisch, Türkisch und
-Ungarisch. **Nicht unterstützt** sind Bosnisch, Kroatisch, Luxemburgisch, Mazedonisch, Maltesisch, Rumantsch und
-Serbisch; dafür bleibt nur die Übersetzung von Hand. (Stand Version 1.9.6; auf dem Betriebsserver sind
-bewusst nur Deutsch und Englisch geladen.)
+Der Standarddienst (LibreTranslate) unterstützt Deutsch und Englisch.
 
 ## UI-Texte anpassen
 

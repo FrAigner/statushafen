@@ -3,33 +3,54 @@
 Statushafen separates three things: the language of the **interface**, the languages of a status
 page's **content**, and **custom UI texts**.
 
+## German and English only, second language only with the switch
+
+Content (incidents, maintenance, notices, components, templates and notifications) is available in
+**German and English**. Whether a status page offers the second language next to its default
+language depends on the switch **Automatic translation** in the
+[System settings](/docs/systemeinstellungen) (global admins only). It is **off by default**.
+
+- **Off:** Every status page has its default language only. There are no language tabs in the
+  forms, no translation pages and no "Translate" button; you cannot maintain a second language by
+  hand either. The public status page shows all content in the default language, and mails to
+  subscribers and internal users go out in the default language as well. The language selector at
+  the top then only switches the interface.
+- **On:** German and English as described below, including translation suggestions when a service
+  is set up.
+
+Translations already stored are not lost when you switch it off: they reappear as soon as the
+switch is on.
+
+**After upgrading:** installations that used translations before start with the switch off. A
+global admin has to switch automatic translation on once in the system settings to show the second
+language and the translations again. Languages other than German and English from the former
+catalog are switched off at startup and no longer offered anywhere; their translations stay in the
+database. A status page that had such a language as its default language now uses German.
+
 ## Interface language
 
 The interface is available in German and English. Pick the language in the language selector at
 the top right. Signed-in users store it in their profile, anonymous visitors in the browser.
 
-On a public status page the language selector lists **all languages enabled for that page** (by
-their native names), not just German and English. Content appears in the chosen language. If a
-language has no interface texts (for example Croatian), labels such as buttons and headings stay in
-German; the texts of incidents, components and notices are still translated.
+If a public status page offers both languages, the language selector also picks the language of the
+content. If it has its default language only (for example with automatic translation switched off),
+the selector only switches the interface; the content stays in the default language.
 
 ## Languages of a status page
 
-Under **Languages** you define which languages a status page offers content in (permission
+Under **Languages** you define which language a status page writes its content in (permission
 `languages:update`):
 
-- At least one language must be active, and one of them is the default language.
+- With automatic translation switched off you only choose the **default language** (German or
+  English). A second language enabled earlier stays stored.
+- With automatic translation switched on you enable German, English or both; one of them is the
+  default language.
 - New status pages start with German (default) and English.
-- Global admins also maintain the **language catalog**: code, display name and whether the
-  language is active. Only catalog languages can be assigned to a page.
-  The catalog ships with 30 languages (German, English and many more European languages, shown
-  by their native name). Changes or deactivations by the operator are kept. With many languages the
-  edit form shows a dropdown instead of tabs.
-- The table shows a national flag (where known) before the code and a **Language** column with the
-  name in the interface language (e.g. "Bulgarian" or "Bulgarisch"); **Name** is the native name.
-- **Format of the code:** 2 to 3 letters, optionally with subtags of 2 to 8 letters or digits
-  separated by hyphens (`fr`, `en-us`, `zh-hant-tw`). Uppercase letters become lowercase;
-  anything else (`FRA!`, `e`) is rejected. Name and code are required.
+- Global admins also see the **language catalog** with German and English: display name and whether
+  the language is active. Other languages cannot be added or switched on (message "Content is
+  available in German and English only").
+- The table shows a national flag before the code and a **Language** column with the name in the
+  interface language; **Name** is the native name.
 
 ## Delete a language from the catalog
 
@@ -48,8 +69,8 @@ instead.
 
 ## Translate content
 
-Incidents (title and message), their updates (message only), components (name and description)
-and notices can be translated per language. Each translation starts as a **draft** and has to be **confirmed**; the public API
+Only with automatic translation switched on: incidents (title and message), their updates (message
+only), components (name and description) and notices can be translated into the second language. Each translation starts as a **draft** and has to be **confirmed**; the public API
 only returns confirmed translations.
 
 The public status page shows the names and descriptions of components and groups as well as the
@@ -87,11 +108,7 @@ Messages in the admin area (e.g. "saved") stay at the top of the content area an
 while scrolling. Success messages fade out by themselves after a few seconds; errors and warnings
 stay until you close them.
 
-The default service (LibreTranslate) supports **23 of the 30** catalog languages: Bulgarian, Czech, Danish, Dutch,
-English, Estonian, Finnish, French, German, Greek, Hungarian, Irish, Italian, Latvian, Lithuanian, Polish,
-Portuguese, Romanian, Slovak, Slovenian, Spanish, Swedish and Turkish. **Not supported** are Bosnian, Croatian,
-Luxembourgish, Macedonian, Maltese, Romansh and Serbian; those can only be translated by hand. (As of version
-1.9.6; the production server deliberately loads German and English only.)
+The default service (LibreTranslate) supports German and English.
 
 ## Customize UI texts
 

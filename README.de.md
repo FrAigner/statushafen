@@ -21,8 +21,9 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT-Lizenz](LICENSE)
 - **Abonnenten:** E-Mail mit Double-Opt-in oder Google-Chat-Webhook, anpassbare Mailvorlagen je
   Sprache und Zielgruppe.
 - **Rollen und Rechte**, Audit-Log, Single Sign-on je Seite mit OIDC und SAML 2.0.
-- **Mehrsprachig** (30 Sprachen im Katalog) für Oberfläche und Inhalte, optional automatische
-  Übersetzung (LibreTranslate oder DeepL).
+- **Deutsch und Englisch** für Oberfläche und Inhalte; eine zweite Inhaltssprache mit optional
+  automatischer Übersetzung (LibreTranslate oder DeepL) ist ein Schalter in den
+  Systemeinstellungen (standardmäßig aus).
 - **Formatierte Texte** in einer eingeschränkten Markdown-Teilmenge, sicher dargestellt in Seiten
   und Mails.
 - **Selbstüberwachung** mit Systemseite, Prometheus-Metriken, strukturierte Logs ohne Geheimnisse.
@@ -115,6 +116,19 @@ Checkliste für die Produktion:
   mehr zu einem Seitennamen auf (sie sehen die Startseite). Der Endpunkt ist je IP auf 120 Anfragen
   pro Minute begrenzt (danach 429), Caddy fragt nur für Hosts ohne Zertifikat.
 - Die Datenbank regelmäßig sichern: [`docs/backup-restore.md`](docs/backup-restore.md).
+
+### Hinweise zum Update
+
+- **Inhaltssprachen und automatische Übersetzung:** Inhalte (Vorfälle, Wartungen, Ankündigungen,
+  Komponenten, Vorlagen, Benachrichtigungen) gibt es nur noch auf Deutsch und Englisch, und die
+  zweite Sprache samt automatischer Übersetzung ist ein Schalter unter *Systemeinstellungen →
+  Automatische Übersetzung*, **standardmäßig aus**. Installationen, die bisher Übersetzungen genutzt
+  haben, starten mit **ausgeschaltetem** Schalter: Bis ein Global Admin ihn einschaltet, zeigt und
+  versendet jede Statusseite ihre Inhalte nur in ihrer Standardsprache. Gespeicherte Übersetzungen
+  bleiben erhalten und erscheinen wieder, sobald er an ist. Beim Start werden Katalogsprachen außer
+  `de` und `en` abgeschaltet (Zeilen und Übersetzungen bleiben in der Datenbank, werden aber weder
+  angeboten noch ausgeliefert); Statusseiten mit einer solchen Standardsprache fallen auf Deutsch
+  zurück (mit Log-Eintrag).
 
 ## Dokumentation
 
