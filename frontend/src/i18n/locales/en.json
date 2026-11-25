@@ -1496,6 +1496,8 @@
     "description": "When maintaining texts in several languages, the editor can generate a translation suggestion. The suggestion always lands as a draft in the field and is never published automatically.",
     "statusNotConfigured": "No translation service is set up. The Translate button reports this when clicked.",
     "statusActive": "Active service: {provider}.",
+    "enabledLabel": "Switch on automatic translation and a second language (German/English)",
+    "offHint": "Switched off: incidents, maintenance, notices, components, templates and notifications exist only in the default language of each status page, without language selection and without translations. Translations already stored are kept and reappear as soon as you switch it on.",
     "name": {
       "libretranslate": "LibreTranslate",
       "deepl": "DeepL"

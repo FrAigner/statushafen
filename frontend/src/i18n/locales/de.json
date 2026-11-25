@@ -1496,6 +1496,8 @@
     "description": "Beim Pflegen von Texten in mehreren Sprachen kann der Bearbeiter einen Übersetzungsvorschlag erzeugen. Der Vorschlag landet immer als Entwurf im Feld und wird nie automatisch veröffentlicht.",
     "statusNotConfigured": "Derzeit ist kein Übersetzungsdienst eingerichtet. Der Knopf „Übersetzen“ meldet das beim Klick.",
     "statusActive": "Aktiver Dienst: {provider}.",
+    "enabledLabel": "Automatische Übersetzung und zweite Sprache (Deutsch/Englisch) einschalten",
+    "offHint": "Ausgeschaltet: Vorfälle, Wartungen, Hinweise, Komponenten, Vorlagen und Benachrichtigungen gibt es nur in der Standardsprache der jeweiligen Statusseite, ohne Sprachauswahl und ohne Übersetzungen. Bereits gespeicherte Übersetzungen bleiben erhalten und erscheinen wieder, sobald du einschaltest.",
     "name": {
       "libretranslate": "LibreTranslate",
       "deepl": "DeepL"
