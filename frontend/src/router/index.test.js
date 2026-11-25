@@ -27,6 +27,37 @@ describe('router beforeEach guard', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
+  // A direct visit of a requiresAuth route counts as an explicit choice: back there after sign-in.
+  it('passes the requested route as returnTo to the login page', async () => {
+    await router.push('/admin/incidents?status=open')
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.returnTo).toBe('/admin/incidents?status=open')
+  })
+
+  // Already signed in on /login?returnTo=...: go straight to the (checked) target.
+  it.each([
+    ['status page', '/status/acme', '/status/acme'],
+    ['admin area', '/admin/overview', '/admin/overview'],
+    ['protocol-relative', '//angreifer.example', '/'],
+    ['absolute URL', 'https://angreifer.example', '/'],
+    ['unknown route', '/admin/gibt/es/nicht/wirklich', '/'],
+  ])('sends a signed-in user from /login straight to returnTo (%s)', async (_, returnTo, expected) => {
+    useAuth().setAuth('jwt-123', { is_global_admin: true })
+
+    await router.push({ path: '/login', query: { returnTo } })
+
+    expect(router.currentRoute.value.fullPath).toBe(expected)
+  })
+
+  it('leaves a signed-in user on /login without returnTo', async () => {
+    useAuth().setAuth('jwt-123', { is_global_admin: true })
+
+    await router.push('/login')
+
+    expect(router.currentRoute.value.fullPath).toBe('/login')
+  })
+
   // Kein Weiterleiten ins Leere mehr. Die Route nennt ihr Recht (meta.permission),
   // AdminLayout zeigt ohne Leserecht „Keine Berechtigung“ (siehe AdminLayout.test.js).
   it('lässt einen eingeloggten Nicht-Global-Admin auf der Adresse, nennt aber das nötige Recht', async () => {

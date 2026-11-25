@@ -14,7 +14,7 @@ test.describe('Admin Roles & Permissions', () => {
 
   test.beforeEach(async ({ page }) => {
     // Login as Global Admin
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

@@ -27,13 +27,18 @@ area.
 
 ## Log in
 
-Login lives under `/login` ("Login" button at the top right).
+Login lives under `/login` ("Login" button at the top right). The operator decides which ways the
+login page offers:
 
-- **Email and password:** after login you land in the admin area.
-- **Google or GitHub:** via the "Sign in with Google" and "Sign in with GitHub" buttons. This
-  requires the operator to have set up sign-in with Google or GitHub.
-- **The status page's SSO:** if you come from a status page that has OIDC or SAML set up, the
-  login page also shows an SSO button. Details in [SSO](/docs/sso).
+- **Sign-in providers:** one "Sign in with <name>" button per active sign-in provider, e.g. for
+  GitLab.
+- **Email and password:** only if the operator has enabled this kind of sign-in.
+- **The status page's SSO:** if you come from a status page that has OIDC set up, the login page
+  also shows "Sign in with SSO". Details in [SSO](/docs/sso).
+
+After signing in you go back to the page you came from, for example the status page. The
+"Administration" link at the bottom of every public page leads into the admin area. If you open an
+address in the admin area directly, you also end up there after signing in.
 
 ## After your first login
 
@@ -60,4 +65,5 @@ Login lives under `/login` ("Login" button at the top right).
 - **Documentation:** the "Documentation" item in the System area opens this page.
 
 On the public status page, the entry "Dashboard" in the user menu leads to the admin area. It only
-appears for roles with the `admin_dashboard` permission.
+appears when your role on exactly this status page has the `admin_dashboard` permission; a role on
+another page is not enough (global admins always see it).

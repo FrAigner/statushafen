@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -188,15 +187,9 @@ func TestDeleteMySubscriptionHandler_DBErrorReturns500(t *testing.T) {
 	sqlWriteDB, _ := writeDB.DB()
 	_ = sqlWriteDB.Close()
 
-	if err := os.Chmod(dbPath, 0o444); err != nil {
-		t.Fatalf("failed to chmod db file read-only: %v", err)
-	}
-	defer func() {
-		_ = os.Chmod(dbPath, 0o644)
-		_ = os.Remove(dbPath)
-	}()
-
-	roDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	// Open the file in SQLite's read-only mode instead of relying on file
+	// permissions: chmod 0444 does not stop root, so the test failed there.
+	roDB, err := gorm.Open(sqlite.Open("file:"+dbPath+"?mode=ro"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open read-only DB: %v", err)
 	}

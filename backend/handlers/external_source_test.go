@@ -85,18 +85,23 @@ func newExtFixture(t *testing.T) *extFixture {
 	t.Helper()
 	f := &extFixture{t: t, db: testutils.SetupTestDB(), provider: &extFakeProvider{}, listener: &extListener{}}
 	f.h = handlers.NewHandler(f.db)
+	// The service and the handlers share the fake clock, so time windows in
+	// the read APIs (e.g. "closed within 14 days") follow the fixture dates
+	// instead of the real current date.
+	now := func() time.Time {
+		if f.clock.IsZero() {
+			return time.Now()
+		}
+		return f.clock
+	}
+	f.h.Now = now
 	f.h.ExternalStatus = externalstatus.NewService(f.db, externalstatus.Options{
 		Providers: map[string]externalstatus.Provider{externalstatus.ProviderSummaryV2: f.provider},
 		Listener:  f.listener,
 		Outage:    f.h,
 		Incidents: f.h,
 		Jitter:    func(time.Duration) time.Duration { return 0 },
-		Now: func() time.Time {
-			if f.clock.IsZero() {
-				return time.Now()
-			}
-			return f.clock
-		},
+		Now:       now,
 	})
 	f.r = testutils.SetupRouter()
 	auth := f.r.Group("/api")

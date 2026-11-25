@@ -30,7 +30,7 @@
     "error": "Language could not be saved.",
     "sso": {
       "title": "SSO sign-in",
-      "description": "Link your account with the SSO sign-in of a status page. Afterwards you can sign in there with “Sign in with SSO” without a password.",
+      "description": "Link your account with a sign-in provider or the SSO sign-in of a status page. Afterwards you can sign in that way without a password.",
       "linkedHeading": "Linked",
       "linkedAs": "as {email}",
       "unknownPage": "Deleted status page",
@@ -39,11 +39,11 @@
       "unlinked": "Link removed.",
       "unlinkError": "Could not remove the link.",
       "linkableHeading": "Link",
+      "providersHeading": "Sign-in providers",
+      "linkProvider": "Link with {name}",
       "link": "Link with SSO",
       "linkError": "Could not start linking: {message}",
-      "loadError": "Could not load SSO links.",
-      "protocolOidc": "OIDC",
-      "protocolSaml": "SAML"
+      "loadError": "Could not load SSO links."
     },
     "cardTitle": "Account and interface"
   },
@@ -1179,30 +1179,7 @@
       "testFailed": "Test sign-in failed: {message}",
       "testStartError": "Could not start test sign-in: {message}",
       "oidcHeading": "OpenID Connect (OIDC)",
-      "samlHeading": "SAML 2.0",
-      "samlIntro": "This status page's own SAML service provider. Register the SP metadata (URL below) with the IdP; key and certificate are generated on first save.",
-      "samlEnable": "Enable SAML sign-in",
-      "samlMetadataUrl": "IdP metadata URL",
-      "samlMetadataUrlHelp": "https only. Reloaded regularly, so key rollovers at the IdP arrive automatically. Provide either URL or XML.",
-      "samlMetadataXml": "IdP metadata (XML)",
-      "samlMetadataXmlHelp": "Alternatively paste the IdP metadata XML instead of a URL. Paste it again after a key rollover at the IdP.",
-      "samlAttributeEmail": "Attribute for the email address",
-      "samlAttributeName": "Attribute for the name",
-      "samlAttributeHelp": "Name or FriendlyName of the attribute in the assertion (e.g. email, mail or http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress). The email is only displayed, never used for matching.",
-      "samlEntityId": "SP entity ID",
-      "samlAcsUrl": "SP ACS URL (HTTP-POST)",
-      "samlSpHelp": "Register these with the IdP as entity ID and reply/ACS URL.",
-      "samlMetadataLink": "Open SP metadata",
-      "samlMetadataPending": "The SP metadata is available after the first save.",
-      "samlCertificate": "SP certificate",
-      "samlCertificateHelp": "Also part of the SP metadata. The IdP uses it to verify signed AuthnRequests.",
-      "samlTestButton": "Start SAML test sign-in",
-      "samlTestOk": "SAML test sign-in successful: IdP metadata, signature and ACS URL match.",
-      "testMissingAttributes": "These attributes were missing from the assertion: {claims}",
-      "samlAllowUnspecified": "Allow NameID format “unspecified”",
-      "samlAllowUnspecifiedHelp": "Default: persistent NameIDs only (urn:oasis:names:tc:SAML:2.0:nameid-format:persistent). Email addresses as NameID are always rejected.",
-      "samlAllowUnspecifiedWarning": "Caution: a NameID in format unspecified is often a changeable value such as the user name. If the IdP reassigns it, the new person signs in with the linked account. Only enable this if the IdP cannot provide a persistent NameID and never reassigns the identifier.",
-      "identityResetWarning": "Caution: issuer or IdP metadata changed. If the OIDC issuer, the SAML metadata source or the IdP entity ID or signing certificate changes, saving deletes the existing SSO links of this page for that protocol; users have to link again in their profile.",
+      "identityResetWarning": "Caution: issuer changed. If the OIDC issuer changes, saving deletes the existing SSO links of this page; users have to link again in their profile.",
       "testCardTitle": "Test login"
     }
   },
@@ -1334,7 +1311,7 @@
     "feature5Title": "Multilingual",
     "feature5Desc": "Content and notifications in your customers' languages.",
     "feature6Title": "Tenants & SSO",
-    "feature6Desc": "Many status pages in one account, sign-in via OIDC or SAML, roles per page.",
+    "feature6Desc": "Many status pages in one account, sign-in via OIDC, roles per page.",
     "openPage": "Open status page"
   },
   "order": {
@@ -1650,7 +1627,8 @@
       "auth_code_missing": "The provider did not return an authorization code.",
       "login_code_required": "Please provide the sign-in code.",
       "login_code_invalid": "The sign-in code is invalid or expired.",
-      "saml_not_configured": "SAML is not configured for this page.",
+      "password_login_disabled": "Signing in with email and password is disabled.",
+      "provider_unknown": "This sign-in provider is unknown or no longer active.",
       "identity_not_found": "The linked identity was not found.",
       "confirmation_invalid": "The confirmation does not match.",
       "last_global_admin": "The last global admin cannot be removed.",
@@ -1735,8 +1713,6 @@
       "emailLabel": "Email",
       "emailPlaceholder": "name{'@'}company.com",
       "failed": "Login failed: {message}",
-      "githubButton": "Sign in with GitHub",
-      "googleButton": "Sign in with Google",
       "hidePassword": "Hide password",
       "orDivider": "or with email & password",
       "passwordLabel": "Password",
@@ -1745,7 +1721,9 @@
       "submit": "Sign in",
       "subtitle": "Sign in to continue",
       "oidcButton": "Sign in with SSO",
-      "samlButton": "Sign in with SSO (SAML)"
+      "providerButton": "Sign in with {name}",
+      "configLoadError": "The sign-in methods could not be loaded. Please reload the page.",
+      "noMethod": "No sign-in method is configured. Please contact the operator."
     },
     "sso": {
       "loadingAria": "Loading",
@@ -1769,11 +1747,11 @@
       "test_incomplete": "Test sign-in needs a discovery URL, client ID and client secret.",
       "unsafe_redirect": "The sign-in service returned an unsafe address. The redirect was not followed.",
       "unknown": "SSO sign-in failed.",
-      "metadata_invalid": "The sign-in service (IdP) metadata is invalid. Please contact the page admin.",
-      "saml_response_invalid": "The sign-in service's response was invalid or expired. Please try again.",
-      "saml_replay": "This sign-in has already been used. Please sign in again.",
-      "saml_test_incomplete": "SAML test sign-in needs IdP metadata.",
-      "saml_nameid_format": "The sign-in service does not provide a persistent identifier (persistent NameID). Please contact the page admin."
+      "provider_unknown": "This sign-in provider is unknown or no longer active.",
+      "email_missing": "The sign-in provider did not send an e-mail address. Please add one at the provider or contact the operator.",
+      "email_unverified": "The e-mail address is not verified at the sign-in provider. Please verify it there and sign in again.",
+      "domain_not_allowed": "The domain of this e-mail address is not allowed to sign in.",
+      "page_session": "A sign-in through a status page's SSO cannot link a global provider. Please sign in with a global provider."
     }
   },
   "layout": {
@@ -1786,6 +1764,7 @@
     "footer": {
       "navLabel": "Footer",
       "docs": "Documentation",
+      "admin": "Administration",
       "copyright": "© {year} Statushafen"
     }
   },

@@ -3,9 +3,7 @@ module github.com/fraigner/statushafen
 go 1.26.11
 
 require (
-	github.com/beevik/etree v1.8.1
 	github.com/coreos/go-oidc/v3 v3.21.0
-	github.com/crewjam/saml v0.5.2
 	github.com/fergusstrange/embedded-postgres v1.34.0
 	github.com/getkin/kin-openapi v0.152.0
 	github.com/gin-contrib/cors v1.7.10
@@ -15,10 +13,8 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/mattermost/xml-roundtrip-validator v0.1.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
-	github.com/russellhaering/goxmldsig v1.6.1
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.62.0
@@ -31,7 +27,6 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.2 // indirect
@@ -55,7 +50,6 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect

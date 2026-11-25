@@ -175,3 +175,22 @@ describe('Begriff Vorfall statt Incident', () => {
     expect(offenders).toEqual([])
   })
 })
+
+// Sign-in is OIDC only: no UI text mentions SAML. Audit log actions are the exception,
+// so older entries (sso.saml_identities_reset) stay readable.
+describe('no SAML texts', () => {
+  function flattenEntries(obj, prefix = '') {
+    return Object.entries(obj).flatMap(([key, value]) => {
+      const path = prefix ? `${prefix}.${key}` : key
+      return value && typeof value === 'object' ? flattenEntries(value, path) : [[path, String(value)]]
+    })
+  }
+
+  it.each([['de', de], ['en', en]])('%s.json has neither keys nor texts about SAML', (_, messages) => {
+    const hits = flattenEntries(messages)
+      .filter(([path]) => !path.startsWith('auditLog.actions.'))
+      .filter(([path, value]) => /saml/i.test(path) || /saml/i.test(value))
+      .map(([path]) => path)
+    expect(hits).toEqual([])
+  })
+})

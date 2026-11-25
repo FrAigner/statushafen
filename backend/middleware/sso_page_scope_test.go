@@ -33,12 +33,12 @@ func TestGeneratePageSSOToken_SetsPageClaim(t *testing.T) {
 		Role: models.Role{Name: "Viewer", Permissions: "incidents:read"}}
 	user.ID = 7
 
-	token, err := middleware.GeneratePageSSOToken(user, "V", models.SSOProtocolSAML, 42)
+	token, err := middleware.GeneratePageSSOToken(user, "V", models.SSOProtocolOIDC, 42)
 	if err != nil {
 		t.Fatalf("GeneratePageSSOToken: %v", err)
 	}
 	c := parseTestClaims(t, token)
-	if c.SSOPageID != 42 || c.IsGlobalAdmin || c.SSOProvider != "saml" || c.UserID != 7 ||
+	if c.SSOPageID != 42 || c.IsGlobalAdmin || c.SSOProvider != "oidc" || c.UserID != 7 ||
 		c.Permissions != "incidents:read" || c.Name != "V" || c.PreferredLanguage != "de" || c.ExpiresAt == nil {
 		t.Errorf("Claims = %+v", c)
 	}

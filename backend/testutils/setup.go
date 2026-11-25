@@ -59,9 +59,6 @@ func SetupTestDB() *gorm.DB {
 		&models.UiTranslationOverride{},
 		&models.OIDCLoginState{},
 		&models.UserSSOIdentity{},
-		// SAML-Login je Statusseite.
-		&models.SAMLLoginState{},
-		&models.SAMLAssertionUse{},
 		// globale Systemeinstellungen (Key/Value).
 		&models.SystemSetting{},
 		// externe Statusseiten.

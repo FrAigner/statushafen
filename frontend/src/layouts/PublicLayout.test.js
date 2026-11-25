@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { createOnyx } from 'sit-onyx'
@@ -116,13 +116,26 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.user-menu-trigger').exists()).toBe(false)
   })
 
-  it('navigiert beim Klick auf den Admin-Login-Button zu /login', async () => {
+  // The login button brings the user back to where they came from (here: the landing page).
+  it('navigates to /login with the current route as returnTo', async () => {
     const { wrapper, router } = await mountLayout()
 
     await wrapper.find('.login-button').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/' })
+  })
+
+  it('passes the full path of another public page as returnTo', async () => {
+    const { wrapper, router } = await mountLayout()
+    await router.push('/docs?section=sso#oben')
+    await flushPromises()
+
+    await wrapper.find('.login-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/docs?section=sso#oben' })
   })
 
   // Der Login-Knopf war früher ein OnyxButton und wich optisch von
@@ -149,8 +162,8 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.language-switcher').classes()).toContain('header-control')
   })
 
-  // Die Login-Seite zeigt den SSO-Knopf der gerade angezeigten Statusseite.
-  it('gibt die angezeigte Statusseite als ?page= an die Login-Seite weiter', async () => {
+  // The login page shows the SSO button of the status page currently shown and returns there.
+  it('passes the shown status page as ?page= and the route as returnTo', async () => {
     useCurrentPageSlug().currentPageSlug.value = 'acme'
     try {
       const { wrapper, router } = await mountLayout()
@@ -158,7 +171,8 @@ describe('PublicLayout', () => {
       await wrapper.find('.login-button').trigger('click')
       await flushPromises()
 
-      expect(router.currentRoute.value.fullPath).toBe('/login?page=acme')
+      expect(router.currentRoute.value.path).toBe('/login')
+      expect(router.currentRoute.value.query).toEqual({ returnTo: '/', page: 'acme' })
     } finally {
       useCurrentPageSlug().currentPageSlug.value = null
     }
@@ -310,7 +324,7 @@ describe('PublicLayout', () => {
       expect(useTenant().myPages.value).toEqual([])
     })
 
-    it('Statusseite X ohne Recht, Recht auf Seite Y: Link da, Klick schaltet auf Y', async () => {
+    it('off a status page: active tenant X without the right, right on page Y: link shown, click switches to Y', async () => {
       mockPages([
         { ID: 1, Permissions: 'components:read' },
         { ID: 2, Permissions: 'admin_dashboard' },
@@ -330,6 +344,98 @@ describe('PublicLayout', () => {
       const { wrapper } = await mountLayout()
       expect(fetchMock).not.toHaveBeenCalled()
       expect(wrapper.text()).not.toContain('Dashboard')
+    })
+  })
+
+  // On a status page the link is decided per page: a role on another page
+  // (or a stale active tenant from the admin area) must not offer the
+  // dashboard of the page being viewed (E2E: login-dropdown.spec.js).
+  describe('Dashboard link on a status page (per page, not global)', () => {
+    const acme = { ID: 2, Slug: 'acme', Permissions: 'admin_dashboard,components:read' }
+    const techstartViewer = { ID: 3, Slug: 'techstart', Permissions: 'components:read' }
+    const dashboardItem = (wrapper) => wrapper.findAll('.user-menu-item').find(el => el.text().includes('Dashboard'))
+    const mockPages = (pages) => {
+      globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => pages }))
+    }
+    const viewPage = (slug) => { useCurrentPageSlug().currentPageSlug.value = slug }
+
+    beforeEach(() => {
+      useTenant().setMyPages([])
+      useTenant().setActiveTenant(null)
+    })
+    afterEach(() => viewPage(null))
+
+    it('hides the link on a page without a role, even with admin_dashboard on another page', async () => {
+      mockPages([acme])
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de', role: 'Viewer' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('hides the link on a page whose role lacks admin_dashboard', async () => {
+      mockPages([acme, techstartViewer])
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('ignores a stale active tenant that grants admin_dashboard on another page', async () => {
+      mockPages([acme])
+      useTenant().setActiveTenant(2)
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('shows the link on the page that grants admin_dashboard and opens that page', async () => {
+      mockPages([{ ID: 1, Slug: 'system', Permissions: 'admin_dashboard' }, acme])
+      useTenant().setActiveTenant(1)
+      viewPage('acme')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper, router } = await mountLayout()
+
+      await dashboardItem(wrapper).trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('2')
+      expect(router.currentRoute.value.path).toBe('/admin')
+    })
+
+    it('updates the link when switching from a granting page to one without a role', async () => {
+      mockPages([acme])
+      viewPage('acme')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeTruthy()
+
+      viewPage('techstart')
+      await flushPromises()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('shows global admins the link on every page and opens the viewed page', async () => {
+      mockPages([acme, { ID: 3, Slug: 'techstart', Permissions: '' }])
+      useTenant().setActiveTenant(2)
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true })
+      const { wrapper } = await mountLayout()
+
+      await dashboardItem(wrapper).trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('3')
+    })
+
+    it('lets a global admin without any known page open /admin without changing the tenant', async () => {
+      mockPages([])
+      useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true })
+      const { wrapper, router } = await mountLayout()
+
+      await dashboardItem(wrapper).trigger('click')
+      await flushPromises()
+      expect(useTenant().activeTenantId.value).toBeNull()
+      expect(router.currentRoute.value.path).toBe('/admin')
     })
   })
 
@@ -490,6 +596,31 @@ describe('PublicLayout', () => {
     await link.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/docs')
+  })
+
+  // The admin area is only a login target when chosen explicitly: a quiet footer link.
+  it.each([
+    ['de', 'Verwaltung'],
+    ['en', 'Administration'],
+  ])('offers an admin link in the footer that logs in towards /admin (%s)', async (locale, label) => {
+    i18n.global.locale.value = locale
+    const { wrapper, router } = await mountLayout()
+
+    const link = wrapper.find('footer .footer-link--admin')
+    expect(link.text()).toBe(label)
+    expect(link.element.closest('header')).toBeNull()
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/admin' })
+  })
+
+  it('shows the admin link for signed-in users too (the guard skips the login page)', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('footer .footer-link--admin').exists()).toBe(true)
   })
 
   it('zeigt im Footer das Copyright mit dem aktuellen Jahr und übersetzt den Link', async () => {

@@ -33,7 +33,6 @@ var (
 // (Login, Abo, Bestellung, IdP-Rückkanal), per eigenem Token geschützt
 // (Komponenten-Webhook) oder Selbstverwaltung des eigenen Kontos (/me).
 var selfServiceWriteRoutes = map[string]bool{
-	"POST /api/auth/saml/:page_id/acs":                   true,
 	"POST /api/auth/sso-exchange":                        true,
 	"POST /api/login":                                    true,
 	"POST /api/subscribe":                                true,
@@ -46,7 +45,7 @@ var selfServiceWriteRoutes = map[string]bool{
 	"POST /api/public/orders/confirm":                    true,
 	"POST /api/public/orders/set-password":               true,
 	"POST /api/auth/oidc/link":                           true,
-	"POST /api/auth/saml/link":                           true,
+	"POST /api/auth/provider/:id/link":                   true,
 	"PATCH /api/me":                                      true,
 	"DELETE /api/me":                                     true,
 	"DELETE /api/me/sso/:id":                             true,

@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { OnyxButton } from 'sit-onyx'
 
 import { useAuth } from '../../composables/useAuth'
 import { useApi } from '../../composables/useApi'
+import { useAuthConfig } from '../../composables/useAuthConfig'
 import { safeReturnTo } from '../../utils/safeReturnTo'
 import AppIcon from '../../components/AppIcon.vue'
 import OidcLoginButton from '../../components/OidcLoginButton.vue'
@@ -14,6 +16,19 @@ const router = useRouter()
 const { t, te } = useI18n()
 const { setAuth } = useAuth()
 const { apiFetch } = useApi()
+// Allowed sign-in methods come from the backend; without an answer there are no buttons.
+const { authConfig, loadFailed: authConfigFailed, loadAuthConfig } = useAuthConfig()
+const providers = computed(() => authConfig.value?.providers ?? [])
+// Unknown config (loading or failed) never shows the password form.
+const passwordLogin = computed(() => authConfig.value?.passwordLogin === true)
+onMounted(loadAuthConfig)
+// Page SSO: null until OidcLoginButton has answered, then whether it shows a button.
+const pageSsoAvailable = ref(null)
+const hasSsoButton = computed(() => providers.value.length > 0 || pageSsoAvailable.value === true)
+// Only claim "no method" once everything is known: config loaded and page SSO answered.
+const noLoginMethod = computed(() =>
+  authConfig.value !== null && !passwordLogin.value && providers.value.length === 0
+  && (!pageSlug || pageSsoAvailable.value === false))
 
 const loginEmail = ref('')
 const loginPass = ref('')
@@ -26,6 +41,9 @@ const urlError = ref(urlParams.get('error'))
 // Kopf bzw. privater Fehlerzustand), ?oidc_error=<code> vom OIDC-Callback.
 // Nur bekannte Codes werden übersetzt, nie der rohe Wert angezeigt.
 const pageSlug = urlParams.get('page')
+// returnTo is attacker input: only checked internal paths, otherwise the landing page.
+// The same target goes to the password login and, as return_to, to every OIDC start.
+const returnTo = safeReturnTo(urlParams.get('returnTo'), router, '/')
 const oidcErrorCode = urlParams.get('oidc_error')
 const oidcErrorMessage = computed(() => {
   if (!oidcErrorCode) return ''
@@ -33,11 +51,19 @@ const oidcErrorMessage = computed(() => {
   return te(key) ? t(key) : t('auth.oidcErrors.unknown')
 })
 
-// SSO-Provider-URLs
-const ssoProviders = computed(() => [
-  { key: 'google', label: t('auth.login.googleButton'), icon: 'google' },
-  { key: 'github', label: t('auth.login.githubButton'), icon: 'github' },
-])
+// Global OIDC provider: real browser navigation, the server redirects to the provider.
+const startProviderLogin = (id) => {
+  const apiBase = import.meta.env.VITE_API_URL || ''
+  window.location.assign(`${apiBase}/api/auth/provider/${encodeURIComponent(id)}/login?return_to=${encodeURIComponent(returnTo)}`)
+}
+
+// 401 of the app means wrong credentials (not Caddy's Basic Auth 401); 403
+// password_login_disabled means the backend switched passwords off meanwhile.
+const loginErrorMessage = (err) => {
+  if (err.status === 401 && !err.basicAuth) return t('auth.login.invalidCredentials')
+  if (err.status === 403 && err.data?.code === 'password_login_disabled') return t('api.errors.password_login_disabled')
+  return t('auth.login.failed', { message: err.message })
+}
 
 const doLogin = async (email, password) => {
   // Doppel-Submit (Doppelklick, Enter) sendet sonst zwei Login-Requests.
@@ -64,17 +90,10 @@ const doLogin = async (email, password) => {
       help_tooltips: data.help_tooltips
     })
   } catch (err) {
-    // Eine 401 der App heißt hier „Zugangsdaten falsch“ (übersetzt
-    // statt der englischen Server-Meldung); Caddys Basic-Auth-401 nicht.
-    errorMessage.value = err.status === 401 && !err.basicAuth
-      ? t('auth.login.invalidCredentials')
-      : t('auth.login.failed', { message: err.message })
+    errorMessage.value = loginErrorMessage(err)
     isSubmitting.value = false
     return
   }
-  // AdminLayout führt zum ersten lesbaren Tab.
-  // returnTo ist Angreifer-Eingabe, nur geprüfte interne Pfade (sonst /admin).
-  const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get('returnTo'), router, '/admin')
   try {
     // Navigation abwarten, sonst gibt der Button frei, solange der lazy Chunk noch lädt.
     await router.push(returnTo)
@@ -84,11 +103,6 @@ const doLogin = async (email, password) => {
     window.location.assign(returnTo)
   }
   isSubmitting.value = false
-}
-
-const doSSOLogin = (provider) => {
-  const apiBase = import.meta.env.VITE_API_URL || ''
-  window.location.href = `${apiBase}/api/auth/${provider}`
 }
 </script>
 
@@ -108,28 +122,35 @@ const doSSOLogin = (provider) => {
         {{ t('auth.login.ssoFailed') }}
       </div>
       <div v-if="oidcErrorMessage" class="login-alert error entry-alert" role="alert">{{ oidcErrorMessage }}</div>
+      <div v-if="authConfigFailed" class="login-alert error entry-alert" role="alert" data-test="auth-config-error">
+        {{ t('auth.login.configLoadError') }}
+      </div>
 
       <!-- SSO Buttons -->
       <div class="sso-section entry-actions">
-        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback />
-        <button
-          v-for="p in ssoProviders"
-          :key="p.key"
-          class="sso-btn entry-btn entry-btn--secondary"
-          @click="doSSOLogin(p.key)"
-        >
-          <span class="sso-icon"><AppIcon :name="p.icon" :size="18" /></span>
-          {{ p.label }}
-        </button>
+        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" :return-to="returnTo" fallback @available="pageSsoAvailable = $event" />
+        <OnyxButton
+          v-for="p in providers"
+          :key="p.id"
+          class="provider-login-btn"
+          type="button"
+          mode="outline"
+          :label="t('auth.login.providerButton', { name: p.name })"
+          @click="startProviderLogin(p.id)"
+        />
       </div>
 
-      <!-- Trennlinie -->
-      <div class="divider entry-divider">
+      <div v-if="noLoginMethod" class="login-alert entry-alert" role="status" data-test="no-login-method">
+        {{ t('auth.login.noMethod') }}
+      </div>
+
+      <!-- Divider only between sign-in buttons and the password form -->
+      <div v-if="passwordLogin && hasSsoButton" class="divider entry-divider">
         <span>{{ t('auth.login.orDivider') }}</span>
       </div>
 
-      <!-- Klassisches Login-Formular -->
-      <form novalidate @submit.prevent="doLogin(loginEmail, loginPass)" class="login-form entry-form">
+      <!-- Email/password form, only when the backend allows it -->
+      <form v-if="passwordLogin" novalidate @submit.prevent="doLogin(loginEmail, loginPass)" class="login-form entry-form">
         <p class="entry-hint" data-test="required-hint">{{ t('patterns.requiredHint') }}</p>
         <div class="entry-field">
           <label class="onyx-required-marker" for="login-email">{{ t('auth.login.emailLabel') }}</label>

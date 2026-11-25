@@ -30,7 +30,7 @@ func TestSSOExchangeHandler(t *testing.T) {
 	}
 
 	t.Run("Gültiger Code liefert das hinterlegte Token", func(t *testing.T) {
-		code := storeSSOCode("test-jwt-token-value")
+		code := storeSSOCode("test-jwt-token-value", "")
 
 		w := doExchange(code)
 
@@ -47,7 +47,7 @@ func TestSSOExchangeHandler(t *testing.T) {
 	})
 
 	t.Run("Code ist Einmalgebrauch - zweiter Austausch schlägt fehl", func(t *testing.T) {
-		code := storeSSOCode("single-use-token")
+		code := storeSSOCode("single-use-token", "")
 
 		first := doExchange(code)
 		if first.Code != http.StatusOK {

@@ -64,7 +64,8 @@ The account is found only through the triple (status page, issuer, subject), **n
 email address**. No new accounts are created at OIDC login. An existing account must be linked to
 the identity once:
 
-1. The user signs in normally (password, Google, GitHub).
+1. The user signs in normally (through a [global provider](providers.md) or, if switched on, with a
+   password).
 2. In the profile, "SSO sign-in" shows the pages they may link. "Link with SSO" calls
    `POST /api/auth/oidc/link?page=<PAGE-ID>` and redirects to the IdP.
 3. After signing in at the IdP, the account is linked and the user is signed in.
@@ -84,9 +85,10 @@ These apply to the server, not per page:
 | `FRONTEND_URL` | The server redirects here after login (`/auth/sso-callback?code=…`) and on errors. Without a value: `http://localhost:5173`. |
 | `JWT_SECRET` | Mandatory for the session after login. |
 
-`SSO_ALLOWED_DOMAINS` and `SSO_BOOTSTRAP_ADMIN_EMAILS` take effect **only** for the Google/GitHub
-login (`/api/auth/google`, `/api/auth/github`), not for page OIDC: there is no automatic account
-creation and no email matching that would need restricting.
+`SSO_ALLOWED_DOMAINS` and `SSO_BOOTSTRAP_ADMIN_EMAILS` take effect **only** for the
+[global providers](providers.md), not for page OIDC: there is no automatic account creation and no
+e-mail matching that would need restricting. Like the global providers, the login start accepts
+`return_to` (see [returning](providers.md#returning-after-the-login)).
 
 ## Troubleshooting
 

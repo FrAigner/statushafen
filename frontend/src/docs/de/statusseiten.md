@@ -112,7 +112,7 @@ der offenen Einladung abdeckt. Offene Einladungen lassen sich zurückziehen; ein
 100 offene und 200 neue Einladungen pro Tag. Abgelaufene Einladungen löscht Statushafen automatisch,
 beim Löschen eines Kontos auch alle Einladungen an und von diesem Konto; der Datenexport enthält die
 offenen Einladungen an die eigene Adresse. Verliert der Einladende sein Recht, die Rolle zu vergeben, verfällt die Einladung.
-Konten mit altem globalem SSO, mit einer Seiten-SSO-Verknüpfung (OIDC/SAML) oder einer Rolle auf
+Konten mit altem globalem SSO, mit einer Seiten-SSO-Verknüpfung (OIDC) oder einer Rolle auf
 einer anderen Seite sowie Global-Admin-Konten bekommen keine Mail und können eine Einladung nicht
 selbst annehmen; sie fügt nur ein Global Admin hinzu (eine zweite Seite würde sonst die
 SSO-Anmeldung der ersten sperren). Einladen ist auf 20 Anfragen pro Minute begrenzt, Annehmen und

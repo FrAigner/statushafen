@@ -47,6 +47,7 @@ async function mockApi(page, layout = 'standard') {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/public/pages') return json(route, PAGES);
     if (path === '/api/public/orders/enabled') return json(route, { enabled: true });
+    if (path === '/api/public/auth-config') return json(route, { password_login: true, providers: [] });
     if (path === '/api/public/pages/acme/dashboard') return json(route, dashboard(layout));
     if (path === '/api/public/pages/acme/availability') return json(route, availabilityNoData());
     return json(route, { error: 'unauthorized' }, 401);

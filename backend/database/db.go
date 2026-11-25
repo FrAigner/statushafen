@@ -225,9 +225,6 @@ func InitDB() {
 		// OIDC-Login je Statusseite.
 		&models.OIDCLoginState{},
 		&models.UserSSOIdentity{},
-		// SAML-Login je Statusseite.
-		&models.SAMLLoginState{},
-		&models.SAMLAssertionUse{},
 		// globale Systemeinstellungen (Key/Value).
 		&models.SystemSetting{},
 		// externe Statusseiten (Quelle, Komponenten, Kopplung).

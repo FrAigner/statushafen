@@ -140,34 +140,19 @@ func TestCORSMiddleware(t *testing.T) {
 		}
 	})
 
-	// Der IdP schickt die SAML-Antwort per Formular-POST von seiner
-	// eigenen Origin an den ACS. gin-contrib/cors bräche das mit 403 ab; der ACS
-	// läuft deshalb ganz ohne CORS (keine Allow-Header, eine fremde Seite kann
-	// die Antwort also nicht lesen). Nur genau dieser POST, sonst nichts.
-	t.Run("SAML-ACS nimmt POST von fremder Origin an", func(t *testing.T) {
+	// With SAML removed there is no exception any more: CORS rejects a
+	// cross-origin POST to the former ACS path as well.
+	t.Run("no CORS exception for the former SAML ACS", func(t *testing.T) {
 		_ = os.Unsetenv("CORS_ORIGINS")
 		r := gin.New()
 		r.Use(CORSMiddleware())
-		ok := func(c *gin.Context) { c.String(http.StatusOK, "ok") }
-		r.POST("/api/auth/saml/:page_id/acs", ok)
-		r.GET("/api/auth/saml/:page_id/acs", ok)
-		r.POST("/api/auth/saml/:page_id/metadata", ok)
-		do := func(method, path string) *httptest.ResponseRecorder {
-			req, _ := http.NewRequest(method, path, nil)
-			req.Header.Set("Origin", "https://idp.example.org")
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, req)
-			return w
-		}
-
-		w := do("POST", "/api/auth/saml/7/acs")
-		if w.Code != http.StatusOK || w.Header().Get("Access-Control-Allow-Origin") != "" {
-			t.Errorf("ACS-POST: Status %d, Allow-Origin %q; expected 200 ohne CORS-Header", w.Code, w.Header().Get("Access-Control-Allow-Origin"))
-		}
-		for _, other := range [][2]string{{"GET", "/api/auth/saml/7/acs"}, {"POST", "/api/auth/saml/7/metadata"}} {
-			if w := do(other[0], other[1]); w.Code != http.StatusForbidden {
-				t.Errorf("%s %s: Status %d, expected 403 (CORS greift)", other[0], other[1], w.Code)
-			}
+		r.POST("/api/auth/saml/:page_id/acs", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+		req, _ := http.NewRequest("POST", "/api/auth/saml/7/acs", nil)
+		req.Header.Set("Origin", "https://idp.example.org")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusForbidden {
+			t.Errorf("cross-origin POST: status %d, expected 403 (CORS applies)", w.Code)
 		}
 	})
 
