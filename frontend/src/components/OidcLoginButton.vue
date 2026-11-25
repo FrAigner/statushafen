@@ -13,6 +13,9 @@
   für eine private und eine fehlende Seite gleichermaßen.
 
   Der Knopf liegt in einem Element, das übergebene Attribute (class) erhält.
+
+  After each lookup the component emits `available` (true when a button is
+  shown), so the login page can tell whether any sign-in method is offered.
 */
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -25,6 +28,7 @@ const props = defineProps({
   // Bei 404 der Auskunft den Einstieg über den Slug anbieten (private Seiten).
   fallback: { type: Boolean, default: false },
 })
+const emit = defineEmits(['available'])
 // Stryker restore all
 
 const { t } = useI18n()
@@ -34,7 +38,11 @@ const loginUrl = ref('')
 
 const load = async (slug) => {
   loginUrl.value = ''
-  if (!slug) return
+  if (slug) await lookup(slug)
+  emit('available', loginUrl.value !== '')
+}
+
+const lookup = async (slug) => {
   const base = import.meta.env.VITE_API_URL || ''
   try {
     const info = await apiFetch(`/api/public/pages/${encodeURIComponent(slug)}/sso`)

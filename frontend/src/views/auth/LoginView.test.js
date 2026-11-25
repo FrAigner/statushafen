@@ -52,6 +52,102 @@ describe('LoginView', () => {
     resetAuthConfig()
   })
 
+  // The password form only appears when the backend explicitly allows it.
+  describe('password switch', () => {
+    it('hides the password form when password_login is off', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [{ id: 'gitlab', name: 'GitLab' }] })
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      expect(wrapper.find('.entry-divider').exists()).toBe(false)
+      expect(wrapper.find('.provider-login-btn').exists()).toBe(true)
+    })
+
+    it('hides the password form while the config is unknown (loading or failed)', async () => {
+      resetAuthConfig()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      let fail
+      global.fetch = vi.fn().mockReturnValue(new Promise((resolve) => { fail = resolve }))
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      fail(jsonResponse({}, 500))
+      await flushPromises()
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+    })
+
+    it('shows the divider only when a sign-in button sits above the password form', async () => {
+      let { wrapper } = await mountLogin()
+      expect(wrapper.find('form.login-form').exists()).toBe(true)
+      expect(wrapper.find('.entry-divider').exists()).toBe(false)
+      wrapper.unmount()
+
+      seedAuthConfig({ providers: [{ id: 'gitlab', name: 'GitLab' }] })
+      ;({ wrapper } = await mountLogin())
+      expect(wrapper.find('.entry-divider').text()).toBe('oder mit E-Mail & Passwort')
+    })
+
+    it('shows the divider for page SSO above the password form', async () => {
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 5 }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+
+      expect(wrapper.find('.entry-divider').exists()).toBe(true)
+    })
+
+    it.each([
+      ['de', 'Keine Anmeldemethode konfiguriert. Wende dich an den Betreiber.'],
+      ['en', 'No sign-in method is configured. Please contact the operator.'],
+    ])('shows a notice when no sign-in method is configured (%s)', async (locale, expected) => {
+      i18n.global.locale.value = locale
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('[data-test="no-login-method"]').text()).toBe(expected)
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+    })
+
+    it('waits for the page SSO answer before showing the no-method notice', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      let answer
+      global.fetch = vi.fn().mockReturnValue(new Promise((resolve) => { answer = resolve }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+
+      answer(jsonResponse({ oidc_enabled: false, page_id: 5 }))
+      await flushPromises()
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(true)
+    })
+
+    it('shows no notice when page SSO is offered', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 5 }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+
+      expect(wrapper.find('a.oidc-login-btn').exists()).toBe(true)
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+    })
+
+    // The backend refuses with 403 password_login_disabled when the switch flipped meanwhile.
+    it.each([
+      ['de', 'Die Anmeldung mit E-Mail und Passwort ist abgeschaltet.'],
+      ['en', 'Signing in with email and password is disabled.'],
+    ])('translates 403 password_login_disabled (%s)', async (locale, expected) => {
+      i18n.global.locale.value = locale
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'password login disabled', code: 'password_login_disabled' }, 403))
+      const { wrapper } = await mountLogin()
+
+      await wrapper.find('form.login-form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(wrapper.find('.login-alert.error').text()).toBe(expected)
+      expect(useAuth().isLoggedIn.value).toBe(false)
+    })
+  })
+
   // Global OIDC providers come from GET /api/public/auth-config.
   describe('global providers', () => {
     const GITLAB = { id: 'gitlab', name: 'GitLab' }

@@ -1622,6 +1622,7 @@
       "auth_code_missing": "The provider did not return an authorization code.",
       "login_code_required": "Please provide the sign-in code.",
       "login_code_invalid": "The sign-in code is invalid or expired.",
+      "password_login_disabled": "Signing in with email and password is disabled.",
       "identity_not_found": "The linked identity was not found.",
       "confirmation_invalid": "The confirmation does not match.",
       "last_global_admin": "The last global admin cannot be removed.",
@@ -1713,7 +1714,8 @@
       "subtitle": "Sign in to continue",
       "oidcButton": "Sign in with SSO",
       "providerButton": "Sign in with {name}",
-      "configLoadError": "The sign-in methods could not be loaded. Please reload the page."
+      "configLoadError": "The sign-in methods could not be loaded. Please reload the page.",
+      "noMethod": "No sign-in method is configured. Please contact the operator."
     },
     "sso": {
       "loadingAria": "Loading",

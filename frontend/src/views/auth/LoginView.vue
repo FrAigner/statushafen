@@ -19,7 +19,16 @@ const { apiFetch } = useApi()
 // Allowed sign-in methods come from the backend; without an answer there are no buttons.
 const { authConfig, loadFailed: authConfigFailed, loadAuthConfig } = useAuthConfig()
 const providers = computed(() => authConfig.value?.providers ?? [])
+// Unknown config (loading or failed) never shows the password form.
+const passwordLogin = computed(() => authConfig.value?.passwordLogin === true)
 onMounted(loadAuthConfig)
+// Page SSO: null until OidcLoginButton has answered, then whether it shows a button.
+const pageSsoAvailable = ref(null)
+const hasSsoButton = computed(() => providers.value.length > 0 || pageSsoAvailable.value === true)
+// Only claim "no method" once everything is known: config loaded and page SSO answered.
+const noLoginMethod = computed(() =>
+  authConfig.value !== null && !passwordLogin.value && providers.value.length === 0
+  && (!pageSlug || pageSsoAvailable.value === false))
 
 const loginEmail = ref('')
 const loginPass = ref('')
@@ -43,6 +52,14 @@ const oidcErrorMessage = computed(() => {
 const startProviderLogin = (id) => {
   const apiBase = import.meta.env.VITE_API_URL || ''
   window.location.assign(`${apiBase}/api/auth/provider/${encodeURIComponent(id)}/login`)
+}
+
+// 401 of the app means wrong credentials (not Caddy's Basic Auth 401); 403
+// password_login_disabled means the backend switched passwords off meanwhile.
+const loginErrorMessage = (err) => {
+  if (err.status === 401 && !err.basicAuth) return t('auth.login.invalidCredentials')
+  if (err.status === 403 && err.data?.code === 'password_login_disabled') return t('api.errors.password_login_disabled')
+  return t('auth.login.failed', { message: err.message })
 }
 
 const doLogin = async (email, password) => {
@@ -70,11 +87,7 @@ const doLogin = async (email, password) => {
       help_tooltips: data.help_tooltips
     })
   } catch (err) {
-    // Eine 401 der App heißt hier „Zugangsdaten falsch“ (übersetzt
-    // statt der englischen Server-Meldung); Caddys Basic-Auth-401 nicht.
-    errorMessage.value = err.status === 401 && !err.basicAuth
-      ? t('auth.login.invalidCredentials')
-      : t('auth.login.failed', { message: err.message })
+    errorMessage.value = loginErrorMessage(err)
     isSubmitting.value = false
     return
   }
@@ -115,7 +128,7 @@ const doLogin = async (email, password) => {
 
       <!-- SSO Buttons -->
       <div class="sso-section entry-actions">
-        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback />
+        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback @available="pageSsoAvailable = $event" />
         <OnyxButton
           v-for="p in providers"
           :key="p.id"
@@ -127,13 +140,17 @@ const doLogin = async (email, password) => {
         />
       </div>
 
-      <!-- Trennlinie -->
-      <div class="divider entry-divider">
+      <div v-if="noLoginMethod" class="login-alert entry-alert" role="status" data-test="no-login-method">
+        {{ t('auth.login.noMethod') }}
+      </div>
+
+      <!-- Divider only between sign-in buttons and the password form -->
+      <div v-if="passwordLogin && hasSsoButton" class="divider entry-divider">
         <span>{{ t('auth.login.orDivider') }}</span>
       </div>
 
-      <!-- Klassisches Login-Formular -->
-      <form novalidate @submit.prevent="doLogin(loginEmail, loginPass)" class="login-form entry-form">
+      <!-- Email/password form, only when the backend allows it -->
+      <form v-if="passwordLogin" novalidate @submit.prevent="doLogin(loginEmail, loginPass)" class="login-form entry-form">
         <p class="entry-hint" data-test="required-hint">{{ t('patterns.requiredHint') }}</p>
         <div class="entry-field">
           <label class="onyx-required-marker" for="login-email">{{ t('auth.login.emailLabel') }}</label>

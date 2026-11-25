@@ -1622,6 +1622,7 @@
       "auth_code_missing": "Der Anbieter hat keinen Autorisierungscode geliefert.",
       "login_code_required": "Bitte gib den Anmeldecode an.",
       "login_code_invalid": "Der Anmeldecode ist ungültig oder abgelaufen.",
+      "password_login_disabled": "Die Anmeldung mit E-Mail und Passwort ist abgeschaltet.",
       "identity_not_found": "Die Verknüpfung wurde nicht gefunden.",
       "confirmation_invalid": "Die Bestätigung stimmt nicht.",
       "last_global_admin": "Der letzte Global Admin kann nicht entfernt werden.",
@@ -1713,7 +1714,8 @@
       "subtitle": "Anmelden um fortzufahren",
       "oidcButton": "Mit SSO anmelden",
       "providerButton": "Mit {name} anmelden",
-      "configLoadError": "Die Anmeldemethoden konnten nicht geladen werden. Bitte lade die Seite neu."
+      "configLoadError": "Die Anmeldemethoden konnten nicht geladen werden. Bitte lade die Seite neu.",
+      "noMethod": "Keine Anmeldemethode konfiguriert. Wende dich an den Betreiber."
     },
     "sso": {
       "loadingAria": "Wird geladen",

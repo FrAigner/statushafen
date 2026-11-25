@@ -78,6 +78,21 @@ describe('OidcLoginButton', () => {
     expect(wrapper.html()).not.toContain('saml')
   })
 
+  // The login page needs to know whether page SSO is offered (no-method notice).
+  it.each([
+    ['active OIDC', jsonResponse({ oidc_enabled: true, page_id: 3 }), false, [true]],
+    ['inactive OIDC', jsonResponse({ oidc_enabled: false, page_id: 3 }), false, [false]],
+    ['404 with fallback', jsonResponse({}, 404), true, [true]],
+    ['404 without fallback', jsonResponse({}, 404), false, [false]],
+  ])('reports availability after loading (%s)', async (_, response, fallback, expected) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn().mockResolvedValue(response)
+    const wrapper = mount(OidcLoginButton, { props: { slug: 'acme', fallback }, global: { plugins: [i18n] } })
+    await flushPromises()
+
+    expect(wrapper.emitted('available')).toEqual([expected])
+  })
+
   it('gibt Attribute wie class an das gemeinsame Element weiter', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 3 }))
     const wrapper = mount(OidcLoginButton, { props: { slug: 'acme' }, attrs: { class: 'extra' }, global: { plugins: [i18n] } })
