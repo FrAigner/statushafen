@@ -30,8 +30,9 @@ const props = defineProps({
   // Internal path to come back to after the sign-in, sent as return_to (the backend checks it again).
   returnTo: { type: String, default: '' },
 })
-const emit = defineEmits(['available'])
 // Stryker restore all
+// Stryker disable next-line all: Vue hoists defineEmits out of setup, instrumented code must not reference local variables there
+const emit = defineEmits(['available'])
 
 const { t } = useI18n()
 const { apiFetch } = useApi()
