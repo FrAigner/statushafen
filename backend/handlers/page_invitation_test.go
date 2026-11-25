@@ -602,11 +602,13 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 		f := newInvFixture(t)
 		u, tok := f.account(t, "q@x.example")
 		token := f.invite(t, srv, u.Email, f.viewer)
-		// The lookup of the existing membership in the transaction (a single row;
-		// the check "other page" reads a list).
+		// The lookup of the existing membership in the transaction: a single row
+		// without preload (the check "other page" reads a list, the inviter's
+		// membership is read with its role).
 		failOn(t, f.db, "query", "user_status_page_roles", func(tx *gorm.DB) bool {
 			_, isSingle := tx.Statement.Dest.(*models.UserStatusPageRole)
-			return isSingle && strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "status_page_id")
+			return isSingle && len(tx.Statement.Preloads) == 0 &&
+				strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "status_page_id")
 		})
 		requireStatusCode(t, idorRequest(t, f.r, "POST", "/api/invitations/accept", tok, map[string]any{"token": token}), http.StatusInternalServerError)
 		if f.isMember(u.ID) {
