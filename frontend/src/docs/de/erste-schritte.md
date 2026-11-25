@@ -50,8 +50,8 @@ Admin-Bereich direkt aufruft, landet nach der Anmeldung ebenfalls dort.
 
 ## Der Admin-Bereich
 
-- **Kopfzeile:** links der Mandant-Umschalter, rechts Hell/Dunkel, Sprachwahl und das
-  Benutzermenü. Auf schmalen Bildschirmen öffnet das Menü-Symbol links in der Kopfzeile die
+- **Kopfzeile:** links der Mandant-Umschalter, daneben die Schnellsuche, rechts Hell/Dunkel,
+  Sprachwahl und das Benutzermenü. Auf schmalen Bildschirmen öffnet das Menü-Symbol links in der Kopfzeile die
   Navigation.
 - **Bereiche:** Darunter stehen die Reiter **Betrieb**, **Inhalte**, **Verwaltung** und **System**.
   Ein Klick zeigt die Menüpunkte des Bereichs. Menüpunkte ohne passendes Recht werden
@@ -69,3 +69,20 @@ Admin-Bereich direkt aufruft, landet nach der Anmeldung ebenfalls dort.
 Auf der öffentlichen Statusseite führt im Benutzermenü der Eintrag „Dashboard“ in den Admin-Bereich.
 Er erscheint nur, wenn deine Rolle auf genau dieser Statusseite das Recht `admin_dashboard` hat;
 eine Rolle auf einer anderen Seite genügt nicht (Global Admins sehen ihn immer).
+
+## Schnellsuche
+
+Die Schnellsuche in der Kopfzeile findet Admin-Seiten, einzelne Einstellungen und Abschnitte dieser
+Dokumentation, ohne dass man wissen muss, wo eine Einstellung steckt. Beispiele: „Antwortadresse“,
+„privat“, „Discovery URL“, „Bestellung“ oder „Auto-Beitritt“.
+
+- **Öffnen:** ins Suchfeld klicken, `Strg+K` (Mac: `Cmd+K`) drücken oder `/`, solange der Fokus
+  nicht in einem Eingabefeld steht. Auf schmalen Bildschirmen öffnet das Lupen-Symbol das Feld.
+- **Ergebnisse:** gruppiert nach Seiten, Einstellungen und Dokumentation. Gesucht wird in der
+  eingestellten Oberflächensprache und zusätzlich nach gängigen Begriffen auf Deutsch und Englisch
+  (z. B. „Reply-To“). Es erscheint nur, was du mit deinen Rechten auch öffnen darfst.
+- **Bedienung:** Pfeiltasten wählen einen Treffer, `Eingabe` öffnet ihn, `Escape` schließt die Liste.
+- **Sprung zur Einstellung:** Die Suche öffnet die Seite, bei Einstellungen einer Statusseite auch
+  deren Bearbeiten-Formular (für die gewählte Statusseite), scrollt zum Feld, setzt den Fokus darauf
+  und hebt es kurz hervor. Erscheint ein Feld erst nach einem Schalter (z. B. die Optionen einer
+  privaten Seite), springt die Suche zu diesem Schalter.

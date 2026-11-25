@@ -15,6 +15,7 @@ import { grantsAdminArea } from '../utils/permissions'
 import AdminNotificationBell from '../components/AdminNotificationBell.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import HelpTooltipsToggle from '../components/HelpTooltipsToggle.vue'
+import AdminQuickSearch from '../components/AdminQuickSearch.vue'
 
 const router = useRouter()
 const route  = useRoute()
@@ -328,6 +329,9 @@ onBeforeUnmount(() => {
           <div v-else-if="pagesFailed" class="tenant-status" role="alert">{{ t('adminLayout.statusPagesLoadError') }}</div>
           <div v-else class="tenant-status">{{ t('adminLayout.noStatusPages') }}</div>
         </div>
+
+        <!-- Quick search over pages, settings and docs (Ctrl/Cmd+K, "/"). -->
+        <AdminQuickSearch :can-see="canSeeNavItem" />
 
         <div class="topbar-right">
           <button
