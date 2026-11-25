@@ -2,6 +2,7 @@ package database
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fraigner/statushafen/models"
@@ -51,9 +52,9 @@ func TestSeedLanguageCatalog_IdempotentAndPreservesEdits(t *testing.T) {
 	}
 }
 
-// Inhaltssprachen gibt es nur noch auf Deutsch und Englisch: der Seed legt genau
-// diese beiden an, beide aktiv und mit Eigenbezeichnung.
-func TestSeedLanguageCatalog_NurDeutschUndEnglisch(t *testing.T) {
+// Content exists only in German and English: the seed creates exactly these two,
+// both active and with their native names.
+func TestSeedLanguageCatalog_OnlyGermanAndEnglish(t *testing.T) {
 	db := setupLanguageTestDB(t)
 
 	seedLanguageCatalog(db)
@@ -145,4 +146,77 @@ func TestSeedLanguageCatalog_BringtGeloeschteSpracheNichtZurueck(t *testing.T) {
 	var all int64
 	require.NoError(t, db.Unscoped().Model(&models.Language{}).Where("code = ?", "en").Count(&all).Error)
 	require.EqualValues(t, 1, all, "keine zweite Zeile")
+}
+
+func TestIsContentLanguage(t *testing.T) {
+	require.True(t, IsContentLanguage("de"))
+	require.True(t, IsContentLanguage("en"))
+	require.False(t, IsContentLanguage("fr"))
+	require.False(t, IsContentLanguage(""))
+}
+
+// Other catalog languages (from the former 30-language seed or created by an admin)
+// are switched off at startup without deleting rows: status page assignments stay.
+// Running it twice changes nothing more.
+func TestDeactivateUnsupportedLanguages(t *testing.T) {
+	db := setupLanguageTestDB(t)
+	seedLanguageCatalog(db)
+	require.NoError(t, db.Create(&models.Language{Code: "fr", Name: "Français", IsActive: true}).Error)
+	require.NoError(t, db.Create(&models.Language{Code: "hr", Name: "hrvatski", IsActive: true}).Error)
+	page := models.StatusPage{Name: "P", Slug: "p"}
+	require.NoError(t, db.Create(&page).Error)
+	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "fr"}).Error)
+
+	deactivateUnsupportedLanguages(db)
+	deactivateUnsupportedLanguages(db)
+
+	var langs []models.Language
+	require.NoError(t, db.Order("code").Find(&langs).Error)
+	active := map[string]bool{}
+	for _, l := range langs {
+		active[l.Code] = l.IsActive
+	}
+	require.Equal(t, map[string]bool{"de": true, "en": true, "fr": false, "hr": false}, active)
+	var rows int64
+	require.NoError(t, db.Model(&models.StatusPageLanguage{}).Where("language_code = ?", "fr").Count(&rows).Error)
+	require.EqualValues(t, 1, rows, "assignment is kept")
+}
+
+// A status page whose default language is no longer a content language falls back
+// to German. The old assignment stays as an additional language, a missing de
+// assignment is created, and the switch is logged.
+func TestFallbackUnsupportedDefaultLanguages(t *testing.T) {
+	db := setupLanguageTestDB(t)
+	mk := func(slug string, rows ...models.StatusPageLanguage) uint {
+		p := models.StatusPage{Name: slug, Slug: slug}
+		require.NoError(t, db.Create(&p).Error)
+		for _, r := range rows {
+			r.StatusPageID = p.ID
+			require.NoError(t, db.Create(&r).Error)
+		}
+		return p.ID
+	}
+	withDe := mk("mit-de", models.StatusPageLanguage{LanguageCode: "fr", IsDefault: true}, models.StatusPageLanguage{LanguageCode: "de"})
+	withoutDe := mk("ohne-de", models.StatusPageLanguage{LanguageCode: "hr", IsDefault: true}, models.StatusPageLanguage{LanguageCode: "en"})
+	english := mk("englisch", models.StatusPageLanguage{LanguageCode: "en", IsDefault: true}, models.StatusPageLanguage{LanguageCode: "fr"})
+
+	out := captureLog(t)
+	fallbackUnsupportedDefaultLanguages(db)
+	fallbackUnsupportedDefaultLanguages(db)
+
+	defaults := func(pageID uint) map[string]bool {
+		var rows []models.StatusPageLanguage
+		require.NoError(t, db.Where("status_page_id = ?", pageID).Find(&rows).Error)
+		m := map[string]bool{}
+		for _, r := range rows {
+			m[r.LanguageCode] = r.IsDefault
+		}
+		return m
+	}
+	require.Equal(t, map[string]bool{"de": true, "fr": false}, defaults(withDe))
+	require.Equal(t, map[string]bool{"de": true, "hr": false, "en": false}, defaults(withoutDe))
+	require.Equal(t, map[string]bool{"en": true, "fr": false}, defaults(english))
+	log := out.String()
+	require.Equal(t, 2, strings.Count(log, "Default language is no longer supported"), log)
+	require.Contains(t, log, "hr")
 }
