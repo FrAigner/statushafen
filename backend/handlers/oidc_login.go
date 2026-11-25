@@ -211,11 +211,11 @@ func cachedOIDCProvider(issuer string) (oidcProviderEntry, bool) {
 // discovery. trusted selects the client for operator-configured issuers.
 func oidcContext(issuer string, trusted bool) context.Context {
 	client := oidcHTTPClient
-	switch {
-	case oidcDevIssuerAllowed(issuer):
-		client = oidcDevHTTPClient()
-	case trusted:
+	if trusted {
 		client = oidcTrustedHTTPClient
+	}
+	if oidcDevIssuerAllowed(issuer) {
+		client = oidcDevHTTPClient()
 	}
 	ctx := oidc.ClientContext(context.Background(), client)
 	return context.WithValue(ctx, oauth2.HTTPClient, client)

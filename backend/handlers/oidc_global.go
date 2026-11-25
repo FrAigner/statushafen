@@ -189,8 +189,7 @@ func (h *Handler) resolveProviderUser(linkUserID uint, idt *oidc.IDToken, claims
 	var ident models.UserSSOIdentity
 	found := providerIdentityScope(h.DB, idt.Issuer, idt.Subject).First(&ident).Error == nil
 	verified := claims.emailVerified != nil && *claims.emailVerified
-	switch {
-	case linkUserID != 0:
+	if linkUserID != 0 {
 		key := models.UserSSOIdentity{Protocol: models.SSOProtocolOIDC, Issuer: idt.Issuer, Subject: idt.Subject, Email: claims.email}
 		if found {
 			key = ident
@@ -200,7 +199,7 @@ func (h *Handler) resolveProviderUser(linkUserID uint, idt *oidc.IDToken, claims
 			return user, e
 		}
 		ident.UserID = userID
-	case !found:
+	} else if !found {
 		var e *oidcError
 		if ident, e = h.firstProviderLogin(claims, verified, idt); e != nil {
 			return user, e
@@ -224,20 +223,28 @@ func (h *Handler) firstProviderLogin(claims oidcClaims, verified bool, idt *oidc
 	if email == "" {
 		return ident, errOIDCEmailMissing
 	}
+	ident.Email = email
 	var existing models.User
 	err := h.DB.Where("email = ?", email).First(&existing).Error
-	switch {
-	case err == nil && verified:
+	if err == nil {
+		// Only a verified e-mail links an existing account; a missing claim
+		// is treated like the page SSO: never link by e-mail.
+		if !verified {
+			return ident, errOIDCEmailUnverified
+		}
 		ident.UserID = existing.ID
 		if h.DB.Create(&ident).Error != nil {
 			return ident, errOIDCLinkFailed
 		}
 		return ident, nil
-	case err == nil, claims.emailVerified != nil && !*claims.emailVerified:
-		return ident, errOIDCEmailUnverified
-	case !errors.Is(err, gorm.ErrRecordNotFound):
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return ident, errOIDCStartFailed
-	case !isEmailDomainAllowed(email):
+	}
+	if claims.emailVerified != nil && !*claims.emailVerified {
+		return ident, errOIDCEmailUnverified
+	}
+	if !isEmailDomainAllowed(email) {
 		return ident, errOIDCDomainNotAllowed
 	}
 	return ident, h.provisionProviderUser(email, verified && isBootstrapAdminEmail(email), &ident)

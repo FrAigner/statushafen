@@ -238,6 +238,48 @@ func TestProviderCallback_EmailRules(t *testing.T) {
 	}
 }
 
+// An email_verified value that is no boolean counts as missing.
+func TestProviderCallback_UnreadableEmailVerifiedCountsAsMissing(t *testing.T) {
+	f := newGlobalOIDCFixture(t)
+	f.idp.claims["email_verified"] = "vielleicht"
+	existing := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
+	require.NoError(t, f.db.Create(&existing).Error)
+	assertOIDCError(t, f.login(t), "/login", "email_unverified")
+
+	f.idp.claims["email"] = "frisch@example.org"
+	claims := jwtFromRedirect(t, f.login(t))
+	assert.NotEqual(t, existing.ID, claims.UserID)
+}
+
+func TestProviderCallback_StorageErrors(t *testing.T) {
+	t.Run("identity cannot be stored for an existing account", func(t *testing.T) {
+		f := newGlobalOIDCFixture(t)
+		require.NoError(t, f.db.Create(&models.User{Email: "neu@example.org", RoleID: f.viewer.ID}).Error)
+		require.NoError(t, f.db.Migrator().DropTable(&models.UserSSOIdentity{}))
+		assertOIDCError(t, f.login(t), "/login", "internal")
+	})
+	t.Run("new account cannot be stored", func(t *testing.T) {
+		f := newGlobalOIDCFixture(t)
+		require.NoError(t, f.db.Migrator().DropTable(&models.UserSSOIdentity{}))
+		assertOIDCError(t, f.login(t), "/login", "internal")
+		assert.Zero(t, f.users(t), "the account is rolled back with its identity")
+	})
+	t.Run("account lookup fails", func(t *testing.T) {
+		f := newGlobalOIDCFixture(t)
+		state, ck := f.startLogin(t, "corp")
+		require.NoError(t, f.db.Exec("ALTER TABLE users RENAME TO users_weg").Error)
+		assertOIDCError(t, f.callback("corp", state, "good-code", ck), "/login", "internal")
+	})
+}
+
+func TestProviderCallback_ProviderUnreachableAtCallback(t *testing.T) {
+	f := newGlobalOIDCFixture(t)
+	state, ck := f.startLogin(t, "corp")
+	f.idp.srv.Close()
+	resetOIDCProviderCache()
+	assertOIDCError(t, f.callback("corp", state, "good-code", ck), "/login", "provider_unreachable")
+}
+
 func TestProviderCallback_EmailMissing(t *testing.T) {
 	f := newGlobalOIDCFixture(t)
 	delete(f.idp.claims, "email")
