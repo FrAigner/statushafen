@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
+import { useAuthConfig, resetAuthConfig } from '../composables/useAuthConfig'
 import { defineComponent, h, ref } from 'vue'
 import SSOLinks from './SSOLinks.vue'
 import { useAutoDismissAlerts, ALERT_AUTO_DISMISS_MS } from '../composables/useAutoDismissAlerts'
@@ -47,6 +48,8 @@ describe('SSOLinks', () => {
     i18n.global.locale.value = 'de'
     useAuth().setAuth('jwt-1', { email: 'a@b.de' })
     vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Seeded auth config: no global providers unless a test says otherwise.
+    useAuthConfig().authConfig.value = { passwordLogin: true, providers: [] }
   })
 
   afterEach(() => {
@@ -56,6 +59,105 @@ describe('SSOLinks', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     useAuth().logout()
+    resetAuthConfig()
+  })
+
+  // Global OIDC providers from the auth config can be linked like page SSO:
+  // POST /api/auth/provider/<id>/link answers { url } like /api/auth/oidc/link.
+  describe('global providers', () => {
+    const EMPTY = { identities: [], linkable: [] }
+    const seedProviders = (providers) => { useAuthConfig().authConfig.value = { passwordLogin: true, providers } }
+
+    it('lists the active providers, even without page SSO', async () => {
+      seedProviders([{ id: 'gitlab', name: 'GitLab' }, { id: 'corp', name: 'Corp SSO' }])
+      const wrapper = await mountLinks({ fetchImpl: makeFetch({ 'GET /api/me/sso': jsonResponse(EMPTY) }) })
+
+      const rows = wrapper.findAll('[data-test="sso-provider"]')
+      expect(rows.map((r) => r.find('strong').text())).toEqual(['GitLab', 'Corp SSO'])
+      expect(rows[0].find('button').text()).toBe('Mit GitLab verknüpfen')
+      expect(wrapper.find('h4').text()).toBe('Anmeldeanbieter')
+    })
+
+    it('starts the link at the provider endpoint and follows the authorize URL', async () => {
+      seedProviders([{ id: 'a/b', name: 'Odd' }])
+      const fetchImpl = makeFetch({
+        'GET /api/me/sso': jsonResponse(EMPTY),
+        'POST /api/auth/provider/a%2Fb/link': jsonResponse({ url: 'https://idp.example/authorize?y=2' }),
+      })
+      const wrapper = await mountLinks({ fetchImpl })
+
+      await wrapper.find('[data-test="sso-provider"] button').trigger('click')
+      await flushPromises()
+
+      expect(fetchImpl).toHaveBeenCalledWith('/api/auth/provider/a%2Fb/link', expect.objectContaining({ method: 'POST' }))
+      expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/authorize?y=2')
+    })
+
+    it('follows no unsafe authorize URL from the provider link', async () => {
+      vi.stubEnv('DEV', false)
+      seedProviders([{ id: 'gitlab', name: 'GitLab' }])
+      const fetchImpl = makeFetch({
+        'GET /api/me/sso': jsonResponse(EMPTY),
+        'POST /api/auth/provider/gitlab/link': jsonResponse({ url: 'javascript:alert(1)' }),
+      })
+      const wrapper = await mountLinks({ fetchImpl })
+
+      await wrapper.find('[data-test="sso-provider"] button').trigger('click')
+      await flushPromises()
+
+      expect(window.location.assign).not.toHaveBeenCalled()
+      expect(wrapper.find('[role="alert"]').text()).toContain('unsichere Adresse')
+    })
+
+    it('shows an error when the provider link does not start', async () => {
+      seedProviders([{ id: 'gitlab', name: 'GitLab' }])
+      const fetchImpl = makeFetch({
+        'GET /api/me/sso': jsonResponse(EMPTY),
+        'POST /api/auth/provider/gitlab/link': jsonResponse({ error: 'Anbieter unbekannt', code: 'provider_unknown' }, 404),
+      })
+      const wrapper = await mountLinks({ fetchImpl })
+
+      await wrapper.find('[data-test="sso-provider"] button').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[role="alert"]').text()).toContain('Verknüpfung konnte nicht gestartet werden')
+      expect(window.location.assign).not.toHaveBeenCalled()
+    })
+
+    it('loads the auth config itself when it is not known yet', async () => {
+      resetAuthConfig()
+      const fetchImpl = makeFetch({
+        'GET /api/me/sso': jsonResponse(EMPTY),
+        'GET /api/public/auth-config': jsonResponse({ password_login: false, providers: [{ id: 'gitlab', name: 'GitLab' }] }),
+      })
+      const wrapper = await mountLinks({ fetchImpl })
+
+      expect(wrapper.find('[data-test="sso-provider"] strong').text()).toBe('GitLab')
+    })
+
+    it('stays hidden without providers, links and page SSO when the config fails', async () => {
+      resetAuthConfig()
+      const fetchImpl = makeFetch({
+        'GET /api/me/sso': jsonResponse(EMPTY),
+        'GET /api/public/auth-config': jsonResponse({}, 500),
+      })
+      const wrapper = await mountLinks({ fetchImpl })
+
+      expect(wrapper.find('section').exists()).toBe(false)
+    })
+
+    // Assumption: a global identity names its provider id in `provider`; it is shown by
+    // the provider's name instead of "Gelöschte Statusseite".
+    it('labels a global identity with its provider name', async () => {
+      seedProviders([{ id: 'gitlab', name: 'GitLab' }])
+      const list = { identities: [{ id: 8, provider: 'gitlab', email: 'e@x.de' }, { id: 9, provider: 'alt' }], linkable: [] }
+      const wrapper = await mountLinks({ fetchImpl: makeFetch({ 'GET /api/me/sso': jsonResponse(list) }) })
+
+      const linked = wrapper.findAll('[data-test="sso-linked"]')
+      expect(linked[0].find('strong').text()).toBe('GitLab')
+      expect(linked[1].find('strong').text()).toBe('alt')
+      expect(wrapper.text()).not.toContain('Gelöschte Statusseite')
+    })
   })
 
   it('zeigt bestehende Verknüpfungen und verknüpfbare Seiten', async () => {

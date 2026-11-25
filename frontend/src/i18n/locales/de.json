@@ -30,7 +30,7 @@
     "error": "Sprache konnte nicht gespeichert werden.",
     "sso": {
       "title": "SSO-Anmeldung",
-      "description": "Verknüpfe dein Konto mit der SSO-Anmeldung einer Statusseite. Danach kannst du dich dort mit „Mit SSO anmelden“ ohne Passwort anmelden.",
+      "description": "Verknüpfe dein Konto mit einem Anmeldeanbieter oder der SSO-Anmeldung einer Statusseite. Danach kannst du dich darüber ohne Passwort anmelden.",
       "linkedHeading": "Verknüpft",
       "linkedAs": "als {email}",
       "unknownPage": "Gelöschte Statusseite",
@@ -39,6 +39,8 @@
       "unlinked": "Verknüpfung gelöst.",
       "unlinkError": "Verknüpfung konnte nicht gelöst werden.",
       "linkableHeading": "Verknüpfen",
+      "providersHeading": "Anmeldeanbieter",
+      "linkProvider": "Mit {name} verknüpfen",
       "link": "Mit SSO verknüpfen",
       "linkError": "Verknüpfung konnte nicht gestartet werden: {message}",
       "loadError": "SSO-Verknüpfungen konnten nicht geladen werden."

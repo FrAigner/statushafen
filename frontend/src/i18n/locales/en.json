@@ -30,7 +30,7 @@
     "error": "Language could not be saved.",
     "sso": {
       "title": "SSO sign-in",
-      "description": "Link your account with the SSO sign-in of a status page. Afterwards you can sign in there with “Sign in with SSO” without a password.",
+      "description": "Link your account with a sign-in provider or the SSO sign-in of a status page. Afterwards you can sign in that way without a password.",
       "linkedHeading": "Linked",
       "linkedAs": "as {email}",
       "unknownPage": "Deleted status page",
@@ -39,6 +39,8 @@
       "unlinked": "Link removed.",
       "unlinkError": "Could not remove the link.",
       "linkableHeading": "Link",
+      "providersHeading": "Sign-in providers",
+      "linkProvider": "Link with {name}",
       "link": "Link with SSO",
       "linkError": "Could not start linking: {message}",
       "loadError": "Could not load SSO links."
