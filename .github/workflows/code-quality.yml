@@ -38,7 +38,7 @@ jobs:
         # Meldet nur Lücken, die der Code wirklich aufruft. Seit Go 1.26.10 (GO-2026-6809, crypto/x509)
         # ist der Scan sauber und blockiert jetzt: eine aufgerufene Schwachstelle macht den Job rot.
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
           cd backend
           "$(go env GOPATH)/bin/govulncheck" ./...
 
