@@ -179,8 +179,6 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 
 	expected := []string{
 		"GET /healthz",
-		"GET /api/auth/:provider",
-		"GET /api/auth/:provider/callback",
 		"POST /api/auth/sso-exchange",
 		"GET /api/auth/oidc/login",
 		"GET /api/auth/oidc/callback",

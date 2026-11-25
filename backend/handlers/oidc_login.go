@@ -40,7 +40,7 @@ import (
 // E-Mail (bewusste Entscheidung gegen Konto-Übernahme). Neue Konten entstehen hier
 //     nicht. Die Verknüpfung legt ein angemeldeter Nutzer selbst an
 //     (POST /api/auth/oidc/link?page=N), danach läuft derselbe Callback.
-//  4. Sitzung wie bei Google/GitHub: Einmal-Code, den das Frontend über
+//  4. Sitzung: Einmal-Code, den das Frontend über
 //     /api/auth/sso-exchange gegen das JWT tauscht.
 //
 // Fehler im Browser-Ablauf (Login-Start und Callback) leiten mit

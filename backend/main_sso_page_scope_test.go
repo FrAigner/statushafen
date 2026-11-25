@@ -41,8 +41,6 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"GET /api/auth/oidc/login":                           ssoUnchanged,
 	"GET /api/auth/oidc/callback":                        ssoUnchanged,
 	"GET /api/auth/sso/login":                            ssoUnchanged,
-	"GET /api/auth/:provider":                            ssoUnchanged,
-	"GET /api/auth/:provider/callback":                   ssoUnchanged,
 	"POST /api/auth/sso-exchange":                        ssoUnchanged,
 	"POST /api/login":                                    ssoUnchanged,
 	"POST /api/subscribe":                                ssoUnchanged,

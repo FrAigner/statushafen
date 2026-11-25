@@ -62,7 +62,7 @@ info:
 
     Ein Login-Token aus dem OIDC-SSO einer Statusseite trägt den
     Claim `sso_page_id` (die Seite, deren IdP die Anmeldung bestätigt hat).
-    Passwort- und Google/GitHub-Logins haben ihn nicht. Mit
+    Passwort-Logins haben ihn nicht. Mit
     `sso_page_id` gilt:
 
     - Seitengebundene Rechte (`<bereich>:<recht>`, `page-role`) nur für diese
@@ -102,7 +102,7 @@ info:
 
     | Endpunkt | Limit |
     |---|---|
-    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `GET /api/auth/{provider}`, `GET /api/auth/{provider}/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test` | 20/min |
+    | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test` | 20/min |
     | `POST /api/subscribe`, `POST /api/subscribe/test-webhook`, `POST /api/auth/sso-exchange`, `POST /api/public/orders/set-password` | 10/min |
     | `POST /api/public/orders` | 5/min |
     | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso` | 60/min |
@@ -191,7 +191,7 @@ tags:
   - name: Public
     description: Öffentliche Lese-API der Statusseiten (optional mit Login-Token).
   - name: Auth
-    description: Anmeldung per Passwort, OAuth (Google/GitHub) und OIDC je Statusseite.
+    description: Anmeldung per Passwort und OIDC je Statusseite.
   - name: Subscriptions
     description: Abonnieren, Bestätigen (Double-Opt-in) und Abbestellen.
   - name: Webhooks
@@ -314,60 +314,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /api/auth/{provider}:
-    parameters:
-      - $ref: "#/components/parameters/OAuthProvider"
-    get:
-      tags: [Auth]
-      operationId: oauthBegin
-      summary: OAuth-Login bei Google/GitHub starten
-      description: |
-        Setzt das Cookie `oauth_state` (5 min, HttpOnly, Secure, SameSite=Lax) und
-        leitet zum Anbieter weiter. Das Cookie ist mit `JWT_SECRET` signiert und
-        trägt State und PKCE-Verifier; die Authorize-URL enthält die
-        `code_challenge` (S256). Für Browser-Navigation gedacht.
-      security: []
-      x-rate-limit: 20/min pro IP
-      responses:
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "307":
-          description: Weiterleitung zum Anbieter.
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "503":
-          description: Anbieter nicht konfiguriert (Client-ID fehlt).
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-  /api/auth/{provider}/callback:
-    parameters:
-      - $ref: "#/components/parameters/OAuthProvider"
-    get:
-      tags: [Auth]
-      operationId: oauthCallback
-      summary: OAuth-Callback des Anbieters
-      description: |
-        Prüft `state` gegen das signierte Cookie (Signatur, Anbieter, höchstens
-        5 Minuten alt, einmal verwendbar), bevor der Anbieter aufgerufen wird;
-        sonst `400 oauth_state_invalid`. Tauscht dann den Code (mit dem
-        PKCE-Verifier aus dem Cookie), legt den Nutzer bei Bedarf an und leitet auf
-        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter. Der kurzlebige `code` wird per `POST /api/auth/sso-exchange`
-        gegen einen Login-Token getauscht.
-      security: []
-      x-rate-limit: 20/min pro IP
-      parameters:
-        - { name: code, in: query, required: true, schema: { type: string } }
-        - { name: state, in: query, required: true, schema: { type: string } }
-      responses:
-        "429": { $ref: "#/components/responses/TooManyRequests" }
-        "307":
-          description: Weiterleitung ins Frontend mit Einmal-Code.
-          headers:
-            Location: { $ref: "#/components/headers/Location" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
   /api/auth/sso-exchange:
     post:
       tags: [Auth]
@@ -449,8 +395,8 @@ paths:
       summary: OIDC-Callback des Identity Providers
       description: |
         Löst den State ein, prüft ID-Token und Nonce und leitet auf
-        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter (Code wie bei
-        OAuth per `POST /api/auth/sso-exchange` tauschen). Bei
+        `<FRONTEND_URL>/auth/sso-callback?code=…` weiter (Code per
+        `POST /api/auth/sso-exchange` tauschen). Bei
         Verknüpfungen geht es ins Profil, bei Testanmeldungen auf die
         SSO-Seite des Admin-Bereichs; Fehler immer als Weiterleitung mit
         Fehlercode.
@@ -4540,11 +4486,6 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
-    OAuthProvider:
-      name: provider
-      in: path
-      required: true
-      schema: { type: string, enum: [google, github] }
     LanguageCodeQuery:
       name: language_code
       in: query

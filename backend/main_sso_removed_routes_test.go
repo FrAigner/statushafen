@@ -34,3 +34,25 @@ func TestRouter_SAMLRoutesRemoved(t *testing.T) {
 		}
 	}
 }
+
+// The built-in Google and GitHub OAuth logins are gone; Google now works as a
+// generic OIDC provider. The former addresses answer 404.
+func TestRouter_GoogleAndGitHubRoutesRemoved(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
+	r := newRouter(handlers.NewHandler(testutils.SetupTestDB()))
+	for _, ri := range r.Routes() {
+		if strings.Contains(ri.Path, ":provider") {
+			t.Errorf("route %s %s still uses the old :provider pattern", ri.Method, ri.Path)
+		}
+	}
+	for _, path := range []string{
+		"/api/auth/google", "/api/auth/google/callback?code=x&state=y",
+		"/api/auth/github", "/api/auth/github/callback?code=x&state=y",
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusNotFound {
+			t.Errorf("GET %s: status %d, want 404", path, w.Code)
+		}
+	}
+}

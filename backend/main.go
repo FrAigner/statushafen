@@ -234,17 +234,12 @@ func registerRoutesInMetrics(r *gin.Engine, reg *metrics.Registry) {
 
 func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// --- SSO (öffentlich) ---
-	// OIDC je Statusseite. Statische Pfade gehen in gin vor
-	// /api/auth/:provider.
+	// OIDC per status page.
 	r.GET("/api/auth/oidc/login", middleware.NewRateLimiter(20, time.Minute), h.OIDCLoginHandler)
 	// Einstieg über den Slug für Besucher einer privaten Seite (Seiten-ID und
 	// SSO-Art nennt die Auskunft /api/public/pages/:slug/sso ihnen nicht).
 	r.GET("/api/auth/sso/login", middleware.NewRateLimiter(20, time.Minute), h.SSOLoginBySlugHandler)
 	r.GET("/api/auth/oidc/callback", middleware.NewRateLimiter(20, time.Minute), h.OIDCCallbackHandler)
-	// Google und GitHub: wie die OIDC-Routen 20/min je IP. Der Callback löst
-	// einen ausgehenden Aufruf beim Anbieter aus.
-	r.GET("/api/auth/:provider", middleware.NewRateLimiter(20, time.Minute), h.OAuthBeginHandler)
-	r.GET("/api/auth/:provider/callback", middleware.NewRateLimiter(20, time.Minute), h.OAuthCallbackHandler)
 	r.POST("/api/auth/sso-exchange", middleware.NewRateLimiter(10, time.Minute), h.SSOExchangeHandler)
 
 	// --- Öffentliche Routen ---

@@ -47,7 +47,6 @@ func errorSourceFiles(t *testing.T) []string {
 // Grenze im selben PR gesenkt werden (Folgeaufgabe).
 var codeLuecken = map[string]int{
 	"auth.go":       1,
-	"auth_sso.go":   4,
 	"webhook.go":    1,
 	"page_order.go": 2,
 }

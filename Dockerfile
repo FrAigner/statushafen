@@ -28,7 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/server .
 FROM alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
 WORKDIR /app
 
-# ca-certificates: nötig für ausgehende HTTPS-Aufrufe (Google/GitHub OAuth-Endpunkte)
+# ca-certificates: needed for outgoing HTTPS calls (OIDC providers, webhooks)
 RUN apk add --no-cache ca-certificates && \
     addgroup -S app && adduser -S app -G app
 

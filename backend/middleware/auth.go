@@ -45,7 +45,7 @@ type Claims struct {
 	// SSOPageID: Seite, deren IdP die Sitzung ausgestellt hat
 	// (Seiten-SSO per OIDC). Die Sitzung gilt nur für diese Seite
 	// und nie mit Global-Admin-Rechten. Fehlt bei Passwort- und
-	// globalen SSO-Logins (Google/GitHub).
+	// globalen SSO-Logins.
 	SSOPageID uint `json:"sso_page_id,omitempty"`
 	// TokenVersion: Stand von users.token_version bei der Ausstellung. Weicht
 	// er vom Konto ab, wurde das Token widerrufen (siehe sessionStillValid).

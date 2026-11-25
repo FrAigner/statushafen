@@ -64,7 +64,7 @@ Optionen mit Erklärung stehen in [`backend/.env.example`](backend/.env.example)
 | `FRONTEND_URL`, `BASE_URL`, `CORS_ORIGINS` | Öffentliche Adressen und erlaubte Origins |
 | `TRUSTED_PROXIES` | Kommagetrennte Proxy-IPs/CIDRs, deren `X-Forwarded-For` vertraut wird (Standard: keine). Nur den eigenen Reverse-Proxy eintragen: Netze weiter als /8 (IPv4) bzw. /16 (IPv6), auch `0.0.0.0/0` und `::/0`, lassen jeden Client seine Adresse fälschen und heben alle IP-Limits auf; das Backend startet damit nicht, außer `APP_ENV` ist `development`, `dev`, `test` oder `local` (dann nur Warnung) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Ausgehende Mails (Standard: lokales Mailpit). `SMTP_FROM` ist die Absenderadresse aller Mails; Statusseiten ergänzen nur ihren Namen und optional eine Antwortadresse |
-| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS`, `GOOGLE_*`, `GITHUB_*` | Plattform-Login über Google/GitHub (mit PKCE; das State-Cookie ist mit `JWT_SECRET` signiert, 20 Anfragen pro Minute und IP) und Start-Admins |
+| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS` | Erlaubte E-Mail-Domains für neue SSO-Konten und Start-Admins |
 | `CUSTOM_DOMAIN_CNAME_TARGET`, `CADDY_INTERNAL_TOKEN` | Eigene Domains (siehe unten) |
 | `METRICS_BASIC_AUTH_USER`, `METRICS_BASIC_AUTH_PASSWORD` | Schalten `/metrics` ein (aus, solange nicht beide gesetzt sind) |
 | `LOG_FORMAT`, `LOG_LEVEL` | Logging (`json`/`text`, `debug` bis `error`) |
