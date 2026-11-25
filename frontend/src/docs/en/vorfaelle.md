@@ -27,32 +27,45 @@ An incident reports an outage. Incidents are managed under **Incidents** (permis
 | `monitoring` | Monitoring | Fix deployed, situation is being watched |
 | `resolved` | Resolved | Incident closed |
 
-The usual order is top to bottom, but Statushafen does not enforce it: you can pick any of the
-four statuses directly and also reopen an incident; Statushafen rejects other values. When you set
-an incident to "Resolved", Statushafen records the time as its end (also via an update). Setting
-it to any other status clears its end time. The end must not be before the start. Resolved
-incidents appear on the status page under "Past Incidents".
+The usual order is top to bottom, but Statushafen does not enforce it:
+
+- You can pick any of the four statuses directly and also reopen an incident; Statushafen rejects
+  other values.
+- When you set an incident to "Resolved", Statushafen records the time as its end (also via an
+  update).
+- Setting it to any other status clears its end time.
+- The end must not be before the start.
+- Resolved incidents appear on the status page under "Past Incidents".
 
 As long as an incident is open (`investigating`, `identified`, `monitoring`), the status page
 shows its components at least with the status of its severity: "Degraded Performance", "Partial
-Outage" or "Major Outage". This is the same mapping as in the availability bars, so the display and
-the bars never contradict each other. If a component belongs to several open incidents, the worst
-severity applies. A worse, manually set status stays in place.
+Outage" or "Major Outage".
+
+- This is the same mapping as in the availability bars, so the display and the bars never
+  contradict each other.
+- If a component belongs to several open incidents, the worst severity applies.
+- A worse, manually set status stays in place.
 
 ## Updates
 
-Clicking an incident opens the detail view with its history. There you add a new entry with the
-update form (new status and update message). The update copies its status into the
-incident and appears publicly in the history. The incident's original description stays as the
-**initial report** and is shown at the very bottom of the history. On the status page, the incident
-shows its latest updates; the newest carries the label "Latest update", see
+Clicking an incident opens the detail view with its history.
+
+1. There you add a new entry with the update form (new status and update message).
+2. The update copies its status into the incident and appears publicly in the history.
+
+The incident's original description stays as the **initial report** and is shown at the very bottom
+of the history. On the status page, the incident shows its latest updates; the newest carries the
+label "Latest update", see
 [The public status page](/docs/oeffentliche-statusseite#incidents-and-their-history).
 
 If the status page has several languages and you may change the incident, a language switcher
-appears above the update message. One message per additional language (no title) is saved together
-with the update. You add translations to updates that are already posted with **Translations** on
-the entry in the history. Visitors see the message in their language once the translation is marked
-as done; otherwise the default language of the page or the original.
+appears above the update message.
+
+- One message per additional language (no title) is saved together with the update.
+- You add translations to updates that are already posted with **Translations** on the entry in
+  the history.
+- Visitors see the message in their language once the translation is marked as done; otherwise the
+  default language of the page or the original.
 
 Example history:
 
@@ -72,10 +85,13 @@ The texts come from the [mail templates](/docs/mail-templates). An update with s
 uses the "Incident resolved" template.
 
 So that a slip or a misused account cannot trigger thousands of mails, limits apply per page and per
-user: at most 30 new incidents, maintenance windows and announcements per hour per page (60 per user)
-and 120 changes and updates per hour. Beyond that the interface answers "Too many requests"; after the
-time given in `Retry-After` you can continue. Normal operation, even a long incident with many
-updates, stays far below.
+user:
+
+- at most 30 new incidents, maintenance windows and announcements per hour per page (60 per user),
+- 120 changes and updates per hour.
+
+Beyond that the interface answers "Too many requests"; after the time given in `Retry-After` you can
+continue. Normal operation, even a long incident with many updates, stays far below.
 
 ## Post-mortem
 

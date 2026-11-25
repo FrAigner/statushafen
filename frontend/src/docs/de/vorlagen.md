@@ -23,12 +23,16 @@ alles frei änderbar.
 ## Mehrere Sprachen
 
 Hat die Statusseite weitere Sprachen, erscheint oben im Formular ein Sprachumschalter: „Deutsch
-(Standard)“ und je eine weitere Sprache mit ihrem Stand („leer“, „Entwurf“, „fertig“). In einer
-weiteren Sprache lassen sich Titel und Nachricht der Vorlage übersetzen; die Standardsprache ist
-Pflicht, weitere Sprachen sind optional. Wer „Ändern“ für Vorlagen darf, sieht den Umschalter;
-gespeichert wird alles mit einem Klick auf „Speichern“. Beim „Vorlage verwenden“ übernimmt das
-Formular auch diese Texte in die Sprachen des neuen Vorfalls bzw. Wartungsfensters (Stand wie in der
-Vorlage); danach sind sie frei änderbar. Siehe auch [Sprachen](/docs/sprachen).
+(Standard)“ und je eine weitere Sprache mit ihrem Stand („leer“, „Entwurf“, „fertig“).
+
+- In einer weiteren Sprache lassen sich Titel und Nachricht der Vorlage übersetzen.
+- Die Standardsprache ist Pflicht, weitere Sprachen sind optional.
+- Wer „Ändern“ für Vorlagen darf, sieht den Umschalter; gespeichert wird alles mit einem Klick auf
+  „Speichern“.
+- Beim „Vorlage verwenden“ übernimmt das Formular auch diese Texte in die Sprachen des neuen
+  Vorfalls bzw. Wartungsfensters (Stand wie in der Vorlage); danach sind sie frei änderbar.
+
+Siehe auch [Sprachen](/docs/sprachen).
 
 Ein Vorfall merkt sich nicht, aus welcher Vorlage er stammt. Wer eine Vorlage ändert oder löscht,
 ändert bestehende Vorfälle nicht.

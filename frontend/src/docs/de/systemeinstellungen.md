@@ -37,13 +37,16 @@ Schaltet die automatische Selbstüberwachung der Systemseite ein oder aus (siehe
 ## Automatische Übersetzung
 
 Der Schalter **Automatische Übersetzung und zweite Sprache (Deutsch/Englisch) einschalten** ist ohne
-Eintrag **aus**. Solange er aus ist, haben Vorfälle, Wartungen, Ankündigungen, Komponenten,
-Vorlagen und Benachrichtigungen nur die Standardsprache der jeweiligen Statusseite: keine
-Sprachauswahl, keine Übersetzungen, auch keine Pflege einer zweiten Sprache von Hand. Ist er an,
-gibt es Deutsch und Englisch samt Übersetzungsvorschlag (siehe [Sprachen](/docs/sprachen)).
-Gespeicherte Übersetzungen bleiben beim Ausschalten erhalten. **Nach dem Update** ist der Schalter
-auch dort aus, wo bisher Übersetzungen genutzt wurden: einmal einschalten, damit sie wieder
-erscheinen. Jede Änderung steht im Audit-Log.
+Eintrag **aus**.
+
+- **Aus:** Vorfälle, Wartungen, Ankündigungen, Komponenten, Vorlagen und Benachrichtigungen haben
+  nur die Standardsprache der jeweiligen Statusseite: keine Sprachauswahl, keine Übersetzungen, auch
+  keine Pflege einer zweiten Sprache von Hand.
+- **An:** Es gibt Deutsch und Englisch samt Übersetzungsvorschlag (siehe [Sprachen](/docs/sprachen)).
+- Gespeicherte Übersetzungen bleiben beim Ausschalten erhalten.
+- **Nach dem Update** ist der Schalter auch dort aus, wo bisher Übersetzungen genutzt wurden:
+  einmal einschalten, damit sie wieder erscheinen.
+- Jede Änderung steht im Audit-Log.
 
 Die übrigen Felder legen fest, welcher Dienst den Knopf **Übersetzen** in den Formularen bedient.
 Der Vorschlag landet immer als Entwurf.
@@ -57,9 +60,12 @@ Der Vorschlag landet immer als Entwurf.
   Datenschutz beachten. Mit einem eigenen kostenlosen Schlüssel stehen rund 500.000 Zeichen im
   Monat zur Verfügung; Schlüssel für das Free-Angebot enden auf `:fx`.
 
-Der Schlüssel wird nur gespeichert und nie wieder angezeigt oder ausgegeben: Das Feld bleibt leer,
-„Gespeicherten Schlüssel entfernen“ löscht ihn. Im Audit-Log steht nur „gesetzt“ bzw. „entfernt“.
-**Verbindung testen** übersetzt einen Beispieltext mit der gespeicherten Konfiguration.
+Zum API-Schlüssel:
+
+- Der Schlüssel wird nur gespeichert und nie wieder angezeigt oder ausgegeben: Das Feld bleibt leer.
+- „Gespeicherten Schlüssel entfernen“ löscht ihn.
+- Im Audit-Log steht nur „gesetzt“ bzw. „entfernt“.
+- **Verbindung testen** übersetzt einen Beispieltext mit der gespeicherten Konfiguration.
 
 ## Übersicht und Monitoring
 
@@ -69,6 +75,12 @@ Zwei weitere Seiten stehen nur Global Admins offen:
   offenen Vorfällen, Abonnenten und Gesamtstatus sowie eine durchsuchbare Tabelle aller Seiten mit
   Status, Komponenten, Abonnenten und offenen Vorfällen.
 - **Monitoring** (Bereich System) zeigt die Betriebskennzahlen des Servers aus der eingebauten
-  Messung: Anfragen, Fehlerquote (nur Antworten mit Status 5xx; 4xx wie 404 oder 409 zählen nicht, Markierung gelb ab 5 %, rot ab 10 %), Latenz (Mittel, p50, p95, Maximum), Anfragen pro Minute und
-  Prozess-Uptime, dazu die Auslastung (Goroutinen, Heap, GC-Zyklen, Datenbank-Pool) und eine
-  Tabelle je Endpunkt. Ein Link öffnet das Grafana-Dashboard des Betreibers.
+  Messung:
+  - Anfragen
+  - Fehlerquote (nur Antworten mit Status 5xx; 4xx wie 404 oder 409 zählen nicht, Markierung gelb
+    ab 5 %, rot ab 10 %)
+  - Latenz (Mittel, p50, p95, Maximum)
+  - Anfragen pro Minute und Prozess-Uptime
+  - dazu die Auslastung (Goroutinen, Heap, GC-Zyklen, Datenbank-Pool) und eine Tabelle je Endpunkt
+
+  Ein Link öffnet das Grafana-Dashboard des Betreibers.
