@@ -172,7 +172,7 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	if st.LinkUserID != 0 {
 		action, next = "auth.sso_linked", "&next=profile"
 	}
-	origin, returnTo := h.loginDelivery(st, user.ID)
+	origin, returnTo := h.loginDelivery(st, user)
 	detail := "provider=" + p.ID
 	if origin.pageID != 0 {
 		detail += " page=" + strconv.FormatUint(uint64(origin.pageID), 10)

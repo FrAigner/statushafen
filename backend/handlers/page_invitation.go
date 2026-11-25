@@ -598,12 +598,17 @@ func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 		if gone {
 			return gorm.ErrRecordNotFound
 		}
-		var n int64
-		if err := tx.Model(&models.UserStatusPageRole{}).Where(whereUserIDAndStatusPageID, u.ID, page.ID).Count(&n).Error; err != nil {
-			return err
-		}
-		if n > 0 {
+		var existing models.UserStatusPageRole
+		err = tx.Where(whereUserIDAndStatusPageID, u.ID, page.ID).First(&existing).Error
+		switch {
+		case err == nil && existing.JoinedVia == models.JoinedViaAutoJoin:
+			// Accepting is the consent an auto-join lacks: the membership becomes
+			// an assigned one with the invited role (custom domain login).
+			return tx.Model(&existing).Updates(map[string]any{"role_id": role.ID, "joined_via": models.JoinedViaAssigned}).Error
+		case err == nil:
 			return errInvitationAlreadyMember
+		case !errors.Is(err, gorm.ErrRecordNotFound):
+			return err
 		}
 		return tx.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: role.ID}).Error
 	})
