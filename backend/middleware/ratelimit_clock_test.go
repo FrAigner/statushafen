@@ -3,6 +3,7 @@ package middleware_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,8 +18,11 @@ import (
 // over the limit slipped through. Tests therefore need to control the limiter's clock.
 func TestSetRateLimiterClockForTests_ControlsRefill(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	now := time.Date(2026, time.November, 25, 12, 0, 0, 0, time.UTC)
-	middleware.SetRateLimiterClockForTests(t.Cleanup, func() time.Time { return now })
+	// Atomic: cleanup goroutines of limiters from other tests keep running and read the
+	// (global) limiter clock concurrently while this test advances it.
+	var now atomic.Int64
+	now.Store(time.Date(2026, time.November, 25, 12, 0, 0, 0, time.UTC).UnixNano())
+	middleware.SetRateLimiterClockForTests(t.Cleanup, func() time.Time { return time.Unix(0, now.Load()).UTC() })
 
 	r := gin.New()
 	r.GET("/x", middleware.NewRateLimiter(1, time.Minute), func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -33,6 +37,6 @@ func TestSetRateLimiterClockForTests_ControlsRefill(t *testing.T) {
 	assert.Equal(t, http.StatusOK, get())
 	assert.Equal(t, http.StatusTooManyRequests, get(), "the frozen clock must not refill the bucket")
 
-	now = now.Add(time.Minute)
+	now.Add(int64(time.Minute))
 	assert.Equal(t, http.StatusOK, get(), "advancing the test clock refills the bucket")
 }
