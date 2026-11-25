@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick, inject } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
-import { OnyxButton } from 'sit-onyx'
+import { OnyxButton, OnyxModal } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
@@ -17,6 +17,7 @@ import SearchBox from '../../components/SearchBox.vue'
 import RowMenu from '../../components/RowMenu.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
+import StatusPage from '../public/StatusPage.vue'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { formatRelative } from '../../utils/relativeTime'
 import { serverInputErrorText } from '../../utils/inputRules'
@@ -50,6 +51,20 @@ const pageLayoutOptions = [
 // kollisionssichere Generierung passiert serverseitig, falls das Feld beim
 // Speichern trotzdem leer bleibt.
 const slugTouched = ref(false)
+
+// Design preview: the real public page in a modal, rendered with the unsaved
+// design values of the form (StatusPage preview mode, read-only). Only for
+// saved pages, because the page content comes from the public dashboard of
+// the saved slug.
+const previewOpen = ref(false)
+const previewSlug = computed(() => pages.value.find(p => p.ID === currentEditItem.value)?.Slug || '')
+const designPreview = computed(() => ({
+  LogoURL: formData.value.LogoURL || '',
+  PrimaryColor: formData.value.PrimaryColor || '',
+  SecondaryColor: formData.value.SecondaryColor || '',
+  HeaderStyle: formData.value.HeaderStyle || 'classic',
+  PageLayout: formData.value.PageLayout || 'standard',
+}))
 function slugify(name) {
   const umlauts = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }
   return (name || '')
@@ -262,6 +277,7 @@ const openEdit = (item, { focus = true } = {}) => {
     : JSON.parse(JSON.stringify(item))
   currentEditItem.value = item === 'new' ? 'new' : item.ID
   slugTouched.value = false
+  previewOpen.value = false
   webhookToken.value = ''
   tokenCopied.value = false
   customDomainInput.value = item === 'new' ? '' : (item.CustomDomain || '')
@@ -287,6 +303,7 @@ const focusForm = async () => {
 
 const cancelEdit = () => {
   isEditing.value = false
+  previewOpen.value = false
   currentEditItem.value = null
   formData.value = {}
   webhookToken.value = ''
@@ -671,6 +688,21 @@ const removeUser = async (assignment) => {
             </label>
           </fieldset>
 
+          <!-- Preview of the design fields above in a modal; nothing is saved here. -->
+          <div class="design-preview">
+            <button
+              v-if="currentEditItem !== 'new' && previewSlug"
+              type="button"
+              class="action-btn"
+              data-test="design-preview-open"
+              aria-haspopup="dialog"
+              @click="previewOpen = true"
+            >
+              <AppIcon name="globe" :size="14" /> {{ t('statusPages.previewShow') }}
+            </button>
+            <p v-else class="adm-hint" data-test="design-preview-new">{{ t('statusPages.previewNewPage') }}</p>
+          </div>
+
           <FormField v-slot="f" :label="t('statusPages.fieldNotificationFrom')" :hint="t('statusPages.fromAddressHint')" field-id="page-notification-from">
             <input
               :id="f.id"
@@ -703,6 +735,19 @@ const removeUser = async (assignment) => {
             <OnyxButton :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
+
+        <OnyxModal
+          v-model:open="previewOpen"
+          class="design-preview-modal"
+          :label="t('statusPages.previewTitle', { name: formData.Name || previewSlug })"
+        >
+          <template #description>
+            <p class="adm-hint design-preview-hint" data-test="design-preview-hint">{{ t('statusPages.previewHint') }}</p>
+          </template>
+          <div v-if="previewOpen" class="design-preview-frame theme-public">
+            <StatusPage :slug="previewSlug" :preview="designPreview" />
+          </div>
+        </OnyxModal>
 
         <!-- Monitoring-Webhook-Token: nur für bereits gespeicherte Seiten, -->
         <!-- eine "neue" Seite hat noch keine ID, gegen die ein Token generiert werden könnte. -->
@@ -889,4 +934,22 @@ const removeUser = async (assignment) => {
 /* Der Slug ist Teil der URL (klein geschrieben); die globale
    .meta-tag-Regel setzt sonst Großbuchstaben ("SYSTEM"). */
 .meta-tag--slug { text-transform: none; letter-spacing: normal; }
+
+/* Design preview: the public page in its own token layer (.theme-public)
+   inside a wide modal; the modal scrolls, the edit panel stays as it is. */
+.design-preview { margin: 0 0 var(--sp-4); }
+.design-preview-modal { inline-size: min(1200px, calc(100vw - 2 * var(--sp-4))); }
+.design-preview-hint { margin: var(--sp-1) 0 0; }
+.design-preview-frame {
+  margin: var(--sp-3) var(--onyx-modal-padding-inline, var(--sp-5)) var(--sp-5);
+  padding: 0 var(--sp-5) var(--sp-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  color: var(--text);
+  min-inline-size: 0;
+}
+@media (max-width: 600px) {
+  .design-preview-frame { margin-inline: var(--sp-3); padding: 0 var(--sp-3) var(--sp-3); }
+}
 </style>

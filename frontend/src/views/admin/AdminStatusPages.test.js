@@ -1201,4 +1201,110 @@ describe('AdminStatusPages', () => {
       expect(posts(fetchImpl).map(([u]) => u)).toEqual(['/api/admin/pages/1/webhook-token'])
     })
   })
+
+  describe('Design-Vorschau', () => {
+    // The real public page is covered by StatusPagePreview.test.js; here only the wiring.
+    const StatusPageStub = {
+      name: 'StatusPage',
+      props: ['slug', 'preview'],
+      template: '<div class="status-page-stub" :data-slug="slug">{{ JSON.stringify(preview) }}</div>',
+    }
+    async function mountWithStub() {
+      useAuth().setAuth('jwt-1', { email: 'a@b.de', is_global_admin: true })
+      const fetchImpl = makeFetchRouter()
+      global.fetch = fetchImpl
+      const wrapper = mount(AdminStatusPages, { attachTo: document.body, global: { plugins: [i18n], stubs: { StatusPage: StatusPageStub } } })
+      await flushPromises()
+      activeWrapper = wrapper
+      return { wrapper, fetchImpl }
+    }
+    const openButton = (wrapper) => wrapper.find('[data-test="design-preview-open"]')
+    const modal = (wrapper) => wrapper.findComponent({ name: 'OnyxModal' })
+    const previewData = (wrapper) => JSON.parse(wrapper.find('.status-page-stub').text())
+    const editFirst = async (wrapper) => {
+      await rowAction(wrapper, 0, 'Bearbeiten')
+      await flushPromises()
+    }
+
+    it('öffnet die Vorschau als Modal mit der Seite und dem Hinweis, dass nichts live ist', async () => {
+      const { wrapper } = await mountWithStub()
+      await editFirst(wrapper)
+
+      expect(modal(wrapper).props('open')).toBe(false)
+      expect(wrapper.find('.status-page-stub').exists()).toBe(false)
+
+      await openButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(modal(wrapper).props('open')).toBe(true)
+      expect(modal(wrapper).props('label')).toBe('Vorschau: Acme Corp')
+      expect(wrapper.find('.status-page-stub').attributes('data-slug')).toBe('acme')
+      expect(wrapper.find('.design-preview-frame').classes()).toContain('theme-public')
+      expect(wrapper.find('[data-test="design-preview-hint"]').text()).toContain('Speichern')
+    })
+
+    it('zeigt die geänderten, noch nicht gespeicherten Design-Felder, ohne zu speichern', async () => {
+      const { wrapper, fetchImpl } = await mountWithStub()
+      await editFirst(wrapper)
+
+      await wrapper.find('#page-logo-url').setValue('https://acme.example/logo.svg')
+      await wrapper.find('#page-primary-color').setValue('#336699')
+      await wrapper.find('#page-header-style').setValue('minimal')
+      await wrapper.find('input[name="page-layout"][value="liste"]').setValue(true)
+      await openButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(previewData(wrapper)).toEqual({
+        LogoURL: 'https://acme.example/logo.svg', PrimaryColor: '#336699', SecondaryColor: '',
+        HeaderStyle: 'minimal', PageLayout: 'liste',
+      })
+      const writes = fetchImpl.mock.calls.filter(([, o]) => o?.method && o.method !== 'GET')
+      expect(writes).toHaveLength(0)
+    })
+
+    it('schließt das Modal und lässt das Formular mit den Änderungen offen', async () => {
+      const { wrapper } = await mountWithStub()
+      await editFirst(wrapper)
+      await wrapper.find('#page-header-style').setValue('centered')
+      await openButton(wrapper).trigger('click')
+      await flushPromises()
+
+      modal(wrapper).vm.$emit('update:open', false)
+      await flushPromises()
+
+      expect(modal(wrapper).props('open')).toBe(false)
+      expect(wrapper.find('.status-page-stub').exists()).toBe(false)
+      expect(wrapper.find('#page-header-style').element.value).toBe('centered')
+    })
+
+    it('bietet für eine neue Seite noch keine Vorschau an', async () => {
+      const { wrapper } = await mountWithStub()
+      await wrapper.findAll('button').find(b => b.text().includes('Neue Statusseite')).trigger('click')
+      await flushPromises()
+
+      expect(openButton(wrapper).exists()).toBe(false)
+      expect(wrapper.find('[data-test="design-preview-new"]').text()).toContain('ersten Speichern')
+    })
+
+    it('schließt die Vorschau mit dem Formular', async () => {
+      const { wrapper } = await mountWithStub()
+      await editFirst(wrapper)
+      await openButton(wrapper).trigger('click')
+      await flushPromises()
+      await wrapper.findAll('button').find(b => b.text() === 'Abbrechen').trigger('click')
+      await rowAction(wrapper, 1, 'Bearbeiten')
+      await flushPromises()
+
+      expect(modal(wrapper).props('open')).toBe(false)
+    })
+
+    it('hat mit geöffneter Vorschau keine axe-Verstöße', async () => {
+      const { wrapper } = await mountWithStub()
+      await editFirst(wrapper)
+      await openButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(await axe(wrapper)).toHaveNoViolations()
+    })
+  })
 })
