@@ -121,11 +121,14 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
    „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
    (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)
    wird verworfen; der Login endet dann wie bisher unter `FRONTEND_URL`.
-3. Der Callback prüft die Domain erneut. Hat das Konto eine Rolle auf der Seite der Domain, leitet er
-   nach `https://<Domain>/auth/sso-callback?code=…` weiter. Sonst endet der Login unter `FRONTEND_URL`
-   auf `/status/<slug>` derselben Seite (globale Anbieter: volle Sitzung). Die Auto-Join-Domains einer
-   Seite zählen dafür nicht, sie pflegt der Mandant. Fehler gehen nach
-   `https://<Domain>/login?oidc_error=<Code>`.
+3. Der Callback prüft die Domain erneut. Hat das Konto einer Rolle auf der Seite der Domain zugestimmt
+   (Einladung, Zuweisung durch einen Global Admin, Bestellung), leitet er nach
+   `https://<Domain>/auth/sso-callback?code=…` weiter. Sonst endet der Login unter `FRONTEND_URL` auf der
+   Startseite (globale Anbieter: volle Sitzung). Eine Rolle aus dem Auto-Join zählt nie, denn dessen
+   E-Mail-Domains pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Rollen aus der Zeit
+   vor dieser Markierung zählen nur, wenn die Seite gerade keinen Auto-Join eingerichtet hat und das
+   Audit-Log keinen Auto-Join dieses Kontos auf dieser Seite kennt. Fehler im Callback gehen immer an
+   `FRONTEND_URL`, nur Fehler beim Login-Start (ohne Kontobezug) an die eigene Domain.
 4. Das Frontend dort tauscht den Code auf demselben Origin ein. Der Code ist an diesen Origin gebunden:
    Ein Code für eine eigene Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer
    eigenen Domain. Der Passwort-Login läuft ohnehin auf demselben Origin.

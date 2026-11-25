@@ -4651,12 +4651,13 @@ components:
         Verifizierte eigene Domain einer Statusseite, auf der der Login begann
         (exakter Hostname, ohne Schema, Port oder Pfad). Nach der Anmeldung
         geht der Einmal-Code an `https://<return_host>/auth/sso-callback`,
-        Fehler an `https://<return_host>/login?oidc_error=<code>`. Gilt nur
+        Fehler beim Login-Start an `https://<return_host>/login?oidc_error=<code>`
+        (Fehler im Callback immer an `FRONTEND_URL`). Gilt nur
         für Domains im Status `verified`/`active`, beim Seiten-SSO nur für die
         Domain derselben Seite, und wird beim Callback erneut geprüft; sonst
         verworfen (Ziel `FRONTEND_URL`). Der Code geht nur an die Domain, wenn
-        das Konto eine Rolle auf ihrer Seite hat; sonst endet der Login unter
-        `FRONTEND_URL` auf `/status/<slug>`. Die Sitzung gilt dann nur für die
+        das Konto einer Rolle auf ihrer Seite zugestimmt hat (nicht per
+        Auto-Join); sonst endet der Login unter `FRONTEND_URL` auf der Startseite. Die Sitzung gilt dann nur für die
         Seite der Domain (`sso_page_id`, keine Global-Admin-Rechte, Claim
         `custom_domain`: kein Löschen, Export oder Verknüpfen des Kontos). Kommt der
         Login-Start selbst auf einer verifizierten eigenen Domain an, leitet er
