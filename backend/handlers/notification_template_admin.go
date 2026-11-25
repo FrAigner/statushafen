@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fraigner/statushafen/database"
 	"github.com/fraigner/statushafen/models"
 	"github.com/fraigner/statushafen/richtext"
 
@@ -79,6 +80,10 @@ var validNotificationAudiences = map[string]bool{
 // database.SeedDefaultStatusPageLanguages, die genau das für jede reale
 // Seite nachziehen).
 func isValidNotificationLanguage(db *gorm.DB, pageID uint, lang string) bool {
+	// Content languages are only de and en.
+	if !database.IsContentLanguage(lang) {
+		return false
+	}
 	var configuredCount int64
 	if err := db.Model(&models.StatusPageLanguage{}).Where("status_page_id = ?", pageID).Count(&configuredCount).Error; err != nil {
 		return lang == "en" || lang == "de"

@@ -136,8 +136,8 @@ func (h *Handler) GetPublicTranslationsHandler(c *gin.Context) {
 // Sprache) und liefert dann false. Gemeinsam genutzt von den Übersetzungen der
 // Seite und der Vorfall-Updates.
 func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) (lang, def string, ok bool) {
-	var langs []models.StatusPageLanguage
-	if err := h.DB.Where(whereStatusPageIDEquals, page.ID).Find(&langs).Error; err != nil {
+	langs, err := h.pageContentLanguages(page.ID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return "", "", false
 	}

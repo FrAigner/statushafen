@@ -92,16 +92,16 @@ func TestSubscriberSprache_Extern_VorlageDerAbonnentensprache(t *testing.T) {
 	defer srv.close()
 	s := newIncidentSetup(t)
 	setPageDefaultLanguage(t, s.db, s.page.ID, "de")
-	addPageLanguage(t, s.db, s.page.ID, "fr")
-	for _, lang := range []string{"de", "fr"} {
+	addPageLanguage(t, s.db, s.page.ID, "en")
+	for _, lang := range []string{"de", "en"} {
 		seedTemplate(t, s.db, s.page.ID, "external_incident_created", handlers.NotificationAudienceSubscriber, lang, "SUJET-"+lang, "<p>CORPS-"+lang+"</p>")
 	}
-	addLangSubscriber(t, s.db, s.page.ID, "sl668-ext-fr@example.com", "fr")
+	addLangSubscriber(t, s.db, s.page.ID, "sl668-ext-fr@example.com", "en")
 
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("i1", "investigating", "Wir schauen"))
 	s.poll()
 	m := drainMails(t, srv, 1)[0]
-	assert.Contains(t, m.body, "CORPS-fr")
+	assert.Contains(t, m.body, "CORPS-en")
 	assert.NotContains(t, m.body, "CORPS-de")
 }
 

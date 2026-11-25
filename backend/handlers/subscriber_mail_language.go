@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/fraigner/statushafen/database"
 	"github.com/fraigner/statushafen/models"
 )
 
@@ -90,7 +91,8 @@ func (h *Handler) validSubscriberLanguage(pageID uint, code string) string {
 // überschreiben.
 func (h *Handler) resolveSubscriberLanguage(pageID uint, code string) (string, error) {
 	code = strings.ToLower(strings.TrimSpace(code))
-	if code == "" {
+	// Only content languages (de/en); anything else means the page default.
+	if code == "" || !database.IsContentLanguage(code) {
 		return "", nil
 	}
 	var n int64

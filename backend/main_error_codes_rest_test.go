@@ -100,7 +100,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 	require.NoError(t, db.Create(&models.Subscriber{StatusPageID: page.ID, Email: "late@example.com", Channel: "email", SubscribedComponentIDs: "all", Status: "pending", ConfirmTokenHash: hashTok("sub-exp"), ConfirmTokenExpiry: &past}).Error)
 	meTok := mkUser("dup@example.com", false, "", nil)
 
-	require.NoError(t, db.Create(&models.Language{Code: "xx", Name: "Xx"}).Error)
+	require.NoError(t, db.Create(&models.Language{Code: "en", Name: "English"}).Error)
 
 	cases := []restCodeCase{
 		// page_order.go (öffentlich, 5 Anfragen/min Limit auf POST /orders)
@@ -155,7 +155,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 		{"Externe Quellen: Mandantentrennung", "GET", "/api/pages/" + oid + "/external-sources", reader, nil, 403, "forbidden"},
 		{"Eigene Domain: ungültig", "PUT", "/api/admin/pages/" + pid + "/custom-domain", admin, map[string]any{"domain": "kein domain!"}, 400, "domain_invalid"},
 		{"Eigene Domain entfernen: keine eingetragen", "POST", "/api/admin/pages/" + pid + "/custom-domain/verify", admin, nil, 400, "custom_domain_missing"},
-		{"Sprache: doppelter Code", "POST", "/api/languages", admin, map[string]any{"code": "xx", "name": "Xx", "native_name": "Xx"}, 409, "language_exists"},
+		{"Sprache: doppelter Code", "POST", "/api/languages", admin, map[string]any{"code": "en", "name": "English", "native_name": "English"}, 409, "language_exists"},
 		{"Einstellungen: nichts angegeben", "PUT", "/api/settings", admin, map[string]any{}, 400, "settings_field_required"},
 	}
 	for _, tc := range cases {

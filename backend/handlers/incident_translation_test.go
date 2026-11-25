@@ -341,8 +341,8 @@ func TestGetIncidentTranslationsHandler_MultipleTranslations(t *testing.T) {
 	page := newTestPage(db)
 	incident := newTestIncident(db, page.ID)
 	db.Create(newTranslation(incident.ID, "de", "confirmed"))
-	db.Create(newTranslation(incident.ID, "fr", "confirmed"))
-	db.Create(newTranslation(incident.ID, "es", "draft"))
+	db.Create(newTranslation(incident.ID, "en", "confirmed"))
+	db.Create(newTranslation(incident.ID, "en-gb", "draft"))
 	iid := strconv.Itoa(int(incident.ID))
 
 	w := doTranslationRequest(r, "GET", "/api/incidents/"+iid+"/translations", nil)

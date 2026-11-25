@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fraigner/statushafen/database"
 	"github.com/fraigner/statushafen/models"
 
 	"github.com/gin-gonic/gin"
@@ -82,7 +83,7 @@ func (h *Handler) GetIncidentTranslationsHandler(c *gin.Context) {
 	}
 
 	var translations []models.IncidentTranslation
-	if err := h.DB.Where("incident_id = ? AND status = ?", incidentID, "confirmed").
+	if err := h.DB.Where("incident_id = ? AND status = ? AND language_code IN ?", incidentID, "confirmed", h.deliveredTranslationCodes()).
 		Find(&translations).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return
@@ -264,7 +265,7 @@ func (h *Handler) SaveIncidentTranslationHandler(c *gin.Context) {
 // antwortet sie mit 400 language_not_available und liefert false.
 func (h *Handler) requireAdditionalLanguage(c *gin.Context, pageID uint, code string) bool {
 	var pageLang models.StatusPageLanguage
-	if err := h.DB.Where("status_page_id = ? AND language_code = ?", pageID, code).First(&pageLang).Error; err != nil || pageLang.IsDefault {
+	if err := h.DB.Where("status_page_id = ? AND language_code = ? AND language_code IN ?", pageID, code, database.ContentLanguageCodes).First(&pageLang).Error; err != nil || pageLang.IsDefault {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Language is not an additional language of this page", "code": "language_not_available"})
 		return false
 	}

@@ -184,10 +184,17 @@ func TestLanguageCreate_CodeFormatAndName(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code)
 	requireErrorCode(t, w.Body.Bytes(), "name_required")
 
+	// Well-formed codes other than de/en are refused: content exists only in German and English.
 	for i, code := range []string{"fr", "ZH-Hant-TW", "fil", "pt-br"} {
-		w = doStatusPageRequest(r, "POST", "/api/languages", map[string]any{"code": code, "name": "Gültig " + strconv.Itoa(i)})
+		w = doStatusPageRequest(r, "POST", "/api/languages", map[string]any{"code": code, "name": "Valid " + strconv.Itoa(i)})
+		require.Equal(t, http.StatusBadRequest, w.Code, code+": "+w.Body.String())
+		requireErrorCode(t, w.Body.Bytes(), "language_not_supported")
+	}
+	for _, code := range []string{"DE", "en"} {
+		w = doStatusPageRequest(r, "POST", "/api/languages", map[string]any{"code": code, "name": "Valid " + code})
 		require.Equal(t, http.StatusCreated, w.Code, code+": "+w.Body.String())
 	}
+	assert.Zero(t, count(db, &models.Language{}, "code IN ?", []string{"fr", "zh-hant-tw", "fil", "pt-br"}))
 	assert.Zero(t, count(db, &models.Language{}, "code IN ?", invalid))
 }
 

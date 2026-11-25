@@ -83,7 +83,7 @@ func (h *Handler) GetComponentTranslationsHandler(c *gin.Context) {
 	}
 
 	var translations []models.ComponentTranslation
-	if err := h.DB.Where("component_id = ? AND status = ?", componentID, "confirmed").
+	if err := h.DB.Where("component_id = ? AND status = ? AND language_code IN ?", componentID, "confirmed", h.deliveredTranslationCodes()).
 		Find(&translations).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return

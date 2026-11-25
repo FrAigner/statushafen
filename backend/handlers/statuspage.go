@@ -558,8 +558,8 @@ type publicLanguage struct {
 // Umschalter fällt dann auf die Oberflächensprachen zurück, das Dashboard
 // bleibt nutzbar.
 func (h *Handler) publicPageLanguages(pageID uint) []publicLanguage {
-	rows := []models.StatusPageLanguage{}
-	h.DB.Preload("Language").Where(whereStatusPageIDEquals, pageID).Order("language_code asc").Find(&rows)
+	// Errors yield an empty list (see above).
+	rows, _ := h.pageContentLanguages(pageID)
 	out := make([]publicLanguage, 0, len(rows))
 	for _, r := range rows {
 		name := r.Language.Name

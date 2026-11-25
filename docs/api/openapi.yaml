@@ -3832,6 +3832,11 @@ paths:
       tags: [Admin – Settings]
       operationId: listLanguages
       summary: Sprachkatalog
+      description: >
+        Nur die Inhaltssprachen Deutsch (`de`) und Englisch (`en`); andere
+        Katalogzeilen bleiben gespeichert, werden aber nicht geliefert.
+        EN: Only the content languages German (`de`) and English (`en`); other
+        catalog rows stay stored but are not returned.
       x-required-permission: authenticated
       responses:
         "200":
@@ -3847,6 +3852,11 @@ paths:
       tags: [Admin – Settings]
       operationId: createLanguage
       summary: Sprache in den Katalog aufnehmen
+      description: >
+        Nur `de` und `en` (z. B. nach dem Löschen wieder anlegen); jeder andere
+        gültige Code ergibt 400 `language_not_supported`.
+        EN: Only `de` and `en` (e.g. to re-create one after deleting it); any other
+        valid code yields 400 `language_not_supported`.
       x-required-permission: global-admin
       requestBody:
         required: true
@@ -3871,6 +3881,11 @@ paths:
       tags: [Admin – Settings]
       operationId: updateLanguage
       summary: Sprache ändern (Name, aktiv)
+      description: >
+        Eine andere Sprache als `de`/`en` lässt sich umbenennen, aber nicht
+        einschalten (400 `language_not_supported`).
+        EN: A language other than `de`/`en` can be renamed but not switched on
+        (400 `language_not_supported`).
       x-required-permission: global-admin
       requestBody:
         required: true
@@ -3915,6 +3930,11 @@ paths:
       tags: [Admin – Settings]
       operationId: listPageLanguages
       summary: Aktivierte Sprachen einer Seite
+      description: >
+        Nur Inhaltssprachen (`de`, `en`); ältere Zuordnungen anderer Sprachen
+        bleiben gespeichert, werden aber nicht geliefert.
+        EN: Only content languages (`de`, `en`); older assignments of other
+        languages stay stored but are not returned.
       x-required-permission: page-role
       responses:
         "200":
@@ -3945,6 +3965,9 @@ paths:
                   type: array
                   items: { type: string }
                 default: { type: string, description: Muss in `codes` enthalten sein. }
+      description: >
+        Erlaubt sind nur `de` und `en` (sonst 400 `language_codes_unknown`).
+        EN: Only `de` and `en` are allowed (otherwise 400 `language_codes_unknown`).
       responses:
         "200":
           description: Neue Sprachliste.

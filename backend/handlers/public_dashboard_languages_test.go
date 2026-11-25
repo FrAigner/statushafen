@@ -28,13 +28,13 @@ func TestPublicDashboard_ListetSeitenSprachen(t *testing.T) {
 	require.NoError(t, db.Create(&page).Error)
 	other := models.StatusPage{Name: "Andere", Slug: "andere"}
 	require.NoError(t, db.Create(&other).Error)
-	for code, name := range map[string]string{"de": "Deutsch", "hr": "Hrvatski", "cs": "Čeština"} {
+	for code, name := range map[string]string{"de": "Deutsch", "en": "English", "hr": "Hrvatski"} {
 		require.NoError(t, db.Where("code = ?", code).FirstOrCreate(&models.Language{Code: code, Name: name, IsActive: true}).Error)
 	}
 	for _, l := range []models.StatusPageLanguage{
 		{StatusPageID: page.ID, LanguageCode: "hr"},
 		{StatusPageID: page.ID, LanguageCode: "de", IsDefault: true},
-		{StatusPageID: page.ID, LanguageCode: "cs"},
+		{StatusPageID: page.ID, LanguageCode: "en"},
 		{StatusPageID: other.ID, LanguageCode: "de", IsDefault: true},
 	} {
 		require.NoError(t, db.Create(&l).Error)
@@ -52,16 +52,16 @@ func TestPublicDashboard_ListetSeitenSprachen(t *testing.T) {
 		return body.Languages
 	}
 
+	// hr is a legacy assignment (no content language any more) and is not listed.
 	assert.Equal(t, []map[string]any{
-		{"code": "cs", "name": "Čeština", "is_default": false, "is_active": true},
 		{"code": "de", "name": "Deutsch", "is_default": true, "is_active": true},
-		{"code": "hr", "name": "Hrvatski", "is_default": false, "is_active": true},
+		{"code": "en", "name": "English", "is_default": false, "is_active": true},
 	}, get("sprachen"))
 
 	// Eine im Katalog deaktivierte Sprache bleibt für den Umschalter in der
 	// Liste, ist aber als is_active=false markiert (die Abo-Auswahlen blenden sie aus).
-	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "hr").Update("is_active", false).Error)
-	assert.Contains(t, get("sprachen"), map[string]any{"code": "hr", "name": "Hrvatski", "is_default": false, "is_active": false})
+	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "en").Update("is_active", false).Error)
+	assert.Contains(t, get("sprachen"), map[string]any{"code": "en", "name": "English", "is_default": false, "is_active": false})
 
 	// Nur die Sprachen der eigenen Seite.
 	assert.Len(t, get("andere"), 1)
