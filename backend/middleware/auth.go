@@ -90,6 +90,13 @@ func WithTokenVersion(v uint) TokenOption {
 	return func(c *Claims) { c.TokenVersion = v }
 }
 
+// WithSSOPageID limits the session to one page (sso_page_id, see
+// Claims.SSOPageID); 0 leaves it unlimited. The caller drops global admin
+// rights itself (GenerateToken's isGlobalAdmin).
+func WithSSOPageID(pageID uint) TokenOption {
+	return func(c *Claims) { c.SSOPageID = pageID }
+}
+
 // GenerateTokenFull ist die zentrale Token-Factory für SSO-Logins, inkl. Name und
 // SSO-Provider als Zusatz-Claims (ersetzt die frühere Inline-Signierung in auth_sso.go).
 func GenerateTokenFull(u models.User, permissions, name, sso string) (string, error) {

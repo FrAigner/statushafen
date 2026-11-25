@@ -69,7 +69,12 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 	}
 	admission.Succeeded()
 
-	token, err := middleware.GenerateToken(user.ID, user.Email, user.Role.Name, user.Role.Permissions, user.IsGlobalAdmin, middleware.WithTokenVersion(user.TokenVersion))
+	// On a verified custom domain the session is limited to its page, like an
+	// OIDC session handed to a custom domain (see login_origin.go).
+	origin := h.customDomainOrigin(c.Request.Host)
+	isGlobalAdmin := user.IsGlobalAdmin && origin.pageID == 0
+	token, err := middleware.GenerateToken(user.ID, user.Email, user.Role.Name, user.Role.Permissions, isGlobalAdmin,
+		middleware.WithTokenVersion(user.TokenVersion), middleware.WithSSOPageID(origin.pageID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate JWT token"})
 		return
@@ -91,7 +96,7 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 		"role":               user.Role.Name,
 		"permissions":        user.Role.Permissions,
 		"tag_ids":            tagIDList(h.tagsForUser(user.ID)),
-		"is_global_admin":    user.IsGlobalAdmin,
+		"is_global_admin":    isGlobalAdmin,
 		"preferred_language": user.PreferredLanguage,
 		"help_tooltips":      !user.HideHelpTooltips,
 	})

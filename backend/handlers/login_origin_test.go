@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -394,4 +395,53 @@ func TestLoginStartOnBaseHost_NeverMovesInALoop(t *testing.T) {
 	t.Setenv("BASE_URL", "http://[::1")
 	w = serveOnHost(f.h.ProviderLoginHandler, acmeHost, "/api/auth/provider/corp/login", "corp")
 	assert.NotContains(t, w.Header().Get("Location"), "return_host")
+}
+
+// loginOnHost signs in with a password through the router, as the browser on
+// host does (same-origin POST).
+func loginOnHost(t *testing.T, e passwordEnv, host, email string) (*middleware.Claims, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/login",
+		strings.NewReader(`{"email":"`+email+`","password":"`+passwordEnvSecret+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Host = host
+	w := httptest.NewRecorder()
+	e.r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	body := map[string]any{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	claims := &middleware.Claims{}
+	_, err := jwt.ParseWithClaims(body["token"].(string), claims, func(*jwt.Token) (interface{}, error) {
+		return []byte("test-jwt-secret-not-for-production"), nil
+	})
+	require.NoError(t, err)
+	return claims, body
+}
+
+// The password login on a custom domain is already same-origin; its session
+// is limited to the page of that domain like an OIDC session handed there.
+func TestPasswordLoginOnCustomDomain_GetsAPageSession(t *testing.T) {
+	t.Setenv("PASSWORD_LOGIN_ENABLED", "true")
+	e := newPasswordEnv(t)
+	pages := customDomainPages(t, e.db)
+
+	claims, body := loginOnHost(t, e, acmeHost, e.admin.Email)
+	assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID)
+	assert.False(t, claims.IsGlobalAdmin)
+	assert.Equal(t, false, body["is_global_admin"], "the frontend must not show global admin features")
+
+	claims, _ = loginOnHost(t, e, acmeHost, e.user.Email)
+	assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID)
+}
+
+func TestPasswordLoginOnOtherHosts_KeepsTheFullSession(t *testing.T) {
+	t.Setenv("PASSWORD_LOGIN_ENABLED", "true")
+	e := newPasswordEnv(t)
+	customDomainPages(t, e.db)
+	for _, host := range []string{"status.example.org", "status.pending.example", acmeHost + ":8443", "evil.example"} {
+		claims, body := loginOnHost(t, e, host, e.admin.Email)
+		assert.Zero(t, claims.SSOPageID, host)
+		assert.True(t, claims.IsGlobalAdmin, host)
+		assert.Equal(t, true, body["is_global_admin"], host)
+	}
 }
