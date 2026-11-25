@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Tabelle des IP-Limiters hat eine harte Obergrenze. Ein Angreifer mit
-// vielen Quelladressen füllt sie, kann den Speicher aber nicht darüber hinaus
-// wachsen lassen.
+// The IP limiter's table has a hard upper bound. An attacker with
+// many source addresses fills it, but cannot make the memory grow
+// beyond that.
 func TestRateLimiter_TableNeverExceedsMaxEntries(t *testing.T) {
 	const maxEntries = 100
 	rl := newRateLimiter(5, time.Hour, maxEntries)
@@ -27,9 +27,9 @@ func TestRateLimiter_TableNeverExceedsMaxEntries(t *testing.T) {
 	assert.Equal(t, maxEntries, rl.size())
 }
 
-// Ist die Tabelle voll, zählt ein neuer Schlüssel trotzdem (er verdrängt den am
-// längsten unberührten Eintrag) und wird nach seinem Kontingent gebremst. Voll
-// darf nie heißen „alles durchlassen“.
+// When the table is full, a new key still counts (it evicts the entry untouched
+// for the longest time) and is throttled according to its quota. Full
+// must never mean "let everything through".
 func TestRateLimiter_NewKeyIsStillLimitedWhenTableIsFull(t *testing.T) {
 	const maxEntries = 10
 	rl := newRateLimiter(3, time.Hour, maxEntries)
@@ -47,9 +47,9 @@ func TestRateLimiter_NewKeyIsStillLimitedWhenTableIsFull(t *testing.T) {
 	assert.LessOrEqual(t, rl.size(), maxEntries)
 }
 
-// Verdrängt wird der am längsten unberührte Eintrag; ein aktiver Schlüssel
-// behält seinen Zähler und lässt sich nicht durch Fremdverkehr zurücksetzen,
-// solange er zu den zuletzt benutzten gehört.
+// The entry untouched for the longest time is evicted; an active key
+// keeps its counter and cannot be reset by foreign traffic,
+// as long as it is among the most recently used.
 func TestRateLimiter_EvictsLeastRecentlyUsedAndKeepsActiveKeyCounted(t *testing.T) {
 	const maxEntries = 10
 	rl := newRateLimiter(2, time.Hour, maxEntries)
@@ -58,7 +58,7 @@ func TestRateLimiter_EvictsLeastRecentlyUsedAndKeepsActiveKeyCounted(t *testing.
 	require.True(t, rl.allow("aktiv"))
 	require.False(t, rl.allow("aktiv"), "Kontingent aufgebraucht")
 
-	// Fremde Schlüssel füllen die Tabelle fast; „aktiv“ wird zwischendurch benutzt.
+	// Foreign keys almost fill the table; "aktiv" is used in between.
 	for i := 0; i < maxEntries-2; i++ {
 		rl.allow(fmt.Sprintf("fremd-%d", i))
 	}
@@ -69,7 +69,7 @@ func TestRateLimiter_EvictsLeastRecentlyUsedAndKeepsActiveKeyCounted(t *testing.
 	assert.LessOrEqual(t, rl.size(), maxEntries)
 }
 
-// Abgelaufene Einträge (Bucket längst wieder voll) machen zuerst Platz.
+// Expired entries (bucket long since full again) make room first.
 func TestRateLimiter_ExpiredEntriesAreDroppedFirst(t *testing.T) {
 	now := time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 	rl := newRateLimiter(2, time.Minute, 4)
@@ -78,17 +78,17 @@ func TestRateLimiter_ExpiredEntriesAreDroppedFirst(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		rl.allow(fmt.Sprintf("alt-%d", i))
 	}
-	now = now.Add(2 * time.Minute) // alle Buckets wären wieder voll
+	now = now.Add(2 * time.Minute) // all buckets would be full again
 	rl.allow("frisch")
 	assert.Equal(t, 1, rl.size(), "abgelaufene Einträge sind entfernt")
 }
 
-// Die Standardgrenze der öffentlichen Konstruktoren ist 100.000 Einträge.
+// The default bound of the public constructors is 100,000 entries.
 func TestRateLimiter_DefaultCapIs100k(t *testing.T) {
 	assert.Equal(t, 100_000, rateLimiterMaxEntries)
 }
 
-// Gegenprobe: normale Nutzung unter der Grenze verhält sich wie zuvor.
+// Control check: normal usage below the bound behaves as before.
 func TestRateLimiter_NormalUseUnchanged(t *testing.T) {
 	rl := newRateLimiter(3, time.Hour, 100)
 	assert.True(t, rl.allow("a"))
@@ -99,8 +99,8 @@ func TestRateLimiter_NormalUseUnchanged(t *testing.T) {
 	assert.Equal(t, 2, rl.size())
 }
 
-// Die Aufräum-Schleife entfernt abgelaufene Einträge von allein, auch wenn die
-// Tabelle nie voll wird.
+// The cleanup loop removes expired entries on its own, even if the
+// table never becomes full.
 func TestRateLimiter_CleanupLoopDropsExpiredEntries(t *testing.T) {
 	rl := newRateLimiter(2, 20*time.Millisecond, 100)
 	rl.allow("selten")
@@ -110,9 +110,9 @@ func TestRateLimiter_CleanupLoopDropsExpiredEntries(t *testing.T) {
 	assert.Eventually(t, func() bool { return rl.size() == 0 }, 2*time.Second, 5*time.Millisecond)
 }
 
-// Ein Eintrag gilt erst nach einem vollen Zeitfenster als abgelaufen. Wird er
-// früher entfernt, startet ein erschöpfter Schlüssel mit vollem Kontingent und
-// umgeht das Limit, sobald ein anderer Schlüssel einen Eintrag anlegt.
+// An entry counts as expired only after a full time window. If it is
+// removed earlier, an exhausted key starts with a full quota and
+// bypasses the limit as soon as another key creates an entry.
 func TestRateLimiter_EntryIsKeptUntilAFullWindowHasPassed(t *testing.T) {
 	now := time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 	rl := newRateLimiter(2, time.Minute, 100)
@@ -122,16 +122,16 @@ func TestRateLimiter_EntryIsKeptUntilAFullWindowHasPassed(t *testing.T) {
 	require.True(t, rl.allow("a"))
 	require.False(t, rl.allow("a"), "Kontingent aufgebraucht")
 
-	now = now.Add(40 * time.Second) // zwei Drittel des Fensters: erst 1,33 von 2 Plätzen aufgefüllt
-	rl.allow("b")                   // legt einen Eintrag an und räumt dabei abgelaufene weg
+	now = now.Add(40 * time.Second) // two thirds of the window: only 1.33 of 2 slots refilled so far
+	rl.allow("b")                   // creates an entry and removes expired ones in the process
 	assert.Equal(t, 2, rl.size(), "a ist noch nicht abgelaufen")
 	assert.True(t, rl.allow("a"), "ein Platz ist wieder frei")
 	assert.False(t, rl.allow("a"), "mehr nicht: kein Zurücksetzen auf das volle Kontingent")
 }
 
-// Die öffentliche Middleware nutzt die Obergrenze: Nach 100.000 weiteren
-// Adressen ist der älteste Eintrag verdrängt, die Tabelle wächst also nicht
-// weiter. (Verdrängt heißt: höchstens volles Kontingent, nie ausgesperrt.)
+// The public middleware uses the upper bound: after 100,000 further
+// addresses the oldest entry is evicted, so the table does not grow
+// any further. (Evicted means: at most a full quota, never locked out.)
 func TestNewRateLimiter_MiddlewareTableIsBounded(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

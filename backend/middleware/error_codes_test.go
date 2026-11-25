@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Fehlerantworten der Middleware tragen einen Fehlercode, den das
-// Frontend unter api.errors.<code> übersetzt.
+// Error responses of the middleware carry an error code that the
+// frontend translates under api.errors.<code>.
 
 type midCase struct {
 	name   string

@@ -14,7 +14,7 @@ import (
 const webhookURL = "https://chat.googleapis.com/v1/spaces/AAA/messages?key=GEHEIMKEY&token=GEHEIMTOKEN"
 
 func TestSanitizeErr_URLErrorOhneURL(t *testing.T) {
-	_, err := http.Get("http://127.0.0.1:1/bot123:GEHEIMTOKEN/getUpdates?key=GEHEIMKEY") //nolint:noctx,bodyclose // nur der Fehlertext zählt
+	_, err := http.Get("http://127.0.0.1:1/bot123:GEHEIMTOKEN/getUpdates?key=GEHEIMKEY") //nolint:noctx,bodyclose // only the error text matters
 	assert.Error(t, err)
 	got := SanitizeErr(err)
 	assert.NotContains(t, got, "GEHEIMTOKEN")
@@ -49,12 +49,12 @@ func TestSanitizeText_UnparsbareURL(t *testing.T) {
 	assert.Equal(t, "x [REDACTED] y", SanitizeText("x http:///pfad?token=geheim y"))
 }
 
-// SMTP-Server wiederholen die Empfängeradresse oft im Fehlertext; sie darf
-// weder in Freitext noch in Fehlerattributen im Klartext im Log stehen.
+// SMTP servers often repeat the recipient address in the error text; it must
+// not appear in plain text in the log, neither in free text nor in error attributes.
 func TestSanitizeText_MasksEmailAddresses(t *testing.T) {
 	assert.Equal(t, "550 5.1.1 <v***@example.org>: Recipient rejected", SanitizeText("550 5.1.1 <victim@example.org>: Recipient rejected"))
 	assert.Equal(t, "a***@example.com und b***@example.net", SanitizeText("anna@example.com und bob+tag@example.net"))
-	// Gegenprobe: Text ohne Adresse und ein einzelnes @ bleiben unverändert.
+	// Control check: text without an address and a lone @ remain unchanged.
 	assert.Equal(t, "kein Treffer @ hier", SanitizeText("kein Treffer @ hier"))
 }
 

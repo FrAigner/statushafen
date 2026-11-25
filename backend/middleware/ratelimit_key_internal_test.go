@@ -13,7 +13,7 @@ func TestLimiterKey(t *testing.T) {
 		"2001:db8:1234:5678::1":       "2001:db8:1234:5678::/64",
 		"2001:db8:1234:5678:aa:bb::9": "2001:db8:1234:5678::/64",
 		"fe80::1%eth0":                "fe80::/64",
-		"":                            "", // unlesbare Adresse bleibt, wie sie ist
+		"":                            "", // unreadable address stays as it is
 		"kein-ip":                     "kein-ip",
 	}
 	for in, want := range cases {

@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ein Eintrag ist genau nach einem vollen Zeitfenster abgelaufen (der Bucket
-// wäre dann wieder voll), nicht erst danach und nicht früher.
+// An entry has expired exactly after a full time window (the bucket
+// would then be full again), not later and not earlier.
 func TestRateLimiter_EntryExpiresExactlyAfterOneWindow(t *testing.T) {
 	now := time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 	rl := newRateLimiter(2, time.Minute, 100)

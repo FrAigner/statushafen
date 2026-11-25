@@ -14,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// requireHeaderEquals bricht den (Sub-)Test ab, wenn der angegebene
-// Response-Header nicht exakt dem erwarteten Wert entspricht.
+// requireHeaderEquals aborts the (sub)test if the given
+// response header does not exactly equal the expected value.
 func requireHeaderEquals(t *testing.T, w *httptest.ResponseRecorder, name, want string) {
 	t.Helper()
 	if got := w.Header().Get(name); got != want {
@@ -23,8 +23,8 @@ func requireHeaderEquals(t *testing.T, w *httptest.ResponseRecorder, name, want 
 	}
 }
 
-// requireHeaderContains bricht den (Sub-)Test ab, wenn der angegebene
-// Response-Header den erwarteten Substring nicht enthält.
+// requireHeaderContains aborts the (sub)test if the given
+// response header does not contain the expected substring.
 func requireHeaderContains(t *testing.T, w *httptest.ResponseRecorder, name, wantSubstr string) {
 	t.Helper()
 	if got := w.Header().Get(name); !strings.Contains(got, wantSubstr) {
@@ -32,8 +32,8 @@ func requireHeaderContains(t *testing.T, w *httptest.ResponseRecorder, name, wan
 	}
 }
 
-// requireHSTSHeader prüft den HSTS-Sonderfall: der Header darf nur bei
-// tatsächlich terminiertem TLS gesetzt werden.
+// requireHSTSHeader checks the HSTS special case: the header may only be set when
+// TLS is actually terminated.
 func requireHSTSHeader(t *testing.T, w *httptest.ResponseRecorder, expectHSTS bool) {
 	t.Helper()
 	hsts := w.Header().Get("Strict-Transport-Security")
@@ -48,9 +48,9 @@ func requireHSTSHeader(t *testing.T, w *httptest.ResponseRecorder, expectHSTS bo
 	}
 }
 
-// TestSecurityHeaders prüft die Standard-Sicherheitsheader aus SecurityHeaders()
-// (Review-Befund S11), inklusive des HSTS-Sonderfalls: der Header darf nur bei
-// tatsächlich terminiertem TLS gesetzt werden.
+// TestSecurityHeaders checks the standard security headers from SecurityHeaders()
+// (review finding S11), including the HSTS special case: the header may only be set when
+// TLS is actually terminated.
 func TestSecurityHeaders(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -96,9 +96,9 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 }
 
-// TestRateLimiter prüft den In-Memory Token-Bucket-Limiter pro Client-IP
-// (Review-Befund S7): Burst-Kontingent, 429 mit Retry-After bei Überschreitung,
-// unabhängige Kontingente pro IP, und Token-Refill nach Ablauf des Zeitfensters.
+// TestRateLimiter checks the in-memory token-bucket limiter per client IP
+// (review finding S7): burst quota, 429 with Retry-After when exceeded,
+// independent quotas per IP, and token refill after the time window elapses.
 func TestRateLimiter(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -119,7 +119,7 @@ func TestRateLimiter(t *testing.T) {
 		return w
 	}
 
-	// Requests 1-2 von IP 1.2.3.4 verbrauchen das Burst-Kontingent.
+	// Requests 1-2 from IP 1.2.3.4 consume the burst quota.
 	for i := 1; i <= burst; i++ {
 		w := doRequest("1.2.3.4:1")
 		if w.Code != http.StatusOK {
@@ -127,7 +127,7 @@ func TestRateLimiter(t *testing.T) {
 		}
 	}
 
-	// Request 3 sofort danach ist über dem Kontingent -> 429 + Retry-After.
+	// Request 3 immediately afterwards is over the quota -> 429 + Retry-After.
 	w := doRequest("1.2.3.4:1")
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("Erwartet 429 nach Ausschöpfen des Kontingents, got %d", w.Code)
@@ -136,13 +136,13 @@ func TestRateLimiter(t *testing.T) {
 		t.Errorf("Retry-After = %q, expected %q", got, "60")
 	}
 
-	// Eine andere IP hat ihr eigenes, unabhängiges Kontingent.
+	// A different IP has its own, independent quota.
 	wOther := doRequest("5.6.7.8:1")
 	if wOther.Code != http.StatusOK {
 		t.Fatalf("Andere IP sollte eigenes Kontingent haben, erwartet 200, got %d", wOther.Code)
 	}
 
-	// Nach Ablauf des Refill-Fensters ist wieder mindestens 1 Token verfügbar.
+	// After the refill window elapses, at least 1 token is available again.
 	time.Sleep(window + 50*time.Millisecond)
 	wRefilled := doRequest("1.2.3.4:1")
 	if wRefilled.Code != http.StatusOK {
@@ -150,10 +150,10 @@ func TestRateLimiter(t *testing.T) {
 	}
 }
 
-// TestSecurityHeaders_CSPOhneFremdeSchriften prüft DSGVO: Schriften
-// werden selbst gehostet, die CSP darf daher keine Google-Fonts-Hosts mehr
-// freigeben und style-src/font-src bleiben auf 'self' beschränkt
-// ('unsafe-inline' bei style-src bleibt, weil Vue Inline-Styles setzt).
+// TestSecurityHeaders_CSPOhneFremdeSchriften checks GDPR: fonts
+// are self-hosted, so the CSP must no longer allow any Google Fonts hosts
+// and style-src/font-src remain restricted to 'self'
+// ('unsafe-inline' stays for style-src because Vue sets inline styles).
 func TestSecurityHeaders_CSPOhneFremdeSchriften(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -177,12 +177,12 @@ func TestSecurityHeaders_CSPOhneFremdeSchriften(t *testing.T) {
 	}
 }
 
-// TestSecurityHeaders_CSPNonceJeAnfrage: Cloudflares
-// JavaScript Detections (auf dem Free-Plan nicht abschaltbar) spritzen ein
-// Inline-Skript ein, das script-src 'self' blockiert. Cloudflare übernimmt
-// laut Doku einen Nonce aus dem CSP-Header für seine Skripte. Der Nonce muss
-// je Anfrage neu und zufällig sein (sonst könnte eingeschleustes Inline-
-// Skript ihn mitbenutzen), 'self' bleibt, 'unsafe-inline' kommt nicht dazu.
+// TestSecurityHeaders_CSPNonceJeAnfrage: Cloudflare's
+// JavaScript Detections (cannot be disabled on the Free plan) inject an
+// inline script that script-src 'self' blocks. According to its docs, Cloudflare takes
+// a nonce from the CSP header for its scripts. The nonce must be
+// new and random per request (otherwise injected inline
+// script could reuse it), 'self' stays, 'unsafe-inline' is not added.
 func TestSecurityHeaders_CSPNonceJeAnfrage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -210,12 +210,12 @@ func TestSecurityHeaders_CSPNonceJeAnfrage(t *testing.T) {
 	}
 }
 
-// base-uri und form-action fallen nicht auf default-src zurück. Ohne sie könnte
-// eingeschleustes HTML mit <base href> alle relativen Skript- und Link-Pfade auf
-// einen fremden Host umbiegen oder ein Formular (etwa ein nachgebautes
-// Login) an einen fremden Host schicken. img-src erlaubt weiter https:, weil
-// Seiten-Logos von beliebigen https-Adressen kommen dürfen (validLogoURL);
-// connect-src bleibt auf 'self' und begrenzt damit den Abfluss per Skript.
+// base-uri and form-action do not fall back to default-src. Without them
+// injected HTML with <base href> could redirect all relative script and link paths to
+// a foreign host or send a form (e.g. a recreated
+// login) to a foreign host. img-src still allows https: because
+// page logos may come from arbitrary https addresses (validLogoURL);
+// connect-src stays at 'self' and thereby limits exfiltration via script.
 func TestSecurityHeaders_CSPBaseUriFormActionUndBildquellen(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -232,7 +232,7 @@ func TestSecurityHeaders_CSPBaseUriFormActionUndBildquellen(t *testing.T) {
 			t.Errorf("CSP %q muss %q enthalten", csp, want)
 		}
 	}
-	// Gegenprobe: keine Aufweichung von base-uri und form-action.
+	// Control check: no loosening of base-uri and form-action.
 	for _, bad := range []string{"base-uri *", "form-action *", "form-action https:"} {
 		if strings.Contains(csp, bad) {
 			t.Errorf("CSP %q darf %q nicht enthalten", csp, bad)

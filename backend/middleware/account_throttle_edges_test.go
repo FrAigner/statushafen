@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Sperre eines Paars endet genau zum Zeitpunkt blockedUntil: In dieser
-// Sekunde ist der Versuch wieder zugelassen, eine Nanosekunde davor nicht.
+// A pair's block ends exactly at blockedUntil: in that
+// second the attempt is admitted again, one nanosecond earlier it is not.
 func TestAccountThrottle_BlockEndsExactlyAtItsDeadline(t *testing.T) {
 	clock := newClock()
-	th := newTestThrottle(clock) // Schwelle 3, Sperre 30 s
+	th := newTestThrottle(clock) // threshold 3, block 30 s
 	const acct = "ende@example.com"
 
 	last := failAttempts(th, acct, srcAttacker, 3)
@@ -30,17 +30,17 @@ func TestAccountThrottle_BlockEndsExactlyAtItsDeadline(t *testing.T) {
 	assert.False(t, th.Admit(acct, srcAttacker).Blocked, "zum Zeitpunkt blockedUntil ist der Versuch zugelassen")
 }
 
-// Das Fenster des Zählers je Konto beginnt neu erst nach Ablauf eines vollen
-// Fensters; genau am Rand zählt der Versuch noch zum alten Fenster.
+// The per-account counter window restarts only after a full
+// window has elapsed; exactly at the edge the attempt still counts toward the old window.
 func TestAccountThrottle_AccountWindowRestartsOnlyAfterFullWindow(t *testing.T) {
 	clock := newClock()
-	th := newTestThrottle(clock) // Fenster 15 min
+	th := newTestThrottle(clock) // window 15 min
 	th.WithAccountDelay(2, 100*time.Millisecond, 10*time.Second)
 	const acct = "konto-fenster@example.com"
 
 	th.Admit(acct, "198.51.100.1")
 	th.Admit(acct, "198.51.100.2")
-	clock.advance(15 * time.Minute) // genau am Rand
+	clock.advance(15 * time.Minute) // exactly at the edge
 	assert.Equal(t, 100*time.Millisecond, th.Admit(acct, "198.51.100.3").Delay, "dritter Versuch im selben Fenster: eine Stufe über der Schwelle")
 
 	clock.advance(15*time.Minute + time.Nanosecond)

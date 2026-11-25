@@ -6,10 +6,10 @@ import (
 	"github.com/fraigner/statushafen/permissions"
 )
 
-// RequireAllPermissions verlangt ALLE genannten Rechte, z. B. der
-// Import externer Bausteine, der Quellen verwaltet und zugleich Komponenten
-// anlegt. Wer nur eines davon hat, bekäme sonst über die Route ein Recht, das
-// ihm die andere Ressource nicht gibt.
+// RequireAllPermissions requires ALL named permissions, e.g. the
+// import of external building blocks, which manages sources and at the same time creates components.
+// Someone who has only one of them would otherwise get, via the route, a permission that
+// the other resource does not give them.
 func RequireAllPermissions(required ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		for _, perm := range required {
@@ -23,15 +23,15 @@ func RequireAllPermissions(required ...string) gin.HandlerFunc {
 	}
 }
 
-// RequireResolvedPermission verlangt "<ressource>:<action>", wobei die
-// Ressource erst zur Anfragezeit feststeht: Wartungen teilen sich
-// die Routen mit Vorfällen, resolve entscheidet nach der Art des Datensatzes
-// zwischen "incidents" und "maintenance". Läuft nach den *PageScope-
-// Middlewares, die :page_id setzen.
+// RequireResolvedPermission requires "<resource>:<action>", where the
+// resource is only known at request time: maintenances share
+// the routes with incidents, resolve decides by the kind of record
+// between "incidents" and "maintenance". Runs after the *PageScope
+// middlewares that set :page_id.
 func RequireResolvedPermission(action string, resolve func(c *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		resource := resolve(c)
-		if c.IsAborted() { // resolve hat selbst geantwortet (z. B. 413)
+		if c.IsAborted() { // resolve has answered itself (e.g. 413)
 			return
 		}
 		if status, msg, ok := requirePermissionCheck(c, permissions.Perm(resource, action)); !ok {

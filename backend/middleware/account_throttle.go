@@ -9,34 +9,34 @@ import (
 	"time"
 )
 
-// AccountThrottle bremst Passwort-Raten gegen ein Konto auf zwei Ebenen.
+// AccountThrottle slows down password guessing against an account on two levels.
 //
-// Je Paar aus Konto und Quelle (IPv4-Adresse bzw. IPv6-/64, dieselbe
-// Normalisierung wie beim IP-Limit) gilt eine harte Sperre: Ab threshold
-// Fehlversuchen ist genau dieses Paar für baseDelay gesperrt, jeder weitere
-// Fehlversuch verdoppelt die Sperre bis maxDelay. Wer nur die E-Mail-Adresse
-// eines Nutzers kennt, kann also nur seine eigene Quelle sperren, nie den Login
-// des Nutzers von einer anderen. Gesperrte Anfragen zählen nicht (die Sperre
-// lässt sich nicht endlos verlängern); Fehlversuche verfallen nach window ohne
-// neuen Versuch, ein erfolgreicher Login setzt das Paar zurück.
+// For each pair of account and source (IPv4 address or IPv6 /64, the same
+// normalization as for the IP limit) a hard block applies: from threshold
+// failed attempts on, exactly this pair is blocked for baseDelay, and every further
+// failed attempt doubles the block up to maxDelay. Someone who knows only a user's
+// email address can therefore only block their own source, never the user's login
+// from another one. Blocked requests do not count (the block
+// cannot be extended endlessly); failed attempts expire after window without a
+// new attempt, a successful login resets the pair.
 //
-// Zusätzlich zählt ein Zähler je Konto über alle Quellen. Er sperrt nie, er
-// verzögert nur: Ab accountDelayThreshold Versuchen im Fenster wartet jeder
-// weitere Versuch länger (accountDelayStep je Überschreitung, höchstens
-// accountDelayMax). So bleibt verteiltes Raten über viele Adressen langsam, ohne
-// dass es sich als Aussperr-Waffe nutzen ließe.
+// In addition, a per-account counter across all sources counts. It never blocks, it
+// only delays: from accountDelayThreshold attempts in the window on, every
+// further attempt waits longer (accountDelayStep per excess attempt, at most
+// accountDelayMax). Distributed guessing across many addresses thus stays slow, without
+// it being usable as a lockout weapon.
 //
-// Kontoschlüssel sind SHA-256 der normalisierten E-Mail und werden für bekannte
-// und unbekannte Adressen gleich geführt, damit nichts über die Existenz eines
-// Kontos verrät. Prüfen und Zählen geschehen in Admit in einem Schritt: Jeder
-// zugelassene Versuch zählt sofort als Fehlversuch und wird bei Erfolg über
-// Admission.Succeeded zurückgenommen, so lassen parallele Versuche höchstens die
-// Schwelle durch.
+// Account keys are the SHA-256 of the normalized email and are handled identically for known
+// and unknown addresses, so that nothing reveals the existence of an
+// account. Checking and counting happen in Admit in one step: every
+// admitted attempt immediately counts as a failed attempt and is taken back on success via
+// Admission.Succeeded, so concurrent attempts let at most the
+// threshold through.
 //
-// Der Speicher ist in-memory und je Prozess (wie RateLimiter). Beide Tabellen
-// sind auf maxEntries Einträge begrenzt; ist eine voll, wird der am längsten
-// unberührte Eintrag verdrängt (abgelaufene zuerst), statt neue Schlüssel nicht
-// mehr zu zählen. Verdrängen sperrt niemanden.
+// The storage is in-memory and per process (like RateLimiter). Both tables
+// are limited to maxEntries entries; when one is full, the entry untouched for the
+// longest time is evicted (expired ones first), instead of no longer counting new keys.
+// Eviction blocks nobody.
 type AccountThrottle struct {
 	mu        sync.Mutex
 	pairs     *lruTable[pairEntry]
@@ -63,10 +63,10 @@ type accountEntry struct {
 	windowStart time.Time
 }
 
-// Standardwerte für den Login: 10 Fehlversuche je Paar, dann 30 s Sperre,
-// verdoppelt bis höchstens 15 min; Fehlversuche verfallen nach 15 min Ruhe. Der
-// Zähler je Konto verzögert ab 100 Versuchen in 15 min um 50 ms je weiteren
-// Versuch, höchstens 3 s.
+// Defaults for login: 10 failed attempts per pair, then a 30 s block,
+// doubled up to at most 15 min; failed attempts expire after 15 min of quiet. The
+// per-account counter delays from 100 attempts in 15 min on by 50 ms per further
+// attempt, at most 3 s.
 const (
 	loginThrottleThreshold     = 10
 	loginThrottleBaseDelay     = 30 * time.Second
@@ -78,13 +78,13 @@ const (
 	throttleDefaultMaxItems    = 100_000
 )
 
-// NewLoginThrottle liefert den AccountThrottle mit den Login-Standardwerten.
+// NewLoginThrottle returns the AccountThrottle with the login defaults.
 func NewLoginThrottle() *AccountThrottle {
 	return NewAccountThrottle(loginThrottleThreshold, loginThrottleBaseDelay, loginThrottleMaxDelay, loginThrottleWindow)
 }
 
-// NewAccountThrottle: siehe AccountThrottle für die Bedeutung der Parameter. Der
-// Zähler je Konto startet mit den Login-Standardwerten (WithAccountDelay ändert sie).
+// NewAccountThrottle: see AccountThrottle for the meaning of the parameters. The
+// per-account counter starts with the login defaults (WithAccountDelay changes them).
 func NewAccountThrottle(threshold int, baseDelay, maxDelay, window time.Duration) *AccountThrottle {
 	return &AccountThrottle{
 		pairs:                 newLRUTable[pairEntry](throttleDefaultMaxItems),
@@ -100,21 +100,21 @@ func NewAccountThrottle(threshold int, baseDelay, maxDelay, window time.Duration
 	}
 }
 
-// WithAccountDelay stellt den Zähler je Konto ein (Schwelle, Schritt je
-// Überschreitung, Obergrenze) und gibt den Throttle zurück.
+// WithAccountDelay configures the per-account counter (threshold, step per
+// excess attempt, upper bound) and returns the throttle.
 func (t *AccountThrottle) WithAccountDelay(threshold int, step, maxDelay time.Duration) *AccountThrottle {
 	t.accountDelayThreshold, t.accountDelayStep, t.accountDelayMax = threshold, step, maxDelay
 	return t
 }
 
-// Admission ist das Ergebnis von Admit.
+// Admission is the result of Admit.
 type Admission struct {
-	// Blocked: Das Paar aus Konto und Quelle ist gesperrt; RetryAfter sagt, wie
-	// lange noch. Der Versuch wurde nicht gezählt.
+	// Blocked: the pair of account and source is blocked; RetryAfter says how
+	// long remains. The attempt was not counted.
 	Blocked    bool
 	RetryAfter time.Duration
-	// Delay ist die Wartezeit vor der Passwortprüfung, wenn das Konto aus vielen
-	// Quellen angegriffen wird (nie eine Sperre).
+	// Delay is the wait before the password check when the account is attacked from many
+	// sources (never a block).
 	Delay time.Duration
 
 	t         *AccountThrottle
@@ -127,9 +127,9 @@ func throttleKey(account string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Admit prüft und zählt in einem Schritt (unter einem Schloss): Ist das Paar
-// gesperrt, kommt Blocked zurück und nichts wird gezählt. Sonst gilt der Versuch
-// als Fehlversuch, bis Succeeded ihn zurücknimmt. Ein nil-Throttle lässt alles zu.
+// Admit checks and counts in one step (under one lock): if the pair is
+// blocked, Blocked is returned and nothing is counted. Otherwise the attempt counts
+// as a failed attempt until Succeeded takes it back. A nil throttle allows everything.
 func (t *AccountThrottle) Admit(account, source string) Admission {
 	if t == nil {
 		return Admission{}
@@ -142,7 +142,7 @@ func (t *AccountThrottle) Admit(account, source string) Admission {
 
 	pair, ok := t.pairs.get(pairKey)
 	if ok && now.Sub(pair.lastFailure) > t.window && !pair.blockedUntil.After(now) {
-		pair.failures = 0 // verfallen
+		pair.failures = 0 // expired
 	}
 	if ok {
 		if wait := pair.blockedUntil.Sub(now); wait > 0 {
@@ -164,7 +164,7 @@ func (t *AccountThrottle) Admit(account, source string) Admission {
 	return Admission{t: t, pairKey: pairKey, accountID: acct, Delay: t.countAccountLocked(acct, now)}
 }
 
-// countAccountLocked zählt den Versuch am Konto und liefert die Verzögerung.
+// countAccountLocked counts the attempt against the account and returns the delay.
 func (t *AccountThrottle) countAccountLocked(acct string, now time.Time) time.Duration {
 	e, ok := t.accounts.get(acct)
 	switch {
@@ -181,8 +181,8 @@ func (t *AccountThrottle) countAccountLocked(acct string, now time.Time) time.Du
 	return min(time.Duration(over)*t.accountDelayStep, t.accountDelayMax)
 }
 
-// Succeeded nimmt den Versuch nach einem erfolgreichen Login zurück: Das Paar
-// wird zurückgesetzt, am Konto zählt der Versuch nicht mit.
+// Succeeded takes the attempt back after a successful login: the pair
+// is reset, the attempt does not count toward the account.
 func (a Admission) Succeeded() {
 	if a.t == nil || a.Blocked {
 		return
@@ -203,10 +203,10 @@ func (t *AccountThrottle) accountExpired(e *accountEntry, now time.Time) bool {
 	return now.Sub(e.windowStart) > t.window
 }
 
-// lruTable ist eine größenbegrenzte Tabelle: vorne steht der am längsten
-// unberührte Eintrag. Einfügen verwirft zuerst abgelaufene Einträge von vorn und
-// dann bei Bedarf den ältesten; beides in O(1) je Eintrag, es gibt keinen Scan
-// über die ganze Tabelle.
+// lruTable is a size-bounded table: the entry untouched for the longest
+// time is at the front. Inserting first discards expired entries from the front and
+// then, if needed, the oldest; both in O(1) per entry, there is no scan
+// over the whole table.
 type lruTable[V any] struct {
 	items map[string]*list.Element
 	order *list.List
@@ -224,7 +224,7 @@ func newLRUTable[V any](maxEntries int) *lruTable[V] {
 
 func (l *lruTable[V]) len() int { return len(l.items) }
 
-// get liefert den Eintrag und markiert ihn als zuletzt benutzt.
+// get returns the entry and marks it as most recently used.
 func (l *lruTable[V]) get(key string) (*V, bool) {
 	el, ok := l.items[key]
 	if !ok {
@@ -241,7 +241,7 @@ func (l *lruTable[V]) remove(key string) {
 	}
 }
 
-// add fügt einen neuen Eintrag ein und hält die Grenze ein.
+// add inserts a new entry and enforces the bound.
 func (l *lruTable[V]) add(key string, val *V, now time.Time, expired func(*V, time.Time) bool) *V {
 	for front := l.order.Front(); front != nil && expired(front.Value.(*lruItem[V]).val, now); front = l.order.Front() {
 		l.remove(front.Value.(*lruItem[V]).key)

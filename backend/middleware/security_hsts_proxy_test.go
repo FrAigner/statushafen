@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Hinter einem TLS-terminierenden Proxy sieht das Backend nur HTTP. HSTS muss
-// trotzdem kommen, aber nur, wenn ein vertrauter Proxy "https" meldet: Ohne
-// Vertrauen kann jeder Client den Header setzen (oder weglassen).
+// Behind a TLS-terminating proxy the backend sees only HTTP. HSTS must
+// still be sent, but only if a trusted proxy reports "https": without
+// trust any client can set the header (or omit it).
 func TestSecurityHeaders_HSTSHinterVertrautemProxy(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -54,8 +54,8 @@ func TestSecurityHeaders_HSTSHinterVertrautemProxy(t *testing.T) {
 	}
 }
 
-// Die Prüfung darf die Anfrage nicht verändern: Handler sehen weiter die
-// echten Header und die echte Client-Adresse.
+// The check must not alter the request: handlers still see the
+// real headers and the real client address.
 func TestSecurityHeaders_HSTSPruefungLaesstAnfrageUnveraendert(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

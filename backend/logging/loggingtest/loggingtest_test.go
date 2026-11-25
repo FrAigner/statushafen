@@ -25,7 +25,7 @@ func TestExpectFatal_RestoresDefaultLogger(t *testing.T) {
 	assert.Same(t, before, slog.Default())
 }
 
-// fakeT fängt Errorf ab, damit der Fehlpfad (fn endet ohne Fatal) prüfbar ist.
+// fakeT intercepts Errorf so that the error path (fn ends without Fatal) is checkable.
 type fakeT struct {
 	testing.TB
 	failed bool
@@ -41,8 +41,8 @@ func TestExpectFatal_FailsWithoutFatal(t *testing.T) {
 	assert.Equal(t, "", got.Message)
 }
 
-// Ein abgeleiteter Logger (With/WithGroup) muss weiter in den Capture
-// schreiben, sonst gingen Fatal-Aufrufe über slog.Default().With(...) verloren.
+// A derived logger (With/WithGroup) must keep writing into the capture,
+// otherwise Fatal calls via slog.Default().With(...) would be lost.
 func TestExpectFatal_DerivedLoggerStillCaptured(t *testing.T) {
 	got := ExpectFatal(t, func() {
 		slog.Default().With("a", 1).WithGroup("g").Error("abgeleitet")

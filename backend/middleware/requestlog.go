@@ -15,24 +15,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RequestIDHeader trägt die Request-ID in Anfrage und Antwort.
+// RequestIDHeader carries the request ID in request and response.
 const RequestIDHeader = "X-Request-ID"
 
-// ContextKeyRequestID ist der gin-Context-Schlüssel der Request-ID.
+// ContextKeyRequestID is the gin context key of the request ID.
 const ContextKeyRequestID = "requestID"
 
-// plausibleRequestID begrenzt übernommene IDs auf 64 harmlose Zeichen: Die
-// ID landet unverändert im Log und im Antwort-Header, ein Client darf darüber
-// weder Zeilenumbrüche (Log-Injection) noch beliebig lange Werte einschleusen.
+// plausibleRequestID restricts adopted IDs to 64 harmless characters: the
+// ID ends up unchanged in the log and the response header, a client must not use it to smuggle in
+// either line breaks (log injection) or arbitrarily long values.
 var plausibleRequestID = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,64}$`)
 
-// RequestLogger ersetzt den gin-Default-Logger: Er übernimmt
-// eine plausible X-Request-ID (z.B. vom Reverse-Proxy) oder erzeugt eine,
-// gibt sie in der Antwort zurück, legt einen Logger mit request_id in den
-// Request-Context (logging.FromContext) und schreibt pro Request genau eine
-// strukturierte Access-Log-Zeile. Geloggt wird nur der Pfad ohne Query -
-// dort stehen u.a. Abmelde- und Webhook-Tokens (?token=...), die der
-// gin-Logger bisher im Klartext ausgab.
+// RequestLogger replaces the gin default logger: it adopts
+// a plausible X-Request-ID (e.g. from the reverse proxy) or generates one,
+// returns it in the response, puts a logger with request_id into the
+// request context (logging.FromContext) and writes exactly one
+// structured access log line per request. Only the path without query is logged -
+// that is where unsubscribe and webhook tokens (?token=...) live, which the
+// gin logger previously printed in plain text.
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -66,8 +66,8 @@ func RequestLogger() gin.HandlerFunc {
 	}
 }
 
-// accessLevel: 5xx Error, 4xx Warn, sonst Info; der Docker-Healthcheck
-// (/healthz alle paar Sekunden) nur auf Debug, damit er das Log nicht flutet.
+// accessLevel: 5xx Error, 4xx Warn, otherwise Info; the Docker healthcheck
+// (/healthz every few seconds) only at Debug, so that it does not flood the log.
 func accessLevel(status int, route string) slog.Level {
 	if status >= http.StatusInternalServerError {
 		return slog.LevelError
@@ -81,8 +81,8 @@ func accessLevel(status int, route string) slog.Level {
 	return slog.LevelInfo
 }
 
-// Recovery ersetzt gin.Recovery: Panics werden mit Stacktrace und Request-ID
-// strukturiert geloggt statt als Freitext auf stderr.
+// Recovery replaces gin.Recovery: panics are logged in structured form
+// with stack trace and request ID instead of as free text on stderr.
 func Recovery() gin.HandlerFunc {
 	return gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, recovered any) {
 		logging.FromContext(c.Request.Context()).Error("panic recovered",
@@ -93,7 +93,7 @@ func Recovery() gin.HandlerFunc {
 	})
 }
 
-// RequestIDFrom liefert die Request-ID des laufenden Requests ("" ohne
+// RequestIDFrom returns the request ID of the current request ("" without
 // RequestLogger).
 func RequestIDFrom(c *gin.Context) string {
 	return c.GetString(ContextKeyRequestID)

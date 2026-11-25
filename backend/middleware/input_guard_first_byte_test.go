@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ein NUL-Byte gilt an jeder Stelle des Bodys, auch als allererstes Byte.
+// A NUL byte counts at any position in the body, even as the very first byte.
 func TestRejectInvalidCharacters_NULAsFirstByteIsRejected(t *testing.T) {
 	for name, body := range map[string]string{
 		"nur NUL":      "\x00",

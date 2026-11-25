@@ -29,8 +29,8 @@ const (
 
 func newClock() *fakeClock { return &fakeClock{t: time.Unix(1_700_000_000, 0)} }
 
-// failAttempts lässt n falsche Versuche (ohne Erfolgsmeldung) durch das Tor laufen
-// und liefert die letzte Zulassung.
+// failAttempts runs n wrong attempts (without a success report) through the gate
+// and returns the last admission.
 func failAttempts(th *AccountThrottle, account, source string, n int) Admission {
 	var last Admission
 	for i := 0; i < n; i++ {
@@ -52,13 +52,13 @@ func TestAccountThrottle_BlocksPairAfterThresholdWithBackoff(t *testing.T) {
 	require.True(t, adm.Blocked, "der Versuch nach der Schwelle ist gesperrt")
 	assert.Equal(t, 30*time.Second, adm.RetryAfter)
 
-	// Gesperrte Anfragen zählen nicht: die Sperre verlängert sich dadurch nicht.
+	// Blocked requests do not count: the block is not extended by them.
 	clock.advance(10 * time.Second)
 	adm = th.Admit(acct, srcAttacker)
 	require.True(t, adm.Blocked)
 	assert.Equal(t, 20*time.Second, adm.RetryAfter)
 
-	// Nach Ablauf zählt der nächste Fehlversuch weiter, die Sperre verdoppelt sich.
+	// After expiry the next failed attempt keeps counting, the block doubles.
 	clock.advance(21 * time.Second)
 	adm = th.Admit(acct, srcAttacker)
 	require.False(t, adm.Blocked, "dieser Versuch ist wieder zugelassen und zählt")
@@ -67,8 +67,8 @@ func TestAccountThrottle_BlocksPairAfterThresholdWithBackoff(t *testing.T) {
 	assert.Equal(t, 60*time.Second, adm.RetryAfter)
 }
 
-// Wer nur die E-Mail-Adresse kennt, darf den Nutzer nicht aussperren: Die
-// Sperre gilt je Paar aus Konto und Quelle.
+// Someone who only knows the email address must not be able to lock the user out: the
+// block applies per pair of account and source.
 func TestAccountThrottle_BlockDoesNotAffectOtherSources(t *testing.T) {
 	th := newTestThrottle(newClock())
 	const acct = "opfer@example.com"
@@ -77,7 +77,7 @@ func TestAccountThrottle_BlockDoesNotAffectOtherSources(t *testing.T) {
 	adm := th.Admit(acct, srcOwner)
 	assert.False(t, adm.Blocked, "der echte Nutzer von anderer Quelle bleibt zugelassen")
 	assert.Zero(t, adm.Delay)
-	// Gegenprobe: dieselbe Quelle bleibt gesperrt, ein anderes Konto nicht.
+	// Control check: the same source stays blocked, a different account does not.
 	assert.True(t, th.Admit(acct, srcAttacker).Blocked)
 	assert.False(t, th.Admit("anderes@example.com", srcAttacker).Blocked)
 }
@@ -85,7 +85,7 @@ func TestAccountThrottle_BlockDoesNotAffectOtherSources(t *testing.T) {
 func TestAccountThrottle_SourceIsIPv4AddressOrIPv6Prefix(t *testing.T) {
 	th := newTestThrottle(newClock())
 	const acct = "a@example.com"
-	// Innerhalb eines IPv6-/64 wechselnde Hostadressen teilen sich den Zähler.
+	// Host addresses changing within an IPv6 /64 share the counter.
 	hosts := []string{"2001:db8:1:2::1", "2001:db8:1:2:aa::2", "2001:db8:1:2:bb::3", "2001:db8:1:2:cc::4"}
 	var adm Admission
 	for _, h := range hosts {
@@ -94,7 +94,7 @@ func TestAccountThrottle_SourceIsIPv4AddressOrIPv6Prefix(t *testing.T) {
 	assert.True(t, adm.Blocked, "vierter Versuch aus demselben /64 ist gesperrt")
 	assert.False(t, th.Admit(acct, "2001:db8:1:3::1").Blocked, "anderes /64 ist unberührt")
 
-	// IPv4 bleibt je Adresse, IPv4-in-IPv6 zählt als dieselbe IPv4-Adresse.
+	// IPv4 stays per address, IPv4-in-IPv6 counts as the same IPv4 address.
 	failAttempts(th, acct, "192.0.2.1", 3)
 	assert.True(t, th.Admit(acct, "::ffff:192.0.2.1").Blocked)
 	assert.False(t, th.Admit(acct, "192.0.2.2").Blocked)
@@ -120,14 +120,14 @@ func TestAccountThrottle_SuccessResetsPairAndDecays(t *testing.T) {
 	adm := failAttempts(th, acct, srcOwner, 3)
 	assert.False(t, adm.Blocked, "Erfolg setzt den Zähler des Paars zurück")
 
-	// Auch eine am Schwellenversuch ausgelöste Sperre verschwindet mit dem Erfolg.
+	// A block triggered at the threshold attempt also disappears on success.
 	th2 := newTestThrottle(newClock())
 	th2.Admit(acct, srcOwner)
 	th2.Admit(acct, srcOwner)
 	th2.Admit(acct, srcOwner).Succeeded()
 	assert.False(t, th2.Admit(acct, srcOwner).Blocked)
 
-	// Fehlversuche verfallen nach dem Zeitfenster ohne weiteren Versuch.
+	// Failed attempts expire after the time window without further attempts.
 	th3 := newTestThrottle(clock)
 	failAttempts(th3, acct, srcOwner, 2)
 	clock.advance(16 * time.Minute)
@@ -143,7 +143,7 @@ func TestAccountThrottle_NilIsNoOp(t *testing.T) {
 	assert.NotPanics(t, adm.Succeeded)
 }
 
-// Zähler je Konto über alle Quellen: bremst verteiltes Raten, sperrt aber nie.
+// Per-account counter across all sources: slows down distributed guessing but never blocks.
 func TestAccountThrottle_AccountWideCounterOnlyDelaysAndNeverBlocks(t *testing.T) {
 	clock := newClock()
 	th := newTestThrottle(clock)
@@ -167,16 +167,16 @@ func TestAccountThrottle_AccountWideCounterOnlyDelaysAndNeverBlocks(t *testing.T
 		400 * time.Millisecond, 400 * time.Millisecond, 400 * time.Millisecond,
 	}, delays, "steigende Wartezeit mit Obergrenze")
 
-	// Der echte Nutzer ist nur verzögert, nicht gesperrt.
+	// The real user is only delayed, not blocked.
 	adm := th.Admit(acct, srcOwner)
 	assert.False(t, adm.Blocked)
 	assert.Equal(t, 400*time.Millisecond, adm.Delay)
 
-	// Ein Erfolg nimmt nur den eigenen Versuch zurück, nicht die der Angreifer.
+	// A success only takes back its own attempt, not the attacker's.
 	adm.Succeeded()
 	assert.Equal(t, 400*time.Millisecond, th.Admit(acct, srcOwner).Delay)
 
-	// Nach dem Zeitfenster ist das Konto wieder frei.
+	// After the time window the account is free again.
 	clock.advance(16 * time.Minute)
 	assert.Zero(t, th.Admit(acct, srcOwner).Delay)
 }
@@ -191,8 +191,8 @@ func TestAccountThrottle_AccountWideCounterIsPerAccount(t *testing.T) {
 	assert.Zero(t, th.Admit("b@example.com", srcOwner).Delay)
 }
 
-// Prüfen und Zählen sind ein Schritt: 100 gleichzeitige Fehlversuche lassen
-// höchstens die Schwelle durch (kein Prüfen-dann-Zählen mehr).
+// Checking and counting are one step: 100 concurrent failed attempts let
+// at most the threshold through (no more check-then-count).
 func TestAccountThrottle_ParallelAttemptsAdmitAtMostThreshold(t *testing.T) {
 	th := NewLoginThrottle()
 	var admitted atomic.Int32
@@ -213,8 +213,8 @@ func TestAccountThrottle_ParallelAttemptsAdmitAtMostThreshold(t *testing.T) {
 	assert.EqualValues(t, loginThrottleThreshold, admitted.Load())
 }
 
-// Volle Tabellen verdrängen den ältesten Eintrag, statt neue Schlüssel nicht
-// mehr zu zählen: Auch das 20. neue Konto bekommt seine Sperre.
+// Full tables evict the oldest entry instead of no longer counting new
+// keys: even the 20th new account gets its block.
 func TestAccountThrottle_FullTableEvictsOldestInsteadOfIgnoringNewKeys(t *testing.T) {
 	th := newTestThrottle(newClock())
 	th.pairs.max, th.accounts.max = 5, 5
@@ -228,18 +228,18 @@ func TestAccountThrottle_FullTableEvictsOldestInsteadOfIgnoringNewKeys(t *testin
 	require.True(t, failAttempts(th, neu, srcAttacker, 4).Blocked, "neuer Schlüssel wird trotz voller Tabelle gezählt und gesperrt")
 	assert.LessOrEqual(t, th.pairs.len(), 5)
 
-	// Der älteste Eintrag ist verdrängt, ohne dass jemand dadurch gesperrt wird.
+	// The oldest entry is evicted without anyone being blocked as a result.
 	assert.False(t, th.Admit("k0@example.com", srcAttacker).Blocked)
 }
 
-// Verdrängt wird der am längsten unberührte Eintrag; ein aktiv genutzter bleibt.
+// The entry untouched for the longest time is evicted; an actively used one stays.
 func TestAccountThrottle_EvictionKeepsRecentlyUsedEntries(t *testing.T) {
 	th := newTestThrottle(newClock())
 	th.pairs.max, th.accounts.max = 3, 3
 	failAttempts(th, "aktiv@example.com", srcAttacker, 3)
 	for i := 0; i < 6; i++ {
 		th.Admit(fmt.Sprintf("fremd%d@example.com", i), srcOwner)
-		th.Admit("aktiv@example.com", srcAttacker) // gesperrt, aber zuletzt benutzt
+		th.Admit("aktiv@example.com", srcAttacker) // blocked, but used most recently
 	}
 	assert.True(t, th.Admit("aktiv@example.com", srcAttacker).Blocked)
 }
@@ -257,8 +257,8 @@ func TestAccountThrottle_ExpiredEntriesAreDroppedBeforeNewOnes(t *testing.T) {
 	assert.Equal(t, 1, th.accounts.len())
 }
 
-// Die Login-Standardwerte: bis zu 10 Fehlversuche je Paar bleiben folgenlos, der
-// elfte Versuch ist 30 Sekunden gesperrt; Fehlversuche verfallen nach 15 Minuten.
+// The login defaults: up to 10 failed attempts per pair have no consequences, the
+// eleventh attempt is blocked for 30 seconds; failed attempts expire after 15 minutes.
 func TestNewLoginThrottle_UsesLoginDefaults(t *testing.T) {
 	clock := newClock()
 	th := NewLoginThrottle()
@@ -275,7 +275,7 @@ func TestNewLoginThrottle_UsesLoginDefaults(t *testing.T) {
 	clock.advance(loginThrottleWindow + loginThrottleBaseDelay)
 	assert.False(t, th.Admit(acct, srcAttacker).Blocked, "nach Ablauf von Sperre und Fenster wieder frei")
 
-	// Zähler je Konto: ab 100 Fehlversuchen in 15 Minuten gibt es Verzögerung, nie eine Sperre.
+	// Per-account counter: from 100 failed attempts in 15 minutes there is a delay, never a block.
 	th2 := NewLoginThrottle()
 	th2.now = clock.now
 	for i := 0; i < loginAccountDelayThreshold; i++ {

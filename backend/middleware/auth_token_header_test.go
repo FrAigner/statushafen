@@ -10,9 +10,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Caddy legt HTTP Basic Auth vor alle Seiten und belegt damit den
-// Authorization-Header. Das Login-Token kommt deshalb über X-Auth-Token,
-// "Authorization: Bearer" bleibt als Fallback für API-Clients bestehen.
+// Caddy puts HTTP Basic Auth in front of all pages and thereby occupies the
+// Authorization header. The login token therefore arrives via X-Auth-Token,
+// "Authorization: Bearer" remains as a fallback for API clients.
 
 func doGetHeaders(path string, headers map[string]string) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest("GET", path, nil)
@@ -26,7 +26,7 @@ func doGetHeaders(path string, headers map[string]string) *httptest.ResponseReco
 
 func TestAuthTokenHeader(t *testing.T) {
 	db := testutils.SetupTestDB()
-	// Das Konto muss existieren: AuthMiddleware gleicht das Token mit der DB ab.
+	// The account must exist: AuthMiddleware checks the token against the DB.
 	if err := db.Create(&models.User{Email: "a@example.com"}).Error; err != nil {
 		t.Fatal(err)
 	}

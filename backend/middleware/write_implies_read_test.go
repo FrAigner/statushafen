@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// "<Bereich>:write" schließt "<Bereich>:read" ein, aber nicht
-// umgekehrt und nicht über Bereichsgrenzen hinweg. Mandantentrennung bleibt
-// bestehen (fremde Seite: 403).
+// "<area>:write" includes "<area>:read", but not
+// the reverse and not across area boundaries. Tenant separation remains
+// intact (other page: 403).
 func TestRequirePermission_WriteImpliesRead(t *testing.T) {
 	db := testutils.SetupTestDB()
 	writeOnly := models.Role{Name: "NurSchreiben", Permissions: "components:write"}

@@ -6,19 +6,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// BodyLimit begrenzt die Größe jedes Request-Bodys. Ohne Grenze liest ein
-// Handler (ShouldBindJSON, ParseForm) beliebig große Bodys in den Speicher.
+// BodyLimit limits the size of every request body. Without a limit a
+// handler (ShouldBindJSON, ParseForm) reads arbitrarily large bodies into memory.
 //
-// Meldet der Client eine Content-Length über der Grenze, antwortet die
-// Middleware sofort mit 413 und dem Code request_too_large, ohne dass ein
-// Handler läuft. Ohne bekannte Länge (chunked) wird der Body mit
-// http.MaxBytesReader gedeckelt: Der Handler liest höchstens max Byte und
-// bekommt dann einen *http.MaxBytesError.
+// If the client reports a Content-Length above the limit, the
+// middleware answers immediately with 413 and the code request_too_large, without any
+// handler running. Without a known length (chunked) the body is capped with
+// http.MaxBytesReader: the handler reads at most max bytes and
+// then gets an *http.MaxBytesError.
 //
-// overrides ordnet Routen-Templates (c.FullPath()) eine eigene Grenze zu, für
-// Pfade mit legitim größeren Bodys. Handler mit engerer eigener Grenze
-// (Webhooks, Vorfall-Art) bleiben davon unberührt, weil sie ihre Grenze
-// zusätzlich um den bereits gedeckelten Body legen.
+// overrides maps route templates (c.FullPath()) to their own limit, for
+// paths with legitimately larger bodies. Handlers with a narrower limit of their own
+// (webhooks, incident type) are unaffected, because they additionally
+// wrap their limit around the already capped body.
 func BodyLimit(max int64, overrides map[string]int64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit := max

@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// create/update/delete schließen read ein, aber nicht einander;
-// der Altwert write (nicht migrierte Rolle) zählt beim Prüfen weiter als
-// create+update+delete+read; ein Alt-Token mit write-Claim gewährt allein nichts
-// (die Rechte kommen immer frisch aus der Rolle in der Datenbank).
+// create/update/delete include read, but not each other;
+// the legacy value write (non-migrated role) still counts when checking as
+// create+update+delete+read; a legacy token with a write claim grants nothing on its own
+// (permissions always come fresh from the role in the database).
 func TestRequirePermission_CrudAktionen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	page := models.StatusPage{Name: "P", Slug: "p"}
@@ -55,7 +55,7 @@ func TestRequirePermission_CrudAktionen(t *testing.T) {
 	}
 
 	id := func(v uint) string { return strconv.Itoa(int(v)) }
-	// Erlaubt je Rolle und verlangter Aktion; alles andere 403.
+	// Allowed per role and requested action; everything else 403.
 	allowed := map[string][]string{
 		"create": {"create", "read"},
 		"update": {"update", "read"},
@@ -78,7 +78,7 @@ func TestRequirePermission_CrudAktionen(t *testing.T) {
 			r.ServeHTTP(w, req)
 			assert.Equal(t, want, w.Code, "Rolle %s verlangt %s", user, act)
 
-			// Mandantentrennung: dasselbe Recht gilt nicht auf der anderen Seite.
+			// Tenant separation: the same permission does not apply on the other page.
 			req = httptest.NewRequest(http.MethodGet, "/"+act+"/"+id(other.ID), nil)
 			req.Header.Set("X-Mock-User-ID", id(uid))
 			w = httptest.NewRecorder()
@@ -128,9 +128,9 @@ func TestRequireAllPermissions_UndResolved(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, do("/kind/"+p+"?res=incidents", maint), "Ressource folgt der Art")
 }
 
-// Alt-Token: Ein vor der Umstellung ausgestelltes Token mit write-Claim
-// bleibt bis zum Ablauf gültig (Signatur/Ablauf unverändert), die Rechte
-// kommen aber nie aus dem Claim, sondern aus der Rolle in der Datenbank.
+// Legacy token: a token with a write claim issued before the changeover
+// remains valid until expiry (signature/expiry unchanged), but the permissions
+// never come from the claim, only from the role in the database.
 func TestAltToken_MitWriteClaimBleibtGueltigUndGewaehrtNichts(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	db := testutils.SetupTestDB()
@@ -142,7 +142,7 @@ func TestAltToken_MitWriteClaimBleibtGueltigUndGewaehrtNichts(t *testing.T) {
 	require.NoError(t, db.Create(&u).Error)
 	require.NoError(t, db.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: role.ID}).Error)
 
-	// Token, wie ihn die Version vor der Umstellung ausgestellt hat.
+	// Token as issued by the version before the changeover.
 	token, err := middleware.GenerateToken(u.ID, u.Email, "Editor", "components:read,components:write,incidents:write", false)
 	require.NoError(t, err)
 
