@@ -28,10 +28,13 @@ func randomToken(nBytes int) string {
 // sanitizeReturnTo), "" if none.
 // host is the custom domain the code was sent to ("" for FRONTEND_URL); the
 // code is redeemed only from there (see SSOExchangeHandler).
+// binding is the hash of the browser binding cookie the exchange needs
+// (handlers/login_binding.go); "" is never redeemed.
 type ssoCodeEntry struct {
 	token    string
 	returnTo string
 	host     string
+	binding  string
 	expires  time.Time
 }
 
@@ -40,10 +43,10 @@ var (
 	ssoCodeStore = map[string]ssoCodeEntry{}
 )
 
-func storeSSOCode(token, returnTo, host string) string {
+func storeSSOCode(token, returnTo, host, binding string) string {
 	code := randomToken(32)
 	ssoCodeMu.Lock()
-	ssoCodeStore[code] = ssoCodeEntry{token: token, returnTo: returnTo, host: host, expires: time.Now().Add(ssoCodeExpiry())}
+	ssoCodeStore[code] = ssoCodeEntry{token: token, returnTo: returnTo, host: host, binding: binding, expires: time.Now().Add(ssoCodeExpiry())}
 	ssoCodeMu.Unlock()
 	return code
 }
@@ -175,11 +178,14 @@ func (h *Handler) SSOExchangeHandler(c *gin.Context) {
 	// for a custom domain only there, a code for FRONTEND_URL never on one.
 	// No boundary against a server-side attacker (any header can be sent);
 	// that is what the page limit and the role check are for.
+	// The browser must also be the one that started the login (binding
+	// cookie, login CSRF); a mismatch spends the code as well.
 	entry, ok := consumeSSOCode(req.Code)
-	if !ok || h.browserOrigin(c).host != entry.host {
+	if !ok || h.browserOrigin(c).host != entry.host || !loginBindingMatches(c, entry.binding) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Ungültiger oder abgelaufener Code", "code": "login_code_invalid"})
 		return
 	}
+	clearLoginBinding(c)
 
 	// return_to: where the frontend continues after the login ("" = its
 	// default); always present.

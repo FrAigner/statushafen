@@ -186,6 +186,9 @@ func (h *Handler) moveLoginToBaseHost(c *gin.Context) bool {
 	}
 	q := c.Request.URL.Query()
 	q.Set(returnHostParam, o.host)
+	// The code may come back to this domain: bind it to this browser here
+	// (only the hash goes along, see bindLoginState).
+	q.Set(loginBindingParam, setLoginBinding(c))
 	c.Redirect(http.StatusTemporaryRedirect, getBaseURL()+c.Request.URL.EscapedPath()+"?"+q.Encode())
 	return true
 }

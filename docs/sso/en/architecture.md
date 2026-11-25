@@ -101,7 +101,7 @@ STRIDE:
 | Spoofing | Forged ID token, token of another issuer or client | Signature via the JWKS, `iss`, `aud`, `exp`, nonce from the state; empty `sub` refused. |
 | Spoofing | Account takeover through a matching e-mail | Linking by e-mail only with `email_verified=true` and only for global providers; page SSO never by e-mail. |
 | Spoofing | Account pre-created for someone else's e-mail (pre-account hijacking) | New accounts only with a verified e-mail; a missing `email_verified` only counts with `OIDC_<ID>_EMAIL_TRUSTED=true`. |
-| Spoofing | Login CSRF (attacker's code in the victim's browser) | State bound to an HttpOnly cookie, constant-time comparison. |
+| Spoofing | Login CSRF (attacker's code in the victim's browser) | State bound to an HttpOnly cookie, constant-time comparison. The one-time code is bound to the browser of the login start: the start sets a random nonce as HttpOnly, Secure, SameSite=Lax cookie `sso_binding` (path `/api/auth/sso-exchange`), state and code know only its SHA-256 hash, `sso-exchange` requires the matching cookie and clears it afterwards. On a start on a custom domain, the move to `BASE_URL` sets a second cookie there and passes on only its hash (`login_binding`); without it `return_host` is dropped. |
 | Tampering | Manipulated or foreign state, state of another provider | State only from the database, redeemable exactly once (`DELETE … RETURNING`), valid for 10 minutes, provider/page must match the callback. |
 | Tampering | Intercepted code at the provider | PKCE (S256) with the verifier kept in the backend. |
 | Repudiation | Unnoticed sign-ins | Audit entries `auth.sso_login`/`auth.sso_linked` with the provider. |

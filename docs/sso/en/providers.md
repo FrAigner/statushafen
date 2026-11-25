@@ -120,6 +120,9 @@ domain. This applies to global providers, page SSO and the password login.
 1. A login start that arrives on the custom domain first redirects to the same path under `BASE_URL`
    and adds the domain as `return_host`. The state cookie has to reach the callback under `BASE_URL`.
    The `Host` of the request wins over a `return_host` in the query.
+   On the custom domain the server sets the cookie `sso_binding` and adds only its hash as
+   `login_binding`: the one-time code is redeemed only in the browser of the login start (login
+   CSRF). A `return_host` without a valid `login_binding` is dropped.
 2. The server keeps `return_host` only if it is exactly the hostname of a custom domain in the state
    "Verified" or "Active"; for page SSO only the domain of that same page. Anything else (unverified,
    unknown or other tenants' domains, scheme, port, path, upper case, trailing dot) is dropped; the

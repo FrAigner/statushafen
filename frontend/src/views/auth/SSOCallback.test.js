@@ -65,7 +65,9 @@ describe('SSOCallback', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/api/auth/sso-exchange'),
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: 'abc123' }) })
+      // credentials: the exchange needs the browser binding cookie of the login
+      // start, also when the API runs on another origin (VITE_API_URL).
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: 'abc123' }), credentials: 'include' })
     )
     expect(useAuth().token.value).toBe(jwt)
     expect(router.currentRoute.value.fullPath).toBe('/')

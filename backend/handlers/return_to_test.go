@@ -68,9 +68,10 @@ func TestSanitizeReturnTo(t *testing.T) {
 	}
 }
 
-// returnToOf redeems the one-time code of a login redirect via the real
-// sso-exchange handler and returns its response.
-func exchangeFromRedirect(t *testing.T, h *Handler, w *httptest.ResponseRecorder) (int, map[string]string) {
+// exchangeFromRedirect redeems the one-time code of a login redirect via the
+// real sso-exchange handler, with the binding cookie of the login start
+// (start), and returns its response.
+func exchangeFromRedirect(t *testing.T, h *Handler, w, start *httptest.ResponseRecorder) (int, map[string]string) {
 	t.Helper()
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 	loc, err := url.Parse(w.Header().Get("Location"))
@@ -80,6 +81,9 @@ func exchangeFromRedirect(t *testing.T, h *Handler, w *httptest.ResponseRecorder
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/auth/sso-exchange",
 		strings.NewReader(`{"code":"`+loc.Query().Get("code")+`"}`))
 	c.Request.Header.Set("Content-Type", "application/json")
+	if ck := bindingCookie(start); ck != nil {
+		c.Request.AddCookie(&http.Cookie{Name: ck.Name, Value: ck.Value})
+	}
 	h.SSOExchangeHandler(c)
 	body := map[string]string{}
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
@@ -98,7 +102,7 @@ func TestReturnTo_ProviderLoginCarriesTheTargetToTheExchange(t *testing.T) {
 	assert.Equal(t, target, st.ReturnTo)
 
 	cb := f.callback("corp", state, "good-code", stateCookie(w))
-	code, body := exchangeFromRedirect(t, f.h, cb)
+	code, body := exchangeFromRedirect(t, f.h, cb, w)
 	require.Equal(t, http.StatusOK, code)
 	assert.NotEmpty(t, body["token"])
 	assert.Equal(t, target, body["return_to"])
@@ -110,7 +114,7 @@ func TestReturnTo_InvalidTargetIsDroppedNotRejected(t *testing.T) {
 		"/api/auth/provider/corp/login?return_to="+url.QueryEscape("//evil.example.org"), "corp", nil, 0)
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code)
 	state := f.rememberAuthorizeURL(t, w.Header().Get("Location"))
-	code, body := exchangeFromRedirect(t, f.h, f.callback("corp", state, "good-code", stateCookie(w)))
+	code, body := exchangeFromRedirect(t, f.h, f.callback("corp", state, "good-code", stateCookie(w)), w)
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, "", body["return_to"])
 	assert.Contains(t, body, "return_to", "the field is always present")
@@ -136,7 +140,7 @@ func TestReturnTo_PageOIDCLoginAndSlugLogin(t *testing.T) {
 			w := serveOIDC(handler, http.MethodGet, path+url.QueryEscape("/status/oidc-seite"), nil, 0)
 			require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 			state := f.rememberAuthorizeURL(t, w.Header().Get("Location"))
-			code, body := exchangeFromRedirect(t, f.h, f.callback(state, "good-code", stateCookie(w)))
+			code, body := exchangeFromRedirect(t, f.h, f.callback(state, "good-code", stateCookie(w)), w)
 			require.Equal(t, http.StatusOK, code)
 			assert.Equal(t, "/status/oidc-seite", body["return_to"])
 		})
@@ -163,17 +167,18 @@ func TestReturnTo_LinkKeepsTheProfileTarget(t *testing.T) {
 	w := f.callback("corp", state, "good-code", stateCookie(rec))
 	loc, _ := url.Parse(w.Header().Get("Location"))
 	assert.Equal(t, "profile", loc.Query().Get("next"))
-	_, body := exchangeFromRedirect(t, f.h, w)
+	_, body := exchangeFromRedirect(t, f.h, w, rec)
 	assert.Equal(t, "", body["return_to"])
 }
 
 // A one-time code works exactly once, also with a return target.
 func TestReturnTo_CodeIsSingleUse(t *testing.T) {
 	f := newGlobalOIDCFixture(t)
-	w := f.login(t)
-	code, _ := exchangeFromRedirect(t, f.h, w)
+	start := serveProvider(f.h.ProviderLoginHandler, http.MethodGet, "/api/auth/provider/corp/login", "corp", nil, 0)
+	w := f.callback("corp", f.rememberAuthorizeURL(t, start.Header().Get("Location")), "good-code", stateCookie(start))
+	code, _ := exchangeFromRedirect(t, f.h, w, start)
 	require.Equal(t, http.StatusOK, code)
-	code, body := exchangeFromRedirect(t, f.h, w)
+	code, body := exchangeFromRedirect(t, f.h, w, start)
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Equal(t, "login_code_invalid", body["code"])
 }

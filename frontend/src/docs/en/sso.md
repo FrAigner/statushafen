@@ -21,6 +21,10 @@ says so.
    from.
 3. A session via a status page's SSO is valid for this status page only.
 
+The sign-in must end in the same browser it started in: a sign-in link from another browser (for
+example sent by mail or chat) signs nobody in but leads back to the login page. This way nobody
+can sign you in to someone else's account without you noticing.
+
 **Important:** a status page's SSO does not create new accounts. You sign in once in another way
 and click "Link with SSO" under "SSO sign-in" in your **Profile**. After that the account is
 recognized by the IdP's identifier, never by email address. There you can also link an existing

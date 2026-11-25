@@ -117,6 +117,9 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
 1. Ein Login-Start, der auf der eigenen Domain ankommt, leitet zuerst auf denselben Pfad unter
    `BASE_URL` weiter und hängt die Domain als `return_host` an. Das State-Cookie muss den Callback
    unter `BASE_URL` erreichen. Der `Host` der Anfrage gewinnt gegen ein `return_host` in der Query.
+   Auf der eigenen Domain setzt der Server dabei das Cookie `sso_binding` und hängt nur dessen Hash
+   als `login_binding` an: Der Einmal-Code wird nur im Browser des Login-Starts eingelöst
+   (Login-CSRF). Ein `return_host` ohne gültiges `login_binding` wird verworfen.
 2. Der Server übernimmt `return_host` nur, wenn es exakt der Hostname einer eigenen Domain im Status
    „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
    (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)

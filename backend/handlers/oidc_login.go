@@ -391,6 +391,7 @@ func (h *Handler) startOIDCFlow(c *gin.Context, cl oidcClient, st models.OIDCLog
 	st.Nonce = randomToken(32)
 	st.CodeVerifier = oauth2.GenerateVerifier()
 	st.ExpiresAt = time.Now().Add(oidcStateLifetime())
+	bindLoginState(c, &st)
 	if err := h.DB.Create(&st).Error; err != nil {
 		return "", errOIDCStartFailed
 	}
@@ -734,5 +735,5 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	// gilt nur für pageID (sso_page_id-Claim).
 	origin, returnTo := h.loginDelivery(st, user)
 	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID, middleware.WithCustomDomain(origin.host))
-	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host)+next)
+	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host, codeBinding(st, origin))+next)
 }

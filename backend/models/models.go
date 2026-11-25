@@ -326,6 +326,11 @@ type OIDCLoginState struct {
 	// (handlers.acceptReturnHost), "" for FRONTEND_URL. Checked again on the
 	// callback.
 	ReturnHost string `gorm:"not null;default:''"`
+	// BrowserBinding is the hash of the binding cookie set on the host of the
+	// login start; DomainBinding the one set on the custom domain in
+	// ReturnHost before the move to BASE_URL (handlers/login_binding.go).
+	BrowserBinding string `gorm:"not null;default:''"`
+	DomainBinding  string `gorm:"not null;default:''"`
 }
 
 // The tables saml_login_states and saml_assertion_uses from the SAML era stay
