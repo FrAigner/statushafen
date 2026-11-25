@@ -109,11 +109,15 @@ func (h *Handler) browserOrigin(c *gin.Context) loginOrigin {
 // with which return path: to the custom domain of the state only for an
 // account that agreed to a role on its page (consentedMember). Anyone else
 // signs in on FRONTEND_URL and lands on the landing page there (empty return
-// path): the private page itself would auto-join the account.
-func (h *Handler) loginDelivery(st models.OIDCLoginState, userID uint) (loginOrigin, string) {
+// path): the private page itself would auto-join the account. A global admin
+// never auto-joins and goes back to the same page there (/status/<slug>).
+func (h *Handler) loginDelivery(st models.OIDCLoginState, user models.User) (loginOrigin, string) {
 	o := h.loginReturnOrigin(st)
-	if o.pageID == 0 || h.consentedMember(userID, o.pageID) {
+	if o.pageID == 0 || h.consentedMember(user.ID, o.pageID) {
 		return o, st.ReturnTo
+	}
+	if user.IsGlobalAdmin {
+		return loginOrigin{}, sanitizeReturnTo("/status/" + o.slug)
 	}
 	return loginOrigin{}, ""
 }

@@ -311,7 +311,12 @@ func TestProviderLoginFromOtherTenantsDomain_WithoutARoleEndsOnTheMainDomain(t *
 
 			returnTo, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://app.example.org")
 
-			assert.Equal(t, "", returnTo, "the landing page: the private page there would auto-join the account")
+			if bootstrap != "" {
+				// A global admin never auto-joins: back to the same page on the main domain.
+				assert.Equal(t, "/status/"+pages[acmeHost].Slug, returnTo)
+			} else {
+				assert.Equal(t, "", returnTo, "the landing page: the private page there would auto-join the account")
+			}
 			assert.Zero(t, claims.SSOPageID)
 			assert.Empty(t, claims.CustomDomain)
 			assert.Equal(t, bootstrap != "", claims.IsGlobalAdmin)

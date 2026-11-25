@@ -602,12 +602,18 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 		f := newInvFixture(t)
 		u, tok := f.account(t, "q@x.example")
 		token := f.invite(t, srv, u.Email, f.viewer)
-		// Erst die Zählung in der Transaktion (Bedingung ohne "<>": nicht die Prüfung "andere Seite").
+		// The lookup of the existing membership in the transaction: a single row
+		// without preload (the check "other page" reads a list, the inviter's
+		// membership is read with its role).
 		failOn(t, f.db, "query", "user_status_page_roles", func(tx *gorm.DB) bool {
-			_, isCount := tx.Statement.Dest.(*int64)
-			return isCount && !strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "<>")
+			_, isSingle := tx.Statement.Dest.(*models.UserStatusPageRole)
+			return isSingle && len(tx.Statement.Preloads) == 0 &&
+				strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "status_page_id")
 		})
 		requireStatusCode(t, idorRequest(t, f.r, "POST", "/api/invitations/accept", tok, map[string]any{"token": token}), http.StatusInternalServerError)
+		if f.isMember(u.ID) {
+			t.Fatal("membership despite the failed check")
+		}
 	})
 	t.Run("Annehmen: Unique-Verletzung -> 409 schon Mitglied", func(t *testing.T) {
 		f := newInvFixture(t)
@@ -700,4 +706,31 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 func backdateInvitations(db *gorm.DB, d time.Duration) {
 	// Unscoped: auch zurückgezogene (soft-gelöschte) Zeilen (Review B1).
 	db.Unscoped().Model(&models.PageInvitation{}).Where("1 = 1").Update("created_at", time.Now().Add(-d))
+}
+
+// Accepting an invitation is the consent an auto-join lacks: an auto-joined
+// membership becomes an assigned one with the invited role (and then lets a
+// login return to the page's custom domain). Any other existing membership
+// stays as it is (see AccountConflicts).
+func TestPageInvitation_AcceptUpgradesAnAutoJoinedMembership(t *testing.T) {
+	srv := startFakeSMTPServerWithEnv(t)
+	defer srv.close()
+	f := newInvFixture(t)
+	u, tok := f.account(t, "joined@x.example")
+	token := f.invite(t, srv, u.Email, f.viewer)
+	autoRole := models.Role{Name: "Auto", Permissions: "incidents:read"}
+	f.db.Create(&autoRole)
+	f.db.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: f.page.ID, RoleID: autoRole.ID, JoinedVia: models.JoinedViaAutoJoin})
+
+	w := idorRequest(t, f.r, "POST", "/api/invitations/accept", tok, map[string]any{"token": token})
+
+	requireStatusCode(t, w, http.StatusOK)
+	var rows []models.UserStatusPageRole
+	f.db.Where("user_id = ? AND status_page_id = ?", u.ID, f.page.ID).Find(&rows)
+	if len(rows) != 1 || rows[0].RoleID != f.viewer.ID || rows[0].JoinedVia != models.JoinedViaAssigned {
+		t.Fatalf("membership not upgraded: %+v", rows)
+	}
+	if f.invitationCount() != 0 || auditCountFor(f.db, "statuspage.invitation_accepted") != 1 {
+		t.Error("invitation not consumed or not audited")
+	}
 }

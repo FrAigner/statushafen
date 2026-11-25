@@ -67,8 +67,17 @@ func TestRouter_CustomDomainSessionCannotTouchTheAccount(t *testing.T) {
 	db.Model(&models.UserSSOIdentity{}).Where("user_id = ?", u.ID).Count(&n)
 	assert.Equal(t, int64(1), n, "the sign-in is still linked")
 
+	// The list of linked sign-ins (provider, e-mail there) stays
+	// empty on a custom domain: linking and unlinking are refused there anyway.
+	for _, token := range []string{onDomain, password} {
+		rec := serveWithToken(r, http.MethodGet, "/api/me/sso", "", token)
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.JSONEq(t, `{"identities":[],"linkable":[]}`, rec.Body.String())
+	}
+
 	// The same page session issued on the main domain keeps the routes.
 	mainDomain, err := middleware.GeneratePageSSOToken(u, "V", models.SSOProtocolOIDC, page.ID)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, serveWithToken(r, http.MethodGet, "/api/me/export", "", mainDomain).Code)
+	assert.Contains(t, serveWithToken(r, http.MethodGet, "/api/me/sso", "", mainDomain).Body.String(), `"protocol":"oidc"`)
 }

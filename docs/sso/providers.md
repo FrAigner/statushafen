@@ -124,8 +124,11 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
 3. Der Callback prüft die Domain erneut. Hat das Konto einer Rolle auf der Seite der Domain zugestimmt
    (Einladung, Zuweisung durch einen Global Admin, Bestellung), leitet er nach
    `https://<Domain>/auth/sso-callback?code=…` weiter. Sonst endet der Login unter `FRONTEND_URL` auf der
-   Startseite (globale Anbieter: volle Sitzung). Eine Rolle aus dem Auto-Join zählt nie, denn dessen
-   E-Mail-Domains pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Rollen aus der Zeit
+   Startseite (globale Anbieter: volle Sitzung), bei Global Admins auf `/status/<slug>` derselben Seite
+   (sie lösen keinen Auto-Join aus). Eine Rolle aus dem Auto-Join zählt nie, denn dessen E-Mail-Domains
+   pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Nimmt das Konto danach eine Einladung
+   auf dieselbe Seite an, wird die Mitgliedschaft zur zugestimmten (mit der Rolle aus der Einladung). Ändert
+   nur ein Seiten-Admin die Rolle, bleibt die Markierung. Rollen aus der Zeit
    vor dieser Markierung zählen nur, wenn die Seite gerade keinen Auto-Join eingerichtet hat und das
    Audit-Log keinen Auto-Join dieses Kontos auf dieser Seite kennt. Fehler im Callback gehen immer an
    `FRONTEND_URL`, nur Fehler beim Login-Start (ohne Kontobezug) an die eigene Domain.
@@ -138,7 +141,8 @@ lesen, was der Browser für diese Domain speichert. Eine Sitzung auf einer eigen
 Passwort) gilt deshalb nur für die Statusseite dieser Domain, nie mit Global-Admin-Rechten, und darf
 nicht am Konto selbst handeln: Konto löschen (`DELETE /api/me`), Datenexport (`GET /api/me/export`),
 Anmeldungen verknüpfen oder lösen (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
-`DELETE /api/me/sso/<id>`) antworten mit `403 custom_domain_session`. Dafür meldet man sich unter
+`DELETE /api/me/sso/<id>`) antworten mit `403 custom_domain_session`; die Liste der Verknüpfungen
+(`GET /api/me/sso`) ist dort leer. Dafür meldet man sich unter
 `FRONTEND_URL` an. Für eine private Seite braucht man eine Rolle auf dieser Seite; Global Admins
 verwalten unter `FRONTEND_URL`.
 

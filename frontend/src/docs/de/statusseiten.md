@@ -98,8 +98,9 @@ oder aktiv, schlägt das Verifizieren mit dem Hinweis „Diese Domain wird berei
 **Anmelden auf der eigenen Domain:** Wer eine Rolle auf der Seite hat (per Einladung, nicht per
 Auto-Join) und sich auf ihrer verifizierten oder aktiven eigenen Domain anmeldet (globaler Anbieter,
 SSO der Seite oder Passwort), landet danach wieder auf dieser Seite und dieser Domain und ist dort
-angemeldet. Alle anderen landen nach der Anmeldung auf der Startseite unter der Hauptadresse der
-Anwendung. Die Anmeldung gilt auf der eigenen
+angemeldet. Wer per Auto-Join beigetreten ist, kommt dorthin zurück, sobald er eine Einladung auf die
+Seite angenommen hat. Alle anderen landen nach der Anmeldung unter der Hauptadresse der Anwendung,
+Global Admins direkt auf dieser Seite. Die Anmeldung gilt auf der eigenen
 Domain nur für diese Statusseite, nie mit Global-Admin-Rechten: Das DNS der Domain liegt beim Inhaber
 der Domain, nicht beim Betreiber. Konto löschen, Datenexport und das Verknüpfen oder Lösen von
 Anmeldungen gehen deshalb nur über die Hauptadresse; dort erreicht man auch die Verwaltung aller Seiten.

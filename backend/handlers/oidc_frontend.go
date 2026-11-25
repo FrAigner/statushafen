@@ -166,6 +166,12 @@ func (h *Handler) GetMySSOHandler(c *gin.Context) {
 		return
 	}
 	resp := mySSOResponse{Identities: []mySSOIdentity{}, Linkable: []mySSOLinkable{}}
+	// On a custom domain the tenant could read the list (providers, e-mail
+	// there); linking and unlinking are refused there anyway.
+	if middleware.CustomDomainSession(c) {
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	// LEFT JOIN: Auch die Verknüpfung einer inzwischen gelöschten Seite bleibt
 	// sichtbar und lösbar.
 	h.DB.Table("user_sso_identities AS i").
