@@ -34,10 +34,23 @@ gibt). Global Admins können sie unter **Rollen & Rechte** anpassen, umbenennen 
 Wer eine Statusseite selbst bestellt, wird „Page Admin“ dieser Seite. Soll er auch Benutzer, SSO,
 Mail-Templates und Sprachen der eigenen Seite pflegen, weist ein Global Admin ihm „Page Owner“ zu.
 
-Wer auf einer Seite Benutzer verwalten darf (`pages:create`/`pages:delete`), kann nur Rollen
-vergeben, deren Rechte er selbst auf dieser Seite hat, und neue Konten nur per E-Mail-Adresse
-einladen: Mitglied wird das Konto erst, wenn es die Einladung annimmt (siehe **Statusseiten**). Konten mit altem globalem SSO, Seiten-SSO-Verknüpfung oder Rolle auf einer anderen Seite sowie Global-Admin-Konten fügt nur ein Global Admin hinzu. Beliebige Konten per ID auswählen darf nur ein Global Admin.
-Pro Konto und Seite gibt es genau eine Rolle. Als Nicht-Global-Admin lässt sich die eigene Rolle nicht entfernen oder auf eine Rolle ohne `pages:update` herabstufen, wenn man das letzte Mitglied mit diesem Recht auf der Seite ist (Meldung „letzter Benutzer mit Verwaltungsrechten“). Beim Entfernen eines Mitglieds, beim Löschen seiner Rolle und beim Entziehen der Seite am Konto wird auch seine Seiten-SSO-Verknüpfung dieser Seite gelöscht.
+### Regeln für die Benutzerverwaltung einer Seite
+
+Pro Konto und Seite gibt es genau eine Rolle. Wer auf einer Seite Benutzer verwalten darf
+(`pages:create`/`pages:delete`), unterliegt diesen Regeln:
+
+- Er kann nur Rollen vergeben, deren Rechte er selbst auf dieser Seite hat.
+- Er kann neue Konten nur per E-Mail-Adresse einladen: Mitglied wird das Konto erst, wenn es die
+  Einladung annimmt (siehe **Statusseiten**).
+- Konten mit altem globalem SSO, Seiten-SSO-Verknüpfung oder Rolle auf einer anderen Seite sowie
+  Global-Admin-Konten fügt nur ein Global Admin hinzu.
+- Beliebige Konten per ID auswählen darf nur ein Global Admin.
+- Als Nicht-Global-Admin lässt sich die eigene Rolle nicht entfernen oder auf eine Rolle ohne
+  `pages:update` herabstufen, wenn man das letzte Mitglied mit diesem Recht auf der Seite ist
+  (Meldung „letzter Benutzer mit Verwaltungsrechten“).
+
+Beim Entfernen eines Mitglieds, beim Löschen seiner Rolle und beim Entziehen der Seite am Konto
+wird auch seine Seiten-SSO-Verknüpfung dieser Seite gelöscht.
 
 
 ## Rechte
@@ -75,21 +88,28 @@ Er zählt nur auf der Seite, für die die Rolle vergeben ist, und nur zusammen m
 Recht aus der Matrix.
 
 **Nur Statusseite:** Eine Rolle ohne jedes Recht aus der Matrix (leer oder nur `admin_dashboard`)
-gibt keinen Zugang zum Admin-Bereich. Mitglieder mit dieser Rolle sehen die Statusseite, auch im
-Privat-Modus, und können sie abonnieren. Rufen sie eine Adresse unter `/admin` auf, landen sie auf
-ihrer Statusseite; nur ihr Profil (Menüpunkt „Profil“ im Benutzermenü der öffentlichen Seite)
-bleibt erreichbar. Auch die API des Admin-Bereichs lehnt solche Konten ab (403). Der Rollen-Editor
-zeigt über der Matrix, ob eine Rolle „Nur Statusseite“ ist; der Knopf „Auf „Nur Statusseite“
-setzen“ entfernt alle Rechte. In der Rollenliste steht für solche Rollen „Nur Statusseite“. Hat ein
-Konto auf mehreren Seiten Rollen, bietet die Seitenwahl im Admin-Bereich nur die Seiten mit
-mindestens einem Recht.
+gibt keinen Zugang zum Admin-Bereich.
+
+- Mitglieder mit dieser Rolle sehen die Statusseite, auch im Privat-Modus, und können sie
+  abonnieren.
+- Rufen sie eine Adresse unter `/admin` auf, landen sie auf ihrer Statusseite; nur ihr Profil
+  (Menüpunkt „Profil“ im Benutzermenü der öffentlichen Seite) bleibt erreichbar.
+- Auch die API des Admin-Bereichs lehnt solche Konten ab (403).
+- Der Rollen-Editor zeigt über der Matrix, ob eine Rolle „Nur Statusseite“ ist; der Knopf „Auf
+  „Nur Statusseite“ setzen“ entfernt alle Rechte. In der Rollenliste steht für solche Rollen „Nur
+  Statusseite“.
+- Hat ein Konto auf mehreren Seiten Rollen, bietet die Seitenwahl im Admin-Bereich nur die Seiten
+  mit mindestens einem Recht.
 
 **Anlegen, Ändern und Löschen schließen Lesen ein:** Wer `components:update` hat, darf auch lesen,
 ohne dass `components:read` eingetragen sein muss. Ändern schließt Anlegen oder Löschen nicht ein.
-Das gilt für jede Ressource. Tabs ohne Leserecht werden ausgeblendet, ebenso Bereiche ohne
-sichtbaren Tab; ruft jemand die Adresse einer solchen Seite direkt auf, erscheint „Keine
-Berechtigung“. Es zählt immer die Rolle auf der aktuell gewählten Statusseite. Knöpfe und
-Menüeinträge erscheinen je Aktion: „Neu …“ mit Anlegen, Bearbeiten mit Ändern, Löschen mit Löschen.
+Das gilt für jede Ressource.
+
+- Tabs ohne Leserecht werden ausgeblendet, ebenso Bereiche ohne sichtbaren Tab; ruft jemand die
+  Adresse einer solchen Seite direkt auf, erscheint „Keine Berechtigung“.
+- Es zählt immer die Rolle auf der aktuell gewählten Statusseite.
+- Knöpfe und Menüeinträge erscheinen je Aktion: „Neu …“ mit Anlegen, Bearbeiten mit Ändern,
+  Löschen mit Löschen.
 
 **Globale Ressourcen** (Übersicht, Benutzer, Rollen & Rechte, Tags, Audit-Log, Monitoring,
 Systemeinstellungen) gelten nicht für eine einzelne Seite, sondern für die ganze Plattform. Sie
@@ -100,14 +120,21 @@ und die globalen UI-Texte.
 **Umstellung von `:write`:** Bis zur Version mit diesem Modell gab es je Bereich nur Lesen und
 Schreiben (`<ressource>:write`). Beim Start ersetzt eine einmalige Migration in allen Rollen
 `:write` durch Anlegen, Lesen, Ändern und Löschen und trägt die Tabs ein, die bisher an einer
-anderen Ressource hingen (`components:write` gibt auch `external_sources:*`, `incidents:write`
-auch `maintenance:*` und `incident_templates:*`, `pages:write` auch `notification_templates:*`,
-`languages:*`, `ui_translations:*` und `sso:*`). Niemand bekommt dadurch Rechte dazu oder verliert
-welche. Die alten Werte stehen als Sicherung in den Systemeinstellungen
-(`permissions.crud_backup`). Alte Anmelde-Token mit `:write` laufen bis zum Ablauf weiter; die
-Rechte kommen ohnehin bei jeder Anfrage frisch aus der Rolle. Ein noch vorhandenes `:write` in
-einer Rolle zählt beim Prüfen als Anlegen, Lesen, Ändern und Löschen, wird aber nie mehr
-gespeichert.
+anderen Ressource hingen:
+
+- `components:write` gibt auch `external_sources:*`.
+- `incidents:write` gibt auch `maintenance:*` und `incident_templates:*`.
+- `pages:write` gibt auch `notification_templates:*`, `languages:*`, `ui_translations:*` und
+  `sso:*`.
+
+Für die Umstellung gilt:
+
+- Niemand bekommt dadurch Rechte dazu oder verliert welche.
+- Die alten Werte stehen als Sicherung in den Systemeinstellungen (`permissions.crud_backup`).
+- Alte Anmelde-Token mit `:write` laufen bis zum Ablauf weiter; die Rechte kommen ohnehin bei
+  jeder Anfrage frisch aus der Rolle.
+- Ein noch vorhandenes `:write` in einer Rolle zählt beim Prüfen als Anlegen, Lesen, Ändern und
+  Löschen, wird aber nie mehr gespeichert.
 
 Der Rollen-Editor zeigt eine Matrix mit einer Zeile je Tab, gruppiert nach Bereich, und den
 Spalten C (Anlegen), R (Lesen), U (Ändern) und D (Löschen). Die Schalter „alle“ setzen eine ganze

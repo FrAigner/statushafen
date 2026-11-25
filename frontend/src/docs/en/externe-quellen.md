@@ -3,10 +3,13 @@
 Many services run on platforms of other providers. With an **external source**, Statushafen reads
 such a provider's status page and takes its state into account on your own status page: if a
 component fails at the provider that one of your components relies on, your component shows that
-too. You manage this under **External sources** in the **Operations** area. You may view the page
-with `external_sources:read`; creating needs `external_sources:create`, changing and fetching ("Fetch
-now") `external_sources:update`, deleting `external_sources:delete`. "Import" creates your own
-components and therefore additionally needs `components:create`.
+too. You manage this under **External sources** in the **Operations** area. Required permissions:
+
+- **View:** `external_sources:read`
+- **Create:** `external_sources:create`
+- **Change, fetch ("Fetch now"):** `external_sources:update`
+- **Delete:** `external_sources:delete`
+- **"Import"** creates your own components and therefore additionally needs `components:create`.
 
 ## Create a source
 
@@ -22,15 +25,20 @@ With "New source" you enter a third-party status page:
 
 The **Summary API v2** (`/api/v2/summary.json`) is supported. Many public status pages offer it,
 including pages built on Atlassian Statuspage. Atlassian and Statuspage are trademarks of
-Atlassian Pty Ltd; Statushafen is not affiliated with Atlassian. Statushafen
-rejects private, local and internal addresses. A newly created source is queried for the first
-time at the next tick, or immediately with "Fetch now" in the row menu; the result of the fetch is
-shown. For each source only one fetch runs at a time.
+Atlassian Pty Ltd; Statushafen is not affiliated with Atlassian.
+
+- Statushafen rejects private, local and internal addresses.
+- A newly created source is queried for the first time at the next tick, or immediately with
+  "Fetch now" in the row menu; the result of the fetch is shown.
+- For each source only one fetch runs at a time.
 
 The list shows each source's state (Reachable, Fetch failed, Outage, Inactive, Not fetched yet),
-the last fetch, and the number of components and links. When you **delete** a source, Statushafen
-also removes its components, links and mirrored reports. An inactive source is not fetched; its
-links and mirrored reports no longer count then, but the data is kept.
+the last fetch, and the number of components and links.
+
+- When you **delete** a source, Statushafen also removes its components, links and mirrored
+  reports.
+- An **inactive** source is not fetched; its links and mirrored reports no longer count then, but
+  the data is kept.
 
 ## Adopt components
 
@@ -43,16 +51,21 @@ The fastest way to linked components is the card "Adopt components":
    = no group) and optionally assign tags.
 4. Click "Adopt".
 
-For every selected component an own component is created with its name, status "Operational" and
-the link to the external component. A whole external group is created as an own group with its
-current components; the group itself is not linked, its status results from the child components.
-Everything happens in one step: if something fails, nothing is created. Skipped entries (already
-linked, meanwhile vanished, group without components) are listed afterwards; a second click does
-not create anything twice.
+Result of adopting:
 
-Good to know: components that the provider adds later are not adopted automatically, name changes
-at the provider are not followed, and adopting cannot be undone (delete the components one by
-one).
+- For every selected component an own component is created with its name, status "Operational"
+  and the link to the external component.
+- A whole external group is created as an own group with its current components; the group itself
+  is not linked, its status results from the child components.
+- Everything happens in one step: if something fails, nothing is created.
+- Skipped entries (already linked, meanwhile vanished, group without components) are listed
+  afterwards; a second click does not create anything twice.
+
+Good to know:
+
+- Components that the provider adds later are not adopted automatically.
+- Name changes at the provider are not followed.
+- Adopting cannot be undone (delete the components one by one).
 
 ## Link components
 
@@ -97,10 +110,12 @@ emails in the [audit log](/docs/audit-log).
 ## Mirrored reports
 
 Besides the status, Statushafen also fetches the source's **incidents and maintenance**. Only
-reports that affect at least one linked component are mirrored. The card "Mirrored reports" lists
-them with kind, state, affected own components and number of updates; filters by kind (incident,
-maintenance), state (open, closed) and source. The texts come from the third-party page and are
-neither translated nor changed. For closed reports, the list covers the last 30 days.
+reports that affect at least one linked component are mirrored.
+
+- **Card "Mirrored reports":** lists them with kind, state, affected own components and number of
+  updates; filters by kind (incident, maintenance), state (open, closed) and source. For closed
+  reports, the list covers the last 30 days.
+- **Texts:** come from the third-party page and are neither translated nor changed.
 
 - **Publicly**, open reports and those that ended in the last 14 days appear under "Reports from
   external sources", clearly marked as external and with a link to the original page.
