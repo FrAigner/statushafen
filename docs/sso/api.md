@@ -179,7 +179,8 @@ Admins). Antwort `200`: `{"url": "<Authorize-URL des Anbieters>"}`. Fehler (JSON
 
 Öffentlich, begrenzt auf 10 Aufrufe pro Minute. Tauscht den Einmal-Code aus dem Redirect gegen das
 JWT. Body: `{"code": "<Einmal-Code>"}`. Antwort `200`: `{"token": "<JWT>", "return_to": "/pfad"}`
-(`return_to` ist der geprüfte Rücksprungpfad aus dem Login-Start, sonst `""`). Der Code gilt nur einmal
+(`return_to` ist der geprüfte Rücksprungpfad aus dem Login-Start, sonst `""`). Ein Code für eine eigene
+Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer eigenen Domain (sonst `401`). Der Code gilt nur einmal
 und nur kurz. Nach einem Seiten-SSO gilt das JWT nur für die Seite, deren IdP die Anmeldung bestätigt
 hat; nach einem globalen Anbieter für das ganze Konto.
 

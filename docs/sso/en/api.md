@@ -187,7 +187,8 @@ a page SSO), `404` (unknown ID), `502` (provider not reachable), `500`.
 
 Public, limited to 10 calls per minute. Exchanges the one-time code from the redirect for the JWT.
 Body: `{"code": "<one-time code>"}`. Response `200`: `{"token": "<JWT>", "return_to": "/path"}`
-(`return_to` is the checked return path from the login start, otherwise `""`). The code is valid only
+(`return_to` is the checked return path from the login start, otherwise `""`). A code for a custom domain
+is redeemed only there, a code for `FRONTEND_URL` never on a custom domain (otherwise `401`). The code is valid only
 once and only briefly. After a page SSO the JWT is valid only for the page whose IdP confirmed the
 sign-in; after a global provider for the whole account.
 

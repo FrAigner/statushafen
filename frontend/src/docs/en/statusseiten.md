@@ -95,12 +95,13 @@ the same domain, and the page that **verifies it first via the TXT record** wins
 already verified or active on another page, verifying fails with the message "Domain is already in
 use".
 
-**Signing in on the custom domain:** whoever signs in on a verified or active custom domain (global
-provider, SSO of the page or password) lands back on this page and this domain afterwards and is
-signed in there. On the custom domain the sign-in is valid only for this status page and never with
-global admin rights: the DNS of the domain belongs to the owner of the domain, not to the operator. A
-private page therefore needs a role on this page. The administration of all pages is reached through
-the main address of the application.
+**Signing in on the custom domain:** whoever has a role on the page and signs in on its verified or
+active custom domain (global provider, SSO of the page or password) lands back on this page and this
+domain afterwards and is signed in there. Without a role the sign-in ends on the main address of the
+application at the same page. On the custom domain the sign-in is valid only for this status page,
+never with global admin rights: the DNS of the domain belongs to the owner of the domain, not to the
+operator. Deleting the account, the data export and linking or unlinking sign-ins therefore only work
+through the main address; the administration of all pages is reached there too.
 
 ## Users of a page
 

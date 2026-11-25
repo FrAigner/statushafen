@@ -121,18 +121,29 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
    „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
    (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)
    wird verworfen; der Login endet dann wie bisher unter `FRONTEND_URL`.
-3. Der Callback prüft die Domain erneut und leitet nach `https://<Domain>/auth/sso-callback?code=…`
-   weiter, Fehler nach `https://<Domain>/login?oidc_error=<Code>`. Das Frontend dort tauscht den Code
-   auf demselben Origin ein. Der Passwort-Login läuft ohnehin auf demselben Origin.
+3. Der Callback prüft die Domain erneut. Hat das Konto eine Rolle auf der Seite der Domain, leitet er
+   nach `https://<Domain>/auth/sso-callback?code=…` weiter. Sonst endet der Login unter `FRONTEND_URL`
+   auf `/status/<slug>` derselben Seite (globale Anbieter: volle Sitzung). Die Auto-Join-Domains einer
+   Seite zählen dafür nicht, sie pflegt der Mandant. Fehler gehen nach
+   `https://<Domain>/login?oidc_error=<Code>`.
+4. Das Frontend dort tauscht den Code auf demselben Origin ein. Der Code ist an diesen Origin gebunden:
+   Ein Code für eine eigene Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer
+   eigenen Domain. Der Passwort-Login läuft ohnehin auf demselben Origin.
 
-Eine Sitzung auf einer eigenen Domain gilt nur für die Statusseite dieser Domain und nie mit
-Global-Admin-Rechten (wie eine Seiten-SSO-Sitzung). Grund: Wer das DNS der Domain kontrolliert, also
-der Mandant, kann dort eigenen Code ausliefern und lesen, was der Browser für diese Domain speichert.
-Für eine private Seite braucht man deshalb eine Rolle auf dieser Seite; Global Admins melden sich für
-die Verwaltung unter `FRONTEND_URL` an.
+Wer das DNS einer eigenen Domain kontrolliert, also der Mandant, kann dort eigenen Code ausliefern und
+lesen, was der Browser für diese Domain speichert. Eine Sitzung auf einer eigenen Domain (OIDC und
+Passwort) gilt deshalb nur für die Statusseite dieser Domain, nie mit Global-Admin-Rechten, und darf
+nicht am Konto selbst handeln: Konto löschen (`DELETE /api/me`), Datenexport (`GET /api/me/export`),
+Anmeldungen verknüpfen oder lösen (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
+`DELETE /api/me/sso/<id>`) antworten mit `403 custom_domain_session`. Dafür meldet man sich unter
+`FRONTEND_URL` an. Für eine private Seite braucht man eine Rolle auf dieser Seite; Global Admins
+verwalten unter `FRONTEND_URL`.
 
-Voraussetzungen: Das Frontend auf der eigenen Domain erreicht die API auf demselben Origin (Standard-Image,
-`VITE_API_URL` leer), und der Reverse-Proxy reicht den `Host`-Header unverändert durch.
+Vertrag mit dem Reverse-Proxy: Er reicht für eigene Domains den `Host`-Header durch und liefert `/api`
+auf demselben Origin aus (Standard-Image, `VITE_API_URL` leer). Ob eine Anfrage von einer eigenen
+Domain kommt, entscheidet das Backend am `Origin`-Header des Browsers oder am `Host`, beide ohne
+Rücksicht auf Groß-/Kleinschreibung, Port und Punkt am Ende. Schreibt der Proxy den `Host` um, bleibt
+der `Origin` maßgeblich; der Umweg über `BASE_URL` beim Login-Start braucht aber den echten `Host`.
 
 ## Fehlersuche
 

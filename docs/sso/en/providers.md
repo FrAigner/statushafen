@@ -124,18 +124,29 @@ domain. This applies to global providers, page SSO and the password login.
    "Verified" or "Active"; for page SSO only the domain of that same page. Anything else (unverified,
    unknown or other tenants' domains, scheme, port, path, upper case, trailing dot) is dropped; the
    login then ends under `FRONTEND_URL` as before.
-3. The callback checks the domain again and redirects to `https://<domain>/auth/sso-callback?code=…`,
-   errors to `https://<domain>/login?oidc_error=<code>`. The frontend there redeems the code on the
-   same origin. The password login runs on the same origin anyway.
+3. The callback checks the domain again. If the account has a role on the domain's page, it redirects
+   to `https://<domain>/auth/sso-callback?code=…`. Otherwise the login ends under `FRONTEND_URL` on
+   `/status/<slug>` of the same page (global providers: full session). The auto-join domains of a page
+   do not count for this, the tenant maintains them. Errors go to
+   `https://<domain>/login?oidc_error=<code>`.
+4. The frontend there redeems the code on the same origin. The code is bound to that origin: a code
+   for a custom domain is redeemed only there, a code for `FRONTEND_URL` never on a custom domain. The
+   password login runs on the same origin anyway.
 
-A session on a custom domain is valid only for the status page of that domain and never has global
-admin rights (like a page SSO session). The reason: whoever controls the DNS of the domain, i.e. the
-tenant, can serve their own code there and read what the browser stores for that domain. A private
-page therefore needs a role on that page; global admins sign in under `FRONTEND_URL` for
-administration.
+Whoever controls the DNS of a custom domain, i.e. the tenant, can serve their own code there and read
+what the browser stores for that domain. A session on a custom domain (OIDC and password) is therefore
+valid only for the status page of that domain, never has global admin rights and must not act on the
+account itself: deleting the account (`DELETE /api/me`), the data export (`GET /api/me/export`),
+linking or unlinking sign-ins (`POST /api/auth/oidc/link`, `POST /api/auth/provider/<id>/link`,
+`DELETE /api/me/sso/<id>`) answer `403 custom_domain_session`. For these, sign in under
+`FRONTEND_URL`. A private page needs a role on that page; global admins administer under
+`FRONTEND_URL`.
 
-Requirements: the frontend on the custom domain reaches the API on the same origin (default image,
-`VITE_API_URL` empty), and the reverse proxy passes the `Host` header on unchanged.
+Contract with the reverse proxy: for custom domains it passes the `Host` header on and serves `/api`
+on the same origin (default image, `VITE_API_URL` empty). Whether a request comes from a custom domain
+is decided by the backend from the browser's `Origin` header or from `Host`, both regardless of case,
+port and trailing dot. If the proxy rewrites `Host`, `Origin` still decides; the move to `BASE_URL` at
+the login start, however, needs the real `Host`.
 
 ## Troubleshooting
 

@@ -95,12 +95,13 @@ nicht: Mehrere Seiten können dieselbe Domain eintragen, den Zuschlag bekommt di
 **zuerst per TXT-Eintrag verifiziert**. Ist die Domain bei einer anderen Seite bereits verifiziert
 oder aktiv, schlägt das Verifizieren mit dem Hinweis „Diese Domain wird bereits von einer anderen Statusseite verwendet“ fehl.
 
-**Anmelden auf der eigenen Domain:** Wer sich auf einer verifizierten oder aktiven eigenen Domain
-anmeldet (globaler Anbieter, SSO der Seite oder Passwort), landet danach wieder auf dieser Seite und
-dieser Domain und ist dort angemeldet. Die Anmeldung gilt auf der eigenen Domain nur für diese
-Statusseite und nie mit Global-Admin-Rechten: Das DNS der Domain liegt beim Inhaber der Domain, nicht
-beim Betreiber. Für eine private Seite braucht man deshalb eine Rolle auf dieser Seite. Die Verwaltung
-aller Seiten erreicht man über die Hauptadresse der Anwendung.
+**Anmelden auf der eigenen Domain:** Wer eine Rolle auf der Seite hat und sich auf ihrer
+verifizierten oder aktiven eigenen Domain anmeldet (globaler Anbieter, SSO der Seite oder Passwort),
+landet danach wieder auf dieser Seite und dieser Domain und ist dort angemeldet. Ohne Rolle endet die
+Anmeldung auf der Hauptadresse der Anwendung bei derselben Seite. Die Anmeldung gilt auf der eigenen
+Domain nur für diese Statusseite, nie mit Global-Admin-Rechten: Das DNS der Domain liegt beim Inhaber
+der Domain, nicht beim Betreiber. Konto löschen, Datenexport und das Verknüpfen oder Lösen von
+Anmeldungen gehen deshalb nur über die Hauptadresse; dort erreicht man auch die Verwaltung aller Seiten.
 
 ## Benutzer einer Seite
 

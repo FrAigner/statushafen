@@ -124,8 +124,8 @@ Checkliste für die Produktion:
   pro Minute begrenzt (danach 429), Caddy fragt nur für Hosts ohne Zertifikat.
   **Anmelden auf eigenen Domains:** Der Proxy muss für eigene Domains den `Host`-Header unverändert an
   die Anwendung weiterreichen und `/api` auf demselben Origin ausliefern (Standard-Image, `VITE_API_URL`
-  leer). Ein Login dort läuft über `BASE_URL` und endet wieder auf der eigenen Domain; die Sitzung gilt
-  dort nur für die Seite der Domain (siehe [`docs/sso/providers.md`](docs/sso/providers.md#statusseiten-auf-eigener-domain)).
+  leer). Ein Login dort läuft über `BASE_URL` und endet für Konten mit Rolle auf der Seite wieder auf
+  der eigenen Domain; die Sitzung gilt dort nur für die Seite der Domain und darf nicht am Konto handeln (siehe [`docs/sso/providers.md`](docs/sso/providers.md#statusseiten-auf-eigener-domain)).
 - Die Datenbank regelmäßig sichern: [`docs/backup-restore.md`](docs/backup-restore.md).
 
 ## Upgrade-Hinweis: Anmeldung

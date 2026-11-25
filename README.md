@@ -122,8 +122,8 @@ Checklist for production:
   (429 afterwards); Caddy only asks for hosts without a certificate.
   **Signing in on custom domains:** for custom domains the proxy must pass the `Host` header on
   unchanged and serve `/api` on the same origin (default image, `VITE_API_URL` empty). A login there
-  runs through `BASE_URL` and ends on the custom domain again; the session there is valid only for the
-  page of the domain (see [`docs/sso/en/providers.md`](docs/sso/en/providers.md#status-pages-on-a-custom-domain)).
+  runs through `BASE_URL` and, for accounts with a role on the page, ends on the custom domain again;
+  the session there is valid only for the page of the domain and must not act on the account (see [`docs/sso/en/providers.md`](docs/sso/en/providers.md#status-pages-on-a-custom-domain)).
 - Back up the database regularly: [`docs/backup-restore.en.md`](docs/backup-restore.en.md).
 
 ## Upgrade note: sign-in
