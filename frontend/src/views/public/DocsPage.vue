@@ -240,6 +240,7 @@ const backToTop = () => {
    landing header above the sticky sidebar. */
 .docs--embedded {
   --lp-header-height: 0px;
+  max-width: none;
   margin: 0;
   padding: 0;
 }

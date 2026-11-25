@@ -358,7 +358,6 @@ const pmFields = computed(() => [
 </template>
 
 <style scoped>
-.wrap { max-width: 1000px; }
 .loading { margin: 0; padding: var(--sp-6); text-align: center; color: var(--text-2); }
 .mono { font-family: var(--font-mono); }
 

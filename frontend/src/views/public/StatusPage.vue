@@ -154,10 +154,8 @@ const showWizard = ref(false)
 const subscriptionManagerRef = ref(null)
 // null = unbekannt, true/false = Abonnement vorhanden bzw. nicht (vom SubscriptionManager gemeldet)
 const hasSubscription = ref(null)
-const openMySubscription = () => {
-  document.getElementById('subscription-manager-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  subscriptionManagerRef.value?.openEditAbo()
-}
+// Scrolling happens inside the manager: its section may only exist once it is open.
+const openMySubscription = () => subscriptionManagerRef.value?.revealEditAbo()
 
 // Header-Menü (PublicLayout.vue) löst dieses Event aus, da es –
 // via Subdomain-Root oder /status/:slug erreicht – keine eigene Ref auf die
