@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/fraigner/statushafen/models"
@@ -34,8 +35,9 @@ import (
 // on it and read what the domain's localStorage holds, and can send anyone a
 // login link with their domain as return_host. Therefore:
 //
-//   - The code goes to a custom domain only for an account with a role on the
-//     domain's page (loginDelivery); anyone else signs in on FRONTEND_URL.
+//   - The code goes to a custom domain only for an account that agreed to a
+//     role on the domain's page (loginDelivery, consentedMember); anyone else
+//     signs in on FRONTEND_URL. Callback errors always go to FRONTEND_URL.
 //   - A session handed to a custom domain (OIDC or password) is limited to the
 //     domain's page (sso_page_id, never global admin rights) and marked
 //     (custom_domain claim): it never acts on the account itself, see
@@ -87,7 +89,7 @@ func requestHostname(raw string) string {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	return strings.TrimSuffix(host, ".")
+	return strings.TrimRight(host, ".")
 }
 
 // browserOrigin is the custom domain a request comes from: the browser's
@@ -105,23 +107,48 @@ func (h *Handler) browserOrigin(c *gin.Context) loginOrigin {
 
 // loginDelivery decides where the one-time code of a finished login goes and
 // with which return path: to the custom domain of the state only for an
-// account with a role on its page. Anyone else signs in on FRONTEND_URL and
-// lands on the same page there (/status/<slug>). The auto-join e-mail
-// domains of a page do not count, its tenant sets them.
+// account that agreed to a role on its page (consentedMember). Anyone else
+// signs in on FRONTEND_URL and lands on the landing page there (empty return
+// path): the private page itself would auto-join the account.
 func (h *Handler) loginDelivery(st models.OIDCLoginState, userID uint) (loginOrigin, string) {
 	o := h.loginReturnOrigin(st)
-	if o.pageID == 0 || h.hasPageRole(userID, o.pageID) {
+	if o.pageID == 0 || h.consentedMember(userID, o.pageID) {
 		return o, st.ReturnTo
 	}
-	return loginOrigin{}, sanitizeReturnTo("/status/" + o.slug)
+	return loginOrigin{}, ""
 }
 
-// hasPageRole reports whether the account has a role on the page; false on a
+// consentedMember reports whether the account has a membership on the page
+// it agreed to (invitation, admin, order). An auto-join does not count: the
+// page's admins choose its e-mail domains. A legacy membership (from before
+// joined_via) counts only if the page has no auto-join set up and no
+// auto-join of this account on this page is in the audit log. False on a
 // database error (fail closed: the login then ends on FRONTEND_URL).
-func (h *Handler) hasPageRole(userID, pageID uint) bool {
+func (h *Handler) consentedMember(userID, pageID uint) bool {
+	var m models.UserStatusPageRole
+	if h.DB.Where(whereUserIDAndStatusPageID, userID, pageID).First(&m).Error != nil {
+		return false
+	}
+	switch m.JoinedVia {
+	case models.JoinedViaAutoJoin:
+		return false
+	case models.JoinedViaLegacy:
+		return h.legacyMembershipCounts(userID, pageID)
+	}
+	return true
+}
+
+// legacyMembershipCounts: see consentedMember.
+func (h *Handler) legacyMembershipCounts(userID, pageID uint) bool {
+	var page models.StatusPage
+	if h.DB.First(&page, pageID).Error != nil || (page.DefaultRoleID != nil && strings.TrimSpace(page.AutoJoinEmailDomains) != "") {
+		return false
+	}
 	var n int64
-	err := h.DB.Model(&models.UserStatusPageRole{}).Where(whereUserIDAndStatusPageID, userID, pageID).Count(&n).Error
-	return err == nil && n > 0
+	err := h.DB.Model(&models.AuditLog{}).
+		Where("action = ? AND actor_id = ? AND target_id = ?", "statuspage.user_role_auto_assigned", userID, strconv.FormatUint(uint64(pageID), 10)).
+		Count(&n).Error
+	return err == nil && n == 0
 }
 
 // acceptReturnHost validates a return_host. pageID != 0 (page SSO) accepts
@@ -167,13 +194,4 @@ func (h *Handler) moveLoginToBaseHost(c *gin.Context) bool {
 // fine here.
 func (h *Handler) loginStartErrorURL(c *gin.Context, e *oidcError) string {
 	return h.acceptReturnHost(c.Query(returnHostParam), 0).frontendURL() + "/login?oidc_error=" + e.code
-}
-
-// callbackErrorURL is the error target of a callback: test sign-in and link
-// as before (admin area on FRONTEND_URL), a login back to its login page.
-func (h *Handler) callbackErrorURL(st models.OIDCLoginState, e *oidcError) string {
-	if st.TestLogin || st.LinkUserID != 0 {
-		return ssoErrorURL(st.TestLogin, st.LinkUserID, e)
-	}
-	return h.loginReturnOrigin(st).frontendURL() + "/login?oidc_error=" + e.code
 }

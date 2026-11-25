@@ -200,7 +200,7 @@ func TestLoginStartOnUnverifiedHost_StartsNormally(t *testing.T) {
 // The Host header is normalised before the lookup (case, port, trailing dot);
 // the move always names the domain as stored.
 func TestLoginStartOnCustomDomain_HostIsNormalised(t *testing.T) {
-	for _, host := range []string{"STATUS.ACME.EXAMPLE", acmeHost + ":443", acmeHost + ":8443", acmeHost + ".", "Status.Acme.Example.:443"} {
+	for _, host := range []string{"STATUS.ACME.EXAMPLE", acmeHost + ":443", acmeHost + ":8443", acmeHost + ".", acmeHost + "..", "Status.Acme.Example.:443"} {
 		t.Run(host, func(t *testing.T) {
 			f := newGlobalOIDCFixture(t)
 			customDomainPages(t, f.db)
@@ -311,7 +311,7 @@ func TestProviderLoginFromOtherTenantsDomain_WithoutARoleEndsOnTheMainDomain(t *
 
 			returnTo, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://app.example.org")
 
-			assert.Equal(t, "/status/"+pages[acmeHost].Slug, returnTo, "back to the same page, on the main domain")
+			assert.Equal(t, "", returnTo, "the landing page: the private page there would auto-join the account")
 			assert.Zero(t, claims.SSOPageID)
 			assert.Empty(t, claims.CustomDomain)
 			assert.Equal(t, bootstrap != "", claims.IsGlobalAdmin)
@@ -369,8 +369,10 @@ func TestProviderLinkIgnoresReturnHost(t *testing.T) {
 	assert.Empty(t, st.ReturnHost)
 }
 
-// Errors after the state is known go to the login page of the custom domain.
-func TestProviderLoginFromCustomDomain_ErrorGoesBackThere(t *testing.T) {
+// Errors of the callback go to FRONTEND_URL: whether the account may use the
+// custom domain is not known (or not given) there, and codes such as
+// global_admin or other_page_role say something about the account.
+func TestProviderLoginFromCustomDomain_CallbackErrorStaysOnTheMainDomain(t *testing.T) {
 	f := newGlobalOIDCFixture(t)
 	customDomainPages(t, f.db)
 	w := serveProvider(f.h.ProviderLoginHandler, http.MethodGet,
@@ -380,7 +382,7 @@ func TestProviderLoginFromCustomDomain_ErrorGoesBackThere(t *testing.T) {
 	cb := f.callback("corp", state, "", stateCookie(w)) // provider reported an error
 
 	require.Equal(t, http.StatusTemporaryRedirect, cb.Code)
-	assert.Equal(t, "https://"+acmeHost+"/login?oidc_error=provider_denied", cb.Header().Get("Location"))
+	assert.Equal(t, getFrontendURL()+"/login?oidc_error=provider_denied", cb.Header().Get("Location"))
 }
 
 // Errors of the login start (before any state) go back to the custom domain too.
@@ -427,7 +429,7 @@ func TestPageSSOLoginFromItsCustomDomain_WithoutARoleEndsOnTheMainDomain(t *test
 
 	returnTo, claims := callbackClaims(t, f.pageLoginFrom(t, acmeHost), "https://app.example.org")
 
-	assert.Equal(t, "/status/oidc-seite", returnTo)
+	assert.Equal(t, "", returnTo)
 	assert.Equal(t, f.page.ID, claims.SSOPageID, "a page SSO session stays limited to its page")
 	assert.Empty(t, claims.CustomDomain)
 }
@@ -598,6 +600,8 @@ func TestPasswordLoginOnCustomDomain_HostVariantsAndRewrittenHost(t *testing.T) 
 		{acmeHost + ":443", ""},
 		{acmeHost + ":8443", ""},
 		{acmeHost + ".", ""},
+		{acmeHost + "..", ""},
+		{acmeHost + "...:443", ""},
 		{"backend:8080", "https://" + acmeHost},
 		{"backend:8080", "https://STATUS.ACME.EXAMPLE:443"},
 		{"status.example.org", "https://" + acmeHost},
@@ -607,5 +611,87 @@ func TestPasswordLoginOnCustomDomain_HostVariantsAndRewrittenHost(t *testing.T) 
 		assert.Equal(t, pages[acmeHost].ID, claims.SSOPageID, "%+v", tc)
 		assert.False(t, claims.IsGlobalAdmin, "%+v", tc)
 		assert.Equal(t, false, body["is_global_admin"], "%+v", tc)
+	}
+}
+
+// autoJoin makes the account join the page the way the SPA does on its first
+// request to the private page (AutoJoinEmailDomains + default role).
+func autoJoin(t *testing.T, h *Handler, user models.User, page models.StatusPage) {
+	t.Helper()
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set("userID", user.ID)
+	status, _, ok := h.autoAssignDefaultRole(c, user, page)
+	require.True(t, ok, "status %d", status)
+}
+
+// enableAutoJoin lets accounts of example.org join the page with a read role;
+// the tenant sets this, e.g. to the victim's mail provider.
+func enableAutoJoin(t *testing.T, db *gorm.DB, page *models.StatusPage) {
+	t.Helper()
+	role := models.Role{Name: "Auto " + page.Slug, Permissions: "incidents:read"}
+	require.NoError(t, db.Create(&role).Error)
+	require.NoError(t, db.Model(page).Updates(map[string]any{"default_role_id": role.ID, "auto_join_email_domains": "example.org", "is_private": true}).Error)
+	require.NoError(t, db.First(page, page.ID).Error)
+}
+
+// Abuse case in two clicks: the tenant turns on auto-join for the victim's
+// mail domain. The first click on the crafted link signs the victim in on the
+// main domain, the page there would auto-join the account; the second click
+// must still not send the code to the tenant's domain.
+func TestProviderLoginFromCustomDomain_AutoJoinedRoleDoesNotCount(t *testing.T) {
+	f := newGlobalOIDCFixture(t)
+	t.Setenv("FRONTEND_URL", "https://app.example.org")
+	pages := customDomainPages(t, f.db)
+	page := pages[acmeHost]
+	enableAutoJoin(t, f.db, &page)
+
+	callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://app.example.org") // click 1
+	var victim models.User
+	require.NoError(t, f.db.Where("email = ?", "neu@example.org").First(&victim).Error)
+	autoJoin(t, f.h, victim, page)
+	var membership models.UserStatusPageRole
+	require.NoError(t, f.db.Where("user_id = ? AND status_page_id = ?", victim.ID, page.ID).First(&membership).Error)
+	assert.Equal(t, models.JoinedViaAutoJoin, membership.JoinedVia)
+
+	_, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), "https://app.example.org") // click 2
+	assert.Empty(t, claims.CustomDomain)
+	assert.Zero(t, claims.SSOPageID)
+}
+
+// Memberships from before joined_via existed may stem from an auto-join. They
+// count only if the page has no auto-join set up now and no auto-join of this
+// account on this page is in the audit log.
+func TestProviderLoginFromCustomDomain_LegacyMembership(t *testing.T) {
+	for name, tc := range map[string]struct {
+		autoJoinNow, audited bool
+		counts               bool
+	}{
+		"plain":              {counts: true},
+		"auto-join set up":   {autoJoinNow: true},
+		"auto-join recorded": {audited: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newGlobalOIDCFixture(t)
+			t.Setenv("FRONTEND_URL", "https://app.example.org")
+			pages := customDomainPages(t, f.db)
+			page := pages[acmeHost]
+			member := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
+			require.NoError(t, f.db.Create(&member).Error)
+			require.NoError(t, f.db.Create(&models.UserStatusPageRole{UserID: member.ID, StatusPageID: page.ID, RoleID: f.viewer.ID, JoinedVia: models.JoinedViaLegacy}).Error)
+			if tc.autoJoinNow {
+				enableAutoJoin(t, f.db, &page)
+			}
+			if tc.audited {
+				require.NoError(t, f.db.Create(&models.AuditLog{ActorID: &member.ID, Action: "statuspage.user_role_auto_assigned", Category: "config",
+					TargetType: "StatusPage", TargetID: strconv.FormatUint(uint64(page.ID), 10)}).Error)
+			}
+			base := "https://app.example.org"
+			if tc.counts {
+				base = "https://" + acmeHost
+			}
+			_, claims := callbackClaims(t, f.providerLoginFrom(t, acmeHost), base)
+			assert.Equal(t, tc.counts, claims.CustomDomain != "")
+		})
 	}
 }

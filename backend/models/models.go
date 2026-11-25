@@ -184,6 +184,28 @@ type UserStatusPageRole struct {
 	StatusPage   StatusPage `gorm:"foreignKey:StatusPageID"`
 	RoleID       uint       `gorm:"not null"`
 	Role         Role       `gorm:"foreignKey:RoleID"`
+	// JoinedVia records how the membership came about: JoinedViaAutoJoin
+	// (AutoJoinEmailDomains, which the page's admins set), JoinedViaAssigned
+	// (invitation, admin, order; the default, see BeforeCreate) or
+	// JoinedViaLegacy (from before this was recorded). Only memberships the
+	// account agreed to let a login return to the page's custom domain.
+	JoinedVia string `gorm:"not null;default:''"`
+}
+
+// Values of UserStatusPageRole.JoinedVia.
+const (
+	JoinedViaAssigned = "assigned"
+	JoinedViaAutoJoin = "auto_join"
+	JoinedViaLegacy   = "legacy"
+)
+
+// BeforeCreate marks a new membership as assigned unless the caller set its
+// origin (the auto-join does).
+func (r *UserStatusPageRole) BeforeCreate(*gorm.DB) error {
+	if r.JoinedVia == "" {
+		r.JoinedVia = JoinedViaAssigned
+	}
+	return nil
 }
 
 // PageOrder: Self-Service-Bestellung einer neuen Statusseite über die

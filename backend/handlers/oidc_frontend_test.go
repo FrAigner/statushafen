@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/fraigner/statushafen/models"
-	"github.com/fraigner/statushafen/testutils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -142,18 +141,11 @@ func TestOIDCCallback_LinkErrorsGoBackToProfile(t *testing.T) {
 	assertOIDCError(t, f.callback(state, "good-code", ck), "/admin/profile", "no_id_token")
 }
 
-func TestCallbackErrorURL_TargetsByFlow(t *testing.T) {
+func TestSSOErrorURL_TargetsByFlow(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://status.example.org")
-	h := NewHandler(testutils.SetupTestDB())
-	assert.Equal(t, "https://status.example.org/login?oidc_error=not_linked",
-		h.callbackErrorURL(models.OIDCLoginState{}, errOIDCNotLinked))
-	assert.Equal(t, "https://status.example.org/admin/profile?oidc_error=not_linked",
-		h.callbackErrorURL(models.OIDCLoginState{LinkUserID: 1}, errOIDCNotLinked))
-	assert.Equal(t, "https://status.example.org/admin/sso?oidc_test=not_linked",
-		h.callbackErrorURL(models.OIDCLoginState{TestLogin: true}, errOIDCNotLinked))
-	// Link and test sign-in never leave the admin area, whatever the state holds.
-	assert.Equal(t, "https://status.example.org/admin/profile?oidc_error=not_linked",
-		h.callbackErrorURL(models.OIDCLoginState{LinkUserID: 1, ReturnHost: "status.acme.example"}, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/login?oidc_error=not_linked", ssoErrorURL(false, 0, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/admin/profile?oidc_error=not_linked", ssoErrorURL(false, 1, errOIDCNotLinked))
+	assert.Equal(t, "https://status.example.org/admin/sso?oidc_test=not_linked", ssoErrorURL(true, 0, errOIDCNotLinked))
 }
 
 // --- Testanmeldung (test_login_enabled) ---

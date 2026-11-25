@@ -45,7 +45,7 @@ import (
 //
 // Fehler im Browser-Ablauf (Login-Start und Callback) leiten mit
 // einem festen Code ins Frontend um statt rohes JSON zu zeigen, siehe
-// ssoErrorURL und callbackErrorURL. Dazu kommt die Testanmeldung eines Seiten-Admins
+// ssoErrorURL. Dazu kommt die Testanmeldung eines Seiten-Admins
 // (OIDCLoginState.TestLogin, StartSSOTestHandler).
 
 const (
@@ -93,8 +93,8 @@ var (
 // ssoErrorURL is the frontend error target of the browser flows on
 // FRONTEND_URL: test sign-in back to the SSO page, link back to the profile,
 // otherwise the login page. It consists of FRONTEND_URL, a fixed path and the
-// fixed code only (no open redirect). Logins from a custom domain use
-// callbackErrorURL / loginStartErrorURL (login_origin.go).
+// fixed code only (no open redirect). Only the error of a login start may go
+// to a custom domain (loginStartErrorURL, login_origin.go).
 func ssoErrorURL(testLogin bool, linkUserID uint, e *oidcError) string {
 	if testLogin {
 		return getFrontendURL() + "/admin/sso?oidc_test=" + e.code
@@ -650,7 +650,7 @@ func (h *Handler) OIDCCallbackHandler(c *gin.Context) {
 		e = h.completeOIDC(c, st)
 	}
 	if e != nil {
-		c.Redirect(http.StatusTemporaryRedirect, h.callbackErrorURL(st, e))
+		c.Redirect(http.StatusTemporaryRedirect, ssoErrorURL(st.TestLogin, st.LinkUserID, e))
 	}
 }
 

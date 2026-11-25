@@ -150,7 +150,7 @@ func (h *Handler) ProviderCallbackHandler(c *gin.Context) {
 		e = h.completeProviderLogin(c, p, st)
 	}
 	if e != nil {
-		c.Redirect(http.StatusTemporaryRedirect, h.callbackErrorURL(st, e))
+		c.Redirect(http.StatusTemporaryRedirect, ssoErrorURL(st.TestLogin, st.LinkUserID, e))
 	}
 }
 

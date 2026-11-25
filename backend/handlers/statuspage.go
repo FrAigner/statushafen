@@ -352,6 +352,9 @@ func (h *Handler) autoAssignDefaultRole(c *gin.Context, user models.User, page m
 		UserID:       userID,
 		StatusPageID: page.ID,
 		RoleID:       *page.DefaultRoleID,
+		// The page's admins set the auto-join: no consent of the account, so
+		// it never lets a login return to the page's custom domain.
+		JoinedVia: models.JoinedViaAutoJoin,
 	}
 	if err := h.DB.Create(&newRole).Error; err != nil {
 		// Die SPA fragt beim ersten Aufruf parallel an; die Anfrage, die
