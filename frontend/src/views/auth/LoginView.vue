@@ -41,6 +41,9 @@ const urlError = ref(urlParams.get('error'))
 // Kopf bzw. privater Fehlerzustand), ?oidc_error=<code> vom OIDC-Callback.
 // Nur bekannte Codes werden übersetzt, nie der rohe Wert angezeigt.
 const pageSlug = urlParams.get('page')
+// returnTo is attacker input: only checked internal paths, otherwise the landing page.
+// The same target goes to the password login and, as return_to, to every OIDC start.
+const returnTo = safeReturnTo(urlParams.get('returnTo'), router, '/')
 const oidcErrorCode = urlParams.get('oidc_error')
 const oidcErrorMessage = computed(() => {
   if (!oidcErrorCode) return ''
@@ -51,7 +54,7 @@ const oidcErrorMessage = computed(() => {
 // Global OIDC provider: real browser navigation, the server redirects to the provider.
 const startProviderLogin = (id) => {
   const apiBase = import.meta.env.VITE_API_URL || ''
-  window.location.assign(`${apiBase}/api/auth/provider/${encodeURIComponent(id)}/login`)
+  window.location.assign(`${apiBase}/api/auth/provider/${encodeURIComponent(id)}/login?return_to=${encodeURIComponent(returnTo)}`)
 }
 
 // 401 of the app means wrong credentials (not Caddy's Basic Auth 401); 403
@@ -91,9 +94,6 @@ const doLogin = async (email, password) => {
     isSubmitting.value = false
     return
   }
-  // AdminLayout führt zum ersten lesbaren Tab.
-  // returnTo ist Angreifer-Eingabe, nur geprüfte interne Pfade (sonst /admin).
-  const returnTo = safeReturnTo(new URLSearchParams(window.location.search).get('returnTo'), router, '/admin')
   try {
     // Navigation abwarten, sonst gibt der Button frei, solange der lazy Chunk noch lädt.
     await router.push(returnTo)
@@ -128,7 +128,7 @@ const doLogin = async (email, password) => {
 
       <!-- SSO Buttons -->
       <div class="sso-section entry-actions">
-        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback @available="pageSsoAvailable = $event" />
+        <OidcLoginButton v-if="pageSlug" :slug="pageSlug" :return-to="returnTo" fallback @available="pageSsoAvailable = $event" />
         <OnyxButton
           v-for="p in providers"
           :key="p.id"

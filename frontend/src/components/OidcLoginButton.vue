@@ -27,6 +27,8 @@ const props = defineProps({
   slug: { type: String, default: '' },
   // Bei 404 der Auskunft den Einstieg über den Slug anbieten (private Seiten).
   fallback: { type: Boolean, default: false },
+  // Internal path to come back to after the sign-in, sent as return_to (the backend checks it again).
+  returnTo: { type: String, default: '' },
 })
 const emit = defineEmits(['available'])
 // Stryker restore all
@@ -44,15 +46,16 @@ const load = async (slug) => {
 
 const lookup = async (slug) => {
   const base = import.meta.env.VITE_API_URL || ''
+  const returnParam = props.returnTo ? `&return_to=${encodeURIComponent(props.returnTo)}` : ''
   try {
     const info = await apiFetch(`/api/public/pages/${encodeURIComponent(slug)}/sso`)
     if (info.oidc_enabled) {
-      loginUrl.value = `${base}/api/auth/oidc/login?page=${info.page_id}`
+      loginUrl.value = `${base}/api/auth/oidc/login?page=${info.page_id}${returnParam}`
     }
   } catch (err) {
     // Private oder fehlende Seite: der Server löst den Einstieg über den Slug selbst auf.
     if (props.fallback && err?.status === 404) {
-      loginUrl.value = `${base}/api/auth/sso/login?slug=${encodeURIComponent(slug)}`
+      loginUrl.value = `${base}/api/auth/sso/login?slug=${encodeURIComponent(slug)}${returnParam}`
     }
     // Sonst kein Knopf: Die übrigen Anmeldewege bleiben nutzbar.
   }

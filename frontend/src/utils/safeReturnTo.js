@@ -8,6 +8,9 @@
 // keinen Backslash enthält (Browser deuten `/\host` wie `//host`), (3) mit genau EINEM
 // Slash beginnt, auch nach einmaligem Dekodieren (`/%2F/host`), und (4) per router.resolve
 // auf eine bekannte Route zeigt. Alles andere fällt auf den Fallback.
+//
+// The default fallback is the landing page "/": the admin area is only a target
+// when it was chosen explicitly (returnTo=/admin or a direct requiresAuth route).
 
 const MAX_LENGTH = 2048
 // Steuerzeichen C0/C1, Leerzeichen und Unicode-Zeilentrenner sowie der Backslash.
@@ -33,7 +36,7 @@ function istInternerPfad(wert) {
  * @param {string} [fallback] Ziel, wenn der Wert nicht taugt
  * @returns {string}
  */
-export function safeReturnTo(raw, router, fallback = '/admin') {
+export function safeReturnTo(raw, router, fallback = '/') {
   if (typeof raw !== 'string' || !istInternerPfad(raw)) return fallback
   const ziel = router.resolve(raw)
   return ziel.matched.length > 0 ? ziel.fullPath : fallback

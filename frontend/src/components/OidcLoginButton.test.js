@@ -93,6 +93,19 @@ describe('OidcLoginButton', () => {
     expect(wrapper.emitted('available')).toEqual([expected])
   })
 
+  it('appends returnTo as encoded return_to to both login starts', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 3 }))
+    const wrapper = mount(OidcLoginButton, { props: { slug: 'acme', fallback: true, returnTo: '/status/acme?x=1' }, global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=3&return_to=%2Fstatus%2Facme%3Fx%3D1')
+
+    global.fetch.mockResolvedValue(jsonResponse({}, 404))
+    await wrapper.setProps({ slug: 'geheim' })
+    await flushPromises()
+    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=geheim&return_to=%2Fstatus%2Facme%3Fx%3D1')
+  })
+
   it('gibt Attribute wie class an das gemeinsame Element weiter', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 3 }))
     const wrapper = mount(OidcLoginButton, { props: { slug: 'acme' }, attrs: { class: 'extra' }, global: { plugins: [i18n] } })
