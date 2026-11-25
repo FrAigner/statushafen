@@ -123,11 +123,12 @@ func (h *Handler) loginDelivery(st models.OIDCLoginState, user models.User) (log
 }
 
 // consentedMember reports whether the account has a membership on the page
-// it agreed to (invitation, admin, order). An auto-join does not count: the
-// page's admins choose its e-mail domains. A legacy membership (from before
-// joined_via) counts only if the page has no auto-join set up and no
-// auto-join of this account on this page is in the audit log. False on a
-// database error (fail closed: the login then ends on FRONTEND_URL).
+// it agreed to (invitation, admin, order). Only an explicit auto-join does not
+// count: the page's admins choose its e-mail domains. A membership from before
+// joined_via (legacy, or a row still empty) counts unless the audit log, which
+// has always recorded every auto-join, shows an auto-join of this account on
+// this page. False on a database error (fail closed: the login then ends on
+// FRONTEND_URL).
 func (h *Handler) consentedMember(userID, pageID uint) bool {
 	var m models.UserStatusPageRole
 	if h.DB.Where(whereUserIDAndStatusPageID, userID, pageID).First(&m).Error != nil {
@@ -136,23 +137,20 @@ func (h *Handler) consentedMember(userID, pageID uint) bool {
 	switch m.JoinedVia {
 	case models.JoinedViaAutoJoin:
 		return false
-	case models.JoinedViaLegacy:
-		return h.legacyMembershipCounts(userID, pageID)
+	case models.JoinedViaLegacy, "":
+		return !h.autoJoinAudited(userID, pageID)
 	}
 	return true
 }
 
-// legacyMembershipCounts: see consentedMember.
-func (h *Handler) legacyMembershipCounts(userID, pageID uint) bool {
-	var page models.StatusPage
-	if h.DB.First(&page, pageID).Error != nil || (page.DefaultRoleID != nil && strings.TrimSpace(page.AutoJoinEmailDomains) != "") {
-		return false
-	}
+// autoJoinAudited reports whether the audit log records an auto-join of the
+// account on the page (true on a database error: fail closed).
+func (h *Handler) autoJoinAudited(userID, pageID uint) bool {
 	var n int64
 	err := h.DB.Model(&models.AuditLog{}).
 		Where("action = ? AND actor_id = ? AND target_id = ?", "statuspage.user_role_auto_assigned", userID, strconv.FormatUint(uint64(pageID), 10)).
 		Count(&n).Error
-	return err == nil && n == 0
+	return err != nil || n > 0
 }
 
 // acceptReturnHost validates a return_host. pageID != 0 (page SSO) accepts

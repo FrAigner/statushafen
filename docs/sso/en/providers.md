@@ -131,9 +131,9 @@ domain. This applies to global providers, page SSO and the password login.
    page (they never trigger an auto-join). A role from the auto-join never counts, because the tenant
    maintains its e-mail domains; such roles are marked (`joined_via`). If the account then accepts an
    invitation to the same page, the membership becomes an agreed one (with the invited role). If only a
-   page admin changes the role, the marking stays. Roles from before this
-   marking count only if the page has no auto-join set up now and the audit log knows no auto-join of
-   this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
+   page admin changes the role, the marking stays; when a global admin saves the account, unchanged
+   roles keep it too. Roles from before this marking count unless the audit log (which has always
+   recorded every auto-join) knows an auto-join of this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
    start (without any account) go to the custom domain.
 4. The frontend there redeems the code on the same origin. The code is bound to that origin: a code
    for a custom domain is redeemed only there, a code for `FRONTEND_URL` never on a custom domain. The

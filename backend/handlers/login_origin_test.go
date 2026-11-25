@@ -664,17 +664,23 @@ func TestProviderLoginFromCustomDomain_AutoJoinedRoleDoesNotCount(t *testing.T) 
 	assert.Zero(t, claims.SSOPageID)
 }
 
-// Memberships from before joined_via existed may stem from an auto-join. They
-// count only if the page has no auto-join set up now and no auto-join of this
-// account on this page is in the audit log.
+// Memberships from before joined_via existed (legacy, or still empty) count
+// as consented. Only an explicit auto-join does not: the auto-join has always
+// been recorded in the audit log, which is the evidence for legacy rows. An
+// auto-join set up on the page today says nothing about how an older
+// membership came about.
 func TestProviderLoginFromCustomDomain_LegacyMembership(t *testing.T) {
 	for name, tc := range map[string]struct {
+		joinedVia            string
 		autoJoinNow, audited bool
 		counts               bool
 	}{
-		"plain":              {counts: true},
-		"auto-join set up":   {autoJoinNow: true},
-		"auto-join recorded": {audited: true},
+		"plain":                     {joinedVia: models.JoinedViaLegacy, counts: true},
+		"empty":                     {joinedVia: "", counts: true},
+		"auto-join set up":          {joinedVia: models.JoinedViaLegacy, autoJoinNow: true, counts: true},
+		"empty, auto-join set up":   {joinedVia: "", autoJoinNow: true, counts: true},
+		"auto-join recorded":        {joinedVia: models.JoinedViaLegacy, audited: true},
+		"empty, auto-join recorded": {joinedVia: "", audited: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newGlobalOIDCFixture(t)
@@ -683,7 +689,10 @@ func TestProviderLoginFromCustomDomain_LegacyMembership(t *testing.T) {
 			page := pages[acmeHost]
 			member := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
 			require.NoError(t, f.db.Create(&member).Error)
-			require.NoError(t, f.db.Create(&models.UserStatusPageRole{UserID: member.ID, StatusPageID: page.ID, RoleID: f.viewer.ID, JoinedVia: models.JoinedViaLegacy}).Error)
+			row := models.UserStatusPageRole{UserID: member.ID, StatusPageID: page.ID, RoleID: f.viewer.ID}
+			require.NoError(t, f.db.Create(&row).Error)
+			// BeforeCreate never stores an empty origin; set it directly.
+			require.NoError(t, f.db.Model(&row).UpdateColumn("joined_via", tc.joinedVia).Error)
 			if tc.autoJoinNow {
 				enableAutoJoin(t, f.db, &page)
 			}

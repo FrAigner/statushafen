@@ -128,9 +128,10 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
    (sie lösen keinen Auto-Join aus). Eine Rolle aus dem Auto-Join zählt nie, denn dessen E-Mail-Domains
    pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Nimmt das Konto danach eine Einladung
    auf dieselbe Seite an, wird die Mitgliedschaft zur zugestimmten (mit der Rolle aus der Einladung). Ändert
-   nur ein Seiten-Admin die Rolle, bleibt die Markierung. Rollen aus der Zeit
-   vor dieser Markierung zählen nur, wenn die Seite gerade keinen Auto-Join eingerichtet hat und das
-   Audit-Log keinen Auto-Join dieses Kontos auf dieser Seite kennt. Fehler im Callback gehen immer an
+   nur ein Seiten-Admin die Rolle, bleibt die Markierung; speichert ein Global Admin das Konto, behalten
+   unveränderte Rollen sie ebenfalls. Rollen aus der Zeit vor dieser Markierung zählen, außer das
+   Audit-Log (das jeden Auto-Join schon immer protokolliert) kennt einen Auto-Join dieses Kontos auf
+   dieser Seite. Fehler im Callback gehen immer an
    `FRONTEND_URL`, nur Fehler beim Login-Start (ohne Kontobezug) an die eigene Domain.
 4. Das Frontend dort tauscht den Code auf demselben Origin ein. Der Code ist an diesen Origin gebunden:
    Ein Code für eine eigene Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer
