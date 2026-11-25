@@ -51,9 +51,11 @@ OIDC_ENTRA_CLIENT_SECRET=CLIENT-SECRET
 OIDC_ENTRA_NAME=Microsoft
 ```
 
-Entra ID sends **no** `email_verified`. Existing accounts are therefore never linked by
-e-mail; they link the provider in the profile (for that, temporarily
-`PASSWORD_LOGIN_ENABLED=true`). New accounts are created as usual. Always use the issuer with your
+Entra ID sends **no** `email_verified`. Without further settings no new accounts are created and
+existing ones are not linked by e-mail. If your tenant only issues addresses of your verified
+company domains, set `OIDC_ENTRA_EMAIL_TRUSTED=true`; the e-mail then counts as verified. Otherwise
+existing accounts link the provider in the profile (for that, temporarily
+`PASSWORD_LOGIN_ENABLED=true`). Always use the issuer with your
 tenant ID, never `common`: with multi-tenant applications the `email` claim can be set by
 outsiders.
 

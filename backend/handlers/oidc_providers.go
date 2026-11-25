@@ -18,6 +18,9 @@ import (
 //	OIDC_<ID>_ISSUER, OIDC_<ID>_CLIENT_ID, OIDC_<ID>_CLIENT_SECRET (required)
 //	OIDC_<ID>_NAME (button label, default: the ID)
 //	OIDC_<ID>_SCOPES (default: "openid email profile")
+//	OIDC_<ID>_EMAIL_TRUSTED (true/1/yes: a missing email_verified claim counts
+//	as verified; only for providers that issue e-mail addresses users cannot
+//	choose, e.g. Entra ID with verified company domains. Default: off)
 //
 // <ID> is the provider ID in upper case with "-" replaced by "_". The
 // configuration is read on every use (cheap) so that tests can set it per
@@ -32,6 +35,9 @@ type globalOIDCProvider struct {
 	ClientID     string
 	ClientSecret string
 	Scopes       []string
+	// EmailTrusted: the operator vouches for the provider's e-mail claim
+	// (OIDC_<ID>_EMAIL_TRUSTED), so a missing email_verified counts as verified.
+	EmailTrusted bool
 }
 
 var oidcProviderIDPattern = regexp.MustCompile(`^[a-z0-9-]{1,32}$`)
@@ -85,6 +91,7 @@ func readOIDCProvider(id string) (globalOIDCProvider, string) {
 		ClientID:     get("CLIENT_ID"),
 		ClientSecret: get("CLIENT_SECRET"),
 		Scopes:       strings.Fields(orDefault(get("SCOPES"), "openid email profile")),
+		EmailTrusted: envFlag(prefix + "EMAIL_TRUSTED"),
 	}
 	var missing []string
 	for _, v := range []struct{ name, value string }{

@@ -17,6 +17,7 @@ Anleitungen je Anbieter: [GitLab](gitlab.md), [Google](google.md), [Keycloak](ke
 | `OIDC_<ID>_CLIENT_SECRET` | Client-Secret. Wird nie ausgegeben oder geloggt. |
 | `OIDC_<ID>_NAME` | Knopftext, z. B. `GitLab`. Standard: die ID. |
 | `OIDC_<ID>_SCOPES` | Scopes, Standard `openid email profile`; `openid` wird immer ergänzt. |
+| `OIDC_<ID>_EMAIL_TRUSTED` | `true` = fehlt `email_verified`, gilt die E-Mail als bestätigt. Nur für Anbieter, bei denen Nutzer ihre Adresse nicht selbst wählen können (z. B. Entra ID mit bestätigten Firmen-Domains). Standard: aus. |
 | `PASSWORD_LOGIN_ENABLED` | `true`, `1` oder `yes` (Groß-/Kleinschreibung egal) schaltet die Anmeldung mit Passwort ein. Alles andere und ungesetzt: **aus**. |
 | `SSO_ALLOWED_DOMAINS` | Kommagetrennte E-Mail-Domains, für die beim ersten Login ein **neues** Konto entstehen darf. Leer: keine Einschränkung. |
 | `SSO_BOOTSTRAP_ADMIN_EMAILS` | E-Mail-Adressen, deren Konto bei jedem Login über einen globalen Anbieter Global Admin wird (nur mit bestätigter E-Mail, siehe unten). |
@@ -65,12 +66,15 @@ Verknüpfung entscheidet die E-Mail-Adresse aus dem Claim `email`:
 | --- | --- |
 | Konto mit dieser E-Mail existiert, `email_verified` ist `true` | Das Konto wird verknüpft und angemeldet (auch ein Konto mit Passwort oder ein Global Admin). |
 | Konto existiert, `email_verified` fehlt oder ist `false` | Abgelehnt mit `email_unverified`. Das Konto kann den Anbieter selbst im Profil verknüpfen. |
-| Kein Konto, `email_verified` ist `false` | Abgelehnt mit `email_unverified`. |
-| Kein Konto, `email_verified` ist `true` oder fehlt | Neues Konto mit der Rolle „Viewer“, ohne Tags und ohne Passwort, sofern die Domain in `SSO_ALLOWED_DOMAINS` steht (sonst `domain_not_allowed`). |
+| Kein Konto, `email_verified` ist `true` | Neues Konto mit der Rolle „Viewer“, ohne Tags und ohne Passwort, sofern die Domain in `SSO_ALLOWED_DOMAINS` steht (sonst `domain_not_allowed`). |
+| Kein Konto, `email_verified` fehlt oder ist `false` | Abgelehnt mit `email_unverified`. |
 | Kein `email`-Claim | Abgelehnt mit `email_missing`. |
 
-Fehlt `email_verified`, wird also nie über die E-Mail mit einem bestehenden Konto verknüpft (wie beim
-Seiten-SSO). Steht die bestätigte E-Mail des Kontos in `SSO_BOOTSTRAP_ADMIN_EMAILS`, wird es Global
+Nur eine bestätigte E-Mail verknüpft ein Konto oder legt eines an. Sonst könnte jemand über einen
+Anbieter ohne Bestätigung ein Konto für eine fremde Adresse vorab anlegen, das die spätere, bestätigte
+Anmeldung der echten Person (oder `SSO_BOOTSTRAP_ADMIN_EMAILS`) übernehmen würde. Mit
+`OIDC_<ID>_EMAIL_TRUSTED=true` zählt bei diesem Anbieter ein fehlendes `email_verified` als
+bestätigt; ein ausdrückliches `false` nie. Steht die bestätigte E-Mail des Kontos in `SSO_BOOTSTRAP_ADMIN_EMAILS`, wird es Global
 Admin. Spätere Logins finden das Konto über `sub`, auch wenn sich die E-Mail beim Anbieter ändert.
 
 Angemeldete Nutzer verknüpfen weitere Anbieter im Profil („SSO-Anmeldung“,
@@ -137,6 +141,7 @@ im Profil:
 - Migrationsschritte: 1. Anbieter beim IdP registrieren (Redirect-URI oben). 2. `OIDC_PROVIDERS`
   und `OIDC_<ID>_*` setzen, `GOOGLE_*`/`GITHUB_*` entfernen. 3. Vorübergehend
   `PASSWORD_LOGIN_ENABLED=true` lassen, bis alle Konten sich über den Anbieter angemeldet haben
-  (Anbieter ohne `email_verified`: im Profil verknüpfen). 4. Den Passwort-Login abschalten.
+  (Anbieter ohne `email_verified`: `OIDC_<ID>_EMAIL_TRUSTED=true` setzen, wenn er nur eure
+  Firmenadressen ausgibt, sonst im Profil verknüpfen). 4. Den Passwort-Login abschalten.
 
 Zurück zur [Übersicht](README.md).

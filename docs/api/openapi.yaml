@@ -367,9 +367,11 @@ paths:
         den Code mit PKCE, prüft ID-Token (Signatur, Issuer, Zielgruppe, Ablauf)
         und Nonce. Das Konto wird über (Issuer, Subject) gefunden. Ohne
         Verknüpfung entscheidet die E-Mail: Ein bestehendes Konto mit derselben
-        Adresse wird nur bei `email_verified=true` verknüpft, sonst
-        `email_unverified`; ohne Konto entsteht ein neues (Rolle Viewer;
-        `SSO_ALLOWED_DOMAINS` gilt, `email_verified=false` wird abgelehnt).
+        Adresse wird nur bei bestätigter E-Mail verknüpft, sonst
+        `email_unverified`; ohne Konto entsteht nur bei bestätigter E-Mail ein
+        neues (Rolle Viewer; `SSO_ALLOWED_DOMAINS` gilt). Bestätigt heißt
+        `email_verified=true` oder, bei `OIDC_<ID>_EMAIL_TRUSTED=true`, ein
+        fehlender Claim; `email_verified=false` wird immer abgelehnt.
         `SSO_BOOTSTRAP_ADMIN_EMAILS` macht ein Konto mit bestätigter E-Mail zum
         Global Admin. Erfolg: `<FRONTEND_URL>/auth/sso-callback?code=…` (bei
         Verknüpfung mit `&next=profile`); Fehler:

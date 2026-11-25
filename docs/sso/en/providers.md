@@ -19,6 +19,7 @@ Guides per provider: [GitLab](gitlab.md), [Google](google.md), [Keycloak](keyclo
 | `OIDC_<ID>_CLIENT_SECRET` | Client secret. Never returned or logged. |
 | `OIDC_<ID>_NAME` | Button label, e.g. `GitLab`. Default: the ID. |
 | `OIDC_<ID>_SCOPES` | Scopes, default `openid email profile`; `openid` is always added. |
+| `OIDC_<ID>_EMAIL_TRUSTED` | `true` = a missing `email_verified` counts as verified. Only for providers where users cannot choose their address (e.g. Entra ID with verified company domains). Default: off. |
 | `PASSWORD_LOGIN_ENABLED` | `true`, `1` or `yes` (any case) switches the password login on. Anything else and unset: **off**. |
 | `SSO_ALLOWED_DOMAINS` | Comma-separated e-mail domains for which a **new** account may be created on the first login. Empty: no restriction. |
 | `SSO_BOOTSTRAP_ADMIN_EMAILS` | E-mail addresses whose account becomes global admin on every login through a global provider (only with a verified e-mail, see below). |
@@ -67,11 +68,15 @@ a link, the e-mail address from the `email` claim decides:
 | --- | --- |
 | An account with this e-mail exists, `email_verified` is `true` | The account is linked and signed in (also an account with a password or a global admin). |
 | Account exists, `email_verified` missing or `false` | Refused with `email_unverified`. The account can link the provider itself in the profile. |
-| No account, `email_verified` is `false` | Refused with `email_unverified`. |
-| No account, `email_verified` is `true` or missing | New account with the role "Viewer", no tags and no password, if the domain is in `SSO_ALLOWED_DOMAINS` (otherwise `domain_not_allowed`). |
+| No account, `email_verified` is `true` | New account with the role "Viewer", no tags and no password, if the domain is in `SSO_ALLOWED_DOMAINS` (otherwise `domain_not_allowed`). |
+| No account, `email_verified` missing or `false` | Refused with `email_unverified`. |
 | No `email` claim | Refused with `email_missing`. |
 
-So without `email_verified` an existing account is never linked by e-mail (as with the page SSO). If
+Only a verified e-mail links or creates an account. Otherwise someone could use a provider without
+verification to pre-create an account for another person's address, which that person's later,
+verified sign-in (or `SSO_BOOTSTRAP_ADMIN_EMAILS`) would take over. With
+`OIDC_<ID>_EMAIL_TRUSTED=true` a missing `email_verified` counts as verified for that provider; an
+explicit `false` never does. If
 the verified e-mail of the account is in `SSO_BOOTSTRAP_ADMIN_EMAILS`, it becomes global admin. Later
 logins find the account through `sub`, even if the e-mail changes at the provider.
 
@@ -137,7 +142,8 @@ the profile:
   or set `PASSWORD_LOGIN_ENABLED=true`, otherwise nobody can sign in.
 - Migration steps: 1. Register the provider at the IdP (redirect URI above). 2. Set `OIDC_PROVIDERS`
   and `OIDC_<ID>_*`, remove `GOOGLE_*`/`GITHUB_*`. 3. Keep `PASSWORD_LOGIN_ENABLED=true` for a while
-  until all accounts have signed in through the provider (providers without `email_verified`: link in
-  the profile). 4. Switch the password login off.
+  until all accounts have signed in through the provider (providers without `email_verified`: set
+  `OIDC_<ID>_EMAIL_TRUSTED=true` if it only issues your company addresses, otherwise link in the
+  profile). 4. Switch the password login off.
 
 Back to the [overview](README.md).

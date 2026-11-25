@@ -100,6 +100,7 @@ STRIDE:
 | --- | --- | --- |
 | Spoofing | Forged ID token, token of another issuer or client | Signature via the JWKS, `iss`, `aud`, `exp`, nonce from the state; empty `sub` refused. |
 | Spoofing | Account takeover through a matching e-mail | Linking by e-mail only with `email_verified=true` and only for global providers; page SSO never by e-mail. |
+| Spoofing | Account pre-created for someone else's e-mail (pre-account hijacking) | New accounts only with a verified e-mail; a missing `email_verified` only counts with `OIDC_<ID>_EMAIL_TRUSTED=true`. |
 | Spoofing | Login CSRF (attacker's code in the victim's browser) | State bound to an HttpOnly cookie, constant-time comparison. |
 | Tampering | Manipulated or foreign state, state of another provider | State only from the database, redeemable exactly once (`DELETE … RETURNING`), valid for 10 minutes, provider/page must match the callback. |
 | Tampering | Intercepted code at the provider | PKCE (S256) with the verifier kept in the backend. |

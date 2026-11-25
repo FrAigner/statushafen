@@ -49,9 +49,11 @@ OIDC_ENTRA_CLIENT_SECRET=CLIENT-SECRET
 OIDC_ENTRA_NAME=Microsoft
 ```
 
-Entra ID liefert **kein** `email_verified`. Bestehende Konten werden deshalb nie über die E-Mail
-verknüpft; sie verknüpfen den Anbieter im Profil (dafür übergangsweise
-`PASSWORD_LOGIN_ENABLED=true`). Neue Konten entstehen wie gewohnt. Verwende immer den Issuer mit
+Entra ID liefert **kein** `email_verified`. Ohne weitere Einstellung entstehen deshalb keine neuen
+Konten, und bestehende werden nicht über die E-Mail verknüpft. Gibt euer Mandant nur Adressen
+eurer bestätigten Firmen-Domains aus, setzt `OIDC_ENTRA_EMAIL_TRUSTED=true`; dann gilt die E-Mail
+als bestätigt. Sonst verknüpfen bestehende Konten den Anbieter im Profil (dafür übergangsweise
+`PASSWORD_LOGIN_ENABLED=true`). Verwende immer den Issuer mit
 eurer Mandanten-ID, nie `common`: Bei mandantenübergreifenden Anwendungen kann der Claim `email`
 von Fremden gesetzt werden.
 

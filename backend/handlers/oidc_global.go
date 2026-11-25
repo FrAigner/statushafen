@@ -22,9 +22,12 @@ import (
 //     this provider), exchange the code, verify the ID token.
 //  3. The account is found through the identity (StatusPageID 0, issuer,
 //     subject). On the first login without an identity, the e-mail claim
-//     decides: an existing account is linked only with email_verified=true;
-//     otherwise a new account is created (SSO_ALLOWED_DOMAINS applies, an
-//     explicit email_verified=false is refused).
+//     decides, and only a verified e-mail counts (email_verified=true, or a
+//     missing claim at a provider with OIDC_<ID>_EMAIL_TRUSTED): it links an
+//     existing account or creates a new one (SSO_ALLOWED_DOMAINS applies).
+//     An unverified e-mail never creates an account: otherwise anyone could
+//     pre-create an account for someone else's address, which that person's
+//     later verified login (or SSO_BOOTSTRAP_ADMIN_EMAILS) would link to.
 //  4. Session as for the page SSO: one-time code, redeemed via
 //     POST /api/auth/sso-exchange. The JWT has no sso_page_id.
 //
@@ -157,7 +160,7 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	if e != nil {
 		return e
 	}
-	user, e := h.resolveProviderUser(st.LinkUserID, idt, claims)
+	user, e := h.resolveProviderUser(st.LinkUserID, idt, claims, p.EmailTrusted)
 	if e != nil {
 		return e
 	}
@@ -184,11 +187,11 @@ func providerIdentityScope(db *gorm.DB, issuer, subject string) *gorm.DB {
 
 // resolveProviderUser finds, links or creates the account of a verified ID
 // token. linkUserID != 0 links that signed-in account.
-func (h *Handler) resolveProviderUser(linkUserID uint, idt *oidc.IDToken, claims oidcClaims) (models.User, *oidcError) {
+func (h *Handler) resolveProviderUser(linkUserID uint, idt *oidc.IDToken, claims oidcClaims, emailTrusted bool) (models.User, *oidcError) {
 	var user models.User
 	var ident models.UserSSOIdentity
 	found := providerIdentityScope(h.DB, idt.Issuer, idt.Subject).First(&ident).Error == nil
-	verified := claims.emailVerified != nil && *claims.emailVerified
+	verified := emailVerified(claims.emailVerified, emailTrusted)
 	if linkUserID != 0 {
 		key := models.UserSSOIdentity{Protocol: models.SSOProtocolOIDC, Issuer: idt.Issuer, Subject: idt.Subject, Email: claims.email}
 		if found {
@@ -215,6 +218,16 @@ func (h *Handler) resolveProviderUser(linkUserID uint, idt *oidc.IDToken, claims
 	return user, nil
 }
 
+// emailVerified reports whether an e-mail claim counts as verified: an explicit
+// email_verified=true, or a missing claim at a provider the operator trusts.
+// An explicit false never counts.
+func emailVerified(claim *bool, trusted bool) bool {
+	if claim == nil {
+		return trusted
+	}
+	return *claim
+}
+
 // firstProviderLogin handles a login without an identity: link an existing
 // account by its verified e-mail, or create a new account.
 func (h *Handler) firstProviderLogin(claims oidcClaims, verified bool, idt *oidc.IDToken) (models.UserSSOIdentity, *oidcError) {
@@ -227,8 +240,7 @@ func (h *Handler) firstProviderLogin(claims oidcClaims, verified bool, idt *oidc
 	var existing models.User
 	err := h.DB.Where("email = ?", email).First(&existing).Error
 	if err == nil {
-		// Only a verified e-mail links an existing account; a missing claim
-		// is treated like the page SSO: never link by e-mail.
+		// Only a verified e-mail links an existing account.
 		if !verified {
 			return ident, errOIDCEmailUnverified
 		}
@@ -241,7 +253,7 @@ func (h *Handler) firstProviderLogin(claims oidcClaims, verified bool, idt *oidc
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return ident, errOIDCStartFailed
 	}
-	if claims.emailVerified != nil && !*claims.emailVerified {
+	if !verified {
 		return ident, errOIDCEmailUnverified
 	}
 	if !isEmailDomainAllowed(email) {

@@ -66,7 +66,7 @@ The backend reads environment variables (a `backend/.env` file is loaded if pres
 | `FRONTEND_URL`, `BASE_URL`, `CORS_ORIGINS` | Public addresses and allowed origins |
 | `TRUSTED_PROXIES` | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` is trusted (none by default). Only list your own reverse proxy: networks wider than /8 (IPv4) or /16 (IPv6), including `0.0.0.0/0` and `::/0`, let any client forge its address and defeat all IP limits; the backend refuses to start with them unless `APP_ENV` is `development`, `dev`, `test` or `local` (warning only) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Outgoing mail (default: local Mailpit). `SMTP_FROM` is the sender address of all mails; status pages only add their name and an optional reply-to |
-| `OIDC_PROVIDERS`, `OIDC_<ID>_ISSUER`, `OIDC_<ID>_CLIENT_ID`, `OIDC_<ID>_CLIENT_SECRET`, `OIDC_<ID>_NAME`, `OIDC_<ID>_SCOPES` | Global OIDC providers for signing in (e.g. GitLab, Google), redirect URI `<BASE_URL>/api/auth/provider/<id>/callback`; see [`docs/sso/en/providers.md`](docs/sso/en/providers.md) |
+| `OIDC_PROVIDERS`, `OIDC_<ID>_ISSUER`, `OIDC_<ID>_CLIENT_ID`, `OIDC_<ID>_CLIENT_SECRET`, `OIDC_<ID>_NAME`, `OIDC_<ID>_SCOPES`, `OIDC_<ID>_EMAIL_TRUSTED` | Global OIDC providers for signing in (e.g. GitLab, Google), redirect URI `<BASE_URL>/api/auth/provider/<id>/callback`; see [`docs/sso/en/providers.md`](docs/sso/en/providers.md) |
 | `PASSWORD_LOGIN_ENABLED` | Password login: `true`, `1` or `yes` = on, otherwise **off** (default) |
 | `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS` | Allowed e-mail domains for new accounts through global providers and bootstrap admins |
 | `CUSTOM_DOMAIN_CNAME_TARGET`, `CADDY_INTERNAL_TOKEN` | Custom domains (see below) |

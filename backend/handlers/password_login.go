@@ -17,7 +17,12 @@ const codePasswordLoginDisabled = "password_login_disabled"
 // including unset, means off; sign-in then works through the global OIDC
 // providers only. The CLI (create-admin) is not affected.
 func passwordLoginEnabled() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("PASSWORD_LOGIN_ENABLED"))) {
+	return envFlag("PASSWORD_LOGIN_ENABLED")
+}
+
+// envFlag reports whether an environment variable is set to true, 1 or yes (any case).
+func envFlag(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
 	case "true", "1", "yes":
 		return true
 	}

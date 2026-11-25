@@ -200,7 +200,10 @@ func TestProviderCallback_EmailRules(t *testing.T) {
 		"missing claim, existing account not linked":  {nil, true, "email_unverified"},
 		"unverified, existing account not linked":     {false, true, "email_unverified"},
 		"unverified, no account":                      {false, false, "email_unverified"},
-		"missing claim, no account: new account":      {nil, false, ""},
+		// Pre-account hijacking: a provider that omits email_verified (e.g. Entra ID) must not
+		// create an account for an arbitrary e-mail, which a verified login through another
+		// provider (or SSO_BOOTSTRAP_ADMIN_EMAILS) would later link to.
+		"missing claim, no account: refused": {nil, false, "email_unverified"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -238,6 +241,52 @@ func TestProviderCallback_EmailRules(t *testing.T) {
 	}
 }
 
+// OIDC_<ID>_EMAIL_TRUSTED=true: the operator states that the provider only issues e-mail addresses
+// it controls, so a missing email_verified claim counts as verified. An explicit false never does.
+func TestProviderCallback_EmailTrustedProvider(t *testing.T) {
+	cases := map[string]struct {
+		verified any // nil = claim missing
+		existing bool
+		wantCode string // "" = success
+	}{
+		"missing claim, existing account is linked": {nil, true, ""},
+		"missing claim, no account: new account":    {nil, false, ""},
+		"explicit false stays refused":              {false, false, "email_unverified"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := newGlobalOIDCFixture(t)
+			t.Setenv("OIDC_CORP_EMAIL_TRUSTED", "true")
+			var existing models.User
+			if tc.existing {
+				existing = models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
+				require.NoError(t, f.db.Create(&existing).Error)
+			}
+			if tc.verified == nil {
+				delete(f.idp.claims, "email_verified")
+			} else {
+				f.idp.claims["email_verified"] = tc.verified
+			}
+			before := f.users(t)
+
+			w := f.login(t)
+
+			if tc.wantCode != "" {
+				assertOIDCError(t, w, "/login", tc.wantCode)
+				assert.Equal(t, before, f.users(t), "no account created")
+				return
+			}
+			claims := jwtFromRedirect(t, w)
+			if tc.existing {
+				assert.Equal(t, existing.ID, claims.UserID)
+				assert.Equal(t, before, f.users(t))
+			} else {
+				assert.Equal(t, before+1, f.users(t))
+			}
+		})
+	}
+}
+
 // An email_verified value that is no boolean counts as missing.
 func TestProviderCallback_UnreadableEmailVerifiedCountsAsMissing(t *testing.T) {
 	f := newGlobalOIDCFixture(t)
@@ -246,9 +295,9 @@ func TestProviderCallback_UnreadableEmailVerifiedCountsAsMissing(t *testing.T) {
 	require.NoError(t, f.db.Create(&existing).Error)
 	assertOIDCError(t, f.login(t), "/login", "email_unverified")
 
+	// Counting as missing also means no new account for another address either.
 	f.idp.claims["email"] = "frisch@example.org"
-	claims := jwtFromRedirect(t, f.login(t))
-	assert.NotEqual(t, existing.ID, claims.UserID)
+	assertOIDCError(t, f.login(t), "/login", "email_unverified")
 }
 
 func TestProviderCallback_StorageErrors(t *testing.T) {
@@ -345,8 +394,10 @@ func TestProviderCallback_BootstrapAdmin(t *testing.T) {
 		f := newGlobalOIDCFixture(t)
 		t.Setenv("SSO_BOOTSTRAP_ADMIN_EMAILS", "neu@example.org")
 		delete(f.idp.claims, "email_verified")
-		claims := jwtFromRedirect(t, f.login(t))
-		assert.False(t, claims.IsGlobalAdmin)
+		assertOIDCError(t, f.login(t), "/login", "email_unverified")
+		var n int64
+		f.db.Model(&models.User{}).Where("is_global_admin = ?", true).Count(&n)
+		assert.Zero(t, n)
 	})
 	t.Run("the account e-mail counts, not a changed claim", func(t *testing.T) {
 		f := newGlobalOIDCFixture(t)

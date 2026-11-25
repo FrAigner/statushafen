@@ -98,6 +98,7 @@ STRIDE:
 | --- | --- | --- |
 | Spoofing | Fremdes ID-Token, Token eines anderen Issuers oder Clients | Signatur über das JWKS, `iss`, `aud`, `exp`, Nonce aus dem State; leeres `sub` abgelehnt. |
 | Spoofing | Konto-Übernahme über eine gleichlautende E-Mail | Verknüpfung per E-Mail nur bei `email_verified=true` und nur bei globalen Anbietern; Seiten-SSO nie per E-Mail. |
+| Spoofing | Vorab angelegtes Konto für eine fremde E-Mail (Pre-Account-Hijacking) | Neue Konten nur mit bestätigter E-Mail; fehlendes `email_verified` zählt nur bei `OIDC_<ID>_EMAIL_TRUSTED=true`. |
 | Spoofing | Login-CSRF (eigener Code im Browser des Opfers) | State an HttpOnly-Cookie gebunden, Vergleich in konstanter Zeit. |
 | Tampering | Manipulierter oder fremder State, State eines anderen Anbieters | State nur aus der Datenbank, genau einmal einlösbar (`DELETE … RETURNING`), 10 Minuten gültig, Anbieter/Seite muss zum Callback passen. |
 | Tampering | Abgefangener Code beim Anbieter | PKCE (S256) mit Verifier nur im Backend. |
