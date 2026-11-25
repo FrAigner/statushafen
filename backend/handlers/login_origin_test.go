@@ -82,7 +82,7 @@ func TestAcceptReturnHost_OnlyExactVerifiedDomains(t *testing.T) {
 		"upper case":            "STATUS.ACME.EXAMPLE",
 		"leading space":         " " + acmeHost,
 		"trailing space":        acmeHost + " ",
-		"cyrillic homograph":    "stаtus.acme.example",
+		"cyrillic homograph":    "st\u0430tus.acme.example",
 		"punycode homograph":    "xn--sttus-2we.acme.example",
 		"https scheme":          "https://" + acmeHost,
 		"http scheme":           "http://" + acmeHost,
@@ -111,8 +111,8 @@ func TestAcceptReturnHost_OnlyExactVerifiedDomains(t *testing.T) {
 		"javascript scheme":     "javascript:alert(1)",
 		"overlong label":        strings.Repeat("a", 64) + ".example",
 		"invalid UTF-8":         "status.acme.example\xff",
-		"zero-width joiner":     "status.acme‍.example",
-		"full-width dot":        "status．acme.example",
+		"zero-width joiner":     "status.acme\u200d.example",
+		"full-width dot":        "status\uff0eacme.example",
 		"verified, other case":  "Status.Acme.Example",
 		"tab inside":            "status.acme\t.example",
 		"encoded dot":           "status%2Eacme.example",
@@ -260,6 +260,9 @@ func TestProviderLoginFromCustomDomain_ReturnsThereWithAPageSession(t *testing.T
 	var user models.User
 	require.NoError(t, f.db.Where("email = ?", "neu@example.org").First(&user).Error)
 	assert.True(t, user.IsGlobalAdmin, "the account itself stays global admin")
+	var audit models.AuditLog
+	require.NoError(t, f.db.Where("action = ?", "auth.sso_login").First(&audit).Error)
+	assert.Equal(t, "provider=corp page="+strconv.FormatUint(uint64(pages[acmeHost].ID), 10), audit.Details)
 }
 
 func TestProviderLoginFromRejectedHost_EndsOnTheMainDomain(t *testing.T) {
