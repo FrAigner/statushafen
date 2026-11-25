@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,7 +41,12 @@ type passwordEnv struct {
 	user  models.User
 }
 
-const passwordEnvSecret = "richtig-langes-pw"
+// Test passwords are generated per run instead of being string literals, so secret scanners
+// (GitGuardian) do not flag them as hardcoded credentials.
+var (
+	passwordEnvSecret = rand.Text()
+	otherTestPassword = rand.Text()
+)
 
 func newPasswordEnv(t *testing.T) passwordEnv {
 	t.Helper()
@@ -101,7 +107,7 @@ func TestPasswordLoginDisabled_AdminUserManagement(t *testing.T) {
 	e := newPasswordEnv(t)
 
 	// Creating a user with a password is refused ...
-	assertPasswordDisabled(t, e.do(http.MethodPost, "/api/users", map[string]any{"email": "neu@example.org", "password": "irgendein-pw-123"}))
+	assertPasswordDisabled(t, e.do(http.MethodPost, "/api/users", map[string]any{"email": "neu@example.org", "password": otherTestPassword}))
 	var n int64
 	e.db.Model(&models.User{}).Where("email = ?", "neu@example.org").Count(&n)
 	assert.Zero(t, n)
@@ -164,7 +170,7 @@ func TestPasswordLoginDisabled_OrderIsActivatedWithoutPassword(t *testing.T) {
 	require.NoError(t, e.db.Where("email = ?", "besteller@example.org").First(&user).Error)
 	assert.Empty(t, user.PasswordHash)
 
-	assertPasswordDisabled(t, e.do(http.MethodPost, "/api/public/orders/set-password", map[string]string{"token": "egal", "password": "irgendein-pw-123"}))
+	assertPasswordDisabled(t, e.do(http.MethodPost, "/api/public/orders/set-password", map[string]string{"token": "egal", "password": otherTestPassword}))
 }
 
 func TestPasswordLoginEnabled_OrderKeepsTheSetPasswordStep(t *testing.T) {
@@ -178,7 +184,7 @@ func TestPasswordLoginEnabled_OrderKeepsTheSetPasswordStep(t *testing.T) {
 	var body map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	require.NotEmpty(t, body["set_password_token"])
-	w = e.do(http.MethodPost, "/api/public/orders/set-password", map[string]string{"token": body["set_password_token"], "password": "irgendein-pw-123"})
+	w = e.do(http.MethodPost, "/api/public/orders/set-password", map[string]string{"token": body["set_password_token"], "password": otherTestPassword})
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
