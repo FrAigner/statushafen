@@ -70,6 +70,11 @@ zugewiesene Nutzer“. Die Standard-Rolle darf keine Rechte zum Anlegen, Ändern
 auf Abonnenten enthalten; Statushafen prüft das beim Speichern und noch einmal beim Beitritt.
 Wer von einem Admin von der Seite entfernt wurde, tritt nicht automatisch wieder bei.
 
+Sollen Nutzer die private Seite nur sehen und abonnieren, aber nicht in den Admin-Bereich kommen,
+bekommen sie eine Rolle ohne Rechte in der Matrix („Nur Statusseite“, siehe
+[Benutzer, Rollen und Rechte](/docs/benutzer-und-rollen#rechte)). Das eignet sich auch als
+Standard-Rolle.
+
 Ohne Berechtigung (nicht angemeldet, ohne Rolle, nicht beitrittsberechtigt) sieht man eine private
 Seite nicht anders als eine Seite, die es nicht gibt: Alle Abrufe antworten mit 404, in der Oberfläche
 steht „Statusseite nicht verfügbar“ mit Link zum Login. Der Beitritt geschieht wie bisher beim ersten

@@ -279,3 +279,25 @@ func TestCovers(t *testing.T) {
 	assert.False(t, Covers("pages:read", "pages:read,"+AdminDashboard))
 	assert.False(t, Covers("pages:read,admin_dashboardx", AdminDashboard))
 }
+
+// TestGrantsAdminArea: only a right on a known resource opens the admin area.
+// A role without one (empty, or only admin_dashboard) is "status page only":
+// view and subscribe the (private) page, no admin area.
+func TestGrantsAdminArea(t *testing.T) {
+	cases := map[string]bool{
+		"":                                   false,
+		" , ":                                false,
+		AdminDashboard:                       false,
+		"unknown:read":                       false,
+		"nonsense":                           false,
+		"incidents:read":                     true,
+		"subscribers:create":                 true,
+		"components:write":                   true,
+		AdminDashboard + ",maintenance:read": true,
+	}
+	for list, want := range cases {
+		if got := GrantsAdminArea(list); got != want {
+			t.Errorf("GrantsAdminArea(%q) = %v, want %v", list, got, want)
+		}
+	}
+}

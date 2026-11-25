@@ -11,6 +11,7 @@ import { applyPageOverrides, clearPageOverrides } from '../i18n/overrides'
 import AppIcon from '../components/AppIcon.vue'
 import AdminForbidden from '../views/admin/AdminForbidden.vue'
 import { NAV_GROUPS, firstAllowedItem } from '../utils/adminNav'
+import { grantsAdminArea } from '../utils/permissions'
 import AdminNotificationBell from '../components/AdminNotificationBell.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import HelpTooltipsToggle from '../components/HelpTooltipsToggle.vue'
@@ -33,11 +34,19 @@ const displayedRole = computed(() => {
 const pages = ref([])
 const pagesLoading = ref(true)
 const pagesFailed = ref(false)
+// Status page only: memberships whose role grants no admin right. They stay in
+// myPages (public header), but the admin area offers only pages with an admin
+// right; without any, the member is sent to the status page.
+const statusPageOnly = ref(null)
 
 onMounted(async () => {
   try {
     const res = await apiFetch('/api/me/pages')
-    pages.value = res || []
+    const all = res || []
+    pages.value = isGlobalAdmin.value ? all : all.filter(p => grantsAdminArea(p.Permissions))
+    statusPageOnly.value = !isGlobalAdmin.value && all.length > 0 && pages.value.length === 0
+      ? (all.find(p => String(p.ID) === String(activeTenantId.value)) ?? all[0])
+      : null
     setMyPages(res)
     // Auch einen gespeicherten Tenant ersetzen, der nicht (mehr)
     // in der Liste steht - nach einem Seiten-SSO-Login liefert das Backend
@@ -156,6 +165,7 @@ const accessState = computed(() => {
   const isHome = route.meta.home === true
   if (!required && !isHome) return 'ok'
   if (pagesLoading.value && !isGlobalAdmin.value) return 'loading'
+  if (statusPageOnly.value) return 'statusPage'
   if (isHome) return homeTarget.value ? 'redirect' : 'forbidden'
   if (pagesFailed.value) return 'ok'
   if (route.meta.globalOnly && !isGlobalAdmin.value) return 'forbidden'
@@ -163,6 +173,7 @@ const accessState = computed(() => {
 })
 watch(accessState, (state) => {
   if (state === 'redirect') router.replace(homeTarget.value)
+  else if (state === 'statusPage') router.replace(`/status/${encodeURIComponent(statusPageOnly.value.Slug)}`)
 }, { immediate: true })
 
 const menuOpen = ref(false)

@@ -1061,12 +1061,18 @@
       "access": "Access",
       "labels": {
         "admin_dashboard": "Admin dashboard"
-      }
+      },
+      "pageOnlyTitle": "Status page only:",
+      "pageOnlyText": "Without a right in the matrix, members only see the status page (also in private mode) and can subscribe to it; no access to the admin area. \"Admin dashboard\" has no effect then.",
+      "adminTitle": "Admin area:",
+      "adminText": "Members open the tabs for which a right is set here. Without any right the role would only have access to the status page.",
+      "pageOnlyReset": "Set to \"Status page only\""
     },
     "summary": {
       "all": "All permissions",
       "more": "+{n}",
-      "none": "No permissions"
+      "none": "No permissions",
+      "pageOnly": "Status page only"
     },
     "cardTitle": "All roles",
     "subtitle": "{n} role | {n} roles",

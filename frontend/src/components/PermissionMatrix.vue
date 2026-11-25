@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RESOURCES, ACTIONS } from '../utils/permissions'
+import { RESOURCES, ACTIONS, grantsAdminArea } from '../utils/permissions'
 import { NAV_GROUPS } from '../utils/adminNav'
 import {
   ACTION_ABBREVIATION,
@@ -69,12 +69,28 @@ const toggleRow = (resource, enabled) => update(setRow(model.value, resource, en
 const toggleColumn = (action, enabled) => update(setColumn(model.value, editable.value, action, enabled))
 const toggleAll = (enabled) => update(editable.value.reduce((acc, resource) => setRow(acc, resource, enabled), model.value))
 const toggleStandalone = (key, enabled) => update(setStandalone(model.value, key, enabled))
+
+// Status page only: no admin right at all. Members view and subscribe to the
+// (private) page but never enter the admin area (backend: GrantsAdminArea).
+// The reset clears every right the matrix owns, foreign entries stay.
+const pageOnly = computed(() => !grantsAdminArea(model.value))
+const resetToPageOnly = () => update(model.value.filter(p =>
+  !props.standalone.includes(p) && !RESOURCES.some(r => p.startsWith(`${r.key}:`))))
 </script>
 
 <template>
   <fieldset class="perm-matrix">
     <legend>{{ t('roles.fieldPermissions') }}</legend>
     <p class="perm-hint">{{ t('roles.matrix.hint') }}</p>
+    <div class="perm-mode" :data-access-mode="pageOnly ? 'page-only' : 'admin'">
+      <p class="perm-mode__text">
+        <strong>{{ pageOnly ? t('roles.matrix.pageOnlyTitle') : t('roles.matrix.adminTitle') }}</strong>
+        {{ pageOnly ? t('roles.matrix.pageOnlyText') : t('roles.matrix.adminText') }}
+      </p>
+      <button v-if="!pageOnly" type="button" class="perm-mode__reset" data-page-only-reset @click="resetToPageOnly">
+        {{ t('roles.matrix.pageOnlyReset') }}
+      </button>
+    </div>
 
     <div
       class="perm-matrix-scroll"
@@ -187,6 +203,40 @@ const toggleStandalone = (key, enabled) => update(setStandalone(model.value, key
   margin: 0 0 8px;
   font-size: 0.8rem;
   color: var(--text-2);
+}
+.perm-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.perm-mode__text {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+.perm-mode__text strong {
+  color: var(--text);
+}
+.perm-mode__reset {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.perm-mode__reset:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 /* Reicht der Platz nicht, scrollt nur die Matrix, nie die Seite. */
 .perm-matrix-scroll {

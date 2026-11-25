@@ -1061,12 +1061,18 @@
       "access": "Zugriff",
       "labels": {
         "admin_dashboard": "Admin-Dashboard"
-      }
+      },
+      "pageOnlyTitle": "Nur Statusseite:",
+      "pageOnlyText": "Ohne Recht in der Matrix sehen Mitglieder nur die Statusseite (auch im Privat-Modus) und können sie abonnieren; kein Zugang zum Admin-Bereich. „Admin-Dashboard“ wirkt dann nicht.",
+      "adminTitle": "Admin-Bereich:",
+      "adminText": "Mitglieder öffnen die Tabs, für die hier ein Recht gesetzt ist. Ohne jedes Recht hätte die Rolle nur Zugriff auf die Statusseite.",
+      "pageOnlyReset": "Auf „Nur Statusseite“ setzen"
     },
     "summary": {
       "all": "Alle Rechte",
       "more": "+{n}",
-      "none": "Keine Rechte"
+      "none": "Keine Rechte",
+      "pageOnly": "Nur Statusseite"
     },
     "cardTitle": "Alle Rollen",
     "subtitle": "{n} Rolle | {n} Rollen",
