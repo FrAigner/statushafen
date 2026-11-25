@@ -36,6 +36,19 @@ describe('LanguageSwitcher', () => {
     expect(wrapper.find('select').element.value).toBe('hr')
   })
 
+  // Translation switched off (or a single page language): there is no content
+  // language to choose, the switcher only changes the UI language; the content
+  // stays in the page default.
+  it('offers the UI languages when the page has only its default language', async () => {
+    usePublicPageLanguages().setPageLanguages([{ code: 'de', name: 'Deutsch', is_default: true }])
+    const wrapper = mount(LanguageSwitcher, { global: { plugins: [i18n] } })
+
+    expect(wrapper.findAll('option').map((o) => o.element.value)).toEqual(['de', 'en'])
+    await wrapper.find('select').setValue('en')
+    expect(i18n.global.locale.value).toBe('en')
+    expect(wrapper.find('select').element.value).toBe('en')
+  })
+
   it('rendert eine Option je unterstützter Sprache und markiert die aktive Locale als ausgewählt', () => {
     const wrapper = mount(LanguageSwitcher, { global: { plugins: [i18n] } })
 

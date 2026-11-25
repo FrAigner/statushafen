@@ -23,8 +23,11 @@ export function useLanguage() {
   // aktivierten Sprachen an (mit Eigenbezeichnung), sonst die Oberflächensprachen.
   // Fehlen für eine Seitensprache Oberflächentexte (nur de/en gibt es), greift
   // der Rückfall von vue-i18n; die Inhalte kommen trotzdem in dieser Sprache.
+  // With a single page language (translation switched off) there is no content
+  // language to choose: the switcher offers the UI languages, the content stays in
+  // the page default (the server ignores ?lang then).
   const languageOptions = computed(() =>
-    pageLanguages.value.length > 0
+    pageLanguages.value.length > 1
       ? pageLanguages.value.map((l) => ({ code: l.code, label: l.name || l.code }))
       : SUPPORTED_LOCALES.map((code) => ({ code, label: te(`language.${code}`) ? t(`language.${code}`) : code }))
   )
