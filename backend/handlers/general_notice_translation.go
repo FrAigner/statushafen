@@ -69,7 +69,7 @@ func (h *Handler) GetGeneralNoticeTranslationsHandler(c *gin.Context) {
 	}
 
 	var translations []models.GeneralNoticeTranslation
-	if err := h.DB.Where("general_notice_id = ? AND status = ?", noticeID, "confirmed").
+	if err := h.DB.Where("general_notice_id = ? AND status = ? AND language_code IN ?", noticeID, "confirmed", h.deliveredTranslationCodes()).
 		Find(&translations).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return

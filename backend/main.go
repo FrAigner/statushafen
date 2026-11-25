@@ -334,6 +334,9 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// öffentlicher Flag-Endpunkt (ohne Auth), ob die Self-Service-
 	// Bestellung aktiv ist - Landing-CTA und /order-Seite richten sich danach.
 	r.GET("/api/public/orders/enabled", middleware.NewRateLimiter(60, time.Minute), h.GetPublicOrdersEnabledHandler)
+	// Public flag (no auth): whether automatic translation and the second content
+	// language are switched on. Admin views of page admins hide translation UI by it.
+	r.GET("/api/public/translation/enabled", middleware.NewRateLimiter(60, time.Minute), h.GetPublicTranslationEnabledHandler)
 	r.POST("/api/public/orders", middleware.NewRateLimiter(5, time.Minute), h.CreateOrderHandler)
 	r.POST("/api/public/orders/confirm", middleware.NewRateLimiter(20, time.Minute), h.ConfirmOrderHandler)
 	r.POST("/api/public/orders/set-password", middleware.NewRateLimiter(10, time.Minute), h.SetOrderPasswordHandler)
@@ -454,7 +457,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	guarded(authGroup, http.MethodPost, "/pages/:page_id/incidents/:id/updates", byKind(permissions.Create, h.IncidentResourceByParam("id")), notifyChange, h.AddIncidentUpdateHandler)
 	// Übersetzungen eines Updates (Entwürfe inklusive) lesen und je Sprache speichern.
 	guarded(authGroup, http.MethodGet, "/pages/:page_id/incidents/:id/updates/:update_id/translations", byKind(permissions.Read, h.IncidentResourceByParam("id")), h.GetIncidentUpdateTranslationsHandler)
-	guarded(authGroup, http.MethodPut, "/pages/:page_id/incidents/:id/updates/:update_id/translations/:language_code", byKind(permissions.Update, h.IncidentResourceByParam("id")), h.SaveIncidentUpdateTranslationHandler)
+	guarded(authGroup, http.MethodPut, "/pages/:page_id/incidents/:id/updates/:update_id/translations/:language_code", byKind(permissions.Update, h.IncidentResourceByParam("id")), h.RequireTranslationEnabled(), h.SaveIncidentUpdateTranslationHandler)
 	guarded(authGroup, http.MethodPut, "/pages/:page_id/incidents/:id/postmortem", byKind(permissions.Update, h.IncidentResourceByParam("id")), h.UpsertPostMortemHandler)
 
 	// Stage 2 der Mehrsprachigkeit: Incident translations (draft/confirmed)
@@ -463,32 +466,32 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	// RequirePermission auch für Seiten-Admins (nicht nur Global Admins)
 	// greift und fremde Seiten mit 403 abweist (handlers/translation_page_scope.go).
 	// Übersetzungen folgen den Rechten der Ressource ihres Inhalts.
-	guarded(authGroup, http.MethodPost, "/incidents/:incident_id/translations", byKind(permissions.Create, h.IncidentResourceByParam("incident_id")).after(h.IncidentPageScope()), h.IncidentTagGuard(), h.CreateIncidentTranslationHandler)
+	guarded(authGroup, http.MethodPost, "/incidents/:incident_id/translations", byKind(permissions.Create, h.IncidentResourceByParam("incident_id")).after(h.IncidentPageScope()), h.IncidentTagGuard(), h.RequireTranslationEnabled(), h.CreateIncidentTranslationHandler)
 	// Admin-Liste inkl. Entwürfe (die öffentliche Route oben liefert nur confirmed).
 	guarded(authGroup, http.MethodGet, "/incidents/:incident_id/translations/all", byKind(permissions.Read, h.IncidentResourceByParam("incident_id")).after(h.IncidentPageScope()), h.IncidentTagGuard(), h.GetAllIncidentTranslationsHandler)
 	// Übersetzung einer Sprache aus dem Bearbeiten-Formular speichern (anlegen oder ändern, Entwurf oder fertig).
 	// Übersetzungsvorschlag: liest/schreibt keinen Datensatz, braucht
 	// daher nur update an einem der drei Texttypen; Aufrufe sind begrenzt.
-	guarded(authGroup, http.MethodPost, "/pages/:page_id/translate", anyOf(permissions.Update, "incidents", "maintenance", "notices"), middleware.NewRateLimiter(30, time.Minute), h.TranslateTextHandler)
-	guarded(authGroup, http.MethodPut, "/incidents/:incident_id/translations/:language_code", byKind(permissions.Update, h.IncidentResourceByParam("incident_id")).after(h.IncidentPageScope()), h.IncidentTagGuard(), h.SaveIncidentTranslationHandler)
+	guarded(authGroup, http.MethodPost, "/pages/:page_id/translate", anyOf(permissions.Update, "incidents", "maintenance", "notices"), middleware.NewRateLimiter(30, time.Minute), h.RequireTranslationEnabled(), h.TranslateTextHandler)
+	guarded(authGroup, http.MethodPut, "/incidents/:incident_id/translations/:language_code", byKind(permissions.Update, h.IncidentResourceByParam("incident_id")).after(h.IncidentPageScope()), h.IncidentTagGuard(), h.RequireTranslationEnabled(), h.SaveIncidentTranslationHandler)
 	// Sonderaktion: Entwurf bestätigen ändert die Übersetzung (update).
-	guarded(authGroup, http.MethodPatch, "/incident-translations/:translation_id/confirm", byKind(permissions.Update, h.IncidentResourceByTranslation()).after(h.IncidentTranslationPageScope()), h.IncidentTranslationTagGuard(), h.ConfirmIncidentTranslationHandler)
-	guarded(authGroup, http.MethodDelete, "/incident-translations/:translation_id", byKind(permissions.Delete, h.IncidentResourceByTranslation()).after(h.IncidentTranslationPageScope()), h.IncidentTranslationTagGuard(), h.DeleteIncidentTranslationHandler)
+	guarded(authGroup, http.MethodPatch, "/incident-translations/:translation_id/confirm", byKind(permissions.Update, h.IncidentResourceByTranslation()).after(h.IncidentTranslationPageScope()), h.IncidentTranslationTagGuard(), h.RequireTranslationEnabled(), h.ConfirmIncidentTranslationHandler)
+	guarded(authGroup, http.MethodDelete, "/incident-translations/:translation_id", byKind(permissions.Delete, h.IncidentResourceByTranslation()).after(h.IncidentTranslationPageScope()), h.IncidentTranslationTagGuard(), h.RequireTranslationEnabled(), h.DeleteIncidentTranslationHandler)
 
 	// Stage 3 der Mehrsprachigkeit: Component translations (draft/confirmed)
-	guarded(authGroup, http.MethodPost, "/components/:component_id/translations", need("components", permissions.Create).after(h.ComponentPageScope()), h.ComponentTagGuard(), h.CreateComponentTranslationHandler)
+	guarded(authGroup, http.MethodPost, "/components/:component_id/translations", need("components", permissions.Create).after(h.ComponentPageScope()), h.ComponentTagGuard(), h.RequireTranslationEnabled(), h.CreateComponentTranslationHandler)
 	guarded(authGroup, http.MethodGet, "/components/:component_id/translations/all", need("components", permissions.Read).after(h.ComponentPageScope()), h.ComponentTagGuard(), h.GetAllComponentTranslationsHandler)
-	guarded(authGroup, http.MethodPut, "/components/:component_id/translations/:language_code", need("components", permissions.Update).after(h.ComponentPageScope()), h.ComponentTagGuard(), h.SaveComponentTranslationHandler)
-	guarded(authGroup, http.MethodPatch, "/component-translations/:translation_id/confirm", need("components", permissions.Update).after(h.ComponentTranslationPageScope()), h.ComponentTranslationTagGuard(), h.ConfirmComponentTranslationHandler)
-	guarded(authGroup, http.MethodDelete, "/component-translations/:translation_id", need("components", permissions.Delete).after(h.ComponentTranslationPageScope()), h.ComponentTranslationTagGuard(), h.DeleteComponentTranslationHandler)
+	guarded(authGroup, http.MethodPut, "/components/:component_id/translations/:language_code", need("components", permissions.Update).after(h.ComponentPageScope()), h.ComponentTagGuard(), h.RequireTranslationEnabled(), h.SaveComponentTranslationHandler)
+	guarded(authGroup, http.MethodPatch, "/component-translations/:translation_id/confirm", need("components", permissions.Update).after(h.ComponentTranslationPageScope()), h.ComponentTranslationTagGuard(), h.RequireTranslationEnabled(), h.ConfirmComponentTranslationHandler)
+	guarded(authGroup, http.MethodDelete, "/component-translations/:translation_id", need("components", permissions.Delete).after(h.ComponentTranslationPageScope()), h.ComponentTranslationTagGuard(), h.RequireTranslationEnabled(), h.DeleteComponentTranslationHandler)
 
 	// Stage 4 der Mehrsprachigkeit: Notice translations (draft/confirmed)
-	guarded(authGroup, http.MethodPost, "/notices/:notice_id/translations", need("notices", permissions.Create).after(h.NoticePageScope()), h.CreateGeneralNoticeTranslationHandler)
+	guarded(authGroup, http.MethodPost, "/notices/:notice_id/translations", need("notices", permissions.Create).after(h.NoticePageScope()), h.RequireTranslationEnabled(), h.CreateGeneralNoticeTranslationHandler)
 	guarded(authGroup, http.MethodGet, "/notices/:notice_id/translations/all", need("notices", permissions.Read).after(h.NoticePageScope()), h.GetAllGeneralNoticeTranslationsHandler)
 	// Übersetzung einer Sprache aus dem Bearbeiten-Formular speichern.
-	guarded(authGroup, http.MethodPut, "/notices/:notice_id/translations/:language_code", need("notices", permissions.Update).after(h.NoticePageScope()), h.SaveGeneralNoticeTranslationHandler)
-	guarded(authGroup, http.MethodPatch, "/notice-translations/:translation_id/confirm", need("notices", permissions.Update).after(h.NoticeTranslationPageScope()), h.ConfirmGeneralNoticeTranslationHandler)
-	guarded(authGroup, http.MethodDelete, "/notice-translations/:translation_id", need("notices", permissions.Delete).after(h.NoticeTranslationPageScope()), h.DeleteGeneralNoticeTranslationHandler)
+	guarded(authGroup, http.MethodPut, "/notices/:notice_id/translations/:language_code", need("notices", permissions.Update).after(h.NoticePageScope()), h.RequireTranslationEnabled(), h.SaveGeneralNoticeTranslationHandler)
+	guarded(authGroup, http.MethodPatch, "/notice-translations/:translation_id/confirm", need("notices", permissions.Update).after(h.NoticeTranslationPageScope()), h.RequireTranslationEnabled(), h.ConfirmGeneralNoticeTranslationHandler)
+	guarded(authGroup, http.MethodDelete, "/notice-translations/:translation_id", need("notices", permissions.Delete).after(h.NoticeTranslationPageScope()), h.RequireTranslationEnabled(), h.DeleteGeneralNoticeTranslationHandler)
 
 	// General Notices – scoped under /pages/:page_id
 	guarded(authGroup, http.MethodGet, "/pages/:page_id/notices/all", need("notices", permissions.Read), h.GetNoticesHandler)
@@ -504,7 +507,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	guarded(authGroup, http.MethodDelete, "/pages/:page_id/incident-templates/:id", need("incident_templates", permissions.Delete), h.DeleteIncidentTemplateHandler)
 	// Übersetzungen einer Vorlage (Sprachumschalter im Formular).
 	guarded(authGroup, http.MethodGet, "/pages/:page_id/incident-templates/:id/translations", need("incident_templates", permissions.Read), h.GetIncidentTemplateTranslationsHandler)
-	guarded(authGroup, http.MethodPut, "/pages/:page_id/incident-templates/:id/translations/:language_code", need("incident_templates", permissions.Update), h.SaveIncidentTemplateTranslationHandler)
+	guarded(authGroup, http.MethodPut, "/pages/:page_id/incident-templates/:id/translations/:language_code", need("incident_templates", permissions.Update), h.RequireTranslationEnabled(), h.SaveIncidentTemplateTranslationHandler)
 
 	// Notification-Mail-Templates - seiten-scoped unter
 	// /pages/:page_id/notification-templates, Ressource notification_templates

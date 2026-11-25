@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fraigner/statushafen/database"
 	"github.com/fraigner/statushafen/models"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +25,8 @@ import (
 // können, um sie für seine Statusseite zu aktivieren.
 func (h *Handler) GetLanguagesHandler(c *gin.Context) {
 	var languages []models.Language
-	if err := h.DB.Order("code asc").Find(&languages).Error; err != nil {
+	// Only content languages; legacy catalog rows stay stored but are not offered.
+	if err := h.DB.Where("code IN ?", database.ContentLanguageCodes).Order("code asc").Find(&languages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch languages", "code": "server_error"})
 		return
 	}
@@ -60,6 +62,11 @@ func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 	// Format prüfen (vorher nur "nicht leer", Frontend nur maxlength).
 	if !languageCodeRegex.MatchString(code) {
 		abortInvalidInput(c, codeLanguageCodeInvalid, "code muss ein Sprachcode wie de oder en-us sein")
+		return
+	}
+	// Content exists only in German and English.
+	if !database.IsContentLanguage(code) {
+		abortInvalidInput(c, codeLanguageNotSupported, "only de and en are supported as content languages")
 		return
 	}
 
@@ -145,6 +152,11 @@ func (h *Handler) UpdateLanguageHandler(c *gin.Context) {
 	name := strings.TrimSpace(req.Name)
 	if name == "" {
 		abortInvalidInput(c, codeNameRequired, "name darf nicht leer sein")
+		return
+	}
+	// A language other than de/en may be renamed but never switched on again.
+	if req.IsActive != nil && *req.IsActive && !database.IsContentLanguage(lang.Code) {
+		abortInvalidInput(c, codeLanguageNotSupported, "only de and en are supported as content languages")
 		return
 	}
 	lang.Name = name
@@ -250,8 +262,8 @@ func (h *Handler) GetPageLanguagesHandler(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var pageLanguages []models.StatusPageLanguage
-	if err := h.DB.Preload("Language").Where("status_page_id = ?", pageID).Order("language_code asc").Find(&pageLanguages).Error; err != nil {
+	pageLanguages, err := h.pageContentLanguages(uint(pageID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch page languages", "code": "server_error"})
 		return
 	}
@@ -294,6 +306,11 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 		if code == "" {
 			continue
 		}
+		// Only content languages, even if another one were still active in the catalog.
+		if !database.IsContentLanguage(code) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Mindestens ein Sprachcode ist unbekannt oder deaktiviert", "code": "language_codes_unknown"})
+			return
+		}
 		codes = append(codes, code)
 		if code == defaultCode {
 			hasDefault = true
@@ -301,6 +318,12 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 	}
 	if !hasDefault {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "default muss Teil von codes sein", "code": "language_default_not_in_codes"})
+		return
+	}
+	// Switch off: a page has its default language only; choosing a second one is refused.
+	enabled := h.translationEnabled()
+	if !enabled && len(codes) != 1 {
+		abortTranslationDisabled(c)
 		return
 	}
 
@@ -315,6 +338,9 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 	}
 
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if !enabled {
+			return setPageDefaultLanguage(tx, uint(pageID), defaultCode)
+		}
 		if err := tx.Where("status_page_id = ?", pageID).Delete(&models.StatusPageLanguage{}).Error; err != nil {
 			return err
 		}
@@ -331,8 +357,8 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 		return
 	}
 
-	var pageLanguages []models.StatusPageLanguage
-	if err := h.DB.Where("status_page_id = ?", pageID).Order("language_code asc").Find(&pageLanguages).Error; err != nil {
+	pageLanguages, err := h.pageContentLanguages(uint(pageID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch page languages", "code": "server_error"})
 		return
 	}

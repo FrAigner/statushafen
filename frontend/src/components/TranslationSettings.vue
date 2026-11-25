@@ -1,19 +1,23 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { OnyxButton, OnyxInput, OnyxSelect } from 'sit-onyx'
+import { OnyxButton, OnyxCheckbox, OnyxInput, OnyxSelect } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useTranslationSettings } from '../composables/useTranslationSettings'
+import { useTranslationEnabled } from '../composables/useTranslationEnabled'
 
-// Abschnitt „Automatische Übersetzung“ in den Systemeinstellungen.
-// Dienst (Standard des Betreibers, eigener LibreTranslate-Server, DeepL),
-// Adresse und Schlüssel. Der Schlüssel ist nur schreibbar: leer lassen = behalten,
-// Haken „entfernen“ = löschen. Die Meldungen zeigt die umgebende Ansicht (emit message).
+// Section "Automatic translation" of the system settings: the on/off switch
+// (default off; while off, content has the page's default language only), the
+// service (operator default, own LibreTranslate server, DeepL), address and key.
+// The key is write-only: leave empty = keep, tick "remove" = delete. The
+// surrounding view shows the messages (emit message).
 // Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
 const emit = defineEmits(['message'])
 const { t } = useI18n()
 const { settings, load, save, test } = useTranslationSettings()
+// Shared flag of the admin views (see useTranslationEnabled), kept in step on save.
+const { enabled: sharedEnabled } = useTranslationEnabled()
 
-const form = ref({ provider: '', url: '', apiKey: '', clearKey: false })
+const form = ref({ enabled: false, provider: '', url: '', apiKey: '', clearKey: false })
 const busy = ref(false)
 const testResult = ref('')
 
@@ -25,7 +29,8 @@ const options = computed(() => [
 const showUrl = computed(() => form.value.provider === 'libretranslate')
 
 const sync = () => {
-  form.value = { provider: settings.value.provider, url: settings.value.url, apiKey: '', clearKey: false }
+  form.value = { enabled: settings.value.enabled === true, provider: settings.value.provider, url: settings.value.url, apiKey: '', clearKey: false }
+  sharedEnabled.value = form.value.enabled
 }
 
 // Zeile unter dem Titel: welcher Dienst gerade wirkt und ob er eingerichtet ist.
@@ -44,7 +49,9 @@ onMounted(async () => {
 })
 
 const onSave = async () => {
-  const patch = { provider: form.value.provider }
+  // The switch is only sent when it changed (no spurious audit entries).
+  const patch = form.value.enabled === (settings.value.enabled === true) ? {} : { enabled: form.value.enabled }
+  patch.provider = form.value.provider
   if (showUrl.value) patch.url = form.value.url
   if (form.value.clearKey) patch.api_key = ''
   else if (form.value.apiKey) patch.api_key = form.value.apiKey
@@ -79,6 +86,9 @@ const onTest = async () => {
     <h4 class="setting__title">{{ t('translationSettings.title') }}</h4>
     <p class="setting__text">{{ t('translationSettings.description') }}</p>
     <p class="setting__text" data-test="translation-status">{{ statusText }}</p>
+
+    <OnyxCheckbox v-model="form.enabled" :label="t('translationSettings.enabledLabel')" />
+    <p v-if="!form.enabled" class="setting__text" data-test="translation-off-hint">{{ t('translationSettings.offHint') }}</p>
 
     <OnyxSelect v-model="form.provider" :label="t('translationSettings.providerLabel')" :options="options" />
     <p v-if="form.provider === 'deepl'" class="setting__text" data-test="deepl-info">{{ t('translationSettings.deeplInfo') }}</p>

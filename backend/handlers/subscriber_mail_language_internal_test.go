@@ -15,6 +15,7 @@ import (
 // Sprache; preferred ist die Sprache des Abonnenten (Subscriber.Language).
 func TestSubscriberMailTemplate_Reihenfolge(t *testing.T) {
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := NewHandler(db)
 	page := models.StatusPage{Name: "p", Slug: "reihenfolge"}
 	require.NoError(t, db.Create(&page).Error)

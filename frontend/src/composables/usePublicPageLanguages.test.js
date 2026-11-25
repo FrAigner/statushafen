@@ -38,10 +38,10 @@ describe('usePublicPageLanguages', () => {
     ])
   })
 
-  it('nimmt ungültige Listen und Einträge nicht an und nutzt den Code ohne Namen', () => {
+  it('rejects invalid lists and entries and uses the code when the name is missing', () => {
     const { setPageLanguages } = usePublicPageLanguages()
-    setPageLanguages([null, { code: '' }, { name: 'x' }, { code: 'hr' }])
-    expect(mountLanguage().languageOptions.value).toEqual([{ code: 'hr', label: 'hr' }])
+    setPageLanguages([null, { code: '' }, { name: 'x' }, { code: 'hr' }, { code: 'de', name: 'Deutsch' }])
+    expect(mountLanguage().languageOptions.value).toEqual([{ code: 'hr', label: 'hr' }, { code: 'de', label: 'Deutsch' }])
     setPageLanguages('kaputt')
     expect(mountLanguage().languageOptions.value.map((o) => o.code)).toEqual(['de', 'en'])
   })

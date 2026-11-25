@@ -32,9 +32,12 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-function makeFetchRouter({ compsOk = true, tagsOk = true, writeOk = true, pageTags = pageTagsFixture() } = {}) {
+function makeFetchRouter({ compsOk = true, tagsOk = true, writeOk = true, pageTags = pageTagsFixture(), languages } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Page languages (only when given; otherwise the form stays monolingual).
+    if (languages && method === 'GET' && /\/api\/pages\/\d+\/languages$/.test(url)) return jsonResponse(languages)
+    if (languages && method === 'GET' && url === '/api/languages') return jsonResponse([])
     if (method === 'GET' && /\/components$/.test(url)) {
       return compsOk ? jsonResponse(componentsFixture()) : jsonResponse({ error: 'kaputt' }, 500)
     }
@@ -89,12 +92,19 @@ describe('AdminComponents', () => {
     useAuth().logout()
   })
 
-  it('verlinkt je Komponente die Übersetzungsseite', async () => {
-    const { wrapper } = await mountComponents()
+  it('links the translations page per component when the page has a second language', async () => {
+    const { wrapper } = await mountComponents({ fetchImpl: makeFetchRouter({ languages: [{ LanguageCode: 'de', IsDefault: true }, { LanguageCode: 'en', IsDefault: false }] }) })
 
     const link = wrapper.findAllComponents(RouterLinkStub).find(l => l.props('to') === '/admin/components/1/translations')
     expect(link.attributes('role')).toBe('menuitem')
     expect(link.text()).toContain('Übersetzungen')
+  })
+
+  // Translation switched off: the server lists only the default language.
+  it('offers no translations when the page has only its default language', async () => {
+    const { wrapper } = await mountComponents({ fetchImpl: makeFetchRouter({ languages: [{ LanguageCode: 'de', IsDefault: true }] }) })
+
+    expect(wrapper.findAllComponents(RouterLinkStub).some(l => l.props('to') === '/admin/components/1/translations')).toBe(false)
   })
 
   it('lädt Komponenten + Tags und zeigt Name, Beschreibung und Tags', async () => {
@@ -331,8 +341,8 @@ describe('AdminComponents', () => {
 
     expect(wrapper.find('.quick-status').exists()).toBe(false)
     expect(wrapper.find('.st-badge').exists()).toBe(true)
-    // Leser bekommen „Ansehen“ und die Übersetzungen, kein Bearbeiten/Löschen.
-    expect(wrapper.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Ansehen', 'Übersetzungen'])
+    // Readers get "view" only, no edit/delete (translations need a second language).
+    expect(wrapper.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Ansehen'])
   })
 
   it('zeigt bei 403 die Berechtigungsmeldung statt Tabelle und Formular', async () => {
@@ -545,7 +555,7 @@ describe('AdminComponents', () => {
       expect(wrapper.find('.empty-state__title').text()).toBe('Keine Komponente gefunden.')
     })
 
-    it('öffnet das Zeilenmenü mit Bearbeiten, Übersetzungen und Löschen (Tastatur: Pfeil unten)', async () => {
+    it('opens the row menu with edit, archive and delete (keyboard: arrow down)', async () => {
       const { wrapper } = await mountTree()
       const row = wrapper.findAll('tbody tr')[1]
       const button = row.find('.row-menu__button')
@@ -553,7 +563,7 @@ describe('AdminComponents', () => {
       await button.trigger('keydown', { key: 'ArrowDown' })
       await flushPromises()
       expect(button.attributes('aria-expanded')).toBe('true')
-      expect(row.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Bearbeiten', 'Übersetzungen', 'Archivieren', 'Löschen'])
+      expect(row.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Bearbeiten', 'Archivieren', 'Löschen'])
     })
 
     it('bearbeitet über das Menü: Titel mit Namen, bleibt beim Tippen stabil', async () => {

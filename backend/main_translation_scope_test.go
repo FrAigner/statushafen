@@ -107,6 +107,9 @@ func TestRouter_TranslationWritesAreScopedToResourcePage(t *testing.T) {
 	for _, tc := range translationRouteCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testutils.SetupTestDB()
+			if err := testutils.EnableTranslation(db); err != nil {
+				t.Fatal(err)
+			}
 			r := newRouter(handlers.NewHandler(db))
 
 			own := models.StatusPage{Name: "Eigene", Slug: "eigene-" + tc.name}

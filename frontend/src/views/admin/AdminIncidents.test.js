@@ -52,10 +52,13 @@ function jsonResponse(body, status = 200) {
 // plus die separaten Tags-/Templates-Requests reicht.
 function makeFetchRouter({
   incidentsOk = true, componentsOk = true, tagsOk = true, templatesOk = true,
-  writeOk = true, writeStatus, writeResponse, incidentsFixtureOverride, pageTags = pageTagsFixture(),
+  writeOk = true, writeStatus, writeResponse, incidentsFixtureOverride, pageTags = pageTagsFixture(), languages,
 } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Page languages (only when given; otherwise the form stays monolingual).
+    if (languages && method === 'GET' && /\/api\/pages\/\d+\/languages$/.test(url)) return jsonResponse(languages)
+    if (languages && method === 'GET' && url === '/api/languages') return jsonResponse([])
     if (method === 'GET' && /\/incident-templates$/.test(url)) {
       return templatesOk ? jsonResponse(templatesFixture()) : jsonResponse({}, 403)
     }
@@ -258,12 +261,20 @@ describe('AdminIncidents', () => {
     expect(rows[0].text()).toContain('API')
   })
 
-  it('verlinkt je Vorfall die Übersetzungsseite', async () => {
+  it('links the translations page per incident when the page has a second language', async () => {
     setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: INCIDENT_PERMS })
-    const { wrapper } = await mountAdminIncidents()
+    const { wrapper } = await mountAdminIncidents({ fetchImpl: makeFetchRouter({ languages: [{ LanguageCode: 'de', IsDefault: true }, { LanguageCode: 'en', IsDefault: false }] }) })
 
     const link = menuItem(wrapper, 'Übersetzungen')
     expect(link.attributes('href')).toBe('/admin/incidents/1/translations')
+  })
+
+  // Translation switched off: the server lists only the default language.
+  it('offers no translations when the page has only its default language', async () => {
+    setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: INCIDENT_PERMS })
+    const { wrapper } = await mountAdminIncidents({ fetchImpl: makeFetchRouter({ languages: [{ LanguageCode: 'de', IsDefault: true }] }) })
+
+    expect(menuItem(wrapper, 'Übersetzungen')).toBeUndefined()
   })
 
   it('bietet im Zeilenmenü „Update posten“ als Link zum Update-Formular (nur mit Anlegerecht)', async () => {
@@ -553,13 +564,13 @@ describe('AdminIncidents', () => {
 
   it('blendet die Aktionen-Spalte ohne incidents:write-Berechtigung aus', async () => {
     const { wrapper } = await mountAdminIncidents({ fetchImpl: makeFetchRouter() })
-    // Ohne Recht nur Ansehen und Übersetzungen, kein Bearbeiten/Löschen.
+    // Without the permission only "view", no edit/delete (translations need a second language).
     const entries = (w) => [...new Set(w.findAll('[role="menuitem"]').map(i => i.text()))]
-    expect(entries(wrapper)).toEqual(['Ansehen', 'Übersetzungen'])
+    expect(entries(wrapper)).toEqual(['Ansehen'])
 
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const { wrapper: withPerm } = await mountAdminIncidents({ fetchImpl: makeFetchRouter() })
-    expect(entries(withPerm)).toEqual(['Bearbeiten', 'Update posten', 'Übersetzungen', 'Löschen'])
+    expect(entries(withPerm)).toEqual(['Bearbeiten', 'Update posten', 'Löschen'])
   })
 
   it('zeigt einen Leerzustand, wenn keine Vorfälle vorhanden sind', async () => {
@@ -685,7 +696,7 @@ describe('AdminIncidents', () => {
       const { wrapper } = await mountAdminIncidents()
       expect(wrapper.find('tbody .action-btn').exists()).toBe(false)
       expect(wrapper.find('tbody .row-menu__button').attributes('aria-label')).toBe('Aktionen für „API down“')
-      expect(wrapper.findAll('tbody [role="menuitem"]').map(i => i.text())).toEqual(['Bearbeiten', 'Update posten', 'Übersetzungen', 'Löschen'])
+      expect(wrapper.findAll('tbody [role="menuitem"]').map(i => i.text())).toEqual(['Bearbeiten', 'Update posten', 'Löschen'])
     })
 
     it('ohne Schreibrecht enthält das Zeilenmenü nur Ansehen und Übersetzungen', async () => {

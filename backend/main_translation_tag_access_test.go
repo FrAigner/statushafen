@@ -90,13 +90,14 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 	for _, tc := range tagTranslationCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testutils.SetupTestDB()
+			require.NoError(t, testutils.EnableTranslation(db))
 			r := newRouter(handlers.NewHandler(db))
 
 			page := models.StatusPage{Name: "Seite", Slug: "tag-tr-" + tc.name}
 			require.NoError(t, db.Create(&page).Error)
 			// Save verlangt eine zusätzliche Sprache der Seite.
-			require.NoError(t, db.FirstOrCreate(&models.Language{Code: "nl"}, models.Language{Code: "nl"}).Error)
-			require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "nl"}).Error)
+			require.NoError(t, db.FirstOrCreate(&models.Language{Code: "en"}, models.Language{Code: "en"}).Error)
+			require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "en"}).Error)
 			tagEU := models.Tag{Name: "eu"}
 			tagUS := models.Tag{Name: "us"}
 			require.NoError(t, db.Create(&tagEU).Error)
@@ -147,7 +148,7 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 					return do(http.MethodGet, coll(p)+"/all", "", tok)
 				}},
 				{"Speichern", func(p uint, _ []uint, _ int, tok string) *httptest.ResponseRecorder {
-					return do(http.MethodPut, coll(p)+"/nl", tc.saveBody, tok)
+					return do(http.MethodPut, coll(p)+"/en", tc.saveBody, tok)
 				}},
 				{"Bestätigen", func(_ uint, trs []uint, n int, tok string) *httptest.ResponseRecorder {
 					return do(http.MethodPatch, tc.adminPrefix+id(trs[n])+"/confirm", "", tok)

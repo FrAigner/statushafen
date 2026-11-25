@@ -33,6 +33,7 @@ type iutEnv struct {
 func newIUTEnv(t *testing.T) *iutEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	r.Use(func(c *gin.Context) {
@@ -144,16 +145,16 @@ func TestSaveIncidentUpdateTranslation_AnlegenDannAendern(t *testing.T) {
 	assert.Equal(t, "manual", rows[0].Source)
 
 	// Admin-Liste enthält Entwürfe und Bestätigte, nach Sprache sortiert.
-	require.Equal(t, http.StatusOK, e.save("fr", "On s'en occupe", "draft").Code)
+	// A legacy fr row (no content language any more) stays stored but is not listed.
+	require.NoError(t, e.db.Create(&models.IncidentUpdateTranslation{UpdateID: e.upd.ID, LanguageCode: "fr", Message: "On s'en occupe", Status: "draft"}).Error)
+	assert.Equal(t, "language_not_available", codeFrom(t, e.save("fr", "x", "draft")))
 	w = e.do("GET", e.adminPath(""), nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	var list []map[string]string
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &list))
-	require.Len(t, list, 2)
+	require.Len(t, list, 1)
 	assert.Equal(t, "en", list[0]["LanguageCode"])
 	assert.Equal(t, "confirmed", list[0]["Status"])
-	assert.Equal(t, "fr", list[1]["LanguageCode"])
-	assert.Equal(t, "draft", list[1]["Status"])
 }
 
 func TestSaveIncidentUpdateTranslation_Eingabepruefung(t *testing.T) {
@@ -265,9 +266,10 @@ func TestPublicIncidentUpdateTranslations_NurBestaetigteUndRueckfall(t *testing.
 	assert.Equal(t, "de", resp.DefaultLanguage)
 	assert.Equal(t, map[string]string{strconv.Itoa(int(e.upd.ID)): "first en"}, resp.Updates)
 
-	_, resp = e.publicGet("iut", e.inc.ID, "?lang=fr")
-	assert.Equal(t, "premier fr", resp.Updates[strconv.Itoa(int(e.upd.ID))])
-	assert.Equal(t, "deuxième fr", resp.Updates[strconv.Itoa(int(upd2.ID))])
+	// fr is no content language any more: its stored translations are not delivered.
+	w, _ = e.publicGet("iut", e.inc.ID, "?lang=fr")
+	assert.Equal(t, "invalid_request", codeFrom(t, w))
+	assert.NotContains(t, resp.Updates, strconv.Itoa(int(upd2.ID)))
 	assert.NotContains(t, resp.Updates, strconv.Itoa(int(upd3.ID)))
 
 	// Ohne lang gilt die Standardsprache (keine Übersetzung dazu: leere Map, nie null).
@@ -280,13 +282,13 @@ func TestPublicIncidentUpdateTranslations_NurBestaetigteUndRueckfall(t *testing.
 
 func TestPublicIncidentUpdateTranslations_StandardspracheAlsRueckfall(t *testing.T) {
 	e := newIUTEnv(t)
-	// Eine Seite, deren Standardsprache Englisch ist: eine bestätigte en-Übersetzung
-	// gilt auch für Besucher in fr, wenn fr nichts bestätigt hat.
+	// A page whose default language is English: a confirmed en translation also
+	// applies to visitors in de when de has nothing confirmed.
 	require.NoError(t, e.db.Model(&models.StatusPageLanguage{}).Where("status_page_id = ?", e.page.ID).Update("is_default", false).Error)
 	require.NoError(t, e.db.Model(&models.StatusPageLanguage{}).Where("status_page_id = ? AND language_code = ?", e.page.ID, "en").Update("is_default", true).Error)
 	require.NoError(t, e.db.Create(&models.IncidentUpdateTranslation{UpdateID: e.upd.ID, LanguageCode: "en", Message: "english", Status: "confirmed"}).Error)
 
-	_, resp := e.publicGet("iut", e.inc.ID, "?lang=fr")
+	_, resp := e.publicGet("iut", e.inc.ID, "?lang=de")
 	assert.Equal(t, "english", resp.Updates[strconv.Itoa(int(e.upd.ID))])
 }
 

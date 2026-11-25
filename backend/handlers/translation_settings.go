@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/fraigner/statushafen/externalstatus"
@@ -23,6 +24,7 @@ func (h *Handler) translationSettingsView() gin.H {
 	eff := h.effectiveTranslationConfig()
 	_, _, err := h.translationProvider()
 	return gin.H{
+		"enabled":            h.translationEnabled(),
 		"provider":           st.Provider,
 		"url":                st.URL,
 		"api_key_set":        st.APIKey != "",
@@ -53,6 +55,7 @@ func (h *Handler) setSystemSettingString(key, value string) error {
 // unverändert, ein leerer String löscht ihn. Das Audit-Log nennt nie den Wert.
 func (h *Handler) UpdateTranslationSettingsHandler(c *gin.Context) {
 	var req struct {
+		Enabled  *bool   `json:"enabled"`
 		Provider *string `json:"provider"`
 		URL      *string `json:"url"`
 		APIKey   *string `json:"api_key"`
@@ -61,7 +64,7 @@ func (h *Handler) UpdateTranslationSettingsHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request fields", "code": "invalid_request"})
 		return
 	}
-	if req.Provider == nil && req.URL == nil && req.APIKey == nil {
+	if req.Enabled == nil && req.Provider == nil && req.URL == nil && req.APIKey == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one field is required", "code": "settings_field_required"})
 		return
 	}
@@ -85,6 +88,14 @@ func (h *Handler) UpdateTranslationSettingsHandler(c *gin.Context) {
 			u = base
 		}
 		*req.URL = u
+	}
+	// The on/off switch is stored like the other bool settings (canonical "true"/"false").
+	if req.Enabled != nil {
+		if err := h.setSystemSettingBool(settingTranslationEnabled, *req.Enabled); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update settings", "code": "server_error"})
+			return
+		}
+		h.RecordAudit(c, "system_setting.updated", "config", "SystemSetting", settingTranslationEnabled, "enabled", strconv.FormatBool(*req.Enabled))
 	}
 	changes := []struct {
 		key, field string

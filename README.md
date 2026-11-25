@@ -22,8 +22,9 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT license](LICENSE)
   language and audience.
 - **Sign-in through OIDC** (GitLab, Google, Keycloak and others), password optional; roles and
   permissions, audit log, plus per-page single sign-on with OIDC.
-- **Multilingual** interface and content (30 languages in the catalog), optional automatic
-  translation (LibreTranslate or DeepL).
+- **German and English** interface and content; a second content language with optional
+  automatic translation (LibreTranslate or DeepL) is a switch in the system settings (off by
+  default).
 - **Formatted texts** in a restricted Markdown subset, rendered safely in pages and mails.
 - **Self-monitoring** with a system page, Prometheus metrics, structured logs without secrets.
 - Documented REST API ([OpenAPI](docs/api/openapi.yaml)) and in-app help.
@@ -132,6 +133,18 @@ The built-in Google/GitHub login and SAML have been removed, and the password lo
 default. Before updating, set up a global OIDC provider (Google keeps working as an OIDC provider) or
 set `PASSWORD_LOGIN_ENABLED=true`; `GOOGLE_*`/`GITHUB_*` are gone. SAML data stays in the database but
 has no effect. Steps: [`docs/sso/en/providers.md`](docs/sso/en/providers.md#upgrading-from-older-versions).
+
+## Upgrade note: content languages
+
+Content (incidents, maintenance, notices,
+components, templates, notifications) now exists in German and English only, and the second
+language including automatic translation is a switch under *System settings → Automatic
+translation*, **off by default**. Installations that used translations before start with the
+switch **off**: until a global admin switches it on, every status page shows and sends its content
+in its default language only. Stored translations are kept and reappear once it is on. At startup
+catalog languages other than `de` and `en` are deactivated (rows and translations stay in the
+database but are no longer offered or delivered), and status pages with such a default language
+fall back to German (logged).
 
 ## Documentation
 

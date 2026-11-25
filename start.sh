@@ -22,7 +22,7 @@ if [ -f .pids ]; then
     ./stop.sh
 fi
 
-# 0. Lokales LibreTranslate (30 Sprachen) für den Übersetzen-Knopf; setzt LIBRETRANSLATE_URL fürs Backend
+# 0. Local LibreTranslate (German and English) for the translate button; sets LIBRETRANSLATE_URL for the backend
 source ./scripts/local-translate.sh
 local_translate_start
 

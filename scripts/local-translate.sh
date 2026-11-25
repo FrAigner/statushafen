@@ -3,18 +3,18 @@
 # Wird von start.sh/stop.sh eingebunden (source). Ohne Docker, bei LOCAL_TRANSLATE=0 oder bei
 # bereits gesetzter LIBRETRANSLATE_URL passiert nichts.
 #
-# Die Codes sind die 30 Standardsprachen des Katalogs (backend/database/languages.go,
-# defaultLanguages); scripts/local_translate_test.sh hält beide Listen gleich.
+# The codes are the content languages of the catalog (backend/database/languages.go,
+# defaultLanguages: German and English only); scripts/local_translate_test.sh keeps both lists equal.
 # Das erste Laden der Modelle dauert lange und braucht mehrere GB RAM; sie liegen in einem
 # benannten Volume und werden danach nicht neu geladen.
 LT_IMAGE="libretranslate/libretranslate:v1.9.6"
 LT_CONTAINER="statushafen_libretranslate"
 LT_VOLUME="statushafen_libretranslate_models"
-LT_CODES="bs,bg,da,de,en,et,fi,fr,el,ga,it,hr,lv,lt,lb,mt,mk,nl,pl,pt,rm,ro,sv,sr,sk,sl,es,cs,tr,hu"
-# Diese Katalogsprachen kennt LibreTranslate v1.9.6 nicht (Modellindex, geprüft 31.10.2026). Steht ein
-# unbekannter Code in LT_LOAD_ONLY, startet der Dienst gar nicht ("Unavailable language codes"),
-# deshalb werden sie beim Start ausgelassen; der Übersetzen-Knopf meldet für sie "nicht unterstützt".
-LT_UNSUPPORTED="bs,hr,lb,mk,mt,rm,sr"
+LT_CODES="de,en"
+# Catalog languages LibreTranslate does not know are left out of LT_LOAD_ONLY: an unknown code there
+# keeps the service from starting ("Unavailable language codes"). LibreTranslate v1.9.6 supports
+# both de and en, so the list is empty; the filter stays for future catalog changes.
+LT_UNSUPPORTED=""
 
 local_translate_start() {
   if [ "${LOCAL_TRANSLATE:-1}" = "0" ]; then
@@ -41,7 +41,7 @@ local_translate_start() {
     echo "ℹ️  Auf Port $port läuft schon etwas, kein LibreTranslate-Container gestartet (LOCAL_TRANSLATE_PORT ändert den Port)."
     return 0
   else
-    echo "🌐 Starte LibreTranslate mit 23 von 30 Katalogsprachen auf 127.0.0.1:$port (erstes Laden der Modelle dauert lange, mehrere GB RAM; LOCAL_TRANSLATE=0 schaltet ab)..."
+    echo "🌐 Starte LibreTranslate mit Deutsch und Englisch auf 127.0.0.1:$port (erstes Laden der Modelle dauert lange, mehrere GB RAM; LOCAL_TRANSLATE=0 schaltet ab)..."
     # Alter, gestoppter oder abgestürzter Container gleichen Namens (restart-Schleife) weicht dem neuen.
     docker stop "$LT_CONTAINER" > /dev/null 2>&1
     docker rm "$LT_CONTAINER" > /dev/null 2>&1

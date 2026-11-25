@@ -4,7 +4,7 @@ import { useApi } from './useApi'
 // Einstellungen der automatischen Übersetzung (Systemeinstellungen).
 // Der Schlüssel kommt nie vom Server zurück, nur api_key_set.
 const settings = ref({
-  provider: '', url: '', api_key_set: false, env_url_set: false, env_api_key_set: false,
+  enabled: false, provider: '', url: '', api_key_set: false, env_url_set: false, env_api_key_set: false,
   effective_provider: '', configured: false,
 })
 
@@ -16,7 +16,7 @@ export function useTranslationSettings() {
     return settings.value
   }
 
-  // patch: nur geänderte Felder (provider, url, api_key); api_key '' löscht den Schlüssel.
+  // patch: only changed fields (enabled, provider, url, api_key); api_key '' deletes the key.
   const save = async (patch) => {
     settings.value = await apiFetch('/api/settings/translation', { method: 'PUT', body: JSON.stringify(patch) })
     return settings.value

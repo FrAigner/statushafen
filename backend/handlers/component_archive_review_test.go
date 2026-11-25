@@ -122,6 +122,7 @@ func TestComponentArchiveReview_AnonymeVorfallRoutenOhneVersteckteKomponenten(t 
 // 3) Übersetzungen archivierter/unsichtbarer Komponenten sind anonym nicht abrufbar.
 func TestComponentArchiveReview_UebersetzungenNurFuerBerechtigte(t *testing.T) {
 	e := newVisEnv(t)
+	require.NoError(t, testutils.EnableTranslation(e.db))
 	archived := e.comp("Arch", nil, true, "operational")
 	hidden := e.comp("Hid", nil, false, "operational")
 	shown := e.comp("Shown", nil, true, "operational")

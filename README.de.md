@@ -22,8 +22,9 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT-Lizenz](LICENSE)
   Sprache und Zielgruppe.
 - **Anmeldung über OIDC** (GitLab, Google, Keycloak u. a.), optional Passwort; Rollen und Rechte,
   Audit-Log, zusätzlich Single Sign-on je Seite mit OIDC.
-- **Mehrsprachig** (30 Sprachen im Katalog) für Oberfläche und Inhalte, optional automatische
-  Übersetzung (LibreTranslate oder DeepL).
+- **Deutsch und Englisch** für Oberfläche und Inhalte; eine zweite Inhaltssprache mit optional
+  automatischer Übersetzung (LibreTranslate oder DeepL) ist ein Schalter in den
+  Systemeinstellungen (standardmäßig aus).
 - **Formatierte Texte** in einer eingeschränkten Markdown-Teilmenge, sicher dargestellt in Seiten
   und Mails.
 - **Selbstüberwachung** mit Systemseite, Prometheus-Metriken, strukturierte Logs ohne Geheimnisse.
@@ -135,6 +136,19 @@ standardmäßig aus. Vor dem Update einen globalen OIDC-Anbieter einrichten (Goo
 OIDC-Anbieter weiter) oder `PASSWORD_LOGIN_ENABLED=true` setzen; `GOOGLE_*`/`GITHUB_*` entfallen.
 SAML-Daten bleiben in der Datenbank, sind aber wirkungslos. Schritte:
 [`docs/sso/providers.md`](docs/sso/providers.md#upgrade-von-älteren-versionen).
+
+## Upgrade-Hinweis: Inhaltssprachen
+
+Inhalte (Vorfälle, Wartungen, Ankündigungen,
+Komponenten, Vorlagen, Benachrichtigungen) gibt es nur noch auf Deutsch und Englisch, und die
+zweite Sprache samt automatischer Übersetzung ist ein Schalter unter *Systemeinstellungen →
+Automatische Übersetzung*, **standardmäßig aus**. Installationen, die bisher Übersetzungen genutzt
+haben, starten mit **ausgeschaltetem** Schalter: Bis ein Global Admin ihn einschaltet, zeigt und
+versendet jede Statusseite ihre Inhalte nur in ihrer Standardsprache. Gespeicherte Übersetzungen
+bleiben erhalten und erscheinen wieder, sobald er an ist. Beim Start werden Katalogsprachen außer
+`de` und `en` abgeschaltet (Zeilen und Übersetzungen bleiben in der Datenbank, werden aber weder
+angeboten noch ausgeliefert); Statusseiten mit einer solchen Standardsprache fallen auf Deutsch
+zurück (mit Log-Eintrag).
 
 ## Dokumentation
 

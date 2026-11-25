@@ -85,7 +85,7 @@ func (h *Handler) GetIncidentUpdateTranslationsHandler(c *gin.Context) {
 		return
 	}
 	var rows []models.IncidentUpdateTranslation
-	if err := h.DB.Where("update_id = ?", upd.ID).Order("language_code").Find(&rows).Error; err != nil {
+	if err := h.DB.Where("update_id = ? AND language_code IN ?", upd.ID, h.deliveredTranslationCodes()).Order("language_code").Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error", "code": "server_error"})
 		return
 	}

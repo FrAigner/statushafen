@@ -23,6 +23,9 @@ func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 	for _, tc := range translationRouteCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testutils.SetupTestDB()
+			if err := testutils.EnableTranslation(db); err != nil {
+				t.Fatal(err)
+			}
 			r := newRouter(handlers.NewHandler(db))
 
 			own := models.StatusPage{Name: "Eigene", Slug: "eigene-liste-" + tc.name}
@@ -37,11 +40,11 @@ func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 			db.Create(&models.UserStatusPageRole{UserID: user.ID, StatusPageID: own.ID, RoleID: reader.ID})
 			token, _ := middleware.GenerateToken(user.ID, user.Email, "", "", false)
 
-			ownParent, _ := tc.seed(db, own.ID, "fr") // Entwurf
-			foreignParent, _ := tc.seed(db, foreign.ID, "fr")
+			ownParent, _ := tc.seed(db, own.ID, "de") // Entwurf
+			foreignParent, _ := tc.seed(db, foreign.ID, "de")
 			// Bestätigte Übersetzung an dasselbe Elternobjekt hängen: seed legt
 			// stets ein neues Elternobjekt an, deshalb umhängen.
-			_, confirmedID := tc.seed(db, own.ID, "es")
+			_, confirmedID := tc.seed(db, own.ID, "en")
 			table := map[string][2]string{
 				"incident":  {"incident_translations", "incident_id"},
 				"component": {"component_translations", "component_id"},
@@ -68,11 +71,11 @@ func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 			if w.Code != http.StatusOK {
 				t.Fatalf("Admin-Liste: Status %d, Body %s", w.Code, w.Body.String())
 			}
-			if got := statuses(t, w.Body.Bytes()); got != "confirmed:es,draft:fr" {
+			if got := statuses(t, w.Body.Bytes()); got != "draft:de,confirmed:en" {
 				t.Errorf("Admin-Liste soll Entwurf und Bestätigte liefern, hat %q", got)
 			}
 
-			if got := statuses(t, get(public(id(ownParent)), "").Body.Bytes()); got != "confirmed:es" {
+			if got := statuses(t, get(public(id(ownParent)), "").Body.Bytes()); got != "confirmed:en" {
 				t.Errorf("öffentliche Liste darf nur Bestätigte liefern, hat %q", got)
 			}
 

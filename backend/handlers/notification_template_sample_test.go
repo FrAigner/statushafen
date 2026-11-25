@@ -55,12 +55,15 @@ func TestIsValidNotificationLanguage(t *testing.T) {
 	if !isValidNotificationLanguage(db, page.ID, "de") || isValidNotificationLanguage(db, page.ID, "fr") {
 		t.Error("Rückfall en/de falsch")
 	}
-	// Mit Sprachzeile: nur konfigurierte Sprachen.
-	if err := db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "fr"}).Error; err != nil {
-		t.Fatal(err)
+	// With language rows: only configured content languages (de/en); a legacy
+	// fr assignment is not valid any more.
+	for _, code := range []string{"en", "fr"} {
+		if err := db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: code}).Error; err != nil {
+			t.Fatal(err)
+		}
 	}
-	if !isValidNotificationLanguage(db, page.ID, "fr") || isValidNotificationLanguage(db, page.ID, "de") {
-		t.Error("konfigurierte Sprachen falsch")
+	if !isValidNotificationLanguage(db, page.ID, "en") || isValidNotificationLanguage(db, page.ID, "de") || isValidNotificationLanguage(db, page.ID, "fr") {
+		t.Error("configured languages wrong")
 	}
 	// DB-Fehler (Tabelle weg): Rückfall en/de.
 	if err := db.Migrator().DropTable(&models.StatusPageLanguage{}); err != nil {

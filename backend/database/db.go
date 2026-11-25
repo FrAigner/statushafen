@@ -278,11 +278,15 @@ func InitDB() {
 	// Review F3: eine Einladungszeile je (Seite, Adresse).
 	CreatePageInvitationUniqueIndex(DB)
 	seedLanguageCatalog(DB)
+	// Content languages are only de and en: switch off the rest of the catalog.
+	deactivateUnsupportedLanguages(DB)
 	// Die System-Statusseite muss vor dem Sprach-Backfill entstehen,
 	// sonst bekommt sie auf einer frischen Datenbank erst beim zweiten Start ihre
 	// Sprachen (vom Postgres-Migrationstest gefunden).
 	SeedSystemStatusPage(DB)
 	backfillStatusPageLanguages(DB)
+	// After the backfill so every page has rows; pages with another default fall back to de.
+	fallbackUnsupportedDefaultLanguages(DB)
 	createUiOverrideUniqueIndexes(DB)
 	// leere Overrides blenden Texte aus, Altfälle entfernen.
 	removeEmptyUiOverrides(DB)

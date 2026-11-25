@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
@@ -31,9 +32,11 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-function makeFetchRouter({ componentOverride, translationsOverride, catalogOverride, pageId = '1' } = {}) {
+function makeFetchRouter({ componentOverride, translationsOverride, catalogOverride, pageId = '1', translationEnabled = true } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
+    // Switch for translations (system setting); on unless a test turns it off.
+    if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: translationEnabled })
     // Einen Einzel-GET für Komponenten gibt es im Backend nicht,
     // die View sucht die Komponente im Baum der Seitenliste (hier als Kind).
     if (method === 'GET' && url === `/api/pages/${pageId}/components`) {
@@ -73,6 +76,26 @@ async function mountComponent({ attach = false, fetchImpl, componentId = '1', pa
   activeWrapper = wrapper
   return { wrapper }
 }
+
+// Translation switched off: the pure translation page sends the user back to the
+// overview and loads no translations.
+describe('AdminComponentTranslations with translation switched off', () => {
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('redirects to the overview', async () => {
+    const { useTenant } = await import('../../composables/useTenant')
+    useTenant().setActiveTenant('1')
+    const fetchMock = makeFetchRouter({ translationEnabled: false })
+    global.fetch = fetchMock
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/:p(.*)*', component: { template: '<div/>' } }] })
+    await router.push('/admin/x/1/translations')
+    const wrapper = mount(AdminComponentTranslations, { global: { plugins: [i18n, router], stubs: onyxFormStubs }, props: { componentId: '1' } })
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/admin/components')
+    expect(fetchMock.mock.calls.some(([u]) => u.includes('/translations'))).toBe(false)
+    wrapper.unmount()
+  })
+})
 
 describe('AdminComponentTranslations', () => {
   beforeEach(() => {
@@ -180,7 +203,9 @@ describe('AdminComponentTranslations', () => {
   })
 
   it('handles load error gracefully', async () => {
-    const errorFetch = vi.fn(async () => {
+    // Only the switch answers (on); every other request fails.
+    const errorFetch = vi.fn(async (url) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       throw new Error('Network error')
     })
     const { wrapper } = await mountComponent({ fetchImpl: errorFetch })
@@ -267,6 +292,7 @@ describe('AdminComponentTranslations', () => {
 
   it('handles confirm error gracefully', async () => {
     const errorFetch = vi.fn(async (url, opts) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       if (opts?.method === 'PATCH' && /confirm/.test(url)) {
         throw new Error('Confirm failed')
       }
@@ -284,6 +310,7 @@ describe('AdminComponentTranslations', () => {
 
   it('handles delete error gracefully', async () => {
     const errorFetch = vi.fn(async (url, opts) => {
+      if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: true })
       if (opts?.method === 'DELETE') {
         throw new Error('Delete failed')
       }

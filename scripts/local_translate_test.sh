@@ -11,11 +11,14 @@ shell=$(sed -n 's/^LT_CODES="\(.*\)"/\1/p' "$script" | tr ',' '\n' | sort)
 go=$(sed -n '/^var defaultLanguages/,/^}/p' backend/database/languages.go | sed -n 's/.*{Code: "\([a-z-]*\)".*/\1/p' | sort)
 [ -n "$shell" ] && [ -n "$go" ] || fail "Codes nicht gefunden"
 [ "$shell" = "$go" ] || fail "Sprachcodes weichen ab: $(diff <(echo "$shell") <(echo "$go") | tr '\n' ' ')"
-[ "$(echo "$shell" | wc -l | tr -d ' ')" = 30 ] || fail "erwartet 30 Sprachen"
+# Content languages are German and English only (backend/database/languages.go).
+[ "$shell" = "$(printf 'de\nen')" ] || fail "erwartet genau de und en"
 
 # Nicht unterstützte Sprachen müssen aus dem Katalog stammen und dürfen nicht in LT_LOAD_ONLY landen.
-unsup=$(sed -n 's/^LT_UNSUPPORTED="\(.*\)"/\1/p' "$script" | tr ',' '\n' | sort)
-[ -n "$unsup" ] && [ -z "$(comm -13 <(echo "$shell") <(echo "$unsup"))" ] || fail "LT_UNSUPPORTED enthält Codes außerhalb des Katalogs"
+# LibreTranslate supports both de and en, so the list may be empty.
+grep -q '^LT_UNSUPPORTED="' "$script" || fail "LT_UNSUPPORTED fehlt"
+unsup=$(sed -n 's/^LT_UNSUPPORTED="\(.*\)"/\1/p' "$script" | tr ',' '\n' | sed '/^$/d' | sort)
+[ -z "$unsup" ] || [ -z "$(comm -13 <(echo "$shell") <(echo "$unsup"))" ] || fail "LT_UNSUPPORTED enthält Codes außerhalb des Katalogs"
 grep -q 'load_only=' "$script" || fail "LT_LOAD_ONLY wird nicht gefiltert"
 grep -q 'LT_LOAD_ONLY="\$load_only"' "$script" || fail "LT_LOAD_ONLY nutzt nicht die gefilterte Liste"
 grep -q 'LT_IMAGE="libretranslate/libretranslate:v[0-9]' "$script" || fail "Image nicht auf eine Version festgelegt"

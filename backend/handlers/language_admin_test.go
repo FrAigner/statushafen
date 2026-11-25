@@ -33,17 +33,17 @@ func TestLanguageCatalogHandlers(t *testing.T) {
 	r.PUT("/api/languages/:id", h.UpdateLanguageHandler)
 
 	t.Run("Create language", func(t *testing.T) {
-		w := doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "FR", "name": "Français"})
+		w := doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "EN", "name": "English"})
 		requireStatusCode(t, w, http.StatusCreated)
 		var lang models.Language
 		_ = json.Unmarshal(w.Body.Bytes(), &lang)
-		if lang.Code != "fr" || !lang.IsActive {
+		if lang.Code != "en" || !lang.IsActive {
 			t.Errorf("Language created incorrectly: %+v", lang)
 		}
 	})
 
 	t.Run("Duplicate code rejected", func(t *testing.T) {
-		w := doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "fr", "name": "French again"})
+		w := doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "en", "name": "English again"})
 		requireStatusCode(t, w, http.StatusConflict)
 	})
 
@@ -59,13 +59,13 @@ func TestLanguageCatalogHandlers(t *testing.T) {
 
 	t.Run("Update renames and can deactivate", func(t *testing.T) {
 		var lang models.Language
-		db.Where("code = ?", "fr").First(&lang)
+		db.Where("code = ?", "en").First(&lang)
 		active := false
-		w := doTagRequest(r, "PUT", "/api/languages/"+itoa(lang.ID), map[string]interface{}{"name": "Francais (updated)", "is_active": &active})
+		w := doTagRequest(r, "PUT", "/api/languages/"+itoa(lang.ID), map[string]interface{}{"name": "English (updated)", "is_active": &active})
 		requireStatusCode(t, w, http.StatusOK)
 		var updated models.Language
 		_ = json.Unmarshal(w.Body.Bytes(), &updated)
-		if updated.Name != "Francais (updated)" || updated.IsActive {
+		if updated.Name != "English (updated)" || updated.IsActive {
 			t.Errorf("expected renamed + deactivated language, got %+v", updated)
 		}
 	})
@@ -91,7 +91,7 @@ func TestLanguageCatalogHandlers(t *testing.T) {
 
 	t.Run("Update rejects empty name", func(t *testing.T) {
 		var lang models.Language
-		db.Where("code = ?", "fr").First(&lang)
+		db.Where("code = ?", "en").First(&lang)
 		w := doTagRequest(r, "PUT", "/api/languages/"+itoa(lang.ID), map[string]interface{}{"name": "  "})
 		requireStatusCode(t, w, http.StatusBadRequest)
 	})
@@ -99,6 +99,7 @@ func TestLanguageCatalogHandlers(t *testing.T) {
 
 func TestPageLanguagesHandlers(t *testing.T) {
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	r.POST("/api/languages", h.CreateLanguageHandler)
@@ -115,7 +116,6 @@ func TestPageLanguagesHandlers(t *testing.T) {
 	// gewünschten Codes dagegen, sie müssen also erst angelegt werden.
 	doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "de", "name": "Deutsch"})
 	doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "en", "name": "English"})
-	doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "fr", "name": "Français"})
 
 	t.Run("Empty page has no configured languages", func(t *testing.T) {
 		w := doTagRequest(r, "GET", "/api/pages/"+itoa(page.ID)+"/languages", nil)
@@ -151,15 +151,15 @@ func TestPageLanguagesHandlers(t *testing.T) {
 		}
 	})
 
-	t.Run("Put replaces the previous set (fr instead of de/en)", func(t *testing.T) {
+	t.Run("Put replaces the previous set (en instead of de/en)", func(t *testing.T) {
 		w := doTagRequest(r, "PUT", "/api/pages/"+itoa(page.ID)+"/languages", map[string]interface{}{
-			"codes": []string{"fr"}, "default": "fr",
+			"codes": []string{"en"}, "default": "en",
 		})
 		requireStatusCode(t, w, http.StatusOK)
 		var list []models.StatusPageLanguage
 		_ = json.Unmarshal(w.Body.Bytes(), &list)
-		if len(list) != 1 || list[0].LanguageCode != "fr" || !list[0].IsDefault {
-			t.Fatalf("expected exactly [fr] as default, got %+v", list)
+		if len(list) != 1 || list[0].LanguageCode != "en" || !list[0].IsDefault {
+			t.Fatalf("expected exactly [en] as default, got %+v", list)
 		}
 	})
 
@@ -207,9 +207,9 @@ func TestCreateLanguageHandler_IsActiveWirdUebernommen(t *testing.T) {
 		payload    map[string]any
 		want       bool
 	}{
-		{"inaktiv", "fr", map[string]any{"code": "fr", "name": "Français", "is_active": false}, false},
-		{"aktiv explizit", "it", map[string]any{"code": "it", "name": "Italiano", "is_active": true}, true},
-		{"ohne Angabe: aktiv", "es", map[string]any{"code": "es", "name": "Español"}, true},
+		{"inaktiv", "de", map[string]any{"code": "de", "name": "Deutsch", "is_active": false}, false},
+		{"aktiv explizit", "en", map[string]any{"code": "en", "name": "English", "is_active": true}, true},
+		{"ohne Angabe: aktiv", "de", map[string]any{"code": "de", "name": "Deutsch"}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -221,17 +221,19 @@ func TestCreateLanguageHandler_IsActiveWirdUebernommen(t *testing.T) {
 			var stored models.Language
 			require.NoError(t, db.Where("code = ?", tc.code).First(&stored).Error)
 			assert.Equal(t, tc.want, stored.IsActive, "gespeicherte Zeile")
+			// Only de and en exist: remove the row entirely so the next case can create it again.
+			require.NoError(t, db.Unscoped().Delete(&stored).Error)
 		})
 	}
 
 	t.Run("gelöschte Sprache lebt inaktiv wieder auf", func(t *testing.T) {
-		var fr models.Language
-		require.NoError(t, db.Where("code = ?", "fr").First(&fr).Error)
-		require.NoError(t, db.Delete(&fr).Error)
-		w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "fr", "name": "Français 2", "is_active": false})
+		en := models.Language{Code: "en", Name: "English", IsActive: true}
+		require.NoError(t, db.Create(&en).Error)
+		require.NoError(t, db.Delete(&en).Error)
+		w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "English 2", "is_active": false})
 		requireStatusCode(t, w, http.StatusCreated)
 		var stored models.Language
-		require.NoError(t, db.Where("code = ?", "fr").First(&stored).Error)
+		require.NoError(t, db.Where("code = ?", "en").First(&stored).Error)
 		assert.False(t, stored.IsActive)
 	})
 }
@@ -245,10 +247,10 @@ func TestCreateLanguageHandler_InaktivSetzenScheitertGibt500(t *testing.T) {
 	require.NoError(t, db.Callback().Update().Before("gorm:update").Register("lang_fail", func(tx *gorm.DB) {
 		_ = tx.AddError(errors.New("db down"))
 	}))
-	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "pt", "name": "Português", "is_active": false})
+	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "de", "name": "Deutsch", "is_active": false})
 	requireStatusCode(t, w, http.StatusInternalServerError)
 	assert.Contains(t, w.Body.String(), `"code":"server_error"`)
 	var n int64
-	db.Model(&models.Language{}).Where("code = ?", "pt").Count(&n)
+	db.Model(&models.Language{}).Where("code = ?", "de").Count(&n)
 	assert.EqualValues(t, 0, n, "nichts halb angelegt")
 }
