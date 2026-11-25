@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import { OnyxButton } from 'sit-onyx'
+import { OnyxButton, OnyxModal } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
@@ -51,10 +51,10 @@ const pageLayoutOptions = [
 // Speichern trotzdem leer bleibt.
 const slugTouched = ref(false)
 
-// Design preview: the real public page, rendered with the unsaved design
-// values of the form (StatusPage preview mode, read-only). Only for saved
-// pages, because the page content comes from the public dashboard of the
-// saved slug.
+// Design preview: the real public page in a modal, rendered with the unsaved
+// design values of the form (StatusPage preview mode, read-only). Only for
+// saved pages, because the page content comes from the public dashboard of
+// the saved slug.
 const previewOpen = ref(false)
 const previewSlug = computed(() => pages.value.find(p => p.ID === currentEditItem.value)?.Slug || '')
 const designPreview = computed(() => ({
@@ -668,31 +668,20 @@ const removeUser = async (assignment) => {
             </label>
           </fieldset>
 
-          <!-- Live preview of the design fields above; nothing is saved here. -->
-          <section class="design-preview" aria-labelledby="design-preview-heading">
-            <div class="design-preview__head">
-              <h4 id="design-preview-heading" class="adm-subhead">{{ t('statusPages.previewHeading') }}</h4>
-              <button
-                v-if="currentEditItem !== 'new' && previewSlug"
-                type="button"
-                class="action-btn"
-                data-test="design-preview-toggle"
-                aria-controls="design-preview-body"
-                :aria-expanded="previewOpen ? 'true' : 'false'"
-                @click="previewOpen = !previewOpen"
-              >
-                <AppIcon :name="previewOpen ? 'chevron-down' : 'chevron-right'" :size="14" />
-                {{ previewOpen ? t('statusPages.previewHide') : t('statusPages.previewShow') }}
-              </button>
-            </div>
-            <p v-if="currentEditItem === 'new' || !previewSlug" class="adm-hint" data-test="design-preview-new">{{ t('statusPages.previewNewPage') }}</p>
-            <div v-else-if="previewOpen" id="design-preview-body">
-              <p class="adm-hint">{{ t('statusPages.previewHint') }}</p>
-              <div class="design-preview-frame theme-public">
-                <StatusPage :slug="previewSlug" :preview="designPreview" />
-              </div>
-            </div>
-          </section>
+          <!-- Preview of the design fields above in a modal; nothing is saved here. -->
+          <div class="design-preview">
+            <button
+              v-if="currentEditItem !== 'new' && previewSlug"
+              type="button"
+              class="action-btn"
+              data-test="design-preview-open"
+              aria-haspopup="dialog"
+              @click="previewOpen = true"
+            >
+              <AppIcon name="globe" :size="14" /> {{ t('statusPages.previewShow') }}
+            </button>
+            <p v-else class="adm-hint" data-test="design-preview-new">{{ t('statusPages.previewNewPage') }}</p>
+          </div>
 
           <FormField v-slot="f" :label="t('statusPages.fieldNotificationFrom')" :hint="t('statusPages.fromAddressHint')" field-id="page-notification-from">
             <input
@@ -726,6 +715,19 @@ const removeUser = async (assignment) => {
             <OnyxButton :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
+
+        <OnyxModal
+          v-model:open="previewOpen"
+          class="design-preview-modal"
+          :label="t('statusPages.previewTitle', { name: formData.Name || previewSlug })"
+        >
+          <template #description>
+            <p class="adm-hint design-preview-hint" data-test="design-preview-hint">{{ t('statusPages.previewHint') }}</p>
+          </template>
+          <div v-if="previewOpen" class="design-preview-frame theme-public">
+            <StatusPage :slug="previewSlug" :preview="designPreview" />
+          </div>
+        </OnyxModal>
 
         <!-- Monitoring-Webhook-Token: nur für bereits gespeicherte Seiten, -->
         <!-- eine "neue" Seite hat noch keine ID, gegen die ein Token generiert werden könnte. -->
@@ -913,19 +915,21 @@ const removeUser = async (assignment) => {
    .meta-tag-Regel setzt sonst Großbuchstaben ("SYSTEM"). */
 .meta-tag--slug { text-transform: none; letter-spacing: normal; }
 
-/* Design preview: the public page in its own token layer (.theme-public),
-   framed and growing with its content, so the edit panel keeps a single scroll. */
+/* Design preview: the public page in its own token layer (.theme-public)
+   inside a wide modal; the modal scrolls, the edit panel stays as it is. */
 .design-preview { margin: 0 0 var(--sp-4); }
-.design-preview__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.design-preview__head .adm-subhead { margin: 0; }
+.design-preview-modal { inline-size: min(1200px, calc(100vw - 2 * var(--sp-4))); }
+.design-preview-hint { margin: var(--sp-1) 0 0; }
 .design-preview-frame {
-  margin-top: var(--sp-2);
-  padding: 0 var(--sp-3) var(--sp-3);
+  margin: var(--sp-3) var(--onyx-modal-padding-inline, var(--sp-5)) var(--sp-5);
+  padding: 0 var(--sp-5) var(--sp-5);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-lg);
   background: var(--bg);
   color: var(--text);
-  overflow: hidden;
   min-inline-size: 0;
+}
+@media (max-width: 600px) {
+  .design-preview-frame { margin-inline: var(--sp-3); padding: 0 var(--sp-3) var(--sp-3); }
 }
 </style>
