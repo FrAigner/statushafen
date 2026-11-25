@@ -1742,7 +1742,11 @@
       "test_incomplete": "Test sign-in needs a discovery URL, client ID and client secret.",
       "unsafe_redirect": "The sign-in service returned an unsafe address. The redirect was not followed.",
       "unknown": "SSO sign-in failed.",
-      "provider_unknown": "This sign-in provider is unknown or no longer active."
+      "provider_unknown": "This sign-in provider is unknown or no longer active.",
+      "email_missing": "The sign-in provider did not send an e-mail address. Please add one at the provider or contact the operator.",
+      "email_unverified": "The e-mail address is not verified at the sign-in provider. Please verify it there and sign in again.",
+      "domain_not_allowed": "The domain of this e-mail address is not allowed to sign in.",
+      "page_session": "A sign-in through a status page's SSO cannot link a global provider. Please sign in with a global provider."
     }
   },
   "layout": {

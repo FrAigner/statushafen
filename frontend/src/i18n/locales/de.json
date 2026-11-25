@@ -1742,7 +1742,11 @@
       "test_incomplete": "Für die Testanmeldung fehlen Discovery URL, Client ID oder Client Secret.",
       "unsafe_redirect": "Der Anmeldedienst hat eine unsichere Adresse geliefert. Die Weiterleitung wurde nicht ausgeführt.",
       "unknown": "Die SSO-Anmeldung ist fehlgeschlagen.",
-      "provider_unknown": "Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv."
+      "provider_unknown": "Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.",
+      "email_missing": "Der Anmeldeanbieter hat keine E-Mail-Adresse übermittelt. Bitte beim Anbieter eine E-Mail-Adresse hinterlegen oder den Betreiber informieren.",
+      "email_unverified": "Die E-Mail-Adresse ist beim Anmeldeanbieter nicht bestätigt. Bitte die Adresse dort bestätigen und erneut anmelden.",
+      "domain_not_allowed": "Die Domain dieser E-Mail-Adresse ist für die Anmeldung nicht freigegeben.",
+      "page_session": "Mit einer Anmeldung über das SSO einer Statusseite lässt sich kein globaler Anbieter verknüpfen. Bitte über einen globalen Anbieter anmelden."
     }
   },
   "layout": {
