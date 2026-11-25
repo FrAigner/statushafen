@@ -111,6 +111,32 @@ no `//`, no control characters or whitespace, no backslash, not under `/api`, at
 silently drops it otherwise. `POST /api/auth/sso-exchange` returns it as `return_to`. After linking,
 the user goes on to the profile.
 
+### Status pages on a custom domain
+
+When the login starts on the verified custom domain of a status page (for example
+`status.acme.example`), the user returns there after signing in, and the session is valid on that
+domain. This applies to global providers, page SSO and the password login.
+
+1. A login start that arrives on the custom domain first redirects to the same path under `BASE_URL`
+   and adds the domain as `return_host`. The state cookie has to reach the callback under `BASE_URL`.
+   The `Host` of the request wins over a `return_host` in the query.
+2. The server keeps `return_host` only if it is exactly the hostname of a custom domain in the state
+   "Verified" or "Active"; for page SSO only the domain of that same page. Anything else (unverified,
+   unknown or other tenants' domains, scheme, port, path, upper case, trailing dot) is dropped; the
+   login then ends under `FRONTEND_URL` as before.
+3. The callback checks the domain again and redirects to `https://<domain>/auth/sso-callback?code=…`,
+   errors to `https://<domain>/login?oidc_error=<code>`. The frontend there redeems the code on the
+   same origin. The password login runs on the same origin anyway.
+
+A session on a custom domain is valid only for the status page of that domain and never has global
+admin rights (like a page SSO session). The reason: whoever controls the DNS of the domain, i.e. the
+tenant, can serve their own code there and read what the browser stores for that domain. A private
+page therefore needs a role on that page; global admins sign in under `FRONTEND_URL` for
+administration.
+
+Requirements: the frontend on the custom domain reaches the API on the same origin (default image,
+`VITE_API_URL` empty), and the reverse proxy passes the `Host` header on unchanged.
+
 ## Troubleshooting
 
 Errors in the browser flow end up as a code on the login page (`?oidc_error=<code>`), when linking in

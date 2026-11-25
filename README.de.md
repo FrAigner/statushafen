@@ -122,6 +122,10 @@ Checkliste für die Produktion:
   beim öffentlichen Aufruf der Seite. Eigene Domains privater Seiten lösen für Nicht-Mitglieder nicht
   mehr zu einem Seitennamen auf (sie sehen die Startseite). Der Endpunkt ist je IP auf 120 Anfragen
   pro Minute begrenzt (danach 429), Caddy fragt nur für Hosts ohne Zertifikat.
+  **Anmelden auf eigenen Domains:** Der Proxy muss für eigene Domains den `Host`-Header unverändert an
+  die Anwendung weiterreichen und `/api` auf demselben Origin ausliefern (Standard-Image, `VITE_API_URL`
+  leer). Ein Login dort läuft über `BASE_URL` und endet wieder auf der eigenen Domain; die Sitzung gilt
+  dort nur für die Seite der Domain (siehe [`docs/sso/providers.md`](docs/sso/providers.md#statusseiten-auf-eigener-domain)).
 - Die Datenbank regelmäßig sichern: [`docs/backup-restore.md`](docs/backup-restore.md).
 
 ## Upgrade-Hinweis: Anmeldung

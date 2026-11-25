@@ -93,7 +93,7 @@ erkennen lässt, welche Slugs private Seiten sind. Den Einstieg für diese Besuc
 ### `GET /api/auth/sso/login`
 
 Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `slug` (Slug der Statusseite), optional
-`return_to`. Einstieg ins
+`return_to` und `return_host` (siehe [eigene Domain](providers.md#statusseiten-auf-eigener-domain)). Einstieg ins
 Seiten-SSO ohne Seiten-ID: Der Server startet
 den Ablauf wie `oidc/login` und leitet mit `307` zum IdP weiter. Eine unbekannte
 Seite, eine Seite ohne aktives SSO und ein fehlender `slug` enden gleich: Weiterleitung auf die
@@ -106,7 +106,7 @@ wenn sie für den Besucher nicht erreichbar ist (nicht vorhanden oder privat).
 ### `GET /api/auth/oidc/login`
 
 Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `page` (ID der Statusseite, Pflicht),
-`return_to` (optional, siehe [Rücksprung](providers.md#rücksprung-nach-dem-login)). Legt
+`return_to` und `return_host` (optional, siehe [Rücksprung](providers.md#rücksprung-nach-dem-login)). Legt
 State, Nonce und PKCE-Verifier an (10 Minuten gültig), setzt das Cookie `oidc_state` (HttpOnly,
 Secure) und leitet mit `307` zum IdP weiter. Fehler leiten auf die Login-Seite um (Codes
 `bad_page`, `not_configured`, `provider_unreachable`, `internal`).
@@ -149,8 +149,10 @@ Client-Daten.
 
 ### `GET /api/auth/provider/:id/login`
 
-Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `return_to` (optional, siehe
-[Rücksprung](providers.md#rücksprung-nach-dem-login)). Legt State, Nonce und PKCE-Verifier an (10
+Öffentlich, begrenzt auf 20 Aufrufe pro Minute. Query: `return_to` und `return_host` (optional, siehe
+[Rücksprung](providers.md#rücksprung-nach-dem-login)). Kommt einer dieser drei Login-Starts auf einer
+verifizierten eigenen Domain an, leitet er zuerst mit `307` auf denselben Pfad unter `BASE_URL` weiter
+(mit der Domain als `return_host`). Legt State, Nonce und PKCE-Verifier an (10
 Minuten gültig), setzt das Cookie `oidc_state` (Pfad `/api/auth/provider`, HttpOnly, Secure) und leitet
 mit `307` zum Anbieter weiter. Fehler leiten auf die Login-Seite um (`provider_unknown`,
 `provider_unreachable`, `internal`).

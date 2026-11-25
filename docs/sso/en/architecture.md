@@ -87,7 +87,7 @@ the profile with the code `already_linked`.
 Trust boundaries:
 
 1. **Browser ↔ backend**: everything from the browser is untrusted (query `state`, `code`,
-   `return_to`, cookies, one-time code). The backend only trusts its own login states stored in the
+   `return_to`, `return_host`, `Host` header, cookies, one-time code). The backend only trusts its own login states stored in the
    database.
 2. **Backend ↔ IdP**: global providers are configured by the operator (trusted, internal addresses
    allowed); the IdP of a page SSO is maintained by a page admin (partly trusted: SSRF protection,
@@ -107,13 +107,16 @@ STRIDE:
 | Repudiation | Unnoticed sign-ins | Audit entries `auth.sso_login`/`auth.sso_linked` with the provider. |
 | Information disclosure | JWT in URL, history, referrer | Only a short-lived one-time code in the URL, JWT via `POST /api/auth/sso-exchange`; code exactly once. |
 | Information disclosure | Secrets in the log | Client secrets are never logged; error texts are sanitized (`logging.SanitizeErr`). |
-| Information disclosure | Open redirect via `return_to` | Only a path with exactly one `/` (also after decoding), no control characters, whitespace, backslashes, not `/api`, at most 2048 bytes; otherwise dropped. The target only reaches the frontend as JSON. Error redirects use `FRONTEND_URL` and fixed codes only. |
+| Information disclosure | Open redirect via `return_to` | Only a path with exactly one `/` (also after decoding), no control characters, whitespace, backslashes, not `/api`, at most 2048 bytes; otherwise dropped. The target only reaches the frontend as JSON. Error redirects use `FRONTEND_URL` (or the checked custom domain, see the next row) and fixed codes only. |
+| Information disclosure | Open redirect via `return_host` (return to a custom domain) | Only the exact hostname of a custom domain in the state "Verified"/"Active" from the database; for page SSO only the domain of that same page; checked again on the callback; the target is always `https://` with the value from the database. Otherwise `FRONTEND_URL`. |
+| Elevation of privilege | A tenant controls the DNS of their custom domain and reads the session stored there (or lures an admin there with a crafted login link) | Sessions on a custom domain (OIDC and password) are valid only for the page of the domain, never with global admin rights. |
 | Denial of service | Many login starts, slow IdPs | Rate limits (20/min login/callback, 10/min exchange, 60/min auth config), timeouts of the HTTP clients, discovery cache with negative cache, expired states are deleted. |
 | Elevation of privilege | Page IdP grants global rights | Page SSO sessions apply to their page only and may not link a global provider; global admins do not use the page SSO. |
 | Elevation of privilege | Bootstrap admin via unverified e-mail | `SSO_BOOTSTRAP_ADMIN_EMAILS` applies only with `email_verified=true` and the account's e-mail. |
 | Elevation of privilege | Password login despite being switched off | `POST /api/login` and all password-setting endpoints answer `403 password_login_disabled`. |
 
-Abuse cases as Go tests: `handlers/return_to_test.go`, `handlers/oidc_global_test.go` (state, nonce,
+Abuse cases as Go tests: `handlers/return_to_test.go`, `handlers/login_origin_test.go` (custom
+domains), `handlers/oidc_global_test.go` (state, nonce,
 issuer, client ID, `email_verified`, domains, unknown providers), `handlers/password_login_test.go`,
 `main_sso_removed_routes_test.go`.
 

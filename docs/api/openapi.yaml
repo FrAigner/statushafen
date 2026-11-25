@@ -301,6 +301,9 @@ paths:
         Nur mit `PASSWORD_LOGIN_ENABLED=true` (bzw. `1`, `yes`). Standardmäßig
         aus: dann `403` mit Code `password_login_disabled`, ohne Prüfung der
         Zugangsdaten; angemeldet wird über die globalen OIDC-Anbieter.
+        Auf der verifizierten eigenen Domain einer Statusseite (`Host`) gilt
+        die Sitzung nur für diese Seite (`sso_page_id` im JWT,
+        `is_global_admin` immer `false`).
       security: []
       x-rate-limit: 20/min pro IP
       requestBody:
@@ -348,6 +351,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -475,6 +479,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -507,6 +512,7 @@ paths:
             Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
             werden verworfen (leer), der Login läuft weiter.
           schema: { type: string, maxLength: 2048 }
+        - $ref: "#/components/parameters/ReturnHost"
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -4616,6 +4622,23 @@ components:
       in: path
       required: true
       schema: { type: integer, minimum: 1 }
+    ReturnHost:
+      name: return_host
+      in: query
+      required: false
+      description: |
+        Verifizierte eigene Domain einer Statusseite, auf der der Login begann
+        (exakter Hostname, ohne Schema, Port oder Pfad). Nach der Anmeldung
+        geht der Einmal-Code an `https://<return_host>/auth/sso-callback`,
+        Fehler an `https://<return_host>/login?oidc_error=<code>`. Gilt nur
+        für Domains im Status `verified`/`active`, beim Seiten-SSO nur für die
+        Domain derselben Seite, und wird beim Callback erneut geprüft; sonst
+        verworfen (Ziel `FRONTEND_URL`). Die Sitzung gilt dann nur für die
+        Seite der Domain (`sso_page_id`, keine Global-Admin-Rechte). Kommt der
+        Login-Start selbst auf einer verifizierten eigenen Domain an, leitet er
+        zuerst mit `307` auf denselben Pfad unter `BASE_URL` um und setzt
+        `return_host` auf diese Domain (der `Host` gewinnt gegen die Query).
+      schema: { type: string, maxLength: 253 }
     ProviderId:
       name: id
       in: path

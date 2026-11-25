@@ -120,6 +120,10 @@ Checklist for production:
   longer on the public page load. Custom domains of private pages no longer resolve to a page for
   non-members (they see the landing page). The endpoint is limited to 120 requests per minute per IP
   (429 afterwards); Caddy only asks for hosts without a certificate.
+  **Signing in on custom domains:** for custom domains the proxy must pass the `Host` header on
+  unchanged and serve `/api` on the same origin (default image, `VITE_API_URL` empty). A login there
+  runs through `BASE_URL` and ends on the custom domain again; the session there is valid only for the
+  page of the domain (see [`docs/sso/en/providers.md`](docs/sso/en/providers.md#status-pages-on-a-custom-domain)).
 - Back up the database regularly: [`docs/backup-restore.en.md`](docs/backup-restore.en.md).
 
 ## Upgrade note: sign-in

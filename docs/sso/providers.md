@@ -108,6 +108,32 @@ führender `/`, kein `//`, keine Steuer- oder Leerzeichen, kein Backslash, nicht
 höchstens 2048 Byte) und verwirft ihn sonst stillschweigend. `POST /api/auth/sso-exchange` liefert
 ihn als `return_to` zurück. Nach dem Verknüpfen geht es weiter ins Profil.
 
+### Statusseiten auf eigener Domain
+
+Startet der Login auf der verifizierten eigenen Domain einer Statusseite (etwa `status.acme.example`),
+geht es nach der Anmeldung dorthin zurück, und die Sitzung gilt auf dieser Domain. Das gilt für
+globale Anbieter, das Seiten-SSO und den Passwort-Login.
+
+1. Ein Login-Start, der auf der eigenen Domain ankommt, leitet zuerst auf denselben Pfad unter
+   `BASE_URL` weiter und hängt die Domain als `return_host` an. Das State-Cookie muss den Callback
+   unter `BASE_URL` erreichen. Der `Host` der Anfrage gewinnt gegen ein `return_host` in der Query.
+2. Der Server übernimmt `return_host` nur, wenn es exakt der Hostname einer eigenen Domain im Status
+   „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
+   (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)
+   wird verworfen; der Login endet dann wie bisher unter `FRONTEND_URL`.
+3. Der Callback prüft die Domain erneut und leitet nach `https://<Domain>/auth/sso-callback?code=…`
+   weiter, Fehler nach `https://<Domain>/login?oidc_error=<Code>`. Das Frontend dort tauscht den Code
+   auf demselben Origin ein. Der Passwort-Login läuft ohnehin auf demselben Origin.
+
+Eine Sitzung auf einer eigenen Domain gilt nur für die Statusseite dieser Domain und nie mit
+Global-Admin-Rechten (wie eine Seiten-SSO-Sitzung). Grund: Wer das DNS der Domain kontrolliert, also
+der Mandant, kann dort eigenen Code ausliefern und lesen, was der Browser für diese Domain speichert.
+Für eine private Seite braucht man deshalb eine Rolle auf dieser Seite; Global Admins melden sich für
+die Verwaltung unter `FRONTEND_URL` an.
+
+Voraussetzungen: Das Frontend auf der eigenen Domain erreicht die API auf demselben Origin (Standard-Image,
+`VITE_API_URL` leer), und der Reverse-Proxy reicht den `Host`-Header unverändert durch.
+
 ## Fehlersuche
 
 Fehler im Browser-Ablauf landen als Code auf der Login-Seite (`?oidc_error=<Code>`), beim Verknüpfen
