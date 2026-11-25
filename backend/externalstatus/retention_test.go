@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Aufbewahrung beendeter gespiegelter Meldungen.
+// Retention of finished mirrored reports.
 
-// MirroredIncidentsPruned macht den Recorder zum RetentionReporter.
+// MirroredIncidentsPruned makes the recorder a RetentionReporter.
 func (r *incRecorder) MirroredIncidentsPruned(_ context.Context, count int, retention time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -48,7 +48,7 @@ func TestPruneMirrored_EntferntNurAlteBeendete(t *testing.T) {
 	old := f.mirror(t, "alt", true, daysAgo(f, 91), nil)
 	f.mirror(t, "grenze-neu", true, daysAgo(f, 89), nil)
 	f.mirror(t, "offen-uralt", false, daysAgo(f, 400), daysAgo(f, 400))
-	// Ohne resolved_at zählt das letzte Update der Fremdseite.
+	// Without resolved_at the last update of the third-party site counts.
 	f.mirror(t, "nur-update-alt", true, nil, daysAgo(f, 120))
 	f.mirror(t, "nur-update-neu", true, nil, daysAgo(f, 5))
 
@@ -72,7 +72,7 @@ func TestPruneMirrored_EntferntNurAlteBeendete(t *testing.T) {
 
 func TestPruneMirrored_LetzterAbrufAlsFallbackUndBatches(t *testing.T) {
 	f := newIncFixture(t)
-	// Weder resolved_at noch Update-Zeit: last_seen_at entscheidet.
+	// Neither resolved_at nor update time: last_seen_at decides.
 	row := f.mirror(t, "ohne-zeiten", true, nil, nil)
 	require.NoError(t, f.db.Model(&row).Update("last_seen_at", *daysAgo(f, 200)).Error)
 	for i := 0; i < pruneBatchSize+50; i++ {
@@ -146,7 +146,7 @@ func TestRunOnce_RaeumtStuendlichAufUndMeldetAnzahl(t *testing.T) {
 	assert.Equal(t, []int{1}, f.rec.pruned)
 	assert.Equal(t, 90*24*time.Hour, f.rec.retention)
 
-	// Innerhalb der Stunde: nicht erneut (auch nicht bei neuem Altbestand).
+	// Within the hour: not again (not even with new old data).
 	f.mirror(t, "alt2", true, daysAgo(f, 200), nil)
 	f.now = f.now.Add(10 * time.Minute)
 	f.svc.RunOnce(ctx)
@@ -170,10 +170,10 @@ func TestMaybePrune_FehlerUndOhneReporter(t *testing.T) {
 	f := newIncFixture(t)
 	f.mirror(t, "alt", true, daysAgo(f, 200), nil)
 	failOn(t, f.db, "query", "external_incidents", 0)
-	f.svc.maybePrune(context.Background()) // Fehler wird geloggt, kein Panic, keine Meldung
+	f.svc.maybePrune(context.Background()) // Error is logged, no panic, no report
 	assert.Empty(t, f.rec.pruned)
 
-	// Notifier ohne RetentionReporter: kein Panic.
+	// Notifier without RetentionReporter: no panic.
 	f2 := newIncFixture(t)
 	f2.mirror(t, "alt", true, daysAgo(f2, 200), nil)
 	f2.svc.SetIncidentNotifier(nil)
@@ -181,12 +181,12 @@ func TestMaybePrune_FehlerUndOhneReporter(t *testing.T) {
 	assert.Zero(t, f2.countAll(t, &models.ExternalIncident{}))
 }
 
-// Ohne Filter beim Spiegeln würde der Feed (letzte 50 Einträge) eine längst
-// aufgeräumte Meldung bei jedem Abruf neu anlegen.
+// Without a filter when mirroring, the feed (last 50 entries) would re-create a
+// long-since cleaned-up report on every fetch.
 func TestSyncFeed_UeberfaelligeBeendeteWerdenNichtNeuAngelegt(t *testing.T) {
 	f := newIncFixture(t)
 	f.prov.set(models.ExternalIncidentKindIncident)
-	require.True(t, f.poll().OK) // Erstimport (leer)
+	require.True(t, f.poll().OK) // initial import (empty)
 
 	old := inc("alt", "resolved", "Behoben")
 	r := f.now.Add(-100 * 24 * time.Hour)

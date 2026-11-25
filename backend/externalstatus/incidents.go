@@ -14,69 +14,67 @@ import (
 	"gorm.io/gorm"
 )
 
-// Teil B2: Vorfälle und Wartungen der Fremdseite
-// spiegeln und Abonnenten benachrichtigen.
+// Part B2: mirror incidents and maintenances of the third-party site
+// and notify subscribers.
 //
-// Ablauf je Abruf: Nach den Komponenten holt der Dienst beide Feeds
-// (Vorfälle, Wartungen), gleicht sie in einer Transaktion mit den
-// gespeicherten Meldungen ab und meldet danach die Ereignisse an den
-// IncidentNotifier.
+// Flow per fetch: after the components, the service fetches both feeds
+// (incidents, maintenances), reconciles them with the stored reports in one
+// transaction and then reports the events to the IncidentNotifier.
 //
-// Stiller Erstimport: Solange der Feed einer Quelle noch nie erfolgreich
-// abgerufen wurde (IncidentsSyncedAt/MaintenancesSyncedAt = nil), löst nichts
-// eine Benachrichtigung aus - die Historie der Fremdseite wäre sonst eine
-// Mailflut. Ebenso bleibt still, was beim ersten Auftauchen schon beendet ist.
+// Silent initial import: as long as a source's feed has never been fetched
+// successfully (IncidentsSyncedAt/MaintenancesSyncedAt = nil), nothing
+// triggers a notification - the third-party site's history would otherwise be
+// a flood of mails. Likewise, anything that is already over when first seen
+// stays silent.
 //
-// Kein Doppelversand: Jede Meldung trägt einen Fingerabdruck ihres
-// verarbeiteten Stands (NotifyKey = Status + jüngstes Update). Ein Ereignis
-// entsteht nur, wenn der Abruf einen anderen Stand sieht UND das bedingte
-// UPDATE "setze NotifyKey auf neu, wo er noch alt ist" genau eine Zeile trifft.
-// Ein zweiter Abruf (oder eine zweite Instanz) sieht dann denselben Stand und
-// schweigt. Neue Meldungen beansprucht der Insert selbst (partieller
-// Unique-Index). Im ungünstigsten Fall - Absturz zwischen Beanspruchen und
-// Versand - fällt eine Mail aus, statt doppelt zu kommen (wie beim
-// Ausfall-Melder in outage.go).
+// No duplicate sending: every report carries a fingerprint of its processed
+// state (NotifyKey = status + latest update). An event is only created if the
+// fetch sees a different state AND the conditional UPDATE "set NotifyKey to
+// new where it is still old" hits exactly one row. A second fetch (or a
+// second instance) then sees the same state and stays quiet. New reports are
+// claimed by the insert itself (partial unique index). In the worst case -
+// crash between claiming and sending - a mail is dropped instead of being
+// sent twice (as with the outage notifier in outage.go).
 
-// IncidentEventKind unterscheidet die Anlässe.
+// IncidentEventKind distinguishes the reasons.
 type IncidentEventKind string
 
-// Anlässe einer Benachrichtigung.
+// Reasons for a notification.
 const (
 	IncidentCreated  IncidentEventKind = "created"
 	IncidentUpdated  IncidentEventKind = "updated"
 	IncidentResolved IncidentEventKind = "resolved"
 )
 
-// OwnComponent ist eine eigene Komponente, die über eine Kopplung von einer
-// Meldung betroffen ist.
+// OwnComponent is an own component that is affected by a report through a
+// link.
 type OwnComponent struct {
 	ID   uint
 	Name string
 }
 
-// IncidentEvent beschreibt eine neue oder geänderte Meldung, die eine
-// gekoppelte Komponente betrifft. Notify=false: nur gespiegelt (stiller
-// Erstimport, bereits beendet, inaktive Quelle) - der Empfänger schreibt dann
-// höchstens einen Audit-Eintrag.
+// IncidentEvent describes a new or changed report that affects a linked
+// component. Notify=false: only mirrored (silent initial import, already
+// over, inactive source) - the recipient then writes at most an audit entry.
 type IncidentEvent struct {
 	Kind   IncidentEventKind
 	Notify bool
 	Source models.ExternalSource
-	// Incident mit Components und Updates (Updates: neueste zuerst).
+	// Incident with Components and Updates (Updates: newest first).
 	Incident models.ExternalIncident
-	// Components: betroffene eigene Komponenten, nach Name sortiert.
+	// Components: affected own components, sorted by name.
 	Components []OwnComponent
 }
 
-// IncidentNotifier verschickt die Benachrichtigungen. Der Aufruf kommt
-// synchron aus dem Abfrage-Dienst; langsame Arbeit gehört in eine eigene
-// Goroutine des Empfängers.
+// IncidentNotifier sends the notifications. The call is made synchronously
+// from the polling service; slow work belongs in a separate goroutine of the
+// recipient.
 type IncidentNotifier interface {
 	ExternalIncident(ctx context.Context, ev IncidentEvent)
 }
 
-// SetIncidentNotifier setzt den Empfänger der Vorfall-Ereignisse (der Handler
-// entsteht nach dem Dienst, deshalb nachträglich).
+// SetIncidentNotifier sets the recipient of the incident events (the handler
+// is created after the service, hence set afterwards).
 func (s *Service) SetIncidentNotifier(n IncidentNotifier) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -85,9 +83,9 @@ func (s *Service) SetIncidentNotifier(n IncidentNotifier) {
 
 var feedKinds = []string{models.ExternalIncidentKindIncident, models.ExternalIncidentKindMaintenance}
 
-// syncIncidents spiegelt beide Feeds einer Quelle. Best effort: Ein Fehler
-// wird in IncidentsError festgehalten, der Abruf der Komponenten bleibt
-// unberührt, der nächste Takt versucht es erneut.
+// syncIncidents mirrors both feeds of a source. Best effort: an error is
+// recorded in IncidentsError, the component fetch is unaffected, the next tick
+// tries again.
 func (s *Service) syncIncidents(ctx context.Context, srcID uint, now time.Time) {
 	var src models.ExternalSource
 	if err := s.db.First(&src, srcID).Error; err != nil {
@@ -125,8 +123,8 @@ func (s *Service) syncIncidents(ctx context.Context, srcID uint, now time.Time) 
 	}
 }
 
-// syncFeed ruft einen Feed ab und übernimmt ihn samt Validatoren und
-// Erst-Import-Marke in einer Transaktion.
+// syncFeed fetches a feed and applies it together with validators and the
+// initial-import marker in one transaction.
 func (s *Service) syncFeed(ctx context.Context, p IncidentProvider, src models.ExternalSource, kind string, now time.Time) ([]IncidentEvent, error) {
 	req := IncidentRequest{BaseURL: src.BaseURL, Kind: kind, ETag: src.IncidentsETag, LastModified: src.IncidentsLastMod}
 	synced := src.IncidentsSyncedAt
@@ -168,9 +166,9 @@ func (s *Service) syncFeed(ctx context.Context, p IncidentProvider, src models.E
 	return events, nil
 }
 
-// fingerprint: Stand einer Meldung für die Doppelversand-Sperre - Status und
-// Prüfsumme der Update-IDs. Ein neues Update ändert ihn auch dann, wenn die
-// Fremdseite es rückdatiert (display_at) oder der Status gleich bleibt.
+// fingerprint: state of a report for the duplicate-send guard - status and
+// checksum of the update IDs. A new update changes it even if the third-party
+// site backdates it (display_at) or the status stays the same.
 func fingerprint(it Incident) string {
 	ids := make([]string, 0, len(it.Updates))
 	for _, u := range it.Updates {
@@ -181,9 +179,9 @@ func fingerprint(it Incident) string {
 	return it.Status + "|" + hex.EncodeToString(sum[:8])
 }
 
-// applyFeed gleicht die Meldungen einer Quelle mit items ab und liefert die
-// Ereignisse für Meldungen, die gekoppelte Komponenten betreffen. Idempotent:
-// Derselbe Feed zweimal ergibt beim zweiten Mal weder Änderungen noch Ereignisse.
+// applyFeed reconciles a source's reports with items and returns the events
+// for reports that affect linked components. Idempotent: the same feed twice
+// yields neither changes nor events the second time.
 func applyFeed(tx *gorm.DB, src models.ExternalSource, items []Incident, silent bool, now time.Time) ([]IncidentEvent, error) {
 	if len(items) == 0 {
 		return nil, nil
@@ -214,7 +212,7 @@ func applyFeed(tx *gorm.DB, src models.ExternalSource, items []Incident, silent 
 	return events, nil
 }
 
-// applyIncident übernimmt eine Meldung. row = bisheriger Stand (nil = neu).
+// applyIncident applies a report. row = previous state (nil = new).
 func applyIncident(tx *gorm.DB, src models.ExternalSource, it Incident, row *models.ExternalIncident, own map[string][]OwnComponent, silent bool, now time.Time) (*IncidentEvent, error) {
 	fp := fingerprint(it)
 	isNew := row == nil
@@ -224,10 +222,10 @@ func applyIncident(tx *gorm.DB, src models.ExternalSource, it Incident, row *mod
 	} else {
 		wasClosed = row.Closed
 		if row.NotifyKey == fp && sameTime(row.ExternalUpdatedAt, it.UpdatedAt) {
-			return nil, nil // nichts Neues
+			return nil, nil // nothing new
 		}
 		if row.NotifyKey != fp {
-			// Bedingtes UPDATE: nur wer den alten Stand ablöst, darf melden.
+			// Conditional UPDATE: only whoever replaces the old state may report.
 			res := tx.Model(&models.ExternalIncident{}).Where("id = ? AND notify_key = ?", row.ID, row.NotifyKey).Update("notify_key", fp)
 			if res.Error != nil {
 				return nil, res.Error
@@ -250,7 +248,7 @@ func applyIncident(tx *gorm.DB, src models.ExternalSource, it Incident, row *mod
 		return nil, err
 	}
 	if !isNew && !claimed {
-		return nil, nil // nur Stammdaten geändert (Titel, Zeiten), kein neuer Stand
+		return nil, nil // only master data changed (title, times), no new state
 	}
 	return buildEvent(tx, src, row, it, own, isNew, wasClosed, silent)
 }
@@ -278,8 +276,8 @@ func fillIncident(row *models.ExternalIncident, it Incident, now time.Time) {
 	row.LastSeenAt = now
 }
 
-// buildEvent entscheidet, ob und wie gemeldet wird. Meldungen ohne gekoppelte
-// Komponente erzeugen kein Ereignis.
+// buildEvent decides whether and how to report. Reports without a linked
+// component produce no event.
 func buildEvent(tx *gorm.DB, src models.ExternalSource, row *models.ExternalIncident, it Incident, own map[string][]OwnComponent, isNew, wasClosed, silent bool) (*IncidentEvent, error) {
 	comps := affectedOwn(own, it)
 	if len(comps) == 0 {
@@ -294,7 +292,7 @@ func buildEvent(tx *gorm.DB, src models.ExternalSource, row *models.ExternalInci
 	}
 	notify := !silent && src.Active
 	if it.Closed && (isNew || wasClosed) {
-		notify = false // beim ersten Auftauchen schon beendet bzw. Nachtrag zu einer beendeten Meldung
+		notify = false // already over when first seen, or an addendum to a finished report
 	}
 	var full models.ExternalIncident
 	if err := tx.Preload("Components").Preload("Updates", func(db *gorm.DB) *gorm.DB {
@@ -305,8 +303,8 @@ func buildEvent(tx *gorm.DB, src models.ExternalSource, row *models.ExternalInci
 	return &IncidentEvent{Kind: kind, Notify: notify, Source: src, Incident: full, Components: comps}, nil
 }
 
-// affectedOwn liefert die eigenen Komponenten, die von der Meldung betroffen
-// sind (Vereinigung über alle genannten externen Komponenten).
+// affectedOwn returns the own components affected by the report
+// (union over all named external components).
 func affectedOwn(own map[string][]OwnComponent, it Incident) []OwnComponent {
 	seen := map[uint]bool{}
 	var out []OwnComponent
@@ -351,8 +349,8 @@ func syncIncidentUpdates(tx *gorm.DB, incidentID uint, updates []IncidentUpdate)
 	return nil
 }
 
-// syncIncidentComponents gleicht die betroffenen Komponenten ab: Neue kommen
-// dazu, nicht mehr genannte werden (soft) entfernt.
+// syncIncidentComponents reconciles the affected components: new ones are
+// added, ones no longer named are removed (soft).
 func syncIncidentComponents(tx *gorm.DB, incidentID uint, comps []IncidentComponent) error {
 	var existing []models.ExternalIncidentComponent
 	if err := tx.Where("external_incident_id = ?", incidentID).Find(&existing).Error; err != nil {
@@ -399,11 +397,11 @@ type ownRow struct {
 	IsGroup     bool
 }
 
-// OwnComponentMap liefert je Quelle der Statusseite (sourceID 0 = alle
-// aktiven, sonst genau diese) und externer Komponenten-ID die gekoppelten
-// eigenen Komponenten. Eine Kopplung auf eine externe Gruppe gilt auch für
-// deren Mitglieder (dynamisch über group_external_id, wie in LinkedRefs).
-// Mandantentrennung: Kopplung und Quelle müssen auf pageID zeigen.
+// OwnComponentMap returns, per source of the status page (sourceID 0 = all
+// active ones, otherwise exactly this one) and external component ID, the
+// linked own components. A link to an external group also applies to its
+// members (dynamically via group_external_id, as in LinkedRefs).
+// Tenant separation: link and source must point to pageID.
 func OwnComponentMap(db *gorm.DB, pageID, sourceID uint) (map[uint]map[string][]OwnComponent, error) {
 	q := db.Table("external_component_links AS l").
 		Select("l.component_id AS component_id, c.name AS name, ec.external_source_id AS source_id, ec.external_id AS external_id, ec.is_group AS is_group").

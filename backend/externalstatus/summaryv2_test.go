@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// summaryFixture: erfundene Antwort im Format von /api/v2/summary.json mit drei
-// Gruppen samt Kindern (testdata/summaryv2_summary.json).
+// summaryFixture: invented response in the format of /api/v2/summary.json with three
+// groups including children (testdata/summaryv2_summary.json).
 func summaryFixture(t *testing.T) []byte {
 	t.Helper()
 	b, err := os.ReadFile("testdata/summaryv2_summary.json")
@@ -22,8 +22,8 @@ func summaryFixture(t *testing.T) []byte {
 	return b
 }
 
-// withStatuses ersetzt in der Fixture die Status einzelner Komponenten
-// (die Fixture ist komplett "operational").
+// withStatuses replaces the statuses of individual components in the fixture
+// (the fixture is entirely "operational").
 func withStatuses(t *testing.T, raw []byte, statuses map[string]string) []byte {
 	t.Helper()
 	var doc map[string]any
@@ -91,7 +91,7 @@ func TestSummaryV2Provider_SummaryFixture(t *testing.T) {
 	assert.Empty(t, g.GroupExternalID)
 	assert.Equal(t, 1, g.Position)
 
-	// Conditional Request: gleicher ETag → 304.
+	// Conditional Request: same ETag → 304.
 	sum, err = p.FetchSummary(context.Background(), FetchRequest{BaseURL: "https://example.com", ETag: `W/"b29160354272ac0f4b86ff79a17c1e02"`})
 	require.NoError(t, err)
 	assert.True(t, sum.NotModified)

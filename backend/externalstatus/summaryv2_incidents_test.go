@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Provider-Tests für incidents.json / scheduled-maintenances.json.
-// Die Fixtures sind erfundene Antworten im Format der API (testdata/summaryv2_*.json),
-// darunter die abgeschlossene Wartung fx0000000062.
+// Provider tests for incidents.json / scheduled-maintenances.json.
+// The fixtures are invented responses in the API's format (testdata/summaryv2_*.json),
+// including the completed maintenance fx0000000062.
 
 func readFixture(t *testing.T, name string) []byte {
 	t.Helper()
@@ -25,7 +25,7 @@ func readFixture(t *testing.T, name string) []byte {
 	return b
 }
 
-// feedServer liefert je Pfad einen Body; etag schaltet Conditional Requests ein.
+// feedServer serves a body per path; etag enables conditional requests.
 func feedServer(t *testing.T, files map[string]*[]byte, etag string) *testTarget {
 	t.Helper()
 	return newTestTarget(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,16 +70,16 @@ func TestSummaryV2Provider_IncidentsFixture(t *testing.T) {
 	require.NotNil(t, multi.StartedAt)
 	assert.Equal(t, time.UTC, multi.StartedAt.Location(), "Zeiten werden als UTC geliefert")
 
-	// postmortem zählt als behoben.
+	// postmortem counts as resolved.
 	assert.Equal(t, "fx0000000032", feed.Items[1].ExternalID)
 	assert.Equal(t, "resolved", feed.Items[1].Status)
 	assert.Equal(t, "postmortem", feed.Items[1].RawStatus)
 	assert.True(t, feed.Items[1].Closed)
 
-	// Ohne Komponenten bleibt die Meldung erhalten (Auswertung entscheidet später).
+	// Without components the report is kept (evaluation decides later).
 	assert.Empty(t, feed.Items[2].Components)
 
-	// Update-Texte sind Klartext: Die API liefert HTML-Schnipsel.
+	// Update texts are plain text: the API returns HTML snippets.
 	for _, it := range feed.Items {
 		for _, u := range it.Updates {
 			assert.NotContains(t, u.Body, "<br", it.ExternalID)
@@ -103,7 +103,7 @@ func TestSummaryV2Provider_MaintenancesFixture(t *testing.T) {
 	assert.Equal(t, "maintenance", sched.Impact)
 	require.NotNil(t, sched.ScheduledAt)
 	require.NotNil(t, sched.ScheduledTo)
-	// 2026-11-09T21:00:00.000+01:00 ist 20:00 UTC: die Zeitzone wird umgerechnet.
+	// 2026-11-09T21:00:00.000+01:00 is 20:00 UTC: the time zone is converted.
 	assert.Equal(t, time.Date(2026, 11, 9, 20, 0, 0, 0, time.UTC), *sched.ScheduledAt)
 
 	done := feed.Items[1]
@@ -151,7 +151,7 @@ func TestSummaryV2Provider_FeedFehler(t *testing.T) {
 }
 
 func TestSummaryV2Provider_FeedRobustgegenSchlechteDaten(t *testing.T) {
-	long := strings.Repeat("ä", maxTitleBytes) // doppelt so viele Bytes wie erlaubt
+	long := strings.Repeat("ä", maxTitleBytes) // twice as many bytes as allowed
 	doc := `{"incidents":[
 	 {"id":"","name":"ohne ID","status":"resolved"},
 	 {"id":"dup","name":"erster","status":"investigating","impact":"bogus","created_at":"kaputt","updated_at":"2026-10-29T10:00:00Z",
@@ -219,7 +219,7 @@ func TestNormalizeIncidentStatus(t *testing.T) {
 		{"incident", "resolved", "resolved", true},
 		{"incident", "postmortem", "resolved", true},
 		{"incident", " Resolved ", "resolved", true},
-		{"incident", "completed", "completed", false}, // Wartungsstatus bei Vorfall: unbekannt, offen
+		{"incident", "completed", "completed", false}, // Maintenance status on an incident: unknown, open
 		{"maintenance", "scheduled", "scheduled", false},
 		{"maintenance", "in_progress", "in_progress", false},
 		{"maintenance", "verifying", "in_progress", false},

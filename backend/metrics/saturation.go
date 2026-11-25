@@ -6,9 +6,9 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Saturation (Golden Signals Schritt 4/4)
+// Saturation (Golden Signals Step 4/4)
 //
-// Latency/Traffic/Errors are covered by RouteMetrics/Observe (Schritt 1/4).
+// Latency/Traffic/Errors are covered by RouteMetrics/Observe (Step 1/4).
 // This file adds the fourth Golden Signal, resource *Saturation*:
 //   - DB connection-pool utilization (database/sql.DBStats, which is what
 //     GORM's *gorm.DB.DB() returns unmodified — no GORM-specific API needed).

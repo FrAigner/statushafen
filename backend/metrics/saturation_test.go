@@ -91,12 +91,12 @@ func TestSaturationSnapshot_ReportsGoroutineCountAndMemStats(t *testing.T) {
 	}
 }
 
-// Der Test verglich früher mit einer Baseline vor dem Start der Last. Unter -race und voller
-// Paketlast lief dort gelegentlich noch eine Goroutine eines vorherigen Tests aus (wg.Done ist vor dem
-// tatsächlichen Ende der Goroutine erreicht): Sie zählte in der Baseline mit, war unter Last schon weg, der
-// Anstieg betrug 199 statt 200 (reproduziert mit go test -race -count=50 -cpu 1,4 ./metrics/). Jetzt wird
-// gemessen, wenn alle n Goroutinen nachweislich laufen, und mit dem Stand nach ihrem Ende verglichen.
-// Auslaufende fremde Goroutinen vergrößern diese Differenz nur, statt sie zu verkleinern.
+// The test used to compare against a baseline taken before the load started. Under -race and full
+// package load, a goroutine of a previous test occasionally was still winding down (wg.Done is reached before the
+// goroutine actually ends): it counted in the baseline, but was already gone under load, so the
+// increase was 199 instead of 200 (reproduced with go test -race -count=50 -cpu 1,4 ./metrics/). Now
+// the measurement is taken when all n goroutines are provably running, and compared with the state after they end.
+// Foreign goroutines winding down only enlarge this difference instead of shrinking it.
 func TestSaturationSnapshot_GoroutineCountRisesUnderLoad(t *testing.T) {
 	reg := NewRegistry()
 
@@ -127,7 +127,7 @@ func TestSaturationSnapshot_GoroutineCountRisesUnderLoad(t *testing.T) {
 
 	releaseAll()
 
-	// done.Done läuft noch in der Goroutine; bis sie wirklich beendet ist, kurz pollen.
+	// done.Done still runs in the goroutine; poll briefly until it has really ended.
 	deadline := time.Now().Add(2 * time.Second)
 	after := reg.SaturationSnapshot().GoroutineCount
 	for underLoad-after < n && time.Now().Before(deadline) {
@@ -186,10 +186,9 @@ func TestSaturationSnapshot_DBStatsReflectProvider(t *testing.T) {
 	}
 }
 
-// TestSaturationSnapshot_DBConnectionsRiseUnderParallelLoad is the
-// Verifikation scenario from "Unter künstlich erzeugter Last
-// (z.B. viele parallele DB-Anfragen im Test) steigen die Saturation-Werte
-// sichtbar an." It drives a real database/sql connection pool (backed by an
+// verification scenario from "Under artificially generated load
+// (e.g. many parallel DB requests in the test) the saturation values
+// rise visibly." It drives a real database/sql connection pool (backed by an
 // in-process SQLite DB, so it needs no external Postgres) with many
 // concurrent long-held connections and asserts DBInUse/DBOpenConnections
 // visibly rise compared to the idle baseline, then fall back down again

@@ -1,13 +1,13 @@
-// Package externalstatus fragt externe Statusseiten ab
-// und spiegelt ihre Komponenten in models.ExternalComponent.
+// Package externalstatus polls external status pages
+// and mirrors their components into models.ExternalComponent.
 //
-// Aufbau:
-//   - Provider: Adapter je Anbieter-API hinter einem Interface, damit weitere
-//     Anbieter später als eigene Adapter folgen.
-//     Erste Implementierung: Summary-API v2 (summaryv2.go).
-//   - safeclient.go: HTTP-Client mit SSRF-Schutz, den jeder Provider nutzt.
-//   - service.go: Abfrage-Dienst (Takt, Jitter, Backoff, Advisory Lock),
-//     store.go: Upsert und effektiver Status.
+// Structure:
+//   - Provider: one adapter per vendor API behind an interface, so further
+//     vendors can follow later as separate adapters.
+//     First implementation: Summary API v2 (summaryv2.go).
+//   - safeclient.go: HTTP client with SSRF protection that every provider uses.
+//   - service.go: polling service (tick, jitter, backoff, advisory lock),
+//     store.go: upsert and effective status.
 package externalstatus
 
 import (
@@ -15,21 +15,21 @@ import (
 	"sort"
 )
 
-// ProviderSummaryV2 ist der Provider-Schlüssel für Statusseiten mit der
-// Summary-API v2 (GET /api/v2/summary.json, von vielen öffentlichen Statusseiten angeboten).
+// ProviderSummaryV2 is the provider key for status pages with the
+// Summary API v2 (GET /api/v2/summary.json, offered by many public status pages).
 const ProviderSummaryV2 = "summaryv2"
 
-// FetchRequest beschreibt einen Abruf: Basis-URL der Quelle und die
-// Validatoren des letzten erfolgreichen Abrufs für Conditional Requests.
+// FetchRequest describes a fetch: base URL of the source and the
+// validators of the last successful fetch for conditional requests.
 type FetchRequest struct {
 	BaseURL      string
 	ETag         string
 	LastModified string
 }
 
-// Component ist eine externe Komponente, wie sie ein Provider liefert.
-// Status ist bereits auf unsere Werte normalisiert (componentstatus), RawStatus
-// der Originalwert.
+// Component is an external component as a provider returns it.
+// Status is already normalized to our values (componentstatus), RawStatus
+// is the original value.
 type Component struct {
 	ExternalID      string
 	Name            string
@@ -41,24 +41,24 @@ type Component struct {
 	Status          string
 }
 
-// Summary ist das Ergebnis eines Abrufs. NotModified = 304, dann sind nur
-// ETag/LastModified gesetzt und Components leer.
+// Summary is the result of a fetch. NotModified = 304, in which case only
+// ETag/LastModified are set and Components is empty.
 type Summary struct {
 	NotModified  bool
 	ETag         string
 	LastModified string
-	// PageURL: öffentliche Adresse der Fremdseite (Link-Ziel), leer = unbekannt.
+	// PageURL: public address of the third-party site (link target), empty = unknown.
 	PageURL    string
 	Components []Component
 }
 
-// Provider ruft die Komponentenübersicht einer externen Statusseite ab.
+// Provider fetches the component overview of an external status page.
 type Provider interface {
 	FetchSummary(ctx context.Context, req FetchRequest) (*Summary, error)
 }
 
-// SupportedProviders liefert die Provider-Schlüssel, die der Dienst kennt
-// (für die Validierung im Admin-Handler), sortiert.
+// SupportedProviders returns the provider keys the service knows
+// (for validation in the admin handler), sorted.
 func (s *Service) SupportedProviders() []string {
 	keys := make([]string, 0, len(s.providers))
 	for k := range s.providers {
@@ -68,7 +68,7 @@ func (s *Service) SupportedProviders() []string {
 	return keys
 }
 
-// SupportsProvider meldet, ob es für key einen Adapter gibt.
+// SupportsProvider reports whether there is an adapter for key.
 func (s *Service) SupportsProvider(key string) bool {
 	_, ok := s.providers[key]
 	return ok

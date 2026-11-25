@@ -8,56 +8,55 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Meldung bei dauerhaftem Ausfall einer
-// externen Quelle.
+// Notification about a lasting outage of an
+// external source.
 //
-// Ausfall = seit OutageAfterMinutes kein erfolgreicher Abruf mehr (ein 304
-// zählt als Erfolg). Ein einzelner Fehler oder der Backoff allein löst nichts
-// aus. Der Zustand steckt in den Spalten outage_since/outage_notified_at/
-// outage_reminded_at der Quelle und wird per bedingtem UPDATE ("nur wenn noch
-// nicht gesetzt") beansprucht, bevor eine Mail rausgeht. Dadurch verschickt
-// weder der Poll-Takt noch ein Neustart noch eine zweite Instanz dieselbe
-// Mail doppelt; im ungünstigsten Fall (Absturz zwischen Beanspruchen und
-// Versand) fällt eine Mail aus statt doppelt zu kommen.
+// Outage = no successful fetch for OutageAfterMinutes (a 304 counts as
+// success). A single error or the backoff alone triggers nothing. The state
+// lives in the columns outage_since/outage_notified_at/outage_reminded_at of
+// the source and is claimed via a conditional UPDATE ("only if not yet set")
+// before a mail goes out. As a result, neither the poll tick nor a restart nor
+// a second instance sends the same mail twice; in the worst case (crash
+// between claiming and sending) a mail is dropped instead of being sent twice.
 
 const (
-	// DefaultOutageAfterMinutes ist der Standard je Quelle, Min/Max die
-	// erlaubten Werte (Admin-API).
+	// DefaultOutageAfterMinutes is the per-source default, Min/Max the allowed
+	// values (admin API).
 	DefaultOutageAfterMinutes = 60
 	MinOutageAfterMinutes     = 10
 	MaxOutageAfterMinutes     = 1440
-	// OutageReminderAfter: Erinnerung, wenn der Ausfall so lange nach der
-	// ersten Meldung noch anhält. Genau eine.
+	// OutageReminderAfter: reminder if the outage still persists this long after
+	// the first notification. Exactly one.
 	OutageReminderAfter = 24 * time.Hour
 )
 
-// OutageKind unterscheidet die drei Mails.
+// OutageKind distinguishes the three mails.
 type OutageKind string
 
-// Die drei Ausfall-Meldungen.
+// The three outage notifications.
 const (
 	OutageStarted   OutageKind = "started"
 	OutageReminder  OutageKind = "reminder"
 	OutageRecovered OutageKind = "recovered"
 )
 
-// OutageEvent beschreibt eine zu meldende Zustandsänderung. Source ist ein
-// Schnappschuss; bei OutageRecovered trägt er noch den Beginn des beendeten
-// Ausfalls in OutageSince.
+// OutageEvent describes a state change to be reported. Source is a
+// snapshot; for OutageRecovered it still carries the start of the ended
+// outage in OutageSince.
 type OutageEvent struct {
 	Kind   OutageKind
 	Source models.ExternalSource
 }
 
-// OutageNotifier verschickt die Meldungen (Mail). Der Aufruf kommt
-// synchron aus dem Abfrage-Dienst; langsame Arbeit gehört in eine eigene
-// Goroutine des Empfängers.
+// OutageNotifier sends the notifications (mail). The call is made
+// synchronously from the polling service; slow work belongs in a separate
+// goroutine of the recipient.
 type OutageNotifier interface {
 	SourceOutage(ctx context.Context, ev OutageEvent)
 }
 
-// OutageAfter liefert die Frist einer Quelle, mindestens MinOutageAfterMinutes
-// (Altdaten und Tests ohne gesetzten Wert fallen auf den Standard).
+// OutageAfter returns a source's grace period, at least MinOutageAfterMinutes
+// (legacy data and tests without a set value fall back to the default).
 func OutageAfter(src models.ExternalSource) time.Duration {
 	m := src.OutageAfterMinutes
 	if m <= 0 {
@@ -66,8 +65,8 @@ func OutageAfter(src models.ExternalSource) time.Duration {
 	return time.Duration(max(m, MinOutageAfterMinutes)) * time.Minute
 }
 
-// outageReference ist der Zeitpunkt, ab dem die Funkstille gezählt wird: der
-// letzte Erfolg, bei einer Quelle ohne jeden Erfolg ihre Anlage.
+// outageReference is the point in time from which the radio silence is
+// counted: the last success, for a source without any success its creation.
 func outageReference(src models.ExternalSource) time.Time {
 	if src.LastSuccessAt != nil {
 		return *src.LastSuccessAt
@@ -75,10 +74,10 @@ func outageReference(src models.ExternalSource) time.Time {
 	return src.CreatedAt
 }
 
-// evaluateOutage prüft eine Quelle und setzt bzw. löscht den Ausfallzustand;
-// bei einem Übergang ändert sich der effektive Status der gekoppelten
-// Komponenten (veralteter Status zählt nicht mehr), das meldet DiffEffective.
-// Best effort: DB-Fehler werden geloggt, der nächste Takt versucht es erneut.
+// evaluateOutage checks a source and sets or clears the outage state;
+// on a transition the effective status of the linked components changes
+// (a stale status no longer counts), which DiffEffective reports.
+// Best effort: DB errors are logged, the next tick tries again.
 func (s *Service) evaluateOutage(ctx context.Context, id uint) {
 	var src models.ExternalSource
 	if err := s.db.First(&src, id).Error; err != nil {
@@ -98,8 +97,8 @@ func (s *Service) evaluateOutage(ctx context.Context, id uint) {
 	}
 }
 
-// setOutage beansprucht den Übergang in den Ausfall. false = schon durch
-// jemand anderen gesetzt oder DB-Fehler.
+// setOutage claims the transition into the outage. false = already set by
+// someone else, or DB error.
 func (s *Service) setOutage(ctx context.Context, src *models.ExternalSource, since time.Time) bool {
 	before := s.snapshot(src)
 	res := s.db.Model(&models.ExternalSource{}).Where("id = ? AND outage_since IS NULL", src.ID).Update("outage_since", since)
@@ -111,8 +110,8 @@ func (s *Service) setOutage(ctx context.Context, src *models.ExternalSource, sin
 	return true
 }
 
-// clearOutage beendet den Ausfall und meldet die Entwarnung - aber nur, wenn
-// zuvor eine Ausfall-Mail rausging.
+// clearOutage ends the outage and reports the all-clear - but only if an
+// outage mail went out before.
 func (s *Service) clearOutage(ctx context.Context, src models.ExternalSource) {
 	before := s.snapshot(&src)
 	res := s.db.Model(&models.ExternalSource{}).Where("id = ? AND outage_since IS NOT NULL", src.ID).
@@ -126,8 +125,8 @@ func (s *Service) clearOutage(ctx context.Context, src models.ExternalSource) {
 	}
 }
 
-// snapshot liefert die effektiven Status der Seite vor einem Wechsel; bei
-// einem DB-Fehler nil (dann gibt es kein Ereignis, siehe DiffEffective).
+// snapshot returns the page's effective statuses before a change; on a DB
+// error nil (then there is no event, see DiffEffective).
 func (s *Service) snapshot(src *models.ExternalSource) map[uint]string {
 	m, err := EffectiveStatuses(s.db, src.StatusPageID)
 	if err != nil {
@@ -145,9 +144,9 @@ func (s *Service) diffAfterOutageChange(ctx context.Context, src *models.Externa
 	DiffEffective(ctx, s.listener, before, after, StatusChange{StatusPageID: src.StatusPageID, Cause: CauseOutage, SourceID: src.ID})
 }
 
-// notifyOutage verschickt (höchstens einmal) die Ausfall-Mail und nach
-// OutageReminderAfter (höchstens einmal) die Erinnerung. Die Zeitstempel
-// werden vor dem Versand per bedingtem UPDATE beansprucht.
+// notifyOutage sends (at most once) the outage mail and, after
+// OutageReminderAfter, (at most once) the reminder. The timestamps are
+// claimed via a conditional UPDATE before sending.
 func (s *Service) notifyOutage(ctx context.Context, src models.ExternalSource, now time.Time) {
 	if src.OutageNotifiedAt == nil {
 		if s.claim(src.ID, "outage_notified_at", now) {
@@ -164,7 +163,7 @@ func (s *Service) notifyOutage(ctx context.Context, src models.ExternalSource, n
 	}
 }
 
-// claim setzt column, falls noch leer und der Ausfall noch besteht.
+// claim sets column if still empty and the outage still exists.
 func (s *Service) claim(id uint, column string, now time.Time) bool {
 	res := s.db.Model(&models.ExternalSource{}).
 		Where("id = ? AND outage_since IS NOT NULL AND "+column+" IS NULL", id).Update(column, now)
@@ -185,8 +184,8 @@ func (s *Service) emitOutage(ctx context.Context, kind OutageKind, src models.Ex
 	}
 }
 
-// SetOutageNotifier setzt den Empfänger der Ausfall-Ereignisse. Der Handler
-// entsteht nach dem Dienst (er braucht ihn), deshalb nachträglich.
+// SetOutageNotifier sets the recipient of the outage events. The handler
+// is created after the service (it needs it), hence set afterwards.
 func (s *Service) SetOutageNotifier(n OutageNotifier) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

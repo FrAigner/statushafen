@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeProvider liefert die nächste Antwort aus responses (letzte bleibt).
+// fakeProvider returns the next response from responses (the last stays).
 type fakeProvider struct {
 	mu        sync.Mutex
 	responses []fakeResponse
@@ -50,7 +50,7 @@ type fakeLocker struct {
 	ok       bool
 	err      error
 	unlocked int
-	tries    int // Zahl der TryLock-Aufrufe = Zahl der gestarteten Takte
+	tries    int // Number of TryLock calls = number of ticks started
 }
 
 func (l *fakeLocker) TryLock(context.Context) (bool, error) {
@@ -91,8 +91,8 @@ type serviceFixture struct {
 	now      time.Time
 }
 
-// newServiceFixture: Fake-Provider, Fake-Uhr, fester Jitter (immer das
-// Maximum, damit Erwartungen exakt sind).
+// newServiceFixture: fake provider, fake clock, fixed jitter (always the
+// maximum, so expectations are exact).
 func newServiceFixture(t *testing.T, responses ...fakeResponse) *serviceFixture {
 	t.Helper()
 	f := &serviceFixture{storeFixture: newStoreFixture(t), provider: &fakeProvider{responses: responses},
@@ -105,7 +105,7 @@ func newServiceFixture(t *testing.T, responses ...fakeResponse) *serviceFixture 
 		Now:       func() time.Time { return f.now },
 		Jitter:    func(max time.Duration) time.Duration { return max },
 	})
-	// Nur die eigene Quelle aktiv, damit RunOnce-Zählungen eindeutig sind.
+	// Only the own source active, so RunOnce counts are unambiguous.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.otherSrc.ID).Update("active", false).Error)
 	return f
 }
@@ -190,9 +190,9 @@ func TestStart_StopptMitContext(t *testing.T) {
 	f.svc.tick = time.Millisecond
 	ctx, cancel := context.WithCancel(context.Background())
 	stop := f.svc.Start(ctx)
-	// auf Ereignisse statt auf feste Zeit warten. Der dritte TryLock-Aufruf beweist,
-	// dass der zweite Takt (über den Ticker, Quelle nicht fällig, Sperre wird erneut geprüft)
-	// vollständig durchgelaufen ist.
+	// wait for events instead of a fixed time. The third TryLock call proves
+	// that the second tick (via the ticker, source not due, lock is checked again)
+	// has run through completely.
 	require.Eventually(t, func() bool { return f.locker.tryCount() >= 3 }, 10*time.Second, time.Millisecond,
 		"mindestens zwei Ticker-Takte nach dem ersten")
 	cancel()
@@ -225,7 +225,7 @@ func TestRunOnce_SperreUndFaelligkeit(t *testing.T) {
 	assert.Equal(t, "https://status.example.com", src.PageURL)
 	assert.Empty(t, src.LastError)
 
-	// next = now + 120 s + Jitter (max = 12 s).
+	// next = now + 120 s + jitter (max = 12 s).
 	f.now = f.now.Add(131 * time.Second)
 	f.svc.RunOnce(ctx)
 	assert.Equal(t, 1, f.provider.calls(), "vor Intervall+Jitter nicht fällig")
@@ -300,7 +300,7 @@ func TestPoll_BackoffVerdoppeltUndErfolgSetztZurueck(t *testing.T) {
 		assert.False(t, *src.LastFetchOK)
 		assert.Contains(t, src.LastError, "HTTP 503")
 		assert.Nil(t, src.LastSuccessAt)
-		// Kurz vorher nicht fällig, dann schon.
+		// Shortly before not due, then it is.
 		f.now = st.next.Add(-time.Second)
 		f.svc.RunOnce(ctx)
 		require.Equal(t, i+1, f.provider.calls())
@@ -356,7 +356,7 @@ func TestPoll_EreignisBeiStatuswechsel(t *testing.T) {
 	f.svc.FetchNow(ctx, f.source(t))
 	assert.Len(t, f.listener.changes, 1, "gleicher Status: kein weiteres Ereignis")
 
-	// Verschwindet die Komponente, zählt sie nicht mehr → zurück auf operational.
+	// If the component vanishes, it no longer counts → back to operational.
 	res = f.svc.FetchNow(ctx, f.source(t))
 	assert.Equal(t, 1, res.Vanished)
 	require.Len(t, f.listener.changes, 2)
