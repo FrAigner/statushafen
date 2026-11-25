@@ -137,8 +137,8 @@ const availableLanguageOptions = computed(() => {
 // languages of the previously opened page until loadPageLanguages has finished.
 watch(availableLanguageOptions, (options) => {
   if (options.some(o => o.value === selectedLanguage.value)) return
-  const fallback = pageLanguages.value?.find(l => l.IsDefault)?.LanguageCode ?? options[0]?.value
-  if (fallback) selectedLanguage.value = fallback
+  // options is never empty (availableLanguageOptions falls back to de/en).
+  selectedLanguage.value = pageLanguages.value.find(l => l.IsDefault)?.LanguageCode ?? options[0].value
 })
 
 const currentTemplate = computed(() =>

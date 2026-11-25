@@ -393,6 +393,15 @@ describe('AdminNotificationTemplates', () => {
     expect(put[0]).toMatch(/\/notification-templates\/incident_created\/staff\/de$/)
   })
 
+  it('falls back to the first offered language when the page marks no default', async () => {
+    const fetchImpl = vi.fn(async (url) => (/\/notification-templates$/.test(url)
+      ? jsonResponse([])
+      : jsonResponse([{ ID: 1, LanguageCode: 'de', IsDefault: false }])))
+    const { wrapper } = await mountView({ fetchImpl })
+
+    expect(wrapper.vm.selectedLanguage).toBe('de')
+  })
+
   it('keeps the selected language when the page offers it', async () => {
     const fetchImpl = vi.fn(async (url) => (/\/notification-templates$/.test(url)
       ? jsonResponse([])
