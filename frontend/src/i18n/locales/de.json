@@ -41,9 +41,7 @@
       "linkableHeading": "Verknüpfen",
       "link": "Mit SSO verknüpfen",
       "linkError": "Verknüpfung konnte nicht gestartet werden: {message}",
-      "loadError": "SSO-Verknüpfungen konnten nicht geladen werden.",
-      "protocolOidc": "OIDC",
-      "protocolSaml": "SAML"
+      "loadError": "SSO-Verknüpfungen konnten nicht geladen werden."
     },
     "cardTitle": "Konto und Oberfläche"
   },
@@ -1178,30 +1176,7 @@
       "testFailed": "Testanmeldung fehlgeschlagen: {message}",
       "testStartError": "Testanmeldung konnte nicht gestartet werden: {message}",
       "oidcHeading": "OpenID Connect (OIDC)",
-      "samlHeading": "SAML 2.0",
-      "samlIntro": "Eigener SAML-Service-Provider dieser Statusseite. Beim IdP die SP-Metadaten (URL unten) hinterlegen; Schlüssel und Zertifikat erzeugt das System beim ersten Speichern.",
-      "samlEnable": "SAML-Anmeldung aktivieren",
-      "samlMetadataUrl": "IdP-Metadaten-URL",
-      "samlMetadataUrlHelp": "Nur https. Wird regelmäßig neu geladen, Schlüsselwechsel beim IdP kommen so von selbst an. Entweder URL oder XML angeben.",
-      "samlMetadataXml": "IdP-Metadaten (XML)",
-      "samlMetadataXmlHelp": "Alternativ zur URL das Metadaten-XML des IdP einfügen. Nach einem Schlüsselwechsel beim IdP neu einfügen.",
-      "samlAttributeEmail": "Attribut für die E-Mail-Adresse",
-      "samlAttributeName": "Attribut für den Namen",
-      "samlAttributeHelp": "Name oder FriendlyName des Attributs in der Assertion (z.B. email, mail oder http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress). Die E-Mail wird nur angezeigt, nie zur Zuordnung genutzt.",
-      "samlEntityId": "SP Entity ID",
-      "samlAcsUrl": "SP ACS URL (HTTP-POST)",
-      "samlSpHelp": "Beim IdP als Entity ID bzw. Reply/ACS URL eintragen.",
-      "samlMetadataLink": "SP-Metadaten öffnen",
-      "samlMetadataPending": "Die SP-Metadaten stehen nach dem ersten Speichern bereit.",
-      "samlCertificate": "SP-Zertifikat",
-      "samlCertificateHelp": "Steht auch in den SP-Metadaten. Damit prüft der IdP die signierten AuthnRequests.",
-      "samlTestButton": "SAML-Testanmeldung starten",
-      "samlTestOk": "SAML-Testanmeldung erfolgreich: IdP-Metadaten, Signatur und ACS-URL passen.",
-      "testMissingAttributes": "In der Assertion fehlten diese Attribute: {claims}",
-      "samlAllowUnspecified": "NameID-Format „unspecified“ zulassen",
-      "samlAllowUnspecifiedHelp": "Standard: nur persistente NameIDs (urn:oasis:names:tc:SAML:2.0:nameid-format:persistent). E-Mail-Adressen als NameID werden immer abgelehnt.",
-      "samlAllowUnspecifiedWarning": "Achtung: Eine NameID im Format unspecified ist oft ein änderbarer Wert wie der Benutzername. Wird er beim IdP neu vergeben, meldet sich die neue Person mit dem verknüpften Konto an. Nur einschalten, wenn der IdP keine persistente NameID liefern kann und die Kennung dort nie neu vergeben wird.",
-      "identityResetWarning": "Achtung: Issuer bzw. IdP-Metadaten geändert. Wechselt der OIDC-Issuer, die Quelle der SAML-Metadaten oder Entity-ID bzw. Signaturzertifikat des IdP, löscht das Speichern die bestehenden SSO-Verknüpfungen dieser Seite für das Protokoll; die Nutzer müssen sie im Profil neu anlegen.",
+      "identityResetWarning": "Achtung: Issuer geändert. Wechselt der OIDC-Issuer, löscht das Speichern die bestehenden SSO-Verknüpfungen dieser Seite; die Nutzer müssen sie im Profil neu anlegen.",
       "testCardTitle": "Testanmeldung"
     }
   },
@@ -1333,7 +1308,7 @@
     "feature5Title": "Mehrsprachig",
     "feature5Desc": "Inhalte und Benachrichtigungen in den Sprachen eurer Kunden.",
     "feature6Title": "Mandanten & SSO",
-    "feature6Desc": "Viele Statusseiten in einem Konto, Anmeldung per OIDC oder SAML, Rollen pro Seite.",
+    "feature6Desc": "Viele Statusseiten in einem Konto, Anmeldung per OIDC, Rollen pro Seite.",
     "openPage": "Statusseite öffnen"
   },
   "order": {
@@ -1647,7 +1622,6 @@
       "auth_code_missing": "Der Anbieter hat keinen Autorisierungscode geliefert.",
       "login_code_required": "Bitte gib den Anmeldecode an.",
       "login_code_invalid": "Der Anmeldecode ist ungültig oder abgelaufen.",
-      "saml_not_configured": "SAML ist für diese Seite nicht eingerichtet.",
       "identity_not_found": "Die Verknüpfung wurde nicht gefunden.",
       "confirmation_invalid": "Die Bestätigung stimmt nicht.",
       "last_global_admin": "Der letzte Global Admin kann nicht entfernt werden.",
@@ -1739,8 +1713,7 @@
       "ssoFailed": "SSO-Login fehlgeschlagen. Bitte versuche es erneut.",
       "submit": "Anmelden",
       "subtitle": "Anmelden um fortzufahren",
-      "oidcButton": "Mit SSO anmelden",
-      "samlButton": "Mit SSO anmelden (SAML)"
+      "oidcButton": "Mit SSO anmelden"
     },
     "sso": {
       "loadingAria": "Wird geladen",
@@ -1763,12 +1736,7 @@
       "test_disabled": "Die Testanmeldung ist für diese Seite abgeschaltet.",
       "test_incomplete": "Für die Testanmeldung fehlen Discovery URL, Client ID oder Client Secret.",
       "unsafe_redirect": "Der Anmeldedienst hat eine unsichere Adresse geliefert. Die Weiterleitung wurde nicht ausgeführt.",
-      "unknown": "Die SSO-Anmeldung ist fehlgeschlagen.",
-      "metadata_invalid": "Die Metadaten des Anmeldedienstes (IdP) sind ungültig. Bitte den Admin der Seite informieren.",
-      "saml_response_invalid": "Die Antwort des Anmeldedienstes war ungültig oder abgelaufen. Bitte erneut versuchen.",
-      "saml_replay": "Diese Anmeldung wurde bereits verwendet. Bitte erneut anmelden.",
-      "saml_test_incomplete": "Für die SAML-Testanmeldung fehlen die IdP-Metadaten.",
-      "saml_nameid_format": "Der Anmeldedienst liefert keine dauerhafte Kennung (persistente NameID). Bitte den Admin der Seite informieren."
+      "unknown": "Die SSO-Anmeldung ist fehlgeschlagen."
     }
   },
   "layout": {

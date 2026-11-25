@@ -7,10 +7,6 @@
   Authorize-URL; der Callback führt danach mit next=profile hierher zurück,
   Fehler kommen als ?oidc_error=<code>. Ohne Verknüpfungen und verknüpfbare
   Seiten bleibt der Bereich ausgeblendet.
-
-  Einträge tragen ihr Protokoll (oidc/saml); SAML verknüpft über
-  POST /api/auth/saml/link?page=N, Fehler kommen über denselben Parameter
-  oidc_error. Fehlt das Feld (ältere Antwort), gilt OIDC.
 */
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -38,8 +34,6 @@ const visible = computed(() =>
 )
 
 const pageName = (entry) => entry.page_name || t('profile.sso.unknownPage')
-const isSaml = (entry) => entry.protocol === 'saml'
-const protocolLabel = (entry) => t(isSaml(entry) ? 'profile.sso.protocolSaml' : 'profile.sso.protocolOidc')
 
 const load = async () => {
   try {
@@ -54,8 +48,7 @@ const load = async () => {
 const startLink = async (page) => {
   errorMsg.value = ''
   try {
-    const endpoint = isSaml(page) ? 'saml' : 'oidc'
-    const { url } = await apiFetch(`/api/auth/${endpoint}/link?page=${page.status_page_id}`, { method: 'POST' })
+    const { url } = await apiFetch(`/api/auth/oidc/link?page=${page.status_page_id}`, { method: 'POST' })
     const target = safeIdpRedirect(url)
     if (!target) throw new Error(t('auth.oidcErrors.unsafe_redirect'))
     window.location.assign(target)
@@ -96,7 +89,6 @@ onMounted(load)
         <li v-for="identity in identities" :key="identity.id" data-test="sso-linked">
           <span>
             <strong>{{ pageName(identity) }}</strong>
-            <span class="sso-links-protocol">{{ protocolLabel(identity) }}</span>
             <span v-if="identity.email" class="sso-links-email"> {{ t('profile.sso.linkedAs', { email: identity.email }) }}</span>
           </span>
           <button type="button" class="btn btn-secondary" @click="unlink(identity)">{{ t('profile.sso.unlink') }}</button>
@@ -107,11 +99,8 @@ onMounted(load)
     <template v-if="linkable.length > 0">
       <h4>{{ t('profile.sso.linkableHeading') }}</h4>
       <ul class="sso-links-list">
-        <li v-for="page in linkable" :key="`${page.status_page_id}-${page.protocol}`" data-test="sso-linkable">
-          <span>
-            <strong>{{ page.page_name }}</strong>
-            <span class="sso-links-protocol">{{ protocolLabel(page) }}</span>
-          </span>
+        <li v-for="page in linkable" :key="page.status_page_id" data-test="sso-linkable">
+          <strong>{{ page.page_name }}</strong>
           <button type="button" class="btn btn-primary" @click="startLink(page)">{{ t('profile.sso.link') }}</button>
         </li>
       </ul>
@@ -124,13 +113,8 @@ onMounted(load)
   margin-top: 24px;
 }
 .sso-links-text,
-.sso-links-email,
-.sso-links-protocol {
+.sso-links-email {
   color: var(--text-3);
-}
-.sso-links-protocol {
-  margin-left: 6px;
-  font-size: 0.8125rem;
 }
 .sso-links-text {
   margin-bottom: 16px;

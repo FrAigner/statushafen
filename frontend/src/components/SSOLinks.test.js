@@ -188,51 +188,19 @@ describe('SSOLinks', () => {
     expect(wrapper.find('[role="alert"]').text()).toBe('Die SSO-Anmeldung ist fehlgeschlagen.')
   })
 
-  // Verknüpfungen und verknüpfbare Seiten tragen ihr Protokoll.
-  describe('SAML', () => {
-    const SAML_LIST = {
-      identities: [{ id: 6, status_page_id: 1, page_name: 'Acme', protocol: 'saml', email: '', created_at: '2026-10-03T10:00:00Z' }],
-      linkable: [
-        { status_page_id: 3, page_name: 'Gamma', protocol: 'oidc' },
-        { status_page_id: 3, page_name: 'Gamma', protocol: 'saml' },
-      ],
-    }
-
-    it('zeigt das Protokoll an Verknüpfung und verknüpfbarer Seite', async () => {
-      const wrapper = await mountLinks({ fetchImpl: makeFetch({ 'GET /api/me/sso': jsonResponse(SAML_LIST) }) })
-
-      expect(wrapper.find('[data-test="sso-linked"]').text()).toContain('SAML')
-      const linkable = wrapper.findAll('[data-test="sso-linkable"]')
-      expect(linkable).toHaveLength(2)
-      expect(linkable[0].text()).toContain('OIDC')
-      expect(linkable[1].text()).toContain('SAML')
+  // SAML gibt es nicht mehr: kein Protokoll-Etikett, verknüpft wird immer über OIDC.
+  it('zeigt kein Protokoll-Etikett und verknüpft über den OIDC-Endpunkt', async () => {
+    const fetchImpl = makeFetch({
+      'GET /api/me/sso': jsonResponse(LIST),
+      'POST /api/auth/oidc/link?page=2': jsonResponse({ url: 'https://idp.example/authorize' }),
     })
+    const wrapper = await mountLinks({ fetchImpl })
 
-    it('startet die SAML-Verknüpfung über den SAML-Endpunkt', async () => {
-      const fetchImpl = makeFetch({
-        'GET /api/me/sso': jsonResponse(SAML_LIST),
-        'POST /api/auth/saml/link?page=3': jsonResponse({ url: 'https://idp.example/sso?SAMLRequest=x' }),
-      })
-      const wrapper = await mountLinks({ fetchImpl })
-
-      await wrapper.findAll('[data-test="sso-linkable"] button')[1].trigger('click')
-      await flushPromises()
-
-      expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/sso?SAMLRequest=x')
-    })
-
-    it('nimmt ohne Protokollangabe OIDC (ältere Antworten)', async () => {
-      const fetchImpl = makeFetch({
-        'GET /api/me/sso': jsonResponse(LIST),
-        'POST /api/auth/oidc/link?page=2': jsonResponse({ url: 'https://idp.example/authorize' }),
-      })
-      const wrapper = await mountLinks({ fetchImpl })
-
-      expect(wrapper.find('[data-test="sso-linkable"]').text()).toContain('OIDC')
-      await wrapper.find('[data-test="sso-linkable"] button').trigger('click')
-      await flushPromises()
-      expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/authorize')
-    })
+    expect(wrapper.text()).not.toMatch(/SAML|OIDC/)
+    expect(wrapper.find('.sso-links-protocol').exists()).toBe(false)
+    await wrapper.find('[data-test="sso-linkable"] button').trigger('click')
+    await flushPromises()
+    expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/authorize')
   })
 
   // Review: Die automatische Ausblendung klickt auf das Schließen-Kreuz; ohne Kreuz blieb die Meldung stehen.

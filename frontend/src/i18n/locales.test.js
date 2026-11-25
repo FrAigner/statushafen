@@ -175,3 +175,22 @@ describe('Begriff Vorfall statt Incident', () => {
     expect(offenders).toEqual([])
   })
 })
+
+// Anmeldung nur noch über OIDC: Kein Oberflächentext nennt SAML. Ausnahme sind die
+// Audit-Log-Aktionen, damit ältere Einträge (sso.saml_identities_reset) lesbar bleiben.
+describe('keine SAML-Texte', () => {
+  function flattenEntries(obj, prefix = '') {
+    return Object.entries(obj).flatMap(([key, value]) => {
+      const path = prefix ? `${prefix}.${key}` : key
+      return value && typeof value === 'object' ? flattenEntries(value, path) : [[path, String(value)]]
+    })
+  }
+
+  it.each([['de', de], ['en', en]])('%s.json hat weder Schlüssel noch Texte zu SAML', (_, messages) => {
+    const hits = flattenEntries(messages)
+      .filter(([path]) => !path.startsWith('auditLog.actions.'))
+      .filter(([path, value]) => /saml/i.test(path) || /saml/i.test(value))
+      .map(([path]) => path)
+    expect(hits).toEqual([])
+  })
+})

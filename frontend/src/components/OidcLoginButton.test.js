@@ -70,26 +70,16 @@ describe('OidcLoginButton', () => {
     expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=4')
   })
 
-  // zweiter Knopf für SAML, beide in einem gemeinsamen Element.
-  it('zeigt bei aktivem SAML einen Link auf den SAML-Login-Start', async () => {
+  // SAML gibt es nicht mehr: Auch ein älteres Backend mit saml_enabled erzeugt keinen SAML-Knopf.
+  it('zeigt keinen SAML-Knopf, auch wenn die Auskunft noch saml_enabled meldet', async () => {
     const wrapper = await mountButton('acme', jsonResponse({ oidc_enabled: false, saml_enabled: true, page_id: 3 }))
 
-    expect(wrapper.find('a.oidc-login-btn').exists()).toBe(false)
-    const link = wrapper.find('a.saml-login-btn')
-    expect(link.attributes('href')).toBe('/api/auth/saml/login?page=3')
-    expect(link.text()).toContain('Mit SSO anmelden (SAML)')
-  })
-
-  it('zeigt mit OIDC und SAML beide Knöpfe', async () => {
-    const wrapper = await mountButton('acme', jsonResponse({ oidc_enabled: true, saml_enabled: true, page_id: 3 }))
-
-    expect(wrapper.findAll('.sso-login-buttons a')).toHaveLength(2)
-    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=3')
-    expect(wrapper.find('a.saml-login-btn').attributes('href')).toBe('/api/auth/saml/login?page=3')
+    expect(wrapper.find('a').exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('saml')
   })
 
   it('gibt Attribute wie class an das gemeinsame Element weiter', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, saml_enabled: false, page_id: 3 }))
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 3 }))
     const wrapper = mount(OidcLoginButton, { props: { slug: 'acme' }, attrs: { class: 'extra' }, global: { plugins: [i18n] } })
     await flushPromises()
 
@@ -124,14 +114,14 @@ describe('OidcLoginButton', () => {
     })
 
     it('zeigt bei einer Seite ohne SSO keinen Knopf', async () => {
-      const wrapper = await mountFallback('acme', jsonResponse({ oidc_enabled: false, saml_enabled: false, page_id: 3 }))
+      const wrapper = await mountFallback('acme', jsonResponse({ oidc_enabled: false, page_id: 3 }))
       expect(wrapper.find('a').exists()).toBe(false)
     })
 
-    it('zeigt bei erfolgreicher Auskunft die üblichen Knöpfe statt des Rückfalls', async () => {
-      const wrapper = await mountFallback('acme', jsonResponse({ oidc_enabled: true, saml_enabled: true, page_id: 3 }))
+    it('zeigt bei erfolgreicher Auskunft den üblichen Knopf statt des Rückfalls', async () => {
+      const wrapper = await mountFallback('acme', jsonResponse({ oidc_enabled: true, page_id: 3 }))
+      expect(wrapper.findAll('a')).toHaveLength(1)
       expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=3')
-      expect(wrapper.find('a.saml-login-btn').attributes('href')).toBe('/api/auth/saml/login?page=3')
     })
 
     it('bleibt bei anderen Fehlern als 404 unsichtbar', async () => {
@@ -144,7 +134,7 @@ describe('OidcLoginButton', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {})
       const wrapper = await mountFallback('geheim', jsonResponse({}, 404))
       expect(wrapper.find('a').exists()).toBe(true)
-      global.fetch.mockResolvedValue(jsonResponse({ oidc_enabled: false, saml_enabled: false, page_id: 4 }))
+      global.fetch.mockResolvedValue(jsonResponse({ oidc_enabled: false, page_id: 4 }))
       await wrapper.setProps({ slug: 'offen' })
       await flushPromises()
       expect(wrapper.find('a').exists()).toBe(false)

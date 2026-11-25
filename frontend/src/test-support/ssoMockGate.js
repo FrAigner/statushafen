@@ -9,14 +9,10 @@ export function ssoMockRequired(env) {
 }
 
 // Liefert null (Spec läuft) oder den Grund zum Überspringen; wirft, wenn der Mock
-// fehlt, obwohl er verlangt ist. mock benennt den Dienst und seinen
-// README-Abschnitt (Standard: Mock-OIDC; frontend/e2e/sso-saml.spec.js übergibt
-// den Mock-SAML-IdP).
-const OIDC_MOCK = { name: 'Mock-OIDC', readme: 'Lokale SSO-Tests mit Mock-OIDC' }
-
-export function ssoMockSkipReason({ reachable, required, issuer, mock = OIDC_MOCK }) {
+// fehlt, obwohl er verlangt ist.
+export function ssoMockSkipReason({ reachable, required, issuer }) {
   if (reachable) return null
-  const reason = `${mock.name} nicht erreichbar (${issuer}), siehe README "${mock.readme}"`
+  const reason = `Mock-OIDC nicht erreichbar (${issuer}), siehe README "Lokale SSO-Tests mit Mock-OIDC"`
   if (required) {
     throw new Error(`${reason}; E2E_REQUIRE_SSO_MOCK=1 verlangt ihn, Überspringen ist hier ein Fehler`)
   }

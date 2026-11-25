@@ -34,27 +34,15 @@ function ssoFixture(overrides = {}) {
     oidc_acs_url: 'http://localhost:8080/api/auth/oidc/callback?page=7',
     test_login_enabled: false,
     oidc_client_secret_set: true,
-    // SAML
-    saml_enabled: false,
-    saml_idp_metadata_url: 'https://idp.example/saml/metadata',
-    saml_idp_metadata_xml: '',
-    saml_attribute_email: 'email',
-    saml_attribute_name: 'name',
-    saml_allow_unspecified_nameid: false,
-    saml_sp_certificate: '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n',
-    saml_entity_id: 'http://localhost:8080/api/auth/saml/7/metadata',
-    saml_metadata_url: 'http://localhost:8080/api/auth/saml/7/metadata',
-    saml_acs_url: 'http://localhost:8080/api/auth/saml/7/acs',
     ...overrides,
   }
 }
 
 // Antwortet je Methode; Fehler werden als { status, body } übergeben.
-function makeFetch({ get = jsonResponse(ssoFixture()), put, del, test, samlTest } = {}) {
+function makeFetch({ get = jsonResponse(ssoFixture()), put, del, test } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
     if (url === `${SSO_URL}/test` && method === 'POST') return test()
-    if (url === `${SSO_URL}/saml-test` && method === 'POST') return samlTest()
     if (url !== SSO_URL) throw new Error(`Unerwarteter Fetch-Aufruf: ${method} ${url}`)
     if (method === 'GET') return typeof get === 'function' ? get() : get
     if (method === 'PUT') return put(JSON.parse(options.body))
@@ -199,12 +187,6 @@ describe('AdminSSO.vue', () => {
       oidc_attribute_email: 'mail',
       oidc_attribute_name: 'anzeigename',
       test_login_enabled: true,
-      saml_enabled: false,
-      saml_idp_metadata_url: 'https://idp.example/saml/metadata',
-      saml_idp_metadata_xml: '',
-      saml_attribute_email: 'email',
-      saml_attribute_name: 'name',
-      saml_allow_unspecified_nameid: false,
     })
     expect(global.fetch).toHaveBeenCalledWith(SSO_URL, expect.objectContaining({
       method: 'PUT',
@@ -394,7 +376,7 @@ describe('AdminSSO.vue', () => {
       expect(id, `Label „${label.text()}“ ohne for`).toBeTruthy()
       expect(wrapper.find(`#${id}`).exists(), `Feld #${id}`).toBe(true)
     }
-    expect(wrapper.findAll('label[for]').length).toBe(18)
+    expect(wrapper.findAll('label[for]').length).toBe(9)
   })
 
   // Testanmeldung (test_login_enabled) aus der SSO-Seite heraus.
@@ -504,169 +486,61 @@ describe('AdminSSO.vue', () => {
     })
   })
 
-  // SAML-Abschnitt der SSO-Seite.
-  describe('SAML', () => {
-    it('füllt die SAML-Felder und zeigt die Werte für den IdP', async () => {
-      const wrapper = await mountAdminSSO()
+  // SAML gibt es nicht mehr: kein Abschnitt, kein SAML-Test, keine saml_*-Felder im PUT,
+  // auch wenn ein älteres Backend sie noch mitliefert.
+  describe('ohne SAML', () => {
+    it('zeigt keinen SAML-Abschnitt und keinen SAML-Testknopf', async () => {
+      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ test_login_enabled: true })) }) })
 
-      expect(wrapper.text()).toContain('SAML 2.0')
-      expect(wrapper.find('#sso-saml-enabled').element.checked).toBe(false)
-      expect(wrapper.find('#sso-saml-metadata-url').element.value).toBe('https://idp.example/saml/metadata')
-      expect(wrapper.find('#sso-saml-metadata-xml').element.value).toBe('')
-      expect(wrapper.find('#sso-saml-attribute-email').element.value).toBe('email')
-      expect(wrapper.find('#sso-saml-attribute-name').element.value).toBe('name')
-      expect(wrapper.find('#sso-saml-entity-id').element.value).toBe('http://localhost:8080/api/auth/saml/7/metadata')
-      expect(wrapper.find('#sso-saml-acs-url').element.value).toBe('http://localhost:8080/api/auth/saml/7/acs')
-      expect(wrapper.find('#sso-saml-certificate').element.value).toContain('BEGIN CERTIFICATE')
-      const link = wrapper.find('a.sso-saml-metadata-link')
-      expect(link.attributes('href')).toBe('http://localhost:8080/api/auth/saml/7/metadata')
-      expect(link.attributes('target')).toBe('_blank')
-      expect(link.attributes('rel')).toBe('noopener noreferrer')
+      expect(wrapper.text()).not.toMatch(/SAML/)
+      expect(wrapper.find('[id^="sso-saml"]').exists()).toBe(false)
+      expect(wrapper.find('.sso-saml-test').exists()).toBe(false)
+      expect(wrapper.find('.sso-test').exists()).toBe(true)
     })
 
-    it('verweist vor dem ersten Speichern auf später verfügbare Metadaten', async () => {
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ saml_sp_certificate: '' })) }) })
-
-      expect(wrapper.find('a.sso-saml-metadata-link').exists()).toBe(false)
-      expect(wrapper.find('#sso-saml-certificate').exists()).toBe(false)
-      expect(wrapper.text()).toContain('Die SP-Metadaten stehen nach dem ersten Speichern bereit.')
-    })
-
-    it('verlangt bei aktivem SAML die Metadaten-URL, solange kein XML eingefügt ist', async () => {
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ saml_idp_metadata_url: '' })) }) })
-      expect(wrapper.find('#sso-saml-metadata-url').attributes('required')).toBeUndefined()
-
-      await wrapper.find('#sso-saml-enabled').setValue(true)
-      expect(wrapper.find('#sso-saml-metadata-url').attributes('required')).toBeDefined()
-
-      await wrapper.find('#sso-saml-metadata-xml').setValue('<EntityDescriptor/>')
-      expect(wrapper.find('#sso-saml-metadata-url').attributes('required')).toBeUndefined()
-    })
-
-    it('speichert die SAML-Felder per PUT und übernimmt das neue Zertifikat', async () => {
-      const put = vi.fn(async (body) => jsonResponse(ssoFixture({ ...body, saml_sp_certificate: 'NEU' })))
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ put, get: jsonResponse(ssoFixture({ saml_sp_certificate: '' })) }) })
-
-      await wrapper.find('#sso-saml-enabled').setValue(true)
-      await wrapper.find('#sso-saml-metadata-url').setValue('')
-      await wrapper.find('#sso-saml-metadata-xml').setValue('<EntityDescriptor/>')
-      await wrapper.find('#sso-saml-attribute-email').setValue('mail')
-      await wrapper.find('#sso-saml-attribute-name').setValue('displayName')
-      await wrapper.find('form').trigger('submit')
-      await flushPromises()
-
-      expect(put).toHaveBeenCalledWith(expect.objectContaining({
-        saml_enabled: true,
-        saml_idp_metadata_url: '',
-        saml_idp_metadata_xml: '<EntityDescriptor/>',
-        saml_attribute_email: 'mail',
-        saml_attribute_name: 'displayName',
-      }))
-      expect(put.mock.calls[0][0]).not.toHaveProperty('saml_sp_certificate')
-      expect(wrapper.find('#sso-saml-certificate').element.value).toBe('NEU')
-    })
-
-    // unspecified nur nach ausdrücklicher Freigabe,
-    // mit Warnhinweis.
-    it('erlaubt unspecified-NameIDs nur per Schalter und warnt dabei', async () => {
+    it('schickt keine saml_*-Felder, auch wenn die Antwort sie noch enthält', async () => {
       const put = vi.fn(async (body) => jsonResponse(ssoFixture(body)))
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ put }) })
+      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ put, get: jsonResponse(ssoFixture({ saml_enabled: true, saml_idp_metadata_url: 'https://idp.example/saml' })) }) })
 
-      const box = wrapper.find('#sso-saml-allow-unspecified')
-      expect(box.element.checked).toBe(false)
-      expect(wrapper.find('[data-test="saml-unspecified-warning"]').exists()).toBe(false)
-
-      await box.setValue(true)
-      expect(wrapper.find('[data-test="saml-unspecified-warning"]').text()).toContain('unspecified')
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(put).toHaveBeenCalledWith(expect.objectContaining({ saml_allow_unspecified_nameid: true }))
+      expect(Object.keys(put.mock.calls[0][0]).filter((k) => k.startsWith('saml_'))).toEqual([])
     })
 
-    // Ein Wechsel von Issuer oder IdP-Metadaten löscht
-    // beim Speichern die Verknüpfungen; die Seite warnt vorher.
-    it('warnt vor dem Speichern, wenn Issuer oder IdP-Metadaten wechseln', async () => {
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ saml_idp_metadata_url: '', saml_idp_metadata_xml: '<EntityDescriptor/>' })) }) })
-      const warning = () => wrapper.find('[data-test="sso-identity-reset-warning"]')
-      expect(warning().exists()).toBe(false)
+    it('wertet sso=saml im Testergebnis nicht mehr aus', async () => {
+      const wrapper = await mountAdminSSO({ search: '?oidc_test=ok&sso=saml&missing=email' })
 
-      // Gleicher Issuer, nur als Discovery-URL ohne .well-known bzw. mit Leerzeichen: kein Wechsel.
-      await wrapper.find('#sso-discovery-url').setValue(' https://idp.example ')
-      await wrapper.find('#sso-saml-metadata-xml').setValue('<EntityDescriptor/>\n')
-      expect(warning().exists()).toBe(false)
-
-      await wrapper.find('#sso-discovery-url').setValue('https://anderer-idp.example')
-      expect(warning().text()).toContain('Verknüpfungen')
-      await wrapper.find('#sso-discovery-url').setValue('https://idp.example/.well-known/openid-configuration')
-      expect(warning().exists()).toBe(false)
-
-      await wrapper.find('#sso-saml-metadata-xml').setValue('<EntityDescriptor entityID="neu"/>')
-      expect(warning().exists()).toBe(true)
-      await wrapper.find('#sso-saml-metadata-xml').setValue('')
-      await wrapper.find('#sso-saml-metadata-url').setValue('https://idp.example/saml/metadata')
-      expect(warning().exists()).toBe(true)
-    })
-
-    it('warnt bei erstmaliger Einrichtung nicht', async () => {
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ oidc_discovery_url: '', saml_idp_metadata_url: '' })) }) })
-
-      await wrapper.find('#sso-discovery-url').setValue('https://idp.example')
-      await wrapper.find('#sso-saml-metadata-url').setValue('https://idp.example/saml/metadata')
-
-      expect(wrapper.find('[data-test="sso-identity-reset-warning"]').exists()).toBe(false)
-    })
-
-    it('startet die SAML-Testanmeldung und leitet zum IdP weiter', async () => {
-      const samlTest = vi.fn(async () => jsonResponse({ url: 'https://idp.example/sso?SAMLRequest=x' }))
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ test_login_enabled: true })), samlTest }) })
-
-      await wrapper.find('.sso-saml-test').trigger('click')
-      await flushPromises()
-
-      expect(samlTest).toHaveBeenCalledTimes(1)
-      expect(global.fetch).toHaveBeenCalledWith(`${SSO_URL}/saml-test`, expect.objectContaining({ method: 'POST' }))
-      expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/sso?SAMLRequest=x')
-    })
-
-    it('meldet, wenn die SAML-Testanmeldung nicht startet', async () => {
-      const samlTest = async () => jsonResponse({ error: 'Für die Testanmeldung fehlen die IdP-Metadaten' }, 400)
-      const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ test_login_enabled: true })), samlTest }) })
-
-      await wrapper.find('.sso-saml-test').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('.alert-error').text()).toContain('Testanmeldung konnte nicht gestartet werden: Für die Testanmeldung fehlen die IdP-Metadaten')
-    })
-
-    it('zeigt den SAML-Erfolg aus ?oidc_test=ok&sso=saml', async () => {
-      const wrapper = await mountAdminSSO({ search: '?oidc_test=ok&sso=saml' })
-
-      const result = wrapper.find('[data-test="sso-test-result"]')
-      expect(result.classes()).toContain('alert-success')
-      expect(result.text()).toBe('SAML-Testanmeldung erfolgreich: IdP-Metadaten, Signatur und ACS-URL passen.')
-    })
-
-    it('nennt fehlende SAML-Attribute mit den konfigurierten Namen', async () => {
-      const wrapper = await mountAdminSSO({
-        fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ saml_attribute_email: 'mail', saml_attribute_name: '' })) }),
-        search: '?oidc_test=ok&sso=saml&missing=email,name',
-      })
-
-      const result = wrapper.find('[data-test="sso-test-result"]')
-      expect(result.classes()).toContain('alert-warning')
-      expect(result.text()).toContain('In der Assertion fehlten diese Attribute: mail, name')
-    })
-
-    it('übersetzt SAML-Fehlercodes', async () => {
-      const wrapper = await mountAdminSSO({ search: '?oidc_test=saml_response_invalid' })
-
-      expect(wrapper.find('[data-test="sso-test-result"]').text()).toBe('Testanmeldung fehlgeschlagen: Die Antwort des Anmeldedienstes war ungültig oder abgelaufen. Bitte erneut versuchen.')
+      expect(wrapper.find('[data-test="sso-test-result"]').text()).toBe('Testanmeldung erfolgreich: Anbieter, Client-Daten und Redirect-URL passen. Im ID-Token fehlten diese Claims: email')
     })
   })
 
+  // Ein Wechsel des Issuers löscht beim Speichern die Verknüpfungen; die Seite warnt vorher.
+  it('warnt vor dem Speichern, wenn der Issuer wechselt', async () => {
+    const wrapper = await mountAdminSSO()
+    const warning = () => wrapper.find('[data-test="sso-identity-reset-warning"]')
+    expect(warning().exists()).toBe(false)
+
+    // Gleicher Issuer, nur als Discovery-URL ohne .well-known bzw. mit Leerzeichen: kein Wechsel.
+    await wrapper.find('#sso-discovery-url').setValue(' https://idp.example ')
+    expect(warning().exists()).toBe(false)
+
+    await wrapper.find('#sso-discovery-url').setValue('https://anderer-idp.example')
+    expect(warning().text()).toContain('Verknüpfungen')
+    await wrapper.find('#sso-discovery-url').setValue('https://idp.example/.well-known/openid-configuration')
+    expect(warning().exists()).toBe(false)
+  })
+
+  it('warnt bei erstmaliger Einrichtung nicht', async () => {
+    const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ oidc_discovery_url: '' })) }) })
+
+    await wrapper.find('#sso-discovery-url').setValue('https://idp.example')
+
+    expect(wrapper.find('[data-test="sso-identity-reset-warning"]').exists()).toBe(false)
+  })
+
   // Richtung C: Brotkrumen mit Seitenname, je Verfahren eine Karte im
-  // gemeinsamen Formular (OIDC, SAML, Testanmeldung).
+  // gemeinsamen Formular (OIDC, Testanmeldung).
   it('zeigt Brotkrumen mit Seitenname und je Verfahren eine Karte im selben Formular', async () => {
     useTenant().setMyPages([{ ID: 7, Name: 'Acme' }])
     const wrapper = await mountAdminSSO()
@@ -674,7 +548,7 @@ describe('AdminSSO.vue', () => {
     const crumbs = wrapper.findAll('.page-head__crumbs li').map(li => li.text())
     expect(crumbs).toEqual(['Acme', 'SSO Konfiguration'])
     const form = wrapper.find('form')
-    expect(form.findAll('section.comp-card h3').map(h => h.text())).toEqual(['OpenID Connect (OIDC)', 'SAML 2.0', 'Testanmeldung'])
+    expect(form.findAll('section.comp-card h3').map(h => h.text())).toEqual(['OpenID Connect (OIDC)', 'Testanmeldung'])
     expect(form.findAll('h3.sso-section')).toHaveLength(0)
     useTenant().setMyPages([])
   })

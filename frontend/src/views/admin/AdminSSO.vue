@@ -28,10 +28,8 @@ import { safeIdpRedirect } from '../../utils/safeIdpRedirect'
 // Rolle aus seinem Claim wäre eine Rechteausweitung an der Rollenverwaltung
 // vorbei. Neu ist die Testanmeldung (test_login_enabled).
 //
-// Abschnitt SAML 2.0 mit den saml_*-Feldern. Entity-ID, ACS-URL,
-// SP-Metadaten-URL und SP-Zertifikat liefert das Backend nur zur Anzeige (sie
-// gehen nicht zurück an PUT); Schlüssel und Zertifikat entstehen beim ersten
-// Speichern. Auch für SAML gibt es kein Rollen-Mapping.
+// SAML gibt es nicht mehr; Seiten-SSO ist nur OIDC. Liefert ein älteres Backend
+// noch saml_*-Felder, übernimmt applyConfig nur die Schlüssel aus emptyForm.
 
 const { t, te } = useI18n()
 const breadcrumbs = usePageCrumbs(computed(() => t('admin.sso.title')))
@@ -49,41 +47,16 @@ const emptyForm = () => ({
   oidc_attribute_email: '',
   oidc_attribute_name: '',
   test_login_enabled: true,
-  // Von den Startwerten zählen nur die Schlüssel (applyConfig,
-  // PUT); das Formular erscheint erst nach dem Laden, die Werte kommen dann
-  // vom Backend. Andere Startwerte wären äquivalente Mutanten.
-  // Stryker disable next-line BooleanLiteral: Startwert äquivalent, s. o.
-  saml_enabled: false,
-  // Stryker disable next-line StringLiteral: Startwert äquivalent, s. o.
-  saml_idp_metadata_url: '',
-  // Stryker disable next-line StringLiteral: Startwert äquivalent, s. o.
-  saml_idp_metadata_xml: '',
-  // Stryker disable next-line StringLiteral: Startwert äquivalent, s. o.
-  saml_attribute_email: '',
-  // Stryker disable next-line StringLiteral: Startwert äquivalent, s. o.
-  saml_attribute_name: '',
-  // Stryker disable next-line BooleanLiteral: Startwert äquivalent, s. o.
-  saml_allow_unspecified_nameid: false,
 })
 
 const form = ref(emptyForm())
 const acsUrl = ref('')
-// Nur lesende SAML-Werte für den IdP, gesetzt von applyConfig.
-const samlInfo = ref({})
-// Zuletzt geladene Vertrauensanker. Wechselt beim
-// Speichern der OIDC-Issuer oder die SAML-Metadaten (Quelle, Entity-ID,
-// Zertifikat), löscht das Backend die Verknüpfungen der Seite. Die Seite warnt
-// vorher; ob Entity-ID oder Zertifikat im XML wirklich wechseln, prüft erst
-// das Backend, deshalb warnt jede inhaltliche Änderung des XML.
-const loadedAnchors = ref({})
+// Zuletzt geladener Issuer. Wechselt er beim Speichern, löscht das Backend die
+// Verknüpfungen der Seite; die Seite warnt vorher.
+const loadedIssuer = ref('')
 const oidcIssuerOf = (url) => url.trim().replace(/\/\.well-known\/openid-configuration$/, '')
-const samlSourceOf = (url, xml) => `${url.trim()}|${xml.trim()}`
-const identityResetWarning = computed(() => {
-  const loaded = loadedAnchors.value
-  const oidcChanged = loaded.oidc !== '' && loaded.oidc !== oidcIssuerOf(form.value.oidc_discovery_url)
-  const samlChanged = loaded.saml !== '|' && loaded.saml !== samlSourceOf(form.value.saml_idp_metadata_url, form.value.saml_idp_metadata_xml)
-  return oidcChanged || samlChanged
-})
+const identityResetWarning = computed(() =>
+  loadedIssuer.value !== '' && loadedIssuer.value !== oidcIssuerOf(form.value.oidc_discovery_url))
 // GET liefert das Secret nie aus, nur ob eins gespeichert ist. Ein leeres Feld
 // behält dann beim Speichern das gespeicherte (Backend).
 const secretSet = ref(false)
@@ -99,11 +72,9 @@ const ssoUrl = () => `/api/admin/pages/${activeTenantId.value}/sso`
 // Ergebnis der Testanmeldung, das der OIDC-Callback als
 // ?oidc_test=<ok|code>&missing=email,name zurückgibt. Nur bekannte Codes und
 // Claim-Schlüssel werden angezeigt, fehlende Claims unter ihrem konfigurierten
-// Namen. Der SAML-ACS hängt sso=saml an; dann gelten die
-// SAML-Attributnamen und -Texte.
+// Namen.
 const testParams = new URLSearchParams(window.location.search)
 const testCode = ref(testParams.get('oidc_test'))
-const testProtocol = testParams.get('sso') === 'saml' ? 'saml' : 'oidc'
 const testMissing = (testParams.get('missing') || '').split(',').filter((k) => k === 'email' || k === 'name')
 const testResult = computed(() => {
   if (!testCode.value) return null
@@ -111,17 +82,15 @@ const testResult = computed(() => {
     const key = `auth.oidcErrors.${testCode.value}`
     return { type: 'error', msg: t('admin.sso.testFailed', { message: te(key) ? t(key) : t('auth.oidcErrors.unknown') }) }
   }
-  const okMsg = t(testProtocol === 'saml' ? 'admin.sso.samlTestOk' : 'admin.sso.testOk')
+  const okMsg = t('admin.sso.testOk')
   if (testMissing.length === 0) return { type: 'success', msg: okMsg }
-  const claims = testMissing.map((k) => form.value[`${testProtocol}_attribute_${k}`] || k).join(', ')
-  const missingKey = testProtocol === 'saml' ? 'admin.sso.testMissingAttributes' : 'admin.sso.testMissingClaims'
-  return { type: 'warning', msg: `${okMsg} ${t(missingKey, { claims })}` }
+  const claims = testMissing.map((k) => form.value[`oidc_attribute_${k}`] || k).join(', ')
+  return { type: 'warning', msg: `${okMsg} ${t('admin.sso.testMissingClaims', { claims })}` }
 })
 
-// endpoint: test (OIDC) oder saml-test.
-const startTest = async (endpoint) => {
+const startTest = async () => {
   try {
-    const { url } = await apiFetch(`${ssoUrl()}/${endpoint}`, { method: 'POST' })
+    const { url } = await apiFetch(`${ssoUrl()}/test`, { method: 'POST' })
     const target = safeIdpRedirect(url)
     if (!target) throw new Error(t('auth.oidcErrors.unsafe_redirect'))
     window.location.assign(target)
@@ -143,16 +112,7 @@ const applyConfig = (cfg) => {
   form.value.oidc_client_secret = ''
   acsUrl.value = cfg.oidc_acs_url
   secretSet.value = cfg.oidc_client_secret_set
-  loadedAnchors.value = {
-    oidc: oidcIssuerOf(cfg.oidc_discovery_url),
-    saml: samlSourceOf(cfg.saml_idp_metadata_url, cfg.saml_idp_metadata_xml),
-  }
-  samlInfo.value = {
-    entityId: cfg.saml_entity_id,
-    metadataUrl: cfg.saml_metadata_url,
-    acsUrl: cfg.saml_acs_url,
-    certificate: cfg.saml_sp_certificate,
-  }
+  loadedIssuer.value = oidcIssuerOf(cfg.oidc_discovery_url)
 }
 
 // 403 -> Berechtigungsmeldung statt Fehler-Alert.
@@ -273,66 +233,6 @@ const deleteConfig = async () => {
 
       </ListCard>
 
-      <ListCard :title="t('admin.sso.samlHeading')" padded>
-        <p class="text-muted">{{ t('admin.sso.samlIntro') }}</p>
-        <div class="form-group">
-          <div class="checkbox-row">
-            <input id="sso-saml-enabled" v-model="form.saml_enabled" type="checkbox" />
-            <label for="sso-saml-enabled">{{ t('admin.sso.samlEnable') }}</label>
-          </div>
-        </div>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlMetadataUrl')" field-id="sso-saml-metadata-url" :required="form.saml_enabled && !form.saml_idp_metadata_xml" :hint="t('admin.sso.samlMetadataUrlHelp')">
-          <input class="form-input" :required="f.required" :aria-describedby="f.describedby"
-            :id="f.id"
-            v-model="form.saml_idp_metadata_url"
-            type="url"
-          />
-        </FormField>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlMetadataXml')" field-id="sso-saml-metadata-xml" :hint="t('admin.sso.samlMetadataXmlHelp')">
-          <textarea :aria-describedby="f.describedby" :id="f.id" v-model="form.saml_idp_metadata_xml" rows="4" spellcheck="false"></textarea>
-        </FormField>
-
-        <div class="form-group">
-          <div class="checkbox-row">
-            <input id="sso-saml-allow-unspecified" v-model="form.saml_allow_unspecified_nameid" type="checkbox" />
-            <label for="sso-saml-allow-unspecified">{{ t('admin.sso.samlAllowUnspecified') }}</label>
-          </div>
-          <small class="adm-hint">{{ t('admin.sso.samlAllowUnspecifiedHelp') }}</small>
-          <div v-if="form.saml_allow_unspecified_nameid" class="alert alert-warning sso-warning" data-test="saml-unspecified-warning">
-            {{ t('admin.sso.samlAllowUnspecifiedWarning') }}
-          </div>
-        </div>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlAttributeEmail')" field-id="sso-saml-attribute-email">
-          <input class="form-input" :aria-describedby="f.describedby" :id="f.id" v-model="form.saml_attribute_email" type="text" />
-        </FormField>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlAttributeName')" field-id="sso-saml-attribute-name" :hint="t('admin.sso.samlAttributeHelp')">
-          <input class="form-input" :aria-describedby="f.describedby" :id="f.id" v-model="form.saml_attribute_name" type="text" />
-        </FormField>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlEntityId')" field-id="sso-saml-entity-id">
-          <input class="form-input" :aria-describedby="f.describedby" :id="f.id" :value="samlInfo.entityId" type="url" readonly />
-        </FormField>
-
-        <FormField v-slot="f" :label="t('admin.sso.samlAcsUrl')" field-id="sso-saml-acs-url" :hint="t('admin.sso.samlSpHelp')">
-          <input class="form-input" :aria-describedby="f.describedby" :id="f.id" :value="samlInfo.acsUrl" type="url" readonly />
-        </FormField>
-
-        <template v-if="samlInfo.certificate">
-          <p class="form-group">
-            <a class="sso-saml-metadata-link" :href="samlInfo.metadataUrl" target="_blank" rel="noopener noreferrer">{{ t('admin.sso.samlMetadataLink') }}</a>
-          </p>
-          <FormField v-slot="f" :label="t('admin.sso.samlCertificate')" field-id="sso-saml-certificate" :hint="t('admin.sso.samlCertificateHelp')">
-            <textarea :id="f.id" :aria-describedby="f.describedby" :value="samlInfo.certificate" rows="4" readonly spellcheck="false"></textarea>
-          </FormField>
-        </template>
-        <p v-else class="text-muted">{{ t('admin.sso.samlMetadataPending') }}</p>
-
-      </ListCard>
-
       <ListCard :title="t('admin.sso.testCardTitle')" padded>
         <div class="form-group">
           <div class="checkbox-row">
@@ -341,8 +241,7 @@ const deleteConfig = async () => {
           </div>
           <small class="adm-hint">{{ t('admin.sso.testLoginHelp') }}</small>
           <div v-if="form.test_login_enabled" class="sso-test-row">
-            <OnyxButton class="sso-test" type="button" mode="outline" :label="t('admin.sso.testButton')" @click="startTest('test')" />
-            <OnyxButton class="sso-saml-test" type="button" mode="outline" :label="t('admin.sso.samlTestButton')" @click="startTest('saml-test')" />
+            <OnyxButton class="sso-test" type="button" mode="outline" :label="t('admin.sso.testButton')" @click="startTest" />
             <small class="adm-hint">{{ t('admin.sso.testHint') }}</small>
           </div>
         </div>
@@ -379,13 +278,4 @@ const deleteConfig = async () => {
   margin-top: 0.5rem;
 }
 
-.sso-warning {
-  margin-top: 0.5rem;
-}
-
-textarea {
-  width: 100%;
-  font-family: monospace;
-  font-size: 0.8125rem;
-}
 </style>
