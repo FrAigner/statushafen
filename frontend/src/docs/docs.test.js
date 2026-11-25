@@ -2,6 +2,8 @@
 // AdminNotificationTemplates.test.js): Die Bereinigung würde dort nicht greifen.
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
+import { existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   SECTION_IDS,
   DOC_SOURCES,
@@ -462,5 +464,42 @@ describe('Hilfsfunktionen', () => {
     expect(en).toContain('If a monitored component is assigned to another status page (e.g. by a database intervention)')
     expect(en).not.toContain('If an admin moves')
     expect(en).toContain('returns to\n"operational"')
+  })
+})
+
+// Screenshots liegen unter public/docs-img/<sprache>/ (eigener Pfad, kollidiert nicht mit der
+// SPA-Route /docs). Jedes Bild muss existieren, einen Alternativtext haben, klein bleiben und
+// zur Sprache der Seite passen.
+describe('Screenshots in der Doku', () => {
+  const images = (md) => [...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map(([, alt, src]) => ({ alt, src }))
+
+  it('es gibt Screenshots, in beiden Sprachen gleich viele je Abschnitt', () => {
+    let total = 0
+    for (const id of SECTION_IDS) {
+      const de = images(DOC_SOURCES.de[id]); const en = images(DOC_SOURCES.en[id])
+      expect(en.length, `${id}: Zahl der Bilder`).toBe(de.length)
+      total += de.length
+    }
+    expect(total).toBeGreaterThan(0)
+  })
+
+  it('jedes Bild existiert, hat Alternativtext und liegt im Ordner seiner Sprache', () => {
+    for (const locale of Object.keys(DOC_SOURCES)) {
+      for (const [id, md] of Object.entries(DOC_SOURCES[locale])) {
+        for (const { alt, src } of images(md)) {
+          const where = `${locale}/${id}.md: ${src}`
+          expect(alt.trim().length, `${where}: Alternativtext`).toBeGreaterThan(10)
+          expect(src, where).toMatch(new RegExp(`^/docs-img/${locale}/[a-z0-9-]+\\.webp$`))
+          const file = resolve(__dirname, '../../public', src.slice(1))
+          expect(existsSync(file), `${where}: Datei fehlt`).toBe(true)
+          expect(statSync(file).size, `${where}: Datei zu groß`).toBeLessThan(150 * 1024)
+        }
+      }
+    }
+  })
+
+  it('der Renderer lässt Bilder mit Alternativtext durch', () => {
+    const { html } = renderMarkdown('![Mitgliederliste einer Statusseite](/docs-img/de/page-members.webp)')
+    expect(html).toContain('<img src="/docs-img/de/page-members.webp" alt="Mitgliederliste einer Statusseite"')
   })
 })

@@ -151,6 +151,8 @@ In the row menu "Users" you assign users a role on the page or withdraw it.
 - "Global Admin" is not a page role; set global admins under **Users** with the "Global Admin"
   switch.
 
+![Side panel "Permissions: Acme Corp" with the user and role fields, the "Add" button, the member list with email and role and the "Open invitations" area](/docs-img/en/page-members.webp)
+
 ### Adding members as a global admin
 
 Global admins pick the account from the list and assign it directly.

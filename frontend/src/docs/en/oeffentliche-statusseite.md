@@ -21,6 +21,8 @@ normally. Below follow, as far as there is anything to show:
 8. **Past incidents**: resolved incidents, newest first.
 9. **Get notified** with the "Subscribe now" button, see [Subscriptions](/docs/abonnements).
 
+![Top part of a public status page: overall status "Partial outage", below it search and filters by region and status, then the current incidents](/docs-img/en/status-page.webp)
+
 ## Searching and filtering
 
 - **Search field:** searches components (name and description) and incidents (title and message).

@@ -12,6 +12,9 @@ Auf der Statusseite öffnet „Jetzt abonnieren“ den Abo-Assistenten:
    „Keine Einschränkung: alle Komponenten“.
 3. Abschicken.
 
+![Erster Schritt des Abo-Assistenten: Auswahl des Kanals E-Mail oder Google Chat, mit den Knöpfen „Abbrechen“ und „Weiter“](/docs-img/de/subscribe-dialog.webp)
+
+
 Benachrichtigt wird, sobald ein Vorfall oder eine Wartung mindestens eine der abonnierten
 Komponenten betrifft. Dazu zählen auch gespiegelte Meldungen
 [externer Quellen](/docs/externe-quellen#gespiegelte-meldungen), die eine gekoppelte Komponente

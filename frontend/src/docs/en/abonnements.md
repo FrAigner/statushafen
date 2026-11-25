@@ -12,6 +12,9 @@ On the status page, "Subscribe now" opens the subscription wizard:
    components" applies.
 3. Submit.
 
+![First step of the subscription wizard: choosing the channel Email or Google Chat, with the "Cancel" and "Next" buttons](/docs-img/en/subscribe-dialog.webp)
+
+
 You are notified as soon as an incident or maintenance window affects at least one of the
 subscribed components. This includes mirrored reports of
 [external sources](/docs/externe-quellen#mirrored-reports) that affect a linked component. Private status pages can only be subscribed to by users with access to

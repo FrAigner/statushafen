@@ -155,6 +155,8 @@ Im Zeilenmenü „Benutzer“ weist man Nutzern eine Rolle auf der Seite zu oder
 - „Global Admin“ ist keine Seitenrolle; Global Admins setzt man unter **Benutzer** mit dem Schalter
   „Global Admin“.
 
+![Bereich „Berechtigungen: Acme Corp“ mit den Feldern Benutzer und Rolle, dem Knopf „Hinzufügen“, der Mitgliederliste mit E-Mail und Rolle sowie dem Bereich „Offene Einladungen“](/docs-img/de/page-members.webp)
+
 ### Mitglieder hinzufügen als Global Admin
 
 Global Admins wählen das Konto aus der Liste und ordnen es direkt zu.

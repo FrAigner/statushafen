@@ -57,6 +57,9 @@ Every tab of the admin navigation is its own resource with four actions: **Creat
 action that matches the HTTP method: GET needs read, POST create, PUT and PATCH update, DELETE
 delete. Special actions are assigned to one action (see the "Routes" column).
 
+![Permission matrix of the "Editor" role: for each area the columns Create, Read, Update and Delete (excerpt with the Operations and Content areas); rows reserved for global admins are locked](/docs-img/en/role-matrix.webp)
+
+
 | Area | Tab | Resource | Applies to | Permissions | Routes |
 |---|---|---|---|---|---|
 | Operations | Overview | `overview` | global | `overview:create`, `overview:read`, `overview:update`, `overview:delete` | GET /admin/overview |

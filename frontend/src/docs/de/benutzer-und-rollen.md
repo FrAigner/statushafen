@@ -61,6 +61,9 @@ Jeder Tab der Admin-Navigation ist eine eigene Ressource mit vier Aktionen: **An
 Lesen, POST Anlegen, PUT und PATCH Ändern, DELETE Löschen. Sonderaktionen sind einer Aktion fest
 zugeordnet (siehe Spalte „Routen“).
 
+![Berechtigungs-Matrix der Rolle „Editor“: je Bereich die Spalten Anlegen, Lesen, Ändern und Löschen (Ausschnitt mit den Bereichen Betrieb und Inhalte); Zeilen, die nur Global Admins vorbehalten sind, sind gesperrt](/docs-img/de/role-matrix.webp)
+
+
 | Bereich | Tab | Ressource | Gilt für | Rechte | Routen |
 |---|---|---|---|---|---|
 | Betrieb | Übersicht | `overview` | global | `overview:create`, `overview:read`, `overview:update`, `overview:delete` | GET /admin/overview |

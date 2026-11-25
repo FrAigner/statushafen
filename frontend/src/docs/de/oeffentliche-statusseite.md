@@ -22,6 +22,8 @@ die normal laufen. Darunter folgen, soweit es etwas zu zeigen gibt:
 9. **Benachrichtigungen erhalten** mit dem Knopf „Jetzt abonnieren“, siehe
    [Abonnements](/docs/abonnements).
 
+![Oberer Teil einer öffentlichen Statusseite: Gesamtstatus „Teilweise Störung“, darunter Suche und Filter nach Region und Status sowie die aktuellen Vorfälle](/docs-img/de/status-page.webp)
+
 ## Suchen und Filtern
 
 - **Suchfeld:** durchsucht Komponenten (Name und Beschreibung) und Vorfälle (Titel und Nachricht).
