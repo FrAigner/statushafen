@@ -189,6 +189,8 @@
   margin-bottom: var(--sp-4);
 }
 .entry-card--center .entry-btn { margin-top: var(--sp-4); }
+/* Provider buttons (OnyxButton) span the card like the other sign-in actions. */
+.entry-actions .onyx-button { width: 100%; }
 
 .entry-divider {
   display: flex;

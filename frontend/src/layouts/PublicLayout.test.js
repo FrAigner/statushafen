@@ -116,13 +116,26 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.user-menu-trigger').exists()).toBe(false)
   })
 
-  it('navigiert beim Klick auf den Admin-Login-Button zu /login', async () => {
+  // The login button brings the user back to where they came from (here: the landing page).
+  it('navigates to /login with the current route as returnTo', async () => {
     const { wrapper, router } = await mountLayout()
 
     await wrapper.find('.login-button').trigger('click')
     await flushPromises()
 
     expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/' })
+  })
+
+  it('passes the full path of another public page as returnTo', async () => {
+    const { wrapper, router } = await mountLayout()
+    await router.push('/docs?section=sso#oben')
+    await flushPromises()
+
+    await wrapper.find('.login-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/docs?section=sso#oben' })
   })
 
   // Der Login-Knopf war früher ein OnyxButton und wich optisch von
@@ -149,8 +162,8 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.language-switcher').classes()).toContain('header-control')
   })
 
-  // Die Login-Seite zeigt den SSO-Knopf der gerade angezeigten Statusseite.
-  it('gibt die angezeigte Statusseite als ?page= an die Login-Seite weiter', async () => {
+  // The login page shows the SSO button of the status page currently shown and returns there.
+  it('passes the shown status page as ?page= and the route as returnTo', async () => {
     useCurrentPageSlug().currentPageSlug.value = 'acme'
     try {
       const { wrapper, router } = await mountLayout()
@@ -158,7 +171,8 @@ describe('PublicLayout', () => {
       await wrapper.find('.login-button').trigger('click')
       await flushPromises()
 
-      expect(router.currentRoute.value.fullPath).toBe('/login?page=acme')
+      expect(router.currentRoute.value.path).toBe('/login')
+      expect(router.currentRoute.value.query).toEqual({ returnTo: '/', page: 'acme' })
     } finally {
       useCurrentPageSlug().currentPageSlug.value = null
     }
@@ -490,6 +504,31 @@ describe('PublicLayout', () => {
     await link.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/docs')
+  })
+
+  // The admin area is only a login target when chosen explicitly: a quiet footer link.
+  it.each([
+    ['de', 'Verwaltung'],
+    ['en', 'Administration'],
+  ])('offers an admin link in the footer that logs in towards /admin (%s)', async (locale, label) => {
+    i18n.global.locale.value = locale
+    const { wrapper, router } = await mountLayout()
+
+    const link = wrapper.find('footer .footer-link--admin')
+    expect(link.text()).toBe(label)
+    expect(link.element.closest('header')).toBeNull()
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/admin' })
+  })
+
+  it('shows the admin link for signed-in users too (the guard skips the login page)', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('footer .footer-link--admin').exists()).toBe(true)
   })
 
   it('zeigt im Footer das Copyright mit dem aktuellen Jahr und übersetzt den Link', async () => {

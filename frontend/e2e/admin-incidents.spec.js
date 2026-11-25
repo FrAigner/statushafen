@@ -7,7 +7,7 @@ test.describe('Admin Incidents Management', () => {
   const incidentTitle = `E2E Incident ${Date.now()}`;
 
   test.beforeEach(async ({ page }) => {
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

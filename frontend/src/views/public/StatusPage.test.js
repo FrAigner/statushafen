@@ -274,25 +274,26 @@ describe('StatusPage', () => {
     expect(new URLSearchParams(loginLink.split('?')[1]).get('page')).toBe('acme')
   })
 
-  it('bietet bei 404 den SSO-Einstieg über den Slug an, wenn die Auskunft ebenfalls 404 liefert', async () => {
+  it('offers the SSO slug entry on 404 when the lookup answers 404 too, returning to this page', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: 'page_not_found' }, 404))
     const { wrapper } = await mountStatusPage({ fetchImpl: fetchMock })
 
-    expect(wrapper.find('.private-error-state a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=acme')
+    expect(wrapper.find('.private-error-state a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=acme&return_to=%2Fstatus%2Facme')
   })
 
   // SSO-Knopf der Seite direkt im privaten Fehlerzustand, und der
   // Login-Link gibt die Seite weiter, damit die Login-Seite ihn ebenfalls zeigt.
-  it('bietet im privaten Fehlerzustand das Seiten-SSO an', async () => {
+  it('offers page SSO in the private error state and returns to this page afterwards', async () => {
     const fetchMock = vi.fn(async (url) => (url.endsWith('/sso')
       ? jsonResponse({ oidc_enabled: true, page_id: 1 })
       : jsonResponse({}, 403)))
     const { wrapper } = await mountStatusPage({ fetchImpl: fetchMock })
 
-    expect(wrapper.find('.private-error-state a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=1')
+    expect(wrapper.find('.private-error-state a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=1&return_to=%2Fstatus%2Facme')
     const loginLink = wrapper.find('.private-error-state a[href^="/login"]').attributes('href')
     expect(new URLSearchParams(loginLink.split('?')[1]).get('page')).toBe('acme')
+    expect(new URLSearchParams(loginLink.split('?')[1]).get('returnTo')).toBe('/status/acme')
   })
 
   it('merkt sich den Slug der angezeigten Seite für den Login-Knopf im Kopf', async () => {

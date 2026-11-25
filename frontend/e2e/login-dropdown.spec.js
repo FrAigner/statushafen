@@ -17,11 +17,12 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
     await expect(page.getByRole('button', { name: 'Admin Login' })).toHaveCount(0);
 
     await loginButton.click();
-    await expect(page).toHaveURL(/\/login/);
+    // The header button returns to the status page after sign-in.
+    await expect(page).toHaveURL(/\/login\?returnTo=\/&page=acme$/);
   });
 
   test('zeigt nach dem Login ein User-Icon statt des Login-Buttons', async ({ page }) => {
-    await page.goto(`http://acme.localhost:${PORT}/login`);
+    await page.goto(`http://acme.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
@@ -35,7 +36,7 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
   });
 
   test('Dropdown eines Global Admins enthält Abonnement verwalten, Dashboard und Abmelden', async ({ page }) => {
-    await page.goto(`http://acme.localhost:${PORT}/login`);
+    await page.goto(`http://acme.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
@@ -59,7 +60,7 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
   // "admin_dashboard"-Berechtigung) eingetragen. Passender Fixture, um zu
   // prüfen, dass "Dashboard" seitenbezogen und nicht global entschieden wird.
   test('Seiten-Admin sieht "Dashboard" nur auf der Statusseite, für die er Rechte hat', async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('viewer@statushafen.local');
     await page.locator('input[type=password]').fill('viewer123');
     await page.locator('button.btn-login').click();

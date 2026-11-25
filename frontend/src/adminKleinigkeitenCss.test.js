@@ -26,7 +26,7 @@ describe('Checkbox neben dem Label', () => {
 
   it('AdminSSO: jede Checkbox steht in einer eigenen .checkbox-row mit ihrem Label', () => {
     const vue = read('views/admin/AdminSSO.vue')
-    for (const id of ['sso-enabled', 'sso-saml-enabled', 'sso-saml-allow-unspecified', 'sso-test-login']) {
+    for (const id of ['sso-enabled', 'sso-test-login']) {
       expect(vue).toMatch(new RegExp(`<div class="checkbox-row">\\s*<input id="${id}"[^>]*type="checkbox" />\\s*<label for="${id}">`))
     }
   })

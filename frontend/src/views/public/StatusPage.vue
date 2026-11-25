@@ -626,7 +626,7 @@ const closeHistory = () => {
       <router-link :to="{ path: '/login', query: { returnTo: route.fullPath, page: props.slug } }">
         <button class="btn-subscribe-cta">{{ t('statusPage.privateErrorLoginButton') }}</button>
       </router-link>
-      <OidcLoginButton class="private-error-sso" :slug="props.slug" fallback />
+      <OidcLoginButton class="private-error-sso" :slug="props.slug" :return-to="route.fullPath" fallback />
     </div>
 
     <!-- Loading Indicator -->

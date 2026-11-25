@@ -262,22 +262,6 @@ defineProps({
       <path d="M15 11h4v9.5h-4" />
     </template>
 
-    <!-- google brand mark -->
-    <template v-else-if="name === 'google'">
-      <path d="M20.5 12.3c0-.7-.06-1.4-.18-2H12v3.8h4.8a4.1 4.1 0 01-1.8 2.7v2.2h2.9c1.7-1.6 2.6-3.9 2.6-6.7z" fill="currentColor" stroke="none" />
-      <path d="M12 21c2.4 0 4.5-.8 5.9-2.2l-2.9-2.2c-.8.5-1.8.9-3 .9-2.3 0-4.3-1.6-5-3.7H4v2.3A9 9 0 0012 21z" fill="currentColor" stroke="none" />
-      <path d="M7 13.8a5.4 5.4 0 010-3.6V7.9H4a9 9 0 000 8.2l3-2.3z" fill="currentColor" stroke="none" />
-      <path d="M12 6.6c1.3 0 2.5.45 3.4 1.3l2.6-2.6A9 9 0 004 7.9l3 2.3c.7-2.1 2.7-3.6 5-3.6z" fill="currentColor" stroke="none" />
-    </template>
-
-    <!-- github brand mark -->
-    <template v-else-if="name === 'github'">
-      <path
-        d="M12 2.2a9.8 9.8 0 00-3.1 19.1c.5.1.7-.2.7-.5v-1.8c-2.7.6-3.3-1.3-3.3-1.3-.4-1.1-1-1.4-1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.7.4-1.1.6-1.4-2.2-.2-4.5-1.1-4.5-4.8 0-1 .4-1.9 1-2.6-.1-.2-.4-1.2.1-2.6 0 0 .8-.3 2.7 1a9.4 9.4 0 014.9 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.6.6.7 1 1.6 1 2.6 0 3.7-2.3 4.6-4.5 4.8.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A9.8 9.8 0 0012 2.2z"
-        fill="currentColor" stroke="none"
-      />
-    </template>
-
     <!-- eye / show password -->
     <template v-else-if="name === 'eye'">
       <path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7z" />

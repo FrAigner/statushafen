@@ -48,4 +48,11 @@ describe('AppIcon', () => {
     const wrapper = mount(AppIcon, { props: { name: 'more' } })
     expect(wrapper.findAll('circle')).toHaveLength(3)
   })
+
+  // Fixed Google/GitHub sign-in is gone, and so are their brand marks.
+  it.each(['google', 'github'])('no longer knows the brand mark "%s" (falls back to the dot)', (name) => {
+    const wrapper = mount(AppIcon, { props: { name } })
+    expect(wrapper.findAll('svg > *')).toHaveLength(1)
+    expect(wrapper.find('circle').attributes('r')).toBe('2')
+  })
 })

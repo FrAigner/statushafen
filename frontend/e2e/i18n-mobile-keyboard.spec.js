@@ -18,6 +18,9 @@ async function mockApi(page, { admin = false } = {}) {
     if (url.pathname === '/api/me') {
       return route.fulfill({ status: 401, json: { error: 'unauthorized' } });
     }
+    if (url.pathname === '/api/public/auth-config') {
+      return route.fulfill({ json: { password_login: true, providers: [] } });
+    }
     // Die Übersicht erwartet ein Objekt mit pages-Liste (sonst Render-Fehler, Befund 2).
     if (url.pathname === '/api/admin/overview') {
       return route.fulfill({
