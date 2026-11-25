@@ -1,8 +1,6 @@
 package handlers_test
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -100,7 +98,6 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 	g.GET("/dash/:slug", h.GetPublicDashboardHandler)
 	r.POST("/t/unsub", h.UnsubscribeHandler)
 	r.POST("/t/order-confirm", h.ConfirmOrderHandler)
-	r.GET("/t/oauth/:provider/callback", h.OAuthCallbackHandler)
 
 	page := models.StatusPage{Name: "P", Slug: "abd-p"}
 	require.NoError(t, db.Create(&page).Error)
@@ -269,17 +266,4 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 			assert.NotContains(t, msg, "injizierter Fehler")
 		})
 	}
-}
-
-// OAuth-Callback mit gültigem State, aber unbekanntem Provider.
-func TestFehlercodes_OAuthUnbekannterProvider(t *testing.T) {
-	h := handlers.NewHandler(testutils.SetupTestDB())
-	r := testutils.SetupRouter()
-	r.GET("/oauth/:provider/callback", h.OAuthCallbackHandler)
-	req := httptest.NewRequest(http.MethodGet, "/oauth/bogus/callback?code=x&state=abc", nil)
-	req.AddCookie(&http.Cookie{Name: "oauth_state", Value: "abc"})
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), `"code":"provider_unknown"`)
 }

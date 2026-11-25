@@ -179,23 +179,20 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 
 	expected := []string{
 		"GET /healthz",
-		"GET /api/auth/:provider",
-		"GET /api/auth/:provider/callback",
 		"POST /api/auth/sso-exchange",
 		"GET /api/auth/oidc/login",
 		"GET /api/auth/oidc/callback",
 		"POST /api/auth/oidc/link",
+		// global OIDC providers
+		"GET /api/auth/provider/:id/login",
+		"GET /api/auth/provider/:id/callback",
+		"POST /api/auth/provider/:id/link",
+		"GET /api/public/auth-config",
 		// Frontend-Einstieg ins Seiten-SSO
 		"GET /api/public/pages/:slug/sso",
 		"GET /api/me/sso",
 		"DELETE /api/me/sso/:id",
 		"POST /api/admin/pages/:page_id/sso/test",
-		// SAML je Statusseite
-		"GET /api/auth/saml/login",
-		"GET /api/auth/saml/:page_id/metadata",
-		"POST /api/auth/saml/:page_id/acs",
-		"POST /api/auth/saml/link",
-		"POST /api/admin/pages/:page_id/sso/saml-test",
 		"POST /api/login",
 		"POST /api/subscribe",
 		"GET /api/public/pages",

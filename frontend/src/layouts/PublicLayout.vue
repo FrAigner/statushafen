@@ -28,10 +28,13 @@ const { currentPageSlug } = useCurrentPageSlug()
 // Marker, Navigation, Anmelden, Bestell-Knopf); LandingPage meldet sich dort an.
 const { isLanding, ordersEnabled } = useLandingChrome()
 
-// Auf einer Statusseite nimmt der Login-Knopf die Seite mit, damit
-// die Login-Seite ihren Knopf „Mit SSO anmelden“ zeigen kann.
+// The login button returns to the current page after sign-in (returnTo). On a
+// status page it also passes the page along, so the login page can show its
+// "Mit SSO anmelden" button.
 const goToLogin = () => {
-  router.push(currentPageSlug.value ? { path: '/login', query: { page: currentPageSlug.value } } : '/login')
+  const query = { returnTo: route.fullPath }
+  if (currentPageSlug.value) query.page = currentPageSlug.value
+  router.push({ path: '/login', query })
 }
 
 const isUserMenuOpen = ref(false)
@@ -209,6 +212,12 @@ const goToDashboard = () => {
       <nav class="footer-nav" :aria-label="t('layout.footer.navLabel')">
         <ul class="footer-links">
           <li><router-link to="/docs" class="footer-link">{{ t('layout.footer.docs') }}</router-link></li>
+          <!-- Explicit way into the admin area; the normal login returns to the current page. -->
+          <li>
+            <router-link :to="{ path: '/login', query: { returnTo: '/admin' } }" class="footer-link footer-link--admin">
+              {{ t('layout.footer.admin') }}
+            </router-link>
+          </li>
         </ul>
       </nav>
       <p class="footer-copyright">{{ t('layout.footer.copyright', { year: currentYear }) }}</p>

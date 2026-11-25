@@ -62,7 +62,8 @@ Das Konto wird nur über das Tripel (Statusseite, Issuer, Subject) gefunden, **n
 E-Mail-Adresse**. Neue Konten entstehen beim OIDC-Login nicht. Ein bestehendes Konto muss einmal mit
 der Identität verknüpft werden:
 
-1. Der Nutzer meldet sich normal an (Passwort, Google, GitHub).
+1. Der Nutzer meldet sich normal an (über einen [globalen Anbieter](providers.md) oder, falls
+   eingeschaltet, mit Passwort).
 2. Im Profil zeigt „SSO-Anmeldung“ die Seiten, die er verknüpfen darf. „Mit SSO verknüpfen“ ruft
    `POST /api/auth/oidc/link?page=<SEITEN-ID>` auf und leitet zum IdP weiter.
 3. Nach der Anmeldung beim IdP ist das Konto verknüpft, und der Nutzer ist angemeldet.
@@ -82,9 +83,10 @@ Diese gelten für den Server, nicht je Seite:
 | `FRONTEND_URL` | Dorthin leitet der Server nach dem Login (`/auth/sso-callback?code=…`) und bei Fehlern. Ohne Wert: `http://localhost:5173`. |
 | `JWT_SECRET` | Pflicht für die Sitzung nach dem Login. |
 
-`SSO_ALLOWED_DOMAINS` und `SSO_BOOTSTRAP_ADMIN_EMAILS` wirken **nur** beim Google-/GitHub-Login
-(`/api/auth/google`, `/api/auth/github`), nicht beim Seiten-OIDC: Dort gibt es keine automatische
-Kontoanlage und keine E-Mail-Zuordnung, die man einschränken müsste.
+`SSO_ALLOWED_DOMAINS` und `SSO_BOOTSTRAP_ADMIN_EMAILS` wirken **nur** bei den
+[globalen Anbietern](providers.md), nicht beim Seiten-OIDC: Dort gibt es keine automatische
+Kontoanlage und keine E-Mail-Zuordnung, die man einschränken müsste. Der Login-Start nimmt wie bei den
+globalen Anbietern `return_to` an (siehe [Rücksprung](providers.md#rücksprung-nach-dem-login)).
 
 ## Fehlersuche
 

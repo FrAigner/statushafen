@@ -23,6 +23,8 @@ function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/', component: { template: '<div/>' } },
+      { path: '/status/:slug', component: { template: '<div/>' } },
       { path: '/sso/callback', component: SSOCallback },
       { path: '/login', component: { template: '<div/>' } },
       { path: '/admin', component: { template: '<div/>' } },
@@ -56,7 +58,7 @@ describe('SSOCallback', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('tauscht den code gegen ein Token und leitet bei Erfolg zu /admin weiter', async () => {
+  it('exchanges the code for a token and goes to the landing page without return_to', async () => {
     const jwt = makeJwt({ email: 'a@b.de' })
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: jwt }))
     const { router } = await mountCallback('?code=abc123')
@@ -66,23 +68,61 @@ describe('SSOCallback', () => {
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: 'abc123' }) })
     )
     expect(useAuth().token.value).toBe(jwt)
-    expect(router.currentRoute.value.fullPath).toBe('/admin')
+    expect(router.currentRoute.value.fullPath).toBe('/')
+  })
+
+  // return_to comes from the exchange answer (the backend kept it from the login start).
+  it.each([
+    ['status page', '/status/acme', '/status/acme'],
+    ['status page with query', '/status/acme?lang=en', '/status/acme?lang=en'],
+    ['admin area chosen explicitly', '/admin', '/admin'],
+    ['empty value', '', '/'],
+  ])('follows return_to from the exchange (%s)', async (_, returnTo, expected) => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }), return_to: returnTo }))
+    const { router } = await mountCallback('?code=abc123')
+
+    expect(router.currentRoute.value.fullPath).toBe(expected)
+  })
+
+  // The answer is not trusted either: everything but a known internal path ends on "/".
+  it.each([
+    ['protocol-relative', '//angreifer.example'],
+    ['slash + encoded slash', '/%2F/angreifer.example'],
+    ['slash + backslash', '/\\angreifer.example'],
+    ['absolute URL', 'https://angreifer.example/x'],
+    ['javascript:', 'javascript:alert(1)'],
+    ['control character', '/status/acme\n//angreifer.example'],
+    ['overlength', '/status/' + 'a'.repeat(3000)],
+    ['unknown route', '/gibt/es/nicht'],
+    ['not a string', { path: '/admin' }],
+  ])('falls back to "/" for a malicious return_to (%s)', async (_, evil) => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }), return_to: evil }))
+    const { router } = await mountCallback('?code=abc123')
+
+    expect(router.currentRoute.value.fullPath).toBe('/')
+  })
+
+  it('ignores a returnTo in the callback URL itself', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }) }))
+    const { router } = await mountCallback('?code=abc123&returnTo=/admin&return_to=/admin')
+
+    expect(router.currentRoute.value.fullPath).toBe('/')
   })
 
   // Nach dem Verknüpfen im Profil zurück ins Profil; nur dieser
   // feste Wert, kein beliebiges Ziel aus der URL (Open Redirect).
-  it('leitet mit next=profile ins Profil weiter', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }) }))
+  it('goes to the profile with next=profile, even with a return_to', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }), return_to: '/status/acme' }))
     const { router } = await mountCallback('?code=abc123&next=profile')
 
     expect(router.currentRoute.value.fullPath).toBe('/admin/profile')
   })
 
-  it('ignoriert unbekannte next-Werte', async () => {
-    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }) }))
+  it('ignores unknown next values', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }), return_to: '/status/acme' }))
     const { router } = await mountCallback('?code=abc123&next=https://evil.example')
 
-    expect(router.currentRoute.value.fullPath).toBe('/admin')
+    expect(router.currentRoute.value.fullPath).toBe('/status/acme')
   })
 
   it('leitet bei fehlgeschlagenem Austausch zu /login?error=sso_failed weiter', async () => {

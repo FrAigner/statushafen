@@ -27,13 +27,17 @@ Ohne Self-Service legt ein Global Admin Statusseiten unter **Statusseiten** im A
 
 ## Anmelden
 
-Die Anmeldung liegt unter `/login` (Knopf „Login“ oben rechts).
+Die Anmeldung liegt unter `/login` (Knopf „Anmelden“ oben rechts). Welche Wege die Login-Seite
+anbietet, legt der Betreiber fest:
 
-- **E-Mail und Passwort:** Nach dem Login geht es in den Admin-Bereich.
-- **Google oder GitHub:** über die Knöpfe „Mit Google anmelden“ und „Mit GitHub anmelden“. Das
-  setzt voraus, dass der Betreiber die Anmeldung bei Google bzw. GitHub eingerichtet hat.
-- **SSO der Statusseite:** Kommt man von einer Statusseite, die OIDC oder SAML eingerichtet hat,
-  zeigt die Login-Seite zusätzlich „Mit SSO anmelden“. Details unter [SSO](/docs/sso).
+- **Anmeldeanbieter:** je aktivem Anmeldeanbieter ein Knopf „Mit <Name> anmelden“, z. B. für GitLab.
+- **E-Mail und Passwort:** nur, wenn der Betreiber diese Anmeldung freigegeben hat.
+- **SSO der Statusseite:** Kommt man von einer Statusseite, die OIDC eingerichtet hat, zeigt die
+  Login-Seite zusätzlich „Mit SSO anmelden“. Details unter [SSO](/docs/sso).
+
+Nach der Anmeldung geht es zurück auf die Seite, von der man kam, etwa auf die Statusseite. In den
+Admin-Bereich führt der Link „Verwaltung“ unten auf jeder öffentlichen Seite. Wer eine Adresse im
+Admin-Bereich direkt aufruft, landet nach der Anmeldung ebenfalls dort.
 
 ## Nach dem ersten Login
 

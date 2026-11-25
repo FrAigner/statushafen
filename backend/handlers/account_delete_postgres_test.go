@@ -43,7 +43,7 @@ func TestAccountDeletePostgres_VsAcceptInvitation(t *testing.T) {
 		t.Run(v.name, func(t *testing.T) {
 			db := startInvitationPostgres(t)
 			if err := db.AutoMigrate(&models.IncidentUpdate{}, &models.ActionItem{}, &models.PageOrder{}, &models.Subscriber{},
-				&models.UserTag{}, &models.OIDCLoginState{}, &models.SAMLLoginState{}, &models.NotificationRead{}); err != nil {
+				&models.UserTag{}, &models.OIDCLoginState{}, &models.NotificationRead{}); err != nil {
 				t.Fatal(err)
 			}
 			f := newInvFixtureOn(t, db)

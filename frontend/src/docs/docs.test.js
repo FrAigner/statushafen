@@ -272,6 +272,28 @@ describe('Korrigierte Doku-Aussagen', () => {
     expect(de.sso).toBeUndefined()
     expect(en.sso).toBeUndefined()
   })
+
+  // Sign-in is generic OIDC only: no SAML, no fixed Google/GitHub buttons anywhere in the help.
+  it.each(['de', 'en'])('no help page (%s) mentions SAML or fixed Google/GitHub sign-in', (loc) => {
+    for (const [section, md] of Object.entries(DOC_SOURCES[loc])) {
+      expect(md, `${loc}/${section}.md`).not.toMatch(/SAML/i)
+      expect(md, `${loc}/${section}.md`).not.toMatch(/Mit (Google|GitHub) anmelden|Sign in with (Google|GitHub)|Google (oder|or) GitHub/)
+    }
+  })
+
+  it.each([
+    ['de', 'Anmeldeanbieter', '„Verwaltung“', /zurück auf die Seite, von der/],
+    ['en', 'sign-in provider', '"Administration"', /back to the page you came from/],
+  ])('sign-in help (%s) explains providers, the way back and the admin link', (loc, provider, adminLink, wayBack) => {
+    const start = DOC_SOURCES[loc]['erste-schritte']
+    expect(start).toContain(provider)
+    expect(start).toContain(adminLink)
+    expect(start).toMatch(wayBack)
+    const sso = DOC_SOURCES[loc].sso
+    expect(sso).toContain(provider)
+    expect(sso).toContain('provider_unknown')
+    expect(sso).toContain('password_login_disabled')
+  })
 })
 
 describe('resolveSection', () => {

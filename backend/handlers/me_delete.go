@@ -223,7 +223,6 @@ func deleteAccount(tx *gorm.DB, user models.User, pages []meDeletePage) error {
 		func() error { return tx.Unscoped().Where("user_id = ?", user.ID).Delete(&models.UserTag{}).Error },
 		func() error { return tx.Where("user_id = ?", user.ID).Delete(&models.UserSSOIdentity{}).Error },
 		func() error { return tx.Where("link_user_id = ?", user.ID).Delete(&models.OIDCLoginState{}).Error },
-		func() error { return tx.Where("link_user_id = ?", user.ID).Delete(&models.SAMLLoginState{}).Error },
 	}
 	// Je Seite zwei eigene Schritte statt einer inneren Schleife: so läuft
 	// jeder Fehler durch dieselbe Abbruchstelle unten.

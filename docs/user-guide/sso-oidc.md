@@ -4,8 +4,7 @@
 
 Jede Statusseite kann einen eigenen OpenID-Connect-Anbieter (IdP) bekommen, etwa Authentik,
 Keycloak, Microsoft Entra ID oder Google. Konten, die mit diesem Anbieter verknüpft sind, melden
-sich darüber an, ohne ein eigenes Passwort zu brauchen (Doku). SAML
-() beschreibt [`sso-saml.md`](./sso-saml.md).
+sich darüber an, ohne ein eigenes Passwort zu brauchen (Doku). SAML wird nicht mehr unterstützt.
 
 Diese Anleitung beschreibt den Stand des Backends (`backend/handlers/oidc_login.go`,
 `backend/handlers/oidc_frontend.go`, `backend/handlers/statuspage_sso.go`).
@@ -26,7 +25,7 @@ Diese Anleitung beschreibt den Stand des Backends (`backend/handlers/oidc_login.
    JWKS des Anbieters, `iss`, `aud` (= Client-ID), Ablaufzeit und Nonce.
 5. Das Konto wird ausschließlich über das Tripel *(Statusseite, Issuer, `sub`)* gefunden, nie über
    die E-Mail-Adresse. Neue Konten entstehen dabei nicht.
-6. Wie beim Google/GitHub-Login leitet das Backend mit einem Einmal-Code auf
+6. Wie bei den [globalen Anbietern](../sso/providers.md) leitet das Backend mit einem Einmal-Code auf
    `<FRONTEND_URL>/auth/sso-callback` weiter; das Frontend tauscht ihn gegen die Sitzung.
 
 Schlägt ein Schritt fehl, leitet das Backend auf `<FRONTEND_URL>/login?oidc_error=<Code>` um
@@ -122,7 +121,8 @@ Statusseite („Anmelden“ → „Mit SSO anmelden“) prüfen. Details zu Fehl
 Über das Seiten-SSO entstehen **keine** neuen Konten. Ein Konto muss bereits existieren und wird
 einmalig verknüpft:
 
-1. Der Nutzer meldet sich auf dem bisherigen Weg an (Passwort, Google, GitHub).
+1. Der Nutzer meldet sich auf dem bisherigen Weg an (globaler OIDC-Anbieter oder, falls
+   eingeschaltet, Passwort).
 2. Im Profil (`/admin/profile`) zeigt der Bereich „SSO-Anmeldung“ die Seiten, die er verknüpfen
    darf, und wählt dort „Mit SSO verknüpfen“. Dahinter steht
    `POST /api/auth/oidc/link?page=<Seiten-ID>` (Login-Token im Header `X-Auth-Token`);
@@ -149,7 +149,7 @@ Ausgeschlossen sind, sowohl beim Verknüpfen als auch bei jeder Anmeldung (403):
 
 ### Die Sitzung gilt nur für diese Seite
 
-Die Sitzung nach einem Seiten-SSO-Login (OIDC und SAML) ist auf die Seite beschränkt, deren IdP
+Die Sitzung nach einem Seiten-SSO-Login ist auf die Seite beschränkt, deren IdP
 die Anmeldung bestätigt hat (Claim `sso_page_id` im JWT). Das gilt auch für Rechte, die
 das Konto erst nach der Anmeldung bekommt: Erhält es während der Sitzung eine Rolle auf einer
 anderen Seite oder wird es Global Admin, wirkt das in dieser Sitzung nicht.
@@ -240,7 +240,7 @@ In allen Fällen: Redirect-URI `<BASE_URL>/api/auth/oidc/callback?page=<Seiten-I
 - In der Google Cloud Console eine *OAuth-Client-ID* vom Typ **Webanwendung** anlegen,
   Redirect-URI unter *Autorisierte Weiterleitungs-URIs* eintragen.
 - Issuer: `https://accounts.google.com`.
-- Dieses Seiten-SSO ist unabhängig vom globalen Google-Login des Systems; Verknüpfungen gelten nur
+- Dieses Seiten-SSO ist unabhängig von Google als [globalem Anbieter](../sso/google.md); Verknüpfungen gelten nur
   für die jeweilige Statusseite.
 
 ## Lokales Testen mit dem Mock

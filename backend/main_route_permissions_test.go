@@ -37,7 +37,6 @@ var routeActionExceptions = map[string]string{
 	"POST /api/pages/:page_id/components/:id/restore":                                   "Wiederherstellen ändert die Komponente (components:update)",
 	"POST /api/pages/:page_id/translate":                                                "Übersetzungsvorschlag ändert nichts (update statt create)",
 	"POST /api/admin/pages/:page_id/sso/test":                                           "Testanmeldung schaltet die SSO-Konfiguration (sso:update)",
-	"POST /api/admin/pages/:page_id/sso/saml-test":                                      "Testanmeldung schaltet die SSO-Konfiguration (sso:update)",
 	"POST /api/pages/:page_id/external-sources/:id/fetch":                               "„Jetzt abrufen“ ändert die Quelle (external_sources:update)",
 	"POST /api/pages/:page_id/notification-templates/:kind/:audience/:language/preview": "Vorschau rendert nur (notification_templates:read)",
 	"GET /api/pages/:page_id/admin-notifications":                                       "Betriebsmeldungen nur für Bearbeiter (update statt read)",

@@ -39,8 +39,7 @@ var webhookLookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
 var allowLoopbackForTests = false
 
 // isBlockedWebhookIP identifiziert interne/nicht-routbare Adressen, die als
-// Webhook-Ziel nicht erlaubt sind (SSRF-Schutz). Gilt für Webhooks wie für den
-// Abruf von SAML-Metadaten. Die Liste liegt seit der Umstellung in netguard, damit
+// Webhook-Ziel nicht erlaubt sind (SSRF-Schutz). Die Liste liegt seit der Umstellung in netguard, damit
 // der Abruf externer Statusseiten dieselbe Prüfung nutzt.
 func isBlockedWebhookIP(ip net.IP) bool {
 	addr, ok := netip.AddrFromSlice(ip)

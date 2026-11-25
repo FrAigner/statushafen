@@ -32,16 +32,3 @@ describe('ssoMockSkipReason', () => {
     )
   })
 })
-
-// derselbe Schalter gilt für frontend/e2e/sso-saml.spec.js; der Grund
-// nennt dann den Mock-SAML-IdP und seinen README-Abschnitt.
-describe('ssoMockSkipReason für den SAML-Mock', () => {
-  const mock = { name: 'Mock-SAML', readme: 'Lokale SSO-Tests mit Mock-SAML' }
-
-  it('nennt den übergebenen Mock', () => {
-    expect(ssoMockSkipReason({ reachable: false, required: false, issuer: 'http://localhost:8091/metadata', mock })).toBe(
-      'Mock-SAML nicht erreichbar (http://localhost:8091/metadata), siehe README "Lokale SSO-Tests mit Mock-SAML"',
-    )
-    expect(ssoMockSkipReason({ reachable: true, required: true, issuer: 'x', mock })).toBeNull()
-  })
-})

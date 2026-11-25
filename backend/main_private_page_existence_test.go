@@ -214,7 +214,7 @@ func TestRouter_AutoJoinStillWorksForPrivatePage(t *testing.T) {
 // auf, bevor sie Existenz oder Art einer privaten Seite verrät. Welche Routen
 // anonym sind, ermittelt der Test am Router selbst (weder 401 noch 403 ohne
 // Token). Die Routen unter /api/auth/ gehören nicht dazu: Anmelde-Einstiege
-// (OAuth, OIDC, SAML) bleiben bewusst für jeden erreichbar.
+// (OAuth, OIDC) bleiben bewusst für jeden erreichbar.
 func TestRouter_EveryAnonymousObjectRouteIsInTheExistenceComparison(t *testing.T) {
 	f := setupExistenceFixture(t)
 	covered := map[string]bool{}

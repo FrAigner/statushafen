@@ -46,21 +46,16 @@ func TestSSOLoginBySlug_StartsOIDCForPublicAndPrivatePage(t *testing.T) {
 	}
 }
 
-func TestSSOLoginBySlug_StartsSAMLWhenOnlySAMLIsActive(t *testing.T) {
-	f := newSAMLFixture(t)
-	w := serveOIDC(f.h.SSOLoginBySlugHandler, http.MethodGet, "/api/auth/sso/login?slug="+f.page.Slug, nil, 0)
-	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
-	loc, err := url.Parse(w.Header().Get("Location"))
-	require.NoError(t, err)
-	assert.NotEmpty(t, loc.Query().Get("SAMLRequest"))
-	assert.NotNil(t, samlStateCookie(w))
-}
-
-func TestSSOLoginBySlug_OIDCWinsWhenBothAreActive(t *testing.T) {
+// A leftover from the SAML era (saml_enabled in the DB) starts nothing: without
+// active OIDC the page counts as having no SSO.
+func TestSSOLoginBySlug_LegacySAMLColumnStartsNothing(t *testing.T) {
 	f := newOIDCFixture(t)
-	require.NoError(t, f.db.Model(&models.StatusPageSSOConfig{}).Where("status_page_id = ?", f.page.ID).Update("saml_enabled", true).Error)
-	_, loc := ssoBySlug(f, f.page.Slug)
-	assert.Contains(t, loc, f.idp.srv.URL+"/authorize")
+	require.NoError(t, f.db.Exec("UPDATE status_page_sso_configs SET o_id_c_enabled = ? WHERE status_page_id = ?", false, f.page.ID).Error)
+	require.NoError(t, f.db.Exec("ALTER TABLE status_page_sso_configs ADD COLUMN saml_enabled numeric DEFAULT false").Error)
+	require.NoError(t, f.db.Exec("UPDATE status_page_sso_configs SET saml_enabled = ? WHERE status_page_id = ?", true, f.page.ID).Error)
+	code, loc := ssoBySlug(f, f.page.Slug)
+	assert.Equal(t, http.StatusTemporaryRedirect, code)
+	assert.Equal(t, notConfiguredRedirect, loc)
 }
 
 // Unbekannter Slug, Seite ohne SSO und Seite mit ausgeschaltetem SSO enden am

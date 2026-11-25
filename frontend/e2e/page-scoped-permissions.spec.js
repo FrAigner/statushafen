@@ -13,7 +13,7 @@ const PORT = process.env.E2E_PORT || '5173';
 // eine Custom-Rolle anlegen zu müssen.
 test.describe('Page-scoped permissions', () => {
   test('Editor sieht Schreibrechte nur für die Berechtigung, die seine Seiten-Rolle tatsächlich gewährt', async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('editor@statushafen.local');
     await page.locator('input[type=password]').fill('editor123');
     await page.locator('button.btn-login').click();
@@ -29,7 +29,7 @@ test.describe('Page-scoped permissions', () => {
   });
 
   test('Global Admin sieht weiterhin alle Schreib-Buttons', async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();
@@ -52,7 +52,7 @@ test.describe('Page-scoped permissions', () => {
   // Das Badge selbst sitzt seit der Umstellung in der Sidebar (unten links) statt in
   // der Topbar.
   test('Badge zeigt die seitenbezogene Rolle, nicht die abweichende globale Rolle', async ({ page }) => {
-    await page.goto(`http://localhost:${PORT}/login`);
+    await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('viewer@statushafen.local');
     await page.locator('input[type=password]').fill('viewer123');
     await page.locator('button.btn-login').click();

@@ -3,7 +3,9 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
+import { useAuthConfig, resetAuthConfig } from '../../composables/useAuthConfig'
 import LoginView from './LoginView.vue'
+import loginSource from './LoginView.vue?raw'
 import { axe } from '../../test-support/axe.js'
 
 function jsonResponse(body, status = 200) {
@@ -14,12 +16,29 @@ function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/', component: { template: '<div/>' } },
       { path: '/login', component: LoginView },
+      { path: '/status/:slug', component: { template: '<div/>' } },
       { path: '/admin', component: { template: '<div/>' } },
       { path: '/admin/incidents', component: { template: '<div/>' } },
     ],
   })
 }
+
+// returnTo is attacker input: every one of these must end on the landing page "/".
+const ABUSE = [
+  ['absolute URL', 'https://angreifer.example/phish'],
+  ['protocol-relative', '//angreifer.example'],
+  ['slash + backslash', '/\\angreifer.example'],
+  ['javascript:', 'javascript:alert(1)'],
+  ['encoded //', '%2F%2Fangreifer.example'],
+  ['slash + encoded slash', '/%2F/angreifer.example'],
+  ['newline', '/admin%0A//x'],
+  ['tab', '/admin%09'],
+  ['leading space', '%20/admin'],
+  ['overlength', '/status/' + 'a'.repeat(3000)],
+  ['unknown route', '/gibt/es/nicht'],
+]
 
 async function mountLogin(search = '') {
   vi.stubGlobal('location', { ...window.location, search })
@@ -31,14 +50,224 @@ async function mountLogin(search = '') {
   return { wrapper, router }
 }
 
+// The auth config is cached module-wide; once seeded the view does not load it,
+// and global.fetch only sees the login request.
+function seedAuthConfig(config = {}) {
+  useAuthConfig().authConfig.value = { passwordLogin: true, providers: [], ...config }
+}
+
 describe('LoginView', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'de'
+    seedAuthConfig()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     useAuth().logout()
+    resetAuthConfig()
+  })
+
+  // The password form only appears when the backend explicitly allows it.
+  describe('password switch', () => {
+    it('hides the password form when password_login is off', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [{ id: 'gitlab', name: 'GitLab' }] })
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      expect(wrapper.find('.entry-divider').exists()).toBe(false)
+      expect(wrapper.find('.provider-login-btn').exists()).toBe(true)
+    })
+
+    it('hides the password form while the config is unknown (loading or failed)', async () => {
+      resetAuthConfig()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      let fail
+      global.fetch = vi.fn().mockReturnValue(new Promise((resolve) => { fail = resolve }))
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      fail(jsonResponse({}, 500))
+      await flushPromises()
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+    })
+
+    it('shows the divider only when a sign-in button sits above the password form', async () => {
+      let { wrapper } = await mountLogin()
+      expect(wrapper.find('form.login-form').exists()).toBe(true)
+      expect(wrapper.find('.entry-divider').exists()).toBe(false)
+      wrapper.unmount()
+
+      seedAuthConfig({ providers: [{ id: 'gitlab', name: 'GitLab' }] })
+      ;({ wrapper } = await mountLogin())
+      expect(wrapper.find('.entry-divider').text()).toBe('oder mit E-Mail & Passwort')
+    })
+
+    it('shows the divider for page SSO above the password form', async () => {
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 5 }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+
+      expect(wrapper.find('.entry-divider').exists()).toBe(true)
+    })
+
+    it.each([
+      ['de', 'Keine Anmeldemethode konfiguriert. Wende dich an den Betreiber.'],
+      ['en', 'No sign-in method is configured. Please contact the operator.'],
+    ])('shows a notice when no sign-in method is configured (%s)', async (locale, expected) => {
+      i18n.global.locale.value = locale
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      const { wrapper } = await mountLogin()
+
+      expect(wrapper.find('[data-test="no-login-method"]').text()).toBe(expected)
+      expect(wrapper.find('form.login-form').exists()).toBe(false)
+    })
+
+    it('waits for the page SSO answer before showing the no-method notice', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      let answer
+      global.fetch = vi.fn().mockReturnValue(new Promise((resolve) => { answer = resolve }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+
+      answer(jsonResponse({ oidc_enabled: false, page_id: 5 }))
+      await flushPromises()
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(true)
+    })
+
+    it('shows no notice when page SSO is offered', async () => {
+      seedAuthConfig({ passwordLogin: false, providers: [] })
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 5 }))
+      const { wrapper } = await mountLogin('?page=acme')
+      await flushPromises()
+
+      expect(wrapper.find('a.oidc-login-btn').exists()).toBe(true)
+      expect(wrapper.find('[data-test="no-login-method"]').exists()).toBe(false)
+    })
+
+    // The backend refuses with 403 password_login_disabled when the switch flipped meanwhile.
+    it.each([
+      ['de', 'Die Anmeldung mit E-Mail und Passwort ist abgeschaltet.'],
+      ['en', 'Signing in with email and password is disabled.'],
+    ])('translates 403 password_login_disabled (%s)', async (locale, expected) => {
+      i18n.global.locale.value = locale
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'password login disabled', code: 'password_login_disabled' }, 403))
+      const { wrapper } = await mountLogin()
+
+      await wrapper.find('form.login-form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(wrapper.find('.login-alert.error').text()).toBe(expected)
+      expect(useAuth().isLoggedIn.value).toBe(false)
+    })
+  })
+
+  // Global OIDC providers come from GET /api/public/auth-config.
+  describe('global providers', () => {
+    const GITLAB = { id: 'gitlab', name: 'GitLab' }
+
+    it('shows one button per active provider with its name', async () => {
+      seedAuthConfig({ providers: [GITLAB, { id: 'corp', name: 'Corp SSO' }] })
+      const { wrapper } = await mountLogin()
+
+      const buttons = wrapper.findAll('.provider-login-btn')
+      expect(buttons.map((b) => b.text())).toEqual(['Mit GitLab anmelden', 'Mit Corp SSO anmelden'])
+    })
+
+    it('starts the login by browser navigation to the provider endpoint', async () => {
+      seedAuthConfig({ providers: [GITLAB] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '', assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign).toHaveBeenCalledTimes(1)
+      expect(assign).toHaveBeenCalledWith('/api/auth/provider/gitlab/login?return_to=%2F')
+    })
+
+    it('uses VITE_API_URL and encodes the provider id', async () => {
+      vi.stubEnv('VITE_API_URL', 'https://api.example.org')
+      seedAuthConfig({ providers: [{ id: 'a/b?c', name: 'Odd' }] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '', assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign).toHaveBeenCalledWith('https://api.example.org/api/auth/provider/a%2Fb%3Fc/login?return_to=%2F')
+    })
+
+    it('passes the checked returnTo as return_to to the provider start', async () => {
+      seedAuthConfig({ providers: [GITLAB] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '?returnTo=/status/acme?lang=en&page=acme', assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign).toHaveBeenCalledWith('/api/auth/provider/gitlab/login?return_to=%2Fstatus%2Facme%3Flang%3Den')
+    })
+
+    it.each(ABUSE)('sends return_to=/ to the provider for a malicious returnTo (%s)', async (_, evil) => {
+      seedAuthConfig({ providers: [GITLAB] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '?returnTo=' + evil, assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign).toHaveBeenCalledWith('/api/auth/provider/gitlab/login?return_to=%2F')
+    })
+
+    // The name comes from the server and is only rendered as text, never as HTML.
+    it('renders the provider name as text, not as HTML', async () => {
+      seedAuthConfig({ providers: [{ id: 'x', name: '<img src=x onerror=alert(1)>' }] })
+      const { wrapper } = await mountLogin()
+
+      const button = wrapper.find('.provider-login-btn')
+      expect(button.text()).toBe('Mit <img src=x onerror=alert(1)> anmelden')
+      expect(button.find('img').exists()).toBe(false)
+      expect(loginSource).not.toContain('v-html')
+    })
+
+    it('loads the config from the server once when it is not known yet', async () => {
+      resetAuthConfig()
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ password_login: true, providers: [GITLAB] }))
+      const { wrapper } = await mountLogin()
+      await flushPromises()
+
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+      expect(global.fetch).toHaveBeenCalledWith('/api/public/auth-config', expect.anything())
+      expect(wrapper.find('.provider-login-btn').text()).toBe('Mit GitLab anmelden')
+    })
+
+    it('shows a notice on a load error and invents no buttons', async () => {
+      resetAuthConfig()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'broken' }, 500))
+      const { wrapper } = await mountLogin()
+      await flushPromises()
+
+      expect(wrapper.find('[data-test="auth-config-error"]').text())
+        .toBe('Die Anmeldemethoden konnten nicht geladen werden. Bitte lade die Seite neu.')
+      expect(wrapper.find('.provider-login-btn').exists()).toBe(false)
+    })
   })
 
   // Branding: Der Login-Titel führt den echten Produktnamen
@@ -70,6 +299,16 @@ describe('LoginView', () => {
     expect(wrapper.find('.login-alert.error').text()).toContain('mit keinem Konto verknüpft')
   })
 
+  it.each([
+    ['de', 'Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.'],
+    ['en', 'This sign-in provider is unknown or no longer active.'],
+  ])('translates the callback error provider_unknown (%s)', async (locale, expected) => {
+    i18n.global.locale.value = locale
+    const { wrapper } = await mountLogin('?oidc_error=provider_unknown')
+
+    expect(wrapper.find('.login-alert.error').text()).toBe(expected)
+  })
+
   it('zeigt bei unbekanntem OIDC-Fehlercode eine allgemeine Meldung statt des Codes', async () => {
     const { wrapper } = await mountLogin('?oidc_error=%3Cb%3Ehallo')
 
@@ -78,22 +317,22 @@ describe('LoginView', () => {
     expect(alert.text()).not.toContain('hallo')
   })
 
-  it('zeigt bei ?page= den Knopf für das Seiten-SSO', async () => {
+  it('shows the page SSO button for ?page= and passes the return target on', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ oidc_enabled: true, page_id: 5 }))
-    const { wrapper } = await mountLogin('?page=acme')
+    const { wrapper } = await mountLogin('?page=acme&returnTo=/status/acme')
     await flushPromises()
 
     expect(global.fetch).toHaveBeenCalledWith('/api/public/pages/acme/sso', expect.anything())
-    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=5')
+    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=5&return_to=%2Fstatus%2Facme')
   })
 
-  it('bietet bei ?page= den Einstieg über den Slug an, wenn die Auskunft 404 liefert (private Seite)', async () => {
+  it('offers the slug entry for ?page= when the lookup answers 404 (private page), with return target', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ code: 'page_not_found' }, 404))
     const { wrapper } = await mountLogin('?page=geheim')
     await flushPromises()
 
-    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=geheim')
+    expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=geheim&return_to=%2F')
   })
 
   it('zeigt ohne ?page= keinen Knopf für das Seiten-SSO', async () => {
@@ -104,7 +343,7 @@ describe('LoginView', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('loggt per E-Mail/Passwort ein und leitet standardmäßig zu /admin weiter (erster lesbarer Tab)', async () => {
+  it('signs in with email/password and goes to the landing page "/" by default', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({
       token: 'jwt-1', id: 4, email: 'a@b.de', role: 'Admin', is_global_admin: true, help_tooltips: false,
     }))
@@ -120,11 +359,22 @@ describe('LoginView', () => {
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'a@b.de', password: 'secret123' }) })
     )
     expect(useAuth().isLoggedIn.value).toBe(true)
-    // ohne id erkennt die Benutzerverwaltung die eigene Zeile nicht.
+    // without id the user management does not recognise the own row.
     expect(useAuth().currentUser.value.id).toBe(4)
-    // ausgeschaltete Hilfe-Tooltips gelten nach dem Login sofort.
+    // switched-off help tooltips apply right after the login.
     expect(useAuth().currentUser.value.help_tooltips).toBe(false)
-    expect(router.currentRoute.value.path).toBe('/admin')
+    expect(router.currentRoute.value.fullPath).toBe('/')
+  })
+
+  it('goes back to the status page it came from after a password login', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: 'jwt-1', email: 'a@b.de' }))
+    const { wrapper, router } = await mountLogin('?returnTo=' + encodeURIComponent('/status/acme?lang=en') + '&page=acme')
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: 'jwt-1', email: 'a@b.de' }))
+
+    await wrapper.find('form.login-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/status/acme?lang=en')
   })
 
   it('respektiert einen returnTo-Query-Parameter nach erfolgreichem Login', async () => {
@@ -139,16 +389,8 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.path).toBe('/admin/incidents')
   })
 
-  // Open Redirect. Ein manipulierter returnTo darf nie zu einer fremden Adresse führen.
-  it.each([
-    'https://angreifer.example/phish',
-    '//angreifer.example',
-    '/\\angreifer.example',
-    'javascript:alert(1)',
-    '%2F%2Fangreifer.example',
-    '/%2F/angreifer.example',
-    '/admin%0A//x',
-  ])('geht bei bösem returnTo %s nach dem Login auf /admin', async (boese) => {
+  // Open redirect: a manipulated returnTo must never lead to a foreign address.
+  it.each(ABUSE)('goes to "/" after the login for a malicious returnTo (%s)', async (_, boese) => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: 'jwt-1', email: 'a@b.de' }))
     const { wrapper, router } = await mountLogin('?returnTo=' + boese)
     const push = vi.spyOn(router, 'push')
@@ -159,17 +401,17 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(push).toHaveBeenCalledTimes(1)
-    expect(push).toHaveBeenCalledWith('/admin')
-    expect(router.currentRoute.value.path).toBe('/admin')
+    expect(push).toHaveBeenCalledWith('/')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
-  it('ruft location.assign bei bösem returnTo nie mit der fremden Adresse auf', async () => {
+  it('never calls location.assign with the foreign address for a malicious returnTo', async () => {
     const assign = vi.fn()
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
+        { path: '/', component: () => Promise.reject(new TypeError('Failed to fetch dynamically imported module')) },
         { path: '/login', component: LoginView },
-        { path: '/admin', component: () => Promise.reject(new TypeError('Failed to fetch dynamically imported module')) },
       ],
     })
     vi.stubGlobal('location', { ...window.location, search: '?returnTo=https://angreifer.example/x', assign })
@@ -184,7 +426,7 @@ describe('LoginView', () => {
     await flushPromises()
 
     expect(assign).toHaveBeenCalledTimes(1)
-    expect(assign).toHaveBeenCalledWith('/admin')
+    expect(assign).toHaveBeenCalledWith('/')
   })
 
   it('zeigt eine Fehlermeldung bei ungültigen Zugangsdaten und bleibt eingeloggt aus', async () => {
@@ -267,7 +509,7 @@ describe('LoginView', () => {
     await flushPromises()
   })
 
-  it('hält den Anmelden-Button gesperrt, bis die Navigation nach dem Login abgeschlossen ist', async () => {
+  it('keeps the sign-in button disabled until the navigation after the login has finished', async () => {
     let resolveRoute
     const router = createRouter({
       history: createMemoryHistory(),
@@ -276,7 +518,7 @@ describe('LoginView', () => {
         { path: '/admin', component: () => new Promise((resolve) => { resolveRoute = resolve }) },
       ],
     })
-    vi.stubGlobal('location', { ...window.location, search: '' })
+    vi.stubGlobal('location', { ...window.location, search: '?returnTo=/admin' })
     router.push('/login')
     await router.isReady()
     const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
@@ -296,7 +538,7 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.path).toBe('/admin')
   })
 
-  it('zeigt bei fehlgeschlagener Navigation nach erfolgreichem Login keine Login-Fehlermeldung und lädt die Zielseite neu', async () => {
+  it('shows no login error when the navigation after a successful login fails and reloads the target', async () => {
     const assign = vi.fn()
     const router = createRouter({
       history: createMemoryHistory(),
@@ -305,7 +547,7 @@ describe('LoginView', () => {
         { path: '/admin', component: () => Promise.reject(new TypeError('Failed to fetch dynamically imported module')) },
       ],
     })
-    vi.stubGlobal('location', { ...window.location, search: '', assign })
+    vi.stubGlobal('location', { ...window.location, search: '?returnTo=/admin', assign })
     router.push('/login')
     await router.isReady()
     const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
@@ -348,13 +590,14 @@ describe('LoginView', () => {
     expect(input.attributes('type')).toBe('text')
   })
 
-  it('leitet per SSO-Button-Klick zum Provider-Endpunkt weiter', async () => {
-    vi.stubGlobal('location', { ...window.location, search: '', href: '' })
+  // Fixed Google/GitHub buttons are gone, and so are their texts.
+  it('shows no fixed Google/GitHub buttons', async () => {
     const { wrapper } = await mountLogin()
 
-    await wrapper.findAll('.sso-btn')[0].trigger('click')
-
-    expect(window.location.href).toContain('/api/auth/google')
+    expect(wrapper.text()).not.toMatch(/Google|GitHub/)
+    expect(wrapper.find('.sso-btn').exists()).toBe(false)
+    expect(i18n.global.te('auth.login.googleButton')).toBe(false)
+    expect(i18n.global.te('auth.login.githubButton')).toBe(false)
   })
 
   it('hat keine axe-Funde, auch mit Fehlermeldung', async () => {

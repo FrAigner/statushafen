@@ -11,7 +11,7 @@ test.describe('Admin Incident Detail (Timeline & Post-Mortem)', () => {
     // wiederholten Suite-Läufen gleichnamige Incidents an und der spätere
     // Link-Klick per Titel wird mehrdeutig (strict mode violation).
     incidentTitle = `E2E Detail Incident ${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-    await page.goto(`http://techstart.localhost:${PORT}/login`);
+    await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
     await page.locator('input[type=password]').fill('admin123');
     await page.locator('button.btn-login').click();

@@ -46,14 +46,6 @@ type Handler struct {
 	TranslationTrustedClient *http.Client
 	TranslationDeepLURL      string
 
-	// OAuthClient ist der HTTP-Client für Token-Tausch und Benutzerdaten bei
-	// Google und GitHub. nil = Standardclient mit Zeitgrenze (oauthHTTPClient);
-	// Tests setzen einen Client mit Attrappen-Anbieter, es geht kein Verkehr ins Netz.
-	OAuthClient *http.Client
-
-	// oauthStates merkt eingelöste State-Werte des OAuth-Logins, siehe oauth_state.go.
-	oauthStates oauthStateUse
-
 	// incidentMails zählt laufende Vorfall-Benachrichtigungen, siehe WaitIncidentMails.
 	incidentMails sync.WaitGroup
 	// outageMails zählt laufende Ausfall-Mails, siehe WaitOutageMails.

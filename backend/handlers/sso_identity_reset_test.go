@@ -1,44 +1,60 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
-	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/fraigner/statushafen/models"
+	"github.com/fraigner/statushafen/testutils"
 
-	"github.com/crewjam/saml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
-// Wechselt der Vertrauensanker des Seiten-SSO
-// (SAML: Entity-ID oder Signaturzertifikat des IdP bzw. die Quelle der
-// Metadaten; OIDC: der Issuer), gelten die bestehenden Verknüpfungen der Seite
-// für dieses Protokoll nicht mehr. Sie werden gelöscht und das Löschen im
-// Audit-Log vermerkt; die Konten verknüpfen neu.
+// When the issuer of a page SSO changes, the page's existing OIDC links no
+// longer apply. They are deleted and the deletion is audited; the accounts
+// link again. Old SAML rows and links of other pages stay untouched.
 
 type identityResetFixture struct {
-	*samlConfigFixture
+	db    *gorm.DB
+	r     http.Handler
+	page  models.StatusPage
 	other models.StatusPage
+	path  string
 }
 
 func newIdentityResetFixture(t *testing.T) *identityResetFixture {
 	t.Helper()
-	f := &identityResetFixture{samlConfigFixture: newSAMLConfigFixture(t)}
+	t.Setenv("BASE_URL", "https://status.example.org")
+	db := testutils.SetupTestDB()
+	f := &identityResetFixture{db: db, r: setupSSORouter(NewHandler(db))}
+	f.page = models.StatusPage{Name: "SSO-Konfig", Slug: "sso-konfig"}
+	require.NoError(t, db.Create(&f.page).Error)
 	f.other = models.StatusPage{Name: "Andere", Slug: "andere-reset"}
-	require.NoError(t, f.db.Create(&f.other).Error)
+	require.NoError(t, db.Create(&f.other).Error)
+	f.path = "/api/admin/pages/" + strconv.Itoa(int(f.page.ID)) + "/sso"
 	return f
 }
 
-// seed legt je eine SAML- und OIDC-Verknüpfung auf der Seite und eine
-// SAML-Verknüpfung auf einer anderen Seite an.
+func (f *identityResetFixture) put(t *testing.T, body map[string]interface{}) (int, map[string]interface{}) {
+	t.Helper()
+	w := doSSORequest(f.r, "PUT", f.path, body)
+	resp := map[string]interface{}{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp), w.Body.String())
+	return w.Code, resp
+}
+
+// seed creates an old SAML link and an OIDC link on the page and an OIDC link
+// on another page.
 func (f *identityResetFixture) seed(t *testing.T) {
 	t.Helper()
 	for _, ident := range []models.UserSSOIdentity{
-		{UserID: 1, StatusPageID: f.page.ID, Protocol: models.SSOProtocolSAML, Issuer: "i", Subject: "s1"},
+		{UserID: 1, StatusPageID: f.page.ID, Protocol: "saml", Issuer: "i", Subject: "s1"},
 		{UserID: 2, StatusPageID: f.page.ID, Protocol: models.SSOProtocolOIDC, Issuer: "i", Subject: "s2"},
-		{UserID: 3, StatusPageID: f.other.ID, Protocol: models.SSOProtocolSAML, Issuer: "i", Subject: "s3"},
+		{UserID: 3, StatusPageID: f.other.ID, Protocol: models.SSOProtocolOIDC, Issuer: "i", Subject: "s3"},
 	} {
 		require.NoError(t, f.db.Create(&ident).Error)
 	}
@@ -58,147 +74,70 @@ func (f *identityResetFixture) resetAudits(t *testing.T, action string) []models
 	return logs
 }
 
-// otherIdP: gleiche Entity-ID, anderes Signaturzertifikat bzw. andere
-// Entity-ID.
-func (f *identityResetFixture) idpVariant(t *testing.T, newCert bool, entityID string) string {
-	t.Helper()
-	ti := newSAMLTestIdP(t, func() *saml.EntityDescriptor { return nil })
-	if newCert {
-		_, other := samlTestKeys()
-		ti.key, ti.cert = other, samlTestCert(t, other, "neuer-idp")
-		ti.idp.Key, ti.idp.Certificate = ti.key, ti.cert
-	}
-	if entityID != "" {
-		u, _ := url.Parse(entityID)
-		ti.idp.MetadataURL = *u
-	}
-	return ti.metadataXML()
+func oidcConfigBody(discovery string) map[string]interface{} {
+	return map[string]interface{}{"oidc_discovery_url": discovery, "oidc_client_id": "c", "oidc_client_secret": "s"}
 }
 
-func TestUpdateSSO_SAMLIdentityReset(t *testing.T) {
-	for name, tc := range map[string]struct {
-		next  func(f *identityResetFixture, t *testing.T) map[string]interface{}
-		reset bool
-	}{
-		"gleiche Metadaten": {func(f *identityResetFixture, _ *testing.T) map[string]interface{} {
-			return map[string]interface{}{"saml_idp_metadata_xml": f.idp.metadataXML()}
-		}, false},
-		"neues Signaturzertifikat": {func(f *identityResetFixture, t *testing.T) map[string]interface{} {
-			return map[string]interface{}{"saml_idp_metadata_xml": f.idpVariant(t, true, "")}
-		}, true},
-		"neue Entity-ID": {func(f *identityResetFixture, t *testing.T) map[string]interface{} {
-			return map[string]interface{}{"saml_idp_metadata_xml": f.idpVariant(t, false, "https://idp2.example.test/metadata")}
-		}, true},
-		"Wechsel auf URL": {func(*identityResetFixture, *testing.T) map[string]interface{} {
-			return map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/metadata"}
-		}, true},
-		"Metadaten entfernt": {func(*identityResetFixture, *testing.T) map[string]interface{} {
-			return map[string]interface{}{}
-		}, true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			f := newIdentityResetFixture(t)
-			code, _ := f.put(t, map[string]interface{}{"saml_idp_metadata_xml": f.idp.metadataXML()})
-			require.Equal(t, http.StatusOK, code)
-			f.seed(t)
-
-			code, _ = f.put(t, tc.next(f, t))
-
-			require.Equal(t, http.StatusOK, code)
-			audits := f.resetAudits(t, "sso.saml_identities_reset")
-			if !tc.reset {
-				assert.Equal(t, []uint{1, 2, 3}, f.remaining(t))
-				assert.Empty(t, audits)
-				return
-			}
-			assert.Equal(t, []uint{2, 3}, f.remaining(t))
-			require.Len(t, audits, 1)
-			assert.Equal(t, "count=1", audits[0].Details)
-			assert.Equal(t, f.page.Name, audits[0].TargetName)
-		})
-	}
-}
-
-func TestUpdateSSO_SAMLURLChangeResets(t *testing.T) {
-	f := newIdentityResetFixture(t)
-	code, _ := f.put(t, map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/a"})
-	require.Equal(t, http.StatusOK, code)
-	f.seed(t)
-
-	code, _ = f.put(t, map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/a"})
-	require.Equal(t, http.StatusOK, code)
-	assert.Equal(t, []uint{1, 2, 3}, f.remaining(t))
-
-	code, _ = f.put(t, map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/b"})
-	require.Equal(t, http.StatusOK, code)
-	assert.Equal(t, []uint{2, 3}, f.remaining(t))
-}
-
-func TestUpdateSSO_FirstSAMLConfigResetsNothing(t *testing.T) {
+func TestUpdateSSO_FirstOIDCConfigResetsNothing(t *testing.T) {
 	f := newIdentityResetFixture(t)
 	f.seed(t)
-	code, _ := f.put(t, map[string]interface{}{"saml_idp_metadata_xml": f.idp.metadataXML()})
+	code, _ := f.put(t, oidcConfigBody("https://idp.example.org/realms/a"))
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, []uint{1, 2, 3}, f.remaining(t))
 }
 
 func TestUpdateSSO_OIDCIssuerChangeResets(t *testing.T) {
 	f := newIdentityResetFixture(t)
-	oidc := func(discovery string) map[string]interface{} {
-		return map[string]interface{}{"oidc_discovery_url": discovery, "oidc_client_id": "c", "oidc_client_secret": "s"}
-	}
-	code, _ := f.put(t, oidc("https://idp.example.org/realms/a"))
+	code, _ := f.put(t, oidcConfigBody("https://idp.example.org/realms/a"))
 	require.Equal(t, http.StatusOK, code)
 	f.seed(t)
 
-	// Derselbe Issuer, nur als voller Discovery-URL: keine Änderung.
-	code, _ = f.put(t, oidc("https://idp.example.org/realms/a/.well-known/openid-configuration"))
+	// Same issuer, only written as the full discovery URL: no change.
+	code, _ = f.put(t, oidcConfigBody("https://idp.example.org/realms/a/.well-known/openid-configuration"))
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, []uint{1, 2, 3}, f.remaining(t))
 	assert.Empty(t, f.resetAudits(t, "sso.oidc_identities_reset"))
 
-	code, _ = f.put(t, oidc("https://idp.example.org/realms/b"))
+	code, _ = f.put(t, oidcConfigBody("https://idp.example.org/realms/b"))
 	require.Equal(t, http.StatusOK, code)
-	assert.Equal(t, []uint{1, 3}, f.remaining(t))
+	assert.Equal(t, []uint{1, 3}, f.remaining(t), "only the page's OIDC link is removed")
 	audits := f.resetAudits(t, "sso.oidc_identities_reset")
 	require.Len(t, audits, 1)
 	assert.Equal(t, "count=1", audits[0].Details)
-	assert.Empty(t, f.resetAudits(t, "sso.saml_identities_reset"))
-}
-
-func TestUpdateSSO_IdentityResetDBError(t *testing.T) {
-	f := newIdentityResetFixture(t)
-	code, _ := f.put(t, map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/a"})
-	require.Equal(t, http.StatusOK, code)
-	require.NoError(t, f.db.Migrator().DropTable(&models.UserSSOIdentity{}))
-	t.Cleanup(func() { _ = f.db.AutoMigrate(&models.UserSSOIdentity{}) })
-
-	code, _ = f.put(t, map[string]interface{}{"saml_idp_metadata_url": "https://idp.example.test/b"})
-
-	assert.Equal(t, http.StatusInternalServerError, code)
-	var cfg models.StatusPageSSOConfig
-	require.NoError(t, f.db.Where("status_page_id = ?", f.page.ID).First(&cfg).Error)
-	assert.Equal(t, "https://idp.example.test/a", cfg.SAMLIdPMetadataURL, "Rollback")
+	assert.Equal(t, f.page.Name, audits[0].TargetName)
 }
 
 func TestUpdateSSO_OIDCIdentityResetDBError(t *testing.T) {
 	f := newIdentityResetFixture(t)
-	oidc := func(discovery string) map[string]interface{} {
-		return map[string]interface{}{"oidc_discovery_url": discovery, "oidc_client_id": "c", "oidc_client_secret": "s"}
-	}
-	code, _ := f.put(t, oidc("https://idp.example.org/a"))
+	code, _ := f.put(t, oidcConfigBody("https://idp.example.org/a"))
 	require.Equal(t, http.StatusOK, code)
 	require.NoError(t, f.db.Migrator().DropTable(&models.UserSSOIdentity{}))
 	t.Cleanup(func() { _ = f.db.AutoMigrate(&models.UserSSOIdentity{}) })
 
-	code, _ = f.put(t, oidc("https://idp.example.org/b"))
+	code, _ = f.put(t, oidcConfigBody("https://idp.example.org/b"))
 
 	assert.Equal(t, http.StatusInternalServerError, code)
+	var cfg models.StatusPageSSOConfig
+	require.NoError(t, f.db.Where("status_page_id = ?", f.page.ID).First(&cfg).Error)
+	assert.Equal(t, "https://idp.example.org/a", cfg.OIDCDiscoveryURL, "rolled back")
 }
 
-func TestSAMLTrustAnchor(t *testing.T) {
-	assert.Equal(t, "", samlTrustAnchor("", ""))
-	assert.Equal(t, "url:https://x", samlTrustAnchor("https://x", ""))
-	// Unlesbares XML (nur durch Eingriff in die DB möglich) zählt als eigener Anker.
-	assert.Equal(t, "xml:<kaputt", samlTrustAnchor("", "<kaputt"))
+// SAML fields are gone from the admin API: PUT ignores them (no error either),
+// GET and PUT no longer return saml_* keys.
+func TestSSOConfig_NoSAMLFieldsAnyMore(t *testing.T) {
+	f := newIdentityResetFixture(t)
+	body := oidcConfigBody("https://idp.example.org/a")
+	body["saml_enabled"] = true
+	body["saml_idp_metadata_url"] = "https://idp.example.org/metadata"
+	code, resp := f.put(t, body)
+	require.Equal(t, http.StatusOK, code, resp)
+	w := doSSORequest(f.r, "GET", f.path, nil)
+	require.Equal(t, http.StatusOK, w.Code)
+	got := map[string]interface{}{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+	for _, m := range []map[string]interface{}{resp, got} {
+		for k := range m {
+			assert.NotContains(t, k, "saml", "key %q", k)
+		}
+	}
 }

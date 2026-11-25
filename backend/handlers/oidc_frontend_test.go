@@ -44,9 +44,9 @@ func TestPublicOIDC_ReportsOnlyWhetherActive(t *testing.T) {
 	w := serveWithParams(f.h.GetPublicOIDCHandler, http.MethodGet, "/", gin.Params{{Key: "slug", Value: "oidc-seite"}}, 0)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-	// Genau diese Felder: keine Discovery-URL, keine Client-ID (
-	// dazu nur, ob SAML aktiv ist).
-	assert.Equal(t, map[string]any{"oidc_enabled": true, "saml_enabled": false, "page_id": float64(f.page.ID)}, decodeJSON(t, w))
+	// Exactly these fields: no discovery URL, no client ID and, since SAML
+	// was removed, no saml_enabled either.
+	assert.Equal(t, map[string]any{"oidc_enabled": true, "page_id": float64(f.page.ID)}, decodeJSON(t, w))
 }
 
 func TestPublicOIDC_InactiveOrMissingConfig(t *testing.T) {

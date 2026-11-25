@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { isBasicAuthChallenge } from '../composables/useApi'
+import { safeReturnTo } from '../utils/safeReturnTo'
 
 
 // Layouts bleiben eager: praktisch jede Route braucht ohnehin eines der beiden
@@ -216,9 +217,13 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // Check route meta
+  // A direct visit of a protected route is an explicit choice: come back to it after
+  // sign-in. Someone already signed in who lands on /login?returnTo=... goes straight
+  // to the checked target (fallback: landing page).
   if (to.meta.requiresAuth && !isLoggedIn.value) {
-    next('/login')
+    next({ path: '/login', query: { returnTo: to.fullPath } })
+  } else if (to.path === '/login' && isLoggedIn.value && to.query.returnTo !== undefined) {
+    next(safeReturnTo(to.query.returnTo, router, '/'))
   } else {
     next()
   }

@@ -91,8 +91,17 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo('/egal/wohin', offen, FALLBACK)).toBe('/egal/wohin')
   })
 
-  it('nutzt ohne Angabe den Fallback "/admin"', () => {
-    expect(safeReturnTo('https://angreifer.example', router)).toBe('/admin')
+  // Without an explicit fallback the landing page is the target, never the admin area.
+  it('uses "/" as the default fallback', () => {
+    expect(safeReturnTo('https://angreifer.example', router)).toBe('/')
+    expect(safeReturnTo(undefined, router)).toBe('/')
+    expect(safeReturnTo('/gibt/es/nicht', router)).toBe('/')
+  })
+
+  it('keeps every attack on the default fallback "/"', () => {
+    for (const wert of Object.values(ANGRIFFE)) {
+      expect(safeReturnTo(wert, router)).toBe('/')
+    }
   })
 
   it('akzeptiert genau die Maximallänge, aber nicht ein Zeichen mehr', () => {

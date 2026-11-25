@@ -20,7 +20,8 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT-Lizenz](LICENSE)
   in eigene Komponenten einfließen lassen.
 - **Abonnenten:** E-Mail mit Double-Opt-in oder Google-Chat-Webhook, anpassbare Mailvorlagen je
   Sprache und Zielgruppe.
-- **Rollen und Rechte**, Audit-Log, Single Sign-on je Seite mit OIDC und SAML 2.0.
+- **Anmeldung über OIDC** (GitLab, Google, Keycloak u. a.), optional Passwort; Rollen und Rechte,
+  Audit-Log, zusätzlich Single Sign-on je Seite mit OIDC.
 - **Mehrsprachig** (30 Sprachen im Katalog) für Oberfläche und Inhalte, optional automatische
   Übersetzung (LibreTranslate oder DeepL).
 - **Formatierte Texte** in einer eingeschränkten Markdown-Teilmenge, sicher dargestellt in Seiten
@@ -48,7 +49,9 @@ Mit `SEED_DB="true"` wird die Datenbank zurückgesetzt (Tabellen werden gelösch
 gefüllt. Das gilt nur mit `APP_ENV=development`, `dev`, `test` oder `local` (`./start.sh` setzt
 standardmäßig `development`); bei jedem anderen oder leeren `APP_ENV` ignoriert das Backend `SEED_DB`
 und schreibt eine Warnung ins Log. Die Demodaten enthalten drei Konten: `admin@statushafen.local` / `admin123`, `editor@statushafen.local` / `editor123`
-und `viewer@statushafen.local` / `viewer123`. Nur für die lokale Entwicklung verwenden.
+und `viewer@statushafen.local` / `viewer123`. Nur für die lokale Entwicklung verwenden. Die
+Anmeldung mit Passwort ist im Backend standardmäßig aus; `./start.sh` schaltet sie lokal ein
+(`PASSWORD_LOGIN_ENABLED=true`, sofern `backend/.env` nichts anderes setzt).
 
 ## Konfiguration
 
@@ -64,7 +67,9 @@ Optionen mit Erklärung stehen in [`backend/.env.example`](backend/.env.example)
 | `FRONTEND_URL`, `BASE_URL`, `CORS_ORIGINS` | Öffentliche Adressen und erlaubte Origins |
 | `TRUSTED_PROXIES` | Kommagetrennte Proxy-IPs/CIDRs, deren `X-Forwarded-For` vertraut wird (Standard: keine). Nur den eigenen Reverse-Proxy eintragen: Netze weiter als /8 (IPv4) bzw. /16 (IPv6), auch `0.0.0.0/0` und `::/0`, lassen jeden Client seine Adresse fälschen und heben alle IP-Limits auf; das Backend startet damit nicht, außer `APP_ENV` ist `development`, `dev`, `test` oder `local` (dann nur Warnung) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | Ausgehende Mails (Standard: lokales Mailpit). `SMTP_FROM` ist die Absenderadresse aller Mails; Statusseiten ergänzen nur ihren Namen und optional eine Antwortadresse |
-| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS`, `GOOGLE_*`, `GITHUB_*` | Plattform-Login über Google/GitHub (mit PKCE; das State-Cookie ist mit `JWT_SECRET` signiert, 20 Anfragen pro Minute und IP) und Start-Admins |
+| `OIDC_PROVIDERS`, `OIDC_<ID>_ISSUER`, `OIDC_<ID>_CLIENT_ID`, `OIDC_<ID>_CLIENT_SECRET`, `OIDC_<ID>_NAME`, `OIDC_<ID>_SCOPES`, `OIDC_<ID>_EMAIL_TRUSTED` | Globale OIDC-Anbieter für die Anmeldung (z. B. GitLab, Google), Redirect-URI `<BASE_URL>/api/auth/provider/<id>/callback`; siehe [`docs/sso/providers.md`](docs/sso/providers.md) |
+| `PASSWORD_LOGIN_ENABLED` | Anmeldung mit Passwort: `true`, `1` oder `yes` = an, sonst **aus** (Standard) |
+| `SSO_ALLOWED_DOMAINS`, `SSO_BOOTSTRAP_ADMIN_EMAILS` | Erlaubte E-Mail-Domains für neue Konten über globale Anbieter und Start-Admins |
 | `CUSTOM_DOMAIN_CNAME_TARGET`, `CADDY_INTERNAL_TOKEN` | Eigene Domains (siehe unten) |
 | `METRICS_BASIC_AUTH_USER`, `METRICS_BASIC_AUTH_PASSWORD` | Schalten `/metrics` ein (aus, solange nicht beide gesetzt sind) |
 | `LOG_FORMAT`, `LOG_LEVEL` | Logging (`json`/`text`, `debug` bis `error`) |
@@ -94,8 +99,11 @@ Checkliste für die Produktion:
   ```
 
   In Docker: `docker exec -i <Container> ./server create-admin --email du@example.org --password-stdin`.
-  Alternativ geht auch `SSO_BOOTSTRAP_ADMIN_EMAILS` (E-Mail-Adressen, die beim nächsten Plattform-Login über
-  Google oder GitHub Global Admin werden).
+  Alternativ geht auch `SSO_BOOTSTRAP_ADMIN_EMAILS` (E-Mail-Adressen, die beim nächsten Login über einen
+  globalen OIDC-Anbieter mit bestätigter E-Mail Global Admin werden). Das per Befehl angelegte Konto meldet
+  sich über einen globalen Anbieter mit derselben, bestätigten E-Mail an oder mit `PASSWORD_LOGIN_ENABLED=true`.
+- Mindestens einen globalen OIDC-Anbieter einrichten (`OIDC_PROVIDERS`, siehe
+  [`docs/sso/providers.md`](docs/sso/providers.md)); der Passwort-Login ist standardmäßig aus.
 - `FRONTEND_URL`, `CORS_ORIGINS`, `TRUSTED_PROXIES` und die SMTP-Einstellungen setzen. Das Backend sendet
   `Strict-Transport-Security`, wenn die Anfrage von einem Proxy aus `TRUSTED_PROXIES` kommt, der
   `X-Forwarded-Proto: https` setzt (von jedem anderen Absender wird der Header ignoriert).
@@ -115,6 +123,14 @@ Checkliste für die Produktion:
   mehr zu einem Seitennamen auf (sie sehen die Startseite). Der Endpunkt ist je IP auf 120 Anfragen
   pro Minute begrenzt (danach 429), Caddy fragt nur für Hosts ohne Zertifikat.
 - Die Datenbank regelmäßig sichern: [`docs/backup-restore.md`](docs/backup-restore.md).
+
+## Upgrade-Hinweis: Anmeldung
+
+Der eingebaute Google-/GitHub-Login und SAML sind entfernt, die Anmeldung mit Passwort ist
+standardmäßig aus. Vor dem Update einen globalen OIDC-Anbieter einrichten (Google geht als
+OIDC-Anbieter weiter) oder `PASSWORD_LOGIN_ENABLED=true` setzen; `GOOGLE_*`/`GITHUB_*` entfallen.
+SAML-Daten bleiben in der Datenbank, sind aber wirkungslos. Schritte:
+[`docs/sso/providers.md`](docs/sso/providers.md#upgrade-von-älteren-versionen).
 
 ## Dokumentation
 
@@ -136,9 +152,9 @@ Beiträge sind willkommen: siehe [CONTRIBUTING.md](CONTRIBUTING.md). Sicherheits
 
 ### Lokale Tests des Single Sign-on
 
-`docker compose --profile sso up -d mock-oidc mock-saml` startet einen OIDC- und einen
-SAML-Mock-Anbieter; die Anleitung steht in [`docs/sso/local-testing.md`](docs/sso/local-testing.md).
-Die Playwright-Specs `sso-oidc` und `sso-saml` spielen den ganzen Ablauf durch und laufen auch jede
+`docker compose --profile sso up -d mock-oidc` startet einen
+OIDC-Mock-Anbieter; die Anleitung steht in [`docs/sso/local-testing.md`](docs/sso/local-testing.md).
+Der Playwright-Spec `sso-oidc` spielt den ganzen Ablauf durch und läuft auch jede
 Nacht in [`.github/workflows/e2e-sso-nachts.yml`](.github/workflows/e2e-sso-nachts.yml).
 
 ## Lizenz, Name und Drittsoftware

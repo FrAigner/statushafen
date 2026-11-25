@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fraigner/statushafen/database"
@@ -153,13 +154,32 @@ type rateLimiter struct {
 	now      func() time.Time
 }
 
+// rateLimiterClock is the clock of all rate limiters created by NewRateLimiter (tests replace it).
+// It is atomic because the cleanup goroutines of long-lived limiters read it concurrently.
+var rateLimiterClock atomic.Pointer[func() time.Time]
+
+func init() {
+	now := time.Now
+	rateLimiterClock.Store(&now)
+}
+
+func rateLimiterNow() time.Time { return (*rateLimiterClock.Load())() }
+
+// SetRateLimiterClockForTests replaces the rate limiter clock and registers the reset via
+// cleanup (like the other *ForTests helpers). It also affects limiters created earlier.
+func SetRateLimiterClockForTests(cleanup func(func()), now func() time.Time) {
+	prev := rateLimiterClock.Swap(&now)
+	cleanup(func() { rateLimiterClock.Store(prev) })
+}
+
 func newRateLimiter(max int, per time.Duration, maxEntries int) *rateLimiter {
 	return &rateLimiter{
 		visitors: newLRUTable[visitor](maxEntries),
 		max:      float64(max),
 		refill:   float64(max) / per.Seconds(),
 		window:   per,
-		now:      time.Now,
+		// Indirection so that SetRateLimiterClockForTests also reaches limiters built before it.
+		now: rateLimiterNow,
 	}
 }
 

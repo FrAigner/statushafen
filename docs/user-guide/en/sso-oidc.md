@@ -5,8 +5,7 @@
 
 Each status page can have its own OpenID Connect identity provider (IdP), for example Authentik,
 Keycloak, Microsoft Entra ID or Google. Accounts linked to this provider sign in through it
-without needing a password of their own (documentation). SAML
-is described in [`sso-saml.md`](./sso-saml.md).
+without needing a password of their own (documentation). SAML is no longer supported.
 
 This guide describes the state of the backend (`backend/handlers/oidc_login.go`,
 `backend/handlers/oidc_frontend.go`, `backend/handlers/statuspage_sso.go`).
@@ -26,7 +25,7 @@ This guide describes the state of the backend (`backend/handlers/oidc_login.go`,
    the provider's JWKS, `iss`, `aud` (= client ID), expiry and nonce.
 5. The account is found exclusively through the triple *(status page, issuer, `sub`)*, never
    through the email address. No new accounts are created in this step.
-6. As with the Google/GitHub login, the backend redirects with a one-time code to
+6. As with the [global providers](../../sso/en/providers.md), the backend redirects with a one-time code to
    `<FRONTEND_URL>/auth/sso-callback`; the frontend exchanges it for the session.
 
 If a step fails, the backend redirects to `<FRONTEND_URL>/login?oidc_error=<code>` (after linking
@@ -123,7 +122,7 @@ status page ("Login" → "Sign in with SSO"). Details on errors are in the backe
 
 The page SSO creates **no** new accounts. An account must already exist and is linked once:
 
-1. The user signs in the usual way (password, Google, GitHub).
+1. The user signs in the usual way (global OIDC provider or, if switched on, password).
 2. In the profile (`/admin/profile`), the section "SSO sign-in" shows the pages they may link, and
    they choose "Link with SSO" there. Behind it is `POST /api/auth/oidc/link?page=<page ID>` (login
    token in the header `X-Auth-Token`); the response contains `{"url": "…"}`, the
@@ -152,7 +151,7 @@ Excluded, both when linking and at every sign-in (403), are:
 
 ### The session is valid for this page only
 
-The session after a page SSO login (OIDC and SAML) is restricted to the page whose IdP confirmed
+The session after a page SSO login is restricted to the page whose IdP confirmed
 the sign-in (claim `sso_page_id` in the JWT). This also applies to permissions the
 account only receives after signing in: if it gets a role on another page or becomes a global
 admin during the session, this has no effect in that session.
@@ -247,7 +246,7 @@ In all cases: redirect URI `<BASE_URL>/api/auth/oidc/callback?page=<page ID>`, c
 - In the Google Cloud Console create an *OAuth client ID* of type **Web application** and enter
   the redirect URI under *Authorized redirect URIs*.
 - Issuer: `https://accounts.google.com`.
-- This page SSO is independent of the system's global Google login; links apply only to the
+- This page SSO is independent of Google as a [global provider](../../sso/en/google.md); links apply only to the
   respective status page.
 
 ## Local testing with the mock

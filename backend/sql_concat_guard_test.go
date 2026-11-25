@@ -56,8 +56,6 @@ var reviewedDynamicSQL = reviewedSites(
 	"column kommt von den drei festen Aufrufern (outage_*_at), nie aus einer Anfrage",
 	"handlers/admin_notification.go:Exec:sql",
 	"scope und adminNotifUnreadClause sind feste Literale im Code, Werte gehen als ?-Parameter",
-	"handlers/oidc_frontend.go:Where:\"p.deleted_at IS NULL AND \"+p.column+\" = ?\"",
-	"Spaltenname aus der festen Liste ssoEnabledColumns",
 	"handlers/page_order.go:Where:mailboxCond+\" AND status = ? AND NOT (\"+orderPendingExpiredSQL+\")\"",
 	"mailboxCond kommt aus mailboxMatch (feste Fragmente, Werte als ?-Parameter), orderPendingExpiredSQL ist eine feste Konstante",
 	"handlers/subscriber.go:Where:\"channel = 'email' AND status_page_id = ? AND \"+clause",

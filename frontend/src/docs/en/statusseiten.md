@@ -114,7 +114,7 @@ invitations per day. Statushafen deletes expired invitations automatically, and 
 also deletes all invitations to and from it; the data export contains the open invitations to your
 own address. If the inviter loses the right
 to assign the role, the invitation lapses. Accounts with the old global SSO, a page SSO link
-(OIDC/SAML) or a role on another page, and global admin accounts, get no email and cannot accept an
+(OIDC) or a role on another page, and global admin accounts, get no email and cannot accept an
 invitation themselves; only a global admin adds them (a second page would otherwise block the SSO
 sign-in of the first). Inviting is limited to 20 requests per minute, as are accepting and
 declining. Existing members of the page can also be changed without an email. A

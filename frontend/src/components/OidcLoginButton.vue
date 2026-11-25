@@ -12,10 +12,10 @@
   (GET /api/auth/sso/login?slug=…), den der Server selbst auflöst. Er erscheint
   für eine private und eine fehlende Seite gleichermaßen.
 
-  Dieselbe Abfrage meldet saml_enabled; dann erscheint ein zweiter
-  Knopf für den SAML-Login. Beide liegen in einem gemeinsamen Element, das
-  übergebene Attribute (class) erhält. Der Komponentenname bleibt, damit
-  Login- und Statusseite unverändert einbinden.
+  The button sits in a wrapper element that receives passed attributes (class).
+
+  After each lookup the component emits `available` (true when a button is
+  shown), so the login page can tell whether any sign-in method is offered.
 */
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -27,33 +27,36 @@ const props = defineProps({
   slug: { type: String, default: '' },
   // Bei 404 der Auskunft den Einstieg über den Slug anbieten (private Seiten).
   fallback: { type: Boolean, default: false },
+  // Internal path to come back to after the sign-in, sent as return_to (the backend checks it again).
+  returnTo: { type: String, default: '' },
 })
 // Stryker restore all
+// Stryker disable next-line all: Vue hoists defineEmits out of setup, instrumented code must not reference local variables there
+const emit = defineEmits(['available'])
 
 const { t } = useI18n()
 const { apiFetch } = useApi()
 // Stryker disable next-line StringLiteral: Startwert äquivalent, load() setzt ihn sofort zurück (watch immediate)
 const loginUrl = ref('')
-// Stryker disable next-line StringLiteral: Startwert äquivalent, load() setzt ihn sofort zurück (watch immediate)
-const samlLoginUrl = ref('')
 
 const load = async (slug) => {
   loginUrl.value = ''
-  samlLoginUrl.value = ''
-  if (!slug) return
+  if (slug) await lookup(slug)
+  emit('available', loginUrl.value !== '')
+}
+
+const lookup = async (slug) => {
   const base = import.meta.env.VITE_API_URL || ''
+  const returnParam = props.returnTo ? `&return_to=${encodeURIComponent(props.returnTo)}` : ''
   try {
     const info = await apiFetch(`/api/public/pages/${encodeURIComponent(slug)}/sso`)
     if (info.oidc_enabled) {
-      loginUrl.value = `${base}/api/auth/oidc/login?page=${info.page_id}`
-    }
-    if (info.saml_enabled) {
-      samlLoginUrl.value = `${base}/api/auth/saml/login?page=${info.page_id}`
+      loginUrl.value = `${base}/api/auth/oidc/login?page=${info.page_id}${returnParam}`
     }
   } catch (err) {
     // Private oder fehlende Seite: der Server löst den Einstieg über den Slug selbst auf.
     if (props.fallback && err?.status === 404) {
-      loginUrl.value = `${base}/api/auth/sso/login?slug=${encodeURIComponent(slug)}`
+      loginUrl.value = `${base}/api/auth/sso/login?slug=${encodeURIComponent(slug)}${returnParam}`
     }
     // Sonst kein Knopf: Die übrigen Anmeldewege bleiben nutzbar.
   }
@@ -63,14 +66,10 @@ watch(() => props.slug, load, { immediate: true })
 </script>
 
 <template>
-  <div v-if="loginUrl || samlLoginUrl" class="sso-login-buttons">
-    <a v-if="loginUrl" class="oidc-login-btn" :href="loginUrl">
+  <div v-if="loginUrl" class="sso-login-buttons">
+    <a class="oidc-login-btn" :href="loginUrl">
       <AppIcon name="shield" :size="18" />
       {{ t('auth.login.oidcButton') }}
-    </a>
-    <a v-if="samlLoginUrl" class="saml-login-btn" :href="samlLoginUrl">
-      <AppIcon name="shield" :size="18" />
-      {{ t('auth.login.samlButton') }}
     </a>
   </div>
 </template>
@@ -83,8 +82,7 @@ watch(() => props.slug, load, { immediate: true })
   width: 100%;
 }
 
-.oidc-login-btn,
-.saml-login-btn {
+.oidc-login-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -101,13 +99,11 @@ watch(() => props.slug, load, { immediate: true })
   text-decoration: none;
 }
 
-.oidc-login-btn:hover,
-.saml-login-btn:hover {
+.oidc-login-btn:hover {
   border-color: var(--primary);
 }
 
-.oidc-login-btn:focus-visible,
-.saml-login-btn:focus-visible {
+.oidc-login-btn:focus-visible {
   outline: 2px solid var(--focus, var(--primary));
   outline-offset: 2px;
 }
