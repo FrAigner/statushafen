@@ -35,9 +35,8 @@ See the quick start in the [README](README.md). Layout of the repository:
 (cd backend && go run ./cmd/workflowlint ../.github/workflows)  # when you change workflows
 ```
 
-Some tests rely on file permissions (`chmod 0444`) and fail when run as root; run the suite as a normal
-user. The PostgreSQL migration test starts a real PostgreSQL 16 through `embedded-postgres`; enable it
-with `MIGRATION_PG_TEST=1 go test ./database/ -run Postgres` (as a normal user, it downloads binaries).
+The PostgreSQL migration test starts a real PostgreSQL 16 through `embedded-postgres`; enable it with
+`MIGRATION_PG_TEST=1 go test ./database/ -run Postgres` (as a normal user, it downloads binaries).
 
 ## Coverage and mutation gate (Coverage- und Mutations-Gate)
 
