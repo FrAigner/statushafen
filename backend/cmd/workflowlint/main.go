@@ -1,5 +1,5 @@
-// Command workflowlint ist der Workflow-Gate: kein self-hosted Runner bei
-// pull_request, alle Actions per SHA gepinnt. Aufruf: workflowlint ../.github/workflows
+// Command workflowlint is the workflow gate: no self-hosted runner on
+// pull_request, all actions pinned by SHA. Usage: workflowlint ../.github/workflows
 package main
 
 import (
@@ -8,7 +8,7 @@ import (
 	"github.com/fraigner/statushafen/workflowlint"
 )
 
-// exit ist austauschbar, damit main() im Test durchlaufen kann.
+// exit is replaceable, so that main() can run through in the test.
 var exit = os.Exit
 
 func main() {

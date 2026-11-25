@@ -28,7 +28,7 @@ func TestSetupTestDB_MigratesAndSetsGlobalDB(t *testing.T) {
 		assert.True(t, db.Migrator().HasTable(m), "Tabelle fehlt für %T", m)
 	}
 
-	// Jeder Aufruf liefert eine eigene, leere Datenbank.
+	// Each call returns its own, empty database.
 	require.NoError(t, db.Create(&models.StatusPage{Name: "A", Slug: "a-setup"}).Error)
 	other := SetupTestDB()
 	var n int64

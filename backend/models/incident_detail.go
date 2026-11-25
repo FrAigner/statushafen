@@ -6,14 +6,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// Erweiterung des Incident-Modells um einen Verlauf (Timeline) und ein Post-Mortem.
-// Diese Modelle liegen bewusst getrennt, damit models.go unverändert bleibt.
+// Extension of the incident model by a history (timeline) and a post-mortem.
+// These models are deliberately kept separate, so that models.go stays unchanged.
 //
-// Migration: In database.InitDB() zur AutoMigrate-Liste hinzufügen:
+// Migration: add to the AutoMigrate list in database.InitDB():
 //   db.AutoMigrate(&models.IncidentUpdate{}, &models.PostMortem{}, &models.ActionItem{})
 
-// IncidentUpdate ist ein einzelner Eintrag in der Incident-Timeline.
-// Jeder Statuswechsel oder jede Kommunikation an Abonnenten erzeugt einen Update.
+// IncidentUpdate is a single entry in the incident timeline.
+// Every status change or communication to subscribers produces an update.
 type IncidentUpdate struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -23,13 +23,13 @@ type IncidentUpdate struct {
 	AuthorEmail string    `json:"author_email"`
 }
 
-// IncidentUpdateTranslation ist die Übersetzung der Nachricht eines
-// Updates in eine weitere Sprache der Seite. Ein Update hat keinen Titel, daher
-// nur Message. Stand wie bei den übrigen Übersetzungen: draft (nur Admin) oder
-// confirmed (öffentlich). Je (Update, Sprache) höchstens eine aktive Zeile
-// (partieller Unique-Index idx_incident_update_translation_active in
-// database.createJoinTableUniqueIndexes); mit dem Update verschwinden per FK
-// (OnDelete:CASCADE) auch die Übersetzungen.
+// IncidentUpdateTranslation is the translation of the message of an
+// update into a further language of the page. An update has no title, hence
+// only Message. Status as with the other translations: draft (admin only) or
+// confirmed (public). At most one active row per (update, language)
+// (partial unique index idx_incident_update_translation_active in
+// database.createJoinTableUniqueIndexes); with the update, the translations
+// also disappear via FK (OnDelete:CASCADE).
 type IncidentUpdateTranslation struct {
 	gorm.Model
 	UpdateID     uint           `gorm:"not null;index" json:"UpdateID"`
@@ -40,8 +40,8 @@ type IncidentUpdateTranslation struct {
 	Source       string         `gorm:"not null;default:'manual'" json:"Source"`
 }
 
-// PostMortem ist die strukturierte Nachbetrachtung eines behobenen Incidents.
-// 1:1-Beziehung zum Incident (ein Incident hat höchstens ein Post-Mortem).
+// PostMortem is the structured retrospective of a resolved incident.
+// 1:1 relationship to the incident (an incident has at most one post-mortem).
 type PostMortem struct {
 	ID          uint       `gorm:"primaryKey" json:"id"`
 	IncidentID  uint       `gorm:"not null;uniqueIndex" json:"incident_id"`
@@ -50,12 +50,12 @@ type PostMortem struct {
 	Impact      string     `gorm:"type:text" json:"impact"`
 	Resolution  string     `gorm:"type:text" json:"resolution"`
 	Detection   string     `gorm:"type:text" json:"detection"`
-	PublishedAt *time.Time `json:"published_at"` // nil = Entwurf, gesetzt = veröffentlicht
+	PublishedAt *time.Time `json:"published_at"` // nil = draft, set = published
 
 	Actions []ActionItem `gorm:"foreignKey:PostMortemID" json:"actions"`
 }
 
-// ActionItem ist eine Folgemaßnahme aus einem Post-Mortem.
+// ActionItem is a follow-up action from a post-mortem.
 type ActionItem struct {
 	ID           uint   `gorm:"primaryKey" json:"id"`
 	PostMortemID uint   `gorm:"not null;index" json:"post_mortem_id"`

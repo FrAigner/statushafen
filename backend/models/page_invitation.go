@@ -6,36 +6,36 @@ import (
 	"gorm.io/gorm"
 )
 
-// PageInvitation: ausstehende Einladung eines Kontos auf eine
-// Statusseite. Nicht-Global-Admins hängen ein Konto nicht mehr direkt an ihre
-// Seite, sondern legen eine Einladung an; erst der Kontoinhaber macht sie mit
-// dem Link aus der Mail (angemeldet mit genau dieser Adresse) zur Mitgliedschaft.
+// PageInvitation: pending invitation of an account to a
+// status page. Non-global admins no longer attach an account directly to their
+// page but create an invitation; only the account holder turns it into a membership
+// with the link from the mail (signed in with exactly this address).
 //
-//   - Email: die vom Seitenadmin eingegebene Adresse (klein geschrieben). Die
-//     Zeile entsteht auch für Adressen ohne Konto, damit Antwort und Liste nicht
-//     verraten, ob ein Konto existiert. Ohne Konto geht keine Mail raus.
-//   - TokenHash: nur der SHA-256 des Einmal-Tokens; der Klartext steht allein im
-//     Mail-Link. Annehmen löscht die Zeile endgültig. Zurückziehen und Ablehnen
-//     löschen sie weich (Grabstein) und halten die 30-Minuten-Sperre je (Seite,
+//   - Email: the address entered by the page admin (lowercase). The
+//     row is also created for addresses without an account, so that response and list do not
+//     reveal whether an account exists. Without an account no mail is sent.
+//   - TokenHash: only the SHA-256 of the one-time token; the plaintext is only in the
+//     mail link. Accepting deletes the row permanently. Withdrawing and declining
+//     soft-delete it (tombstone) and keep the 30-minute block per (page,
 //
-// Adresse) aufrecht (Review B1); der Wartungs-Tick räumt sie danach ab.
-//   - ExpiresAt: danach gilt die Einladung nicht mehr (pageInvitationTTL).
-//   - InvitedByID: wer eingeladen hat. Beim Annehmen muss diese Person die Rolle
-//     auf der Seite noch vergeben dürfen, sonst verfällt die Einladung.
-//   - InvitedUserID: das beim Einladen gefundene (anhängbare) Konto, sonst 0.
-//     Nur dieses Konto kann annehmen; ein später mit derselben Adresse neu
+// address) in place (review B1); the maintenance tick cleans it up afterwards.
+//   - ExpiresAt: after that the invitation no longer applies (pageInvitationTTL).
+//   - InvitedByID: who invited. On acceptance this person must still be allowed to assign the role
+//     on the page, otherwise the invitation lapses.
+//   - InvitedUserID: the (attachable) account found at invitation time, otherwise 0.
+//     Only this account can accept; an account created later with the same address
 //
-// angelegtes Konto nicht (Security-Review). Nie in API-Antworten.
+// does not (security review). Never in API responses.
 //
-// Bewusst ohne Fremdschlüssel: Seite, Rolle und Einladender werden beim
-// Annehmen frisch geprüft (soft-gelöschte Seiten/Rollen finden sich dann nicht).
+// Deliberately without foreign keys: page, role and inviter are freshly checked on
+// acceptance (soft-deleted pages/roles are then not found).
 type PageInvitation struct {
 	gorm.Model
 	StatusPageID  uint      `gorm:"not null;index"`
 	Email         string    `gorm:"not null;index"`
 	RoleID        uint      `gorm:"not null"`
 	TokenHash     string    `gorm:"size:64;not null;uniqueIndex"`
-	ExpiresAt     time.Time `gorm:"not null;index"` // H8: Aufräumen im Wartungs-Tick
+	ExpiresAt     time.Time `gorm:"not null;index"` // H8: cleanup in the maintenance tick
 	InvitedByID   uint      `gorm:"not null"`
 	InvitedUserID uint      `gorm:"not null;default:0;index"`
 }

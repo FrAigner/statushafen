@@ -7,17 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// AuditCategories sind alle Kategorien, die das Audit-Log schreibt.
-// Der Filter ?category= der Audit-Liste akzeptiert nur diese Werte; das
-// Frontend zeigt je Kategorie einen Chip. Neue Kategorie = hier eintragen,
-// Chip und Beschriftung (auditLog.cat*) im Frontend ergänzen -
-// TestAuditCategories_CoverEveryWrittenCategory und die Frontend-Prüfung
-// schlagen sonst fehl.
+// AuditCategories are all categories that the audit log writes.
+// The ?category= filter of the audit list accepts only these values; the
+// frontend shows a chip per category. New category = add it here,
+// add the chip and label (auditLog.cat*) in the frontend -
+// TestAuditCategories_CoverEveryWrittenCategory and the frontend check
+// fail otherwise.
 var AuditCategories = []string{
 	"auth", "incident", "config", "user", "subscriber", "notice", "maintenance", "system",
 }
 
-// IsAuditCategory meldet, ob c eine bekannte Audit-Kategorie ist.
+// IsAuditCategory reports whether c is a known audit category.
 func IsAuditCategory(c string) bool {
 	for _, known := range AuditCategories {
 		if known == c {
@@ -27,37 +27,37 @@ func IsAuditCategory(c string) bool {
 	return false
 }
 
-// AuditLog ist ein append-only Eintrag für revisionssichere Protokollierung
-// aller sicherheitsrelevanten Admin-Aktionen (Adressiert Review-Befund A4).
+// AuditLog is an append-only entry for tamper-proof logging
+// of all security-relevant admin actions (addresses review finding A4).
 //
-// Migration: In database.InitDB() zur AutoMigrate-Liste hinzufügen:
+// Migration: add to the AutoMigrate list in database.InitDB():
 //
 //	db.AutoMigrate(&models.AuditLog{})
 type AuditLog struct {
 	ID         uint   `gorm:"primaryKey" json:"id"`
-	CreatedAt  int64  `gorm:"autoCreateTime;index" json:"created_at"` // Unix-Sekunden, spart Zeitzonen-Ärger
-	ActorID    *uint  `gorm:"index" json:"actor_id"`                  // nil = System/Automation
+	CreatedAt  int64  `gorm:"autoCreateTime;index" json:"created_at"` // Unix seconds, avoids time-zone trouble
+	ActorID    *uint  `gorm:"index" json:"actor_id"`                  // nil = system/automation
 	ActorEmail string `gorm:"index" json:"actor_email"`
 	ActorRole  string `json:"actor_role"`
 
-	// Action ist eine kurze, maschinenlesbare Kennung, z.B. "incident.status_changed",
+	// Action is a short, machine-readable identifier, e.g. "incident.status_changed",
 	// "user.role_changed", "auth.login_failed", "postmortem.published".
 	Action     string `gorm:"not null;index" json:"action"`
-	Category   string `gorm:"not null;index" json:"category"` // siehe AuditCategories
+	Category   string `gorm:"not null;index" json:"category"` // see AuditCategories
 	TargetType string `json:"target_type"`                    // "Incident" | "User" | "Component" | ...
-	TargetID   string `json:"target_id"`                      // freies Feld (ID oder Slug/Code)
-	TargetName string `json:"target_name"`                    // menschenlesbar für die UI
+	TargetID   string `json:"target_id"`                      // free-form field (ID or slug/code)
+	TargetName string `json:"target_name"`                    // human-readable for the UI
 
-	// StatusPageID erlaubt späteres Scoping des Logs pro Mandant (optional).
+	// StatusPageID allows later scoping of the log per tenant (optional).
 	StatusPageID *uint  `gorm:"index" json:"status_page_id"`
 	IP           string `json:"ip"`
-	// Details: optionales JSON mit before/after o.ä. (revisionssicher).
+	// Details: optional JSON with before/after etc. (tamper-proof).
 	Details string `gorm:"type:text" json:"details,omitempty"`
 }
 
-// Obergrenzen (in Zeichen) für Audit-Felder. Mehrere stammen aus Nutzereingaben
-// (E-Mail eines fehlgeschlagenen Logins, Honeypot-Feld) und würden sonst
-// unbegrenzt in die Tabelle geschrieben.
+// Upper limits (in characters) for audit fields. Several come from user input
+// (email of a failed login, honeypot field) and would otherwise be written
+// into the table without limit.
 const (
 	auditMaxEmail   = 254
 	auditMaxText    = 255
@@ -66,10 +66,10 @@ const (
 	auditMaxDetails = 4000
 )
 
-// BeforeCreate kürzt die Textfelder zentral, egal welcher Pfad den Eintrag
-// anlegt (RecordAudit, RecordSystemAudit, Transaktionen). Der Schnitt erfolgt
-// nach Zeichen, nicht nach Bytes, und ungültige UTF-8-Folgen werden ersetzt
-// (Postgres lehnt sie in text-Spalten ab, der Eintrag ginge sonst verloren).
+// BeforeCreate truncates the text fields centrally, whichever path creates
+// the entry (RecordAudit, RecordSystemAudit, transactions). The cut is made
+// by characters, not by bytes, and invalid UTF-8 sequences are replaced
+// (Postgres rejects them in text columns, the entry would otherwise be lost).
 func (a *AuditLog) BeforeCreate(_ *gorm.DB) error {
 	a.ActorEmail = limitAuditText(a.ActorEmail, auditMaxEmail)
 	a.ActorRole = limitAuditText(a.ActorRole, auditMaxText)
@@ -85,7 +85,7 @@ func (a *AuditLog) BeforeCreate(_ *gorm.DB) error {
 
 func limitAuditText(s string, maxRunes int) string {
 	if len(s) <= maxRunes && utf8.ValidString(s) {
-		return s // schneller Pfad: kurz und gültig
+		return s // fast path: short and valid
 	}
 	s = strings.ToValidUTF8(s, "\uFFFD")
 	if utf8.RuneCountInString(s) <= maxRunes {

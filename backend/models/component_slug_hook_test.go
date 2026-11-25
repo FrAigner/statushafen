@@ -10,8 +10,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// BeforeCreate vergibt eine Kennung, wenn keine gesetzt ist, und
-// lässt eine gesetzte unangetastet.
+// BeforeCreate assigns an identifier if none is set, and
+// leaves a set one untouched.
 func TestComponentBeforeCreate_VergibtKennung(t *testing.T) {
 	db := testutils.SetupTestDB()
 	page := models.StatusPage{Name: "P", Slug: "p-577"}
@@ -27,7 +27,7 @@ func TestComponentBeforeCreate_VergibtKennung(t *testing.T) {
 	assert.Equal(t, "datenbank-koeln-2", b.Slug)
 	assert.Equal(t, "eigen", own.Slug)
 
-	// Gelöschte Zeilen blockieren die Kennung nicht (wie der partielle Index).
+	// Deleted rows do not block the identifier (like the partial index).
 	require.NoError(t, db.Delete(&a).Error)
 	c := models.Component{StatusPageID: page.ID, Name: "Datenbank Köln"}
 	require.NoError(t, db.Create(&c).Error)

@@ -15,26 +15,26 @@ func comp(id uint, parent *uint, visible bool) Component {
 	return c
 }
 
-// Wer eine Gruppe ausblendet oder archiviert, blendet alle Nachfahren mit aus;
-// sichtbare Geschwister bleiben sichtbar.
+// Whoever hides or archives a group also hides all descendants;
+// visible siblings stay visible.
 func TestHiddenComponentIDs(t *testing.T) {
 	now := time.Now()
 	archived := comp(20, nil, true)
 	archived.ArchivedAt = &now
 	all := []Component{
-		comp(1, nil, false),         // ausgeblendete Gruppe
-		comp(2, uintPtr(1), true),   // Kind
-		comp(3, uintPtr(2), true),   // Enkel
-		comp(4, nil, true),          // sichtbar
-		comp(5, uintPtr(4), true),   // sichtbar
-		archived,                    // archivierte Gruppe
-		comp(21, uintPtr(20), true), // Kind der archivierten
+		comp(1, nil, false),         // hidden group
+		comp(2, uintPtr(1), true),   // child
+		comp(3, uintPtr(2), true),   // grandchild
+		comp(4, nil, true),          // visible
+		comp(5, uintPtr(4), true),   // visible
+		archived,                    // archived group
+		comp(21, uintPtr(20), true), // child of the archived one
 	}
 	got := HiddenComponentIDs(all)
 	assert.Equal(t, map[uint]bool{1: true, 2: true, 3: true, 20: true, 21: true}, got)
 }
 
-// Zyklen in Altdaten dürfen die Auswertung nicht endlos laufen lassen.
+// Cycles in legacy data must not let the evaluation run endlessly.
 func TestHiddenComponentIDs_CycleTerminates(t *testing.T) {
 	all := []Component{
 		comp(1, uintPtr(2), false),
