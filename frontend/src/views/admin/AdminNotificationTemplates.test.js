@@ -374,6 +374,34 @@ describe('AdminNotificationTemplates', () => {
     expect(wrapper.vm.availableLanguageOptions).toEqual([{ label: 'fr', value: 'fr' }])
   })
 
+  // With the translation switch off the backend offers only the page default language (mostly
+  // "de"); the editor must not stay on "en", or it opens empty and saving answers 409.
+  it('selects the page default language when the current language is not offered', async () => {
+    const fetchImpl = vi.fn(async (url, options = {}) => {
+      if ((options.method || 'GET') === 'PUT') return jsonResponse({})
+      if (/\/notification-templates$/.test(url)) {
+        return jsonResponse([{ ...customTemplate, Language: 'de', Subject: 'Deutscher Betreff' }])
+      }
+      return jsonResponse([{ ID: 1, LanguageCode: 'de', IsDefault: true }])
+    })
+    const { wrapper } = await mountView({ fetchImpl })
+
+    expect(wrapper.vm.selectedLanguage).toBe('de')
+    expect(wrapper.vm.subject).toBe('Deutscher Betreff')
+    await wrapper.vm.save()
+    const put = fetchImpl.mock.calls.find(([, o]) => o?.method === 'PUT')
+    expect(put[0]).toMatch(/\/notification-templates\/incident_created\/staff\/de$/)
+  })
+
+  it('keeps the selected language when the page offers it', async () => {
+    const fetchImpl = vi.fn(async (url) => (/\/notification-templates$/.test(url)
+      ? jsonResponse([])
+      : jsonResponse([{ ID: 1, LanguageCode: 'de', IsDefault: true }, { ID: 2, LanguageCode: 'en', IsDefault: false }])))
+    const { wrapper } = await mountView({ fetchImpl })
+
+    expect(wrapper.vm.selectedLanguage).toBe('en')
+  })
+
   it('hat keine axe-Funde im Editor', async () => {
     const { wrapper } = await mountView()
     expect(await axe(wrapper)).toHaveNoViolations()

@@ -131,6 +131,16 @@ const availableLanguageOptions = computed(() => {
   return pageLanguages.value.map(l => ({ label: l.LanguageCode, value: l.LanguageCode }))
 })
 
+// With the translation switch off the page offers only its default language; keep the editor on
+// an offered language (the page default first), otherwise it would edit and save a language the
+// backend refuses. Not immediate: pageLanguages is shared state and may still hold the
+// languages of the previously opened page until loadPageLanguages has finished.
+watch(availableLanguageOptions, (options) => {
+  if (options.some(o => o.value === selectedLanguage.value)) return
+  const fallback = pageLanguages.value?.find(l => l.IsDefault)?.LanguageCode ?? options[0]?.value
+  if (fallback) selectedLanguage.value = fallback
+})
+
 const currentTemplate = computed(() =>
   templates.value.find(t => t.Kind === selectedKind.value && t.Audience === selectedAudience.value && t.Language === selectedLanguage.value)
 )

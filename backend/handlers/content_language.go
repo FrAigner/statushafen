@@ -72,8 +72,11 @@ func abortTranslationDisabled(c *gin.Context) {
 
 // RequireTranslationEnabled guards every route that writes translations or asks
 // for an automatic translation: with the switch off they answer 409
-// translation_disabled and nothing is stored. Registered after the permission and
-// tag guards, so callers without access still get 401/403 first.
+// translation_disabled and nothing is stored. Registered after the route's
+// permission and tag middlewares; where a handler checks page, tag or existence
+// itself (update translations, /translate, template translations), the 409 comes
+// first. That leaks nothing: the answer does not depend on the resource, and the
+// switch is public (GET /api/public/translation/enabled).
 func (h *Handler) RequireTranslationEnabled() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !h.translationEnabled() {
