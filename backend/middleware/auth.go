@@ -520,6 +520,11 @@ func requirePermissionCheck(c *gin.Context, requiredPerms ...string) (int, strin
 	if err := database.DB.Preload("Role").Where("user_id = ? AND status_page_id = ?", userID, pageID).First(&userRole).Error; err != nil {
 		return http.StatusForbidden, "Access denied: No role assigned for this Status Page", false
 	}
+	// A status-page-only role (no admin right) never passes an admin route,
+	// not even one that accepts any role on the page.
+	if !permissions.GrantsAdminArea(userRole.Role.Permissions) {
+		return http.StatusForbidden, "Access denied: Role grants no admin access for this Status Page", false
+	}
 	if len(requiredPerms) > 0 && requiredPerms[0] != "" && !roleHasAnyPermission(userRole.Role.Permissions, requiredPerms) {
 		return http.StatusForbidden, "Access denied: Missing required permission: " + strings.Join(requiredPerms, " or "), false
 	}
@@ -528,6 +533,8 @@ func requirePermissionCheck(c *gin.Context, requiredPerms ...string) (int, strin
 
 // RequirePageRole verlangt eine beliebige Rolle auf der Statusseite aus
 // :page_id (oder Global Admin), ohne bestimmte Permission.
+// The role must grant admin access (permissions.GrantsAdminArea): a
+// status-page-only role reads no admin configuration.
 // Für Lesezugriffe auf seiten-interne Konfiguration, die jeder
 // Admin-Bereich der Seite braucht (Sprachen, UI-Overrides) - vorher waren sie
 // für jeden eingeloggten Nutzer auf jeder Seite lesbar.

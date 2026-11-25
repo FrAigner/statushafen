@@ -21,6 +21,7 @@ function makeRouter() {
       { path: '/', component: Empty },
       { path: '/login', component: Empty },
       { path: '/admin/components', component: Empty },
+      { path: '/admin/profile', component: Empty },
       { path: '/docs', component: Empty },
     ],
   })
@@ -196,15 +197,39 @@ describe('PublicLayout', () => {
     expect(withoutPerm.text()).not.toContain('Dashboard')
 
     useAuth().logout()
-    setAuthAsPageRole('jwt-2', { email: 'b@x.de', permissions: 'admin_dashboard' })
+    setAuthAsPageRole('jwt-2', { email: 'b@x.de', permissions: 'admin_dashboard,components:read' })
     const { wrapper: withPerm } = await mountLayout()
     expect(withPerm.text()).toContain('Dashboard')
+  })
+
+  // Status page only: admin_dashboard without any admin right has no effect,
+  // the admin area would send the member straight back to the status page.
+  it('blendet den Dashboard-Menüpunkt mit admin_dashboard, aber ohne Admin-Recht aus', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard' })
+    const { wrapper } = await mountLayout()
+    expect(wrapper.text()).not.toContain('Dashboard')
+  })
+
+  // Members without admin area still manage their account (language, SSO
+  // links, export, deletion) on the profile page.
+  it('bietet angemeldeten Nutzern das Profil im Benutzermenü', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: '' })
+    const { wrapper, router } = await mountLayout()
+    const item = wrapper.findAll('.user-menu-item').find(el => el.text().includes('Profil'))
+    expect(item).toBeTruthy()
+    await item.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/admin/profile')
   })
 
   it('wertet admin_dashboard der globalen Rolle nicht aus, nur das Recht auf der aktiven Seite', async () => {
     useTenant().setMyPages([])
     useTenant().setActiveTenant(null)
-    useAuth().setAuth('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard' })
+    useAuth().setAuth('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
     const { wrapper } = await mountLayout()
     expect(wrapper.text()).not.toContain('Dashboard')
   })
@@ -230,7 +255,7 @@ describe('PublicLayout', () => {
       const fetchMock = mockPages([
         { ID: 4, Permissions: 'components:read' },
         { ID: 7, Permissions: 'admin_dashboard,components:read' },
-        { ID: 9, Permissions: 'admin_dashboard' },
+        { ID: 9, Permissions: 'admin_dashboard,components:read' },
       ])
       useAuth().setAuth('jwt-1', { email: 'a@x.de', role: 'Viewer' })
       const { wrapper, router } = await mountLayout()
@@ -246,8 +271,8 @@ describe('PublicLayout', () => {
 
     it('behält einen aktiven Tenant, der admin_dashboard gewährt', async () => {
       mockPages([
-        { ID: 7, Permissions: 'admin_dashboard' },
-        { ID: 9, Permissions: 'admin_dashboard' },
+        { ID: 7, Permissions: 'admin_dashboard,components:read' },
+        { ID: 9, Permissions: 'admin_dashboard,components:read' },
       ])
       useTenant().setActiveTenant(9)
       useAuth().setAuth('jwt-1', { email: 'a@x.de' })
@@ -281,7 +306,7 @@ describe('PublicLayout', () => {
     })
 
     it('lädt beim Nutzerwechsel neu und zeigt nicht den Link anhand der Seiten des Vorgängers', async () => {
-      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard' }])
+      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard,components:read' }])
       useAuth().setAuth('jwt-a', { email: 'a@x.de' })
       const { wrapper } = await mountLayout()
       expect(dashboardItem(wrapper)).toBeTruthy()
@@ -306,7 +331,7 @@ describe('PublicLayout', () => {
       expect(dashboardItem(wrapper)).toBeUndefined()
 
       useAuth().logout()
-      fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => [{ ID: 9, Permissions: 'admin_dashboard' }] }))
+      fetchMock.mockImplementation(async () => ({ ok: true, status: 200, json: async () => [{ ID: 9, Permissions: 'admin_dashboard,components:read' }] }))
       useAuth().setAuth('jwt-b', { email: 'b@x.de' })
       await flushPromises()
       expect(dashboardItem(wrapper)).toBeTruthy()
@@ -319,7 +344,7 @@ describe('PublicLayout', () => {
       await mountLayout()
 
       useAuth().logout()
-      resolve({ ok: true, status: 200, json: async () => [{ ID: 7, Permissions: 'admin_dashboard' }] })
+      resolve({ ok: true, status: 200, json: async () => [{ ID: 7, Permissions: 'admin_dashboard,components:read' }] })
       await flushPromises()
       expect(useTenant().myPages.value).toEqual([])
     })
@@ -327,7 +352,7 @@ describe('PublicLayout', () => {
     it('off a status page: active tenant X without the right, right on page Y: link shown, click switches to Y', async () => {
       mockPages([
         { ID: 1, Permissions: 'components:read' },
-        { ID: 2, Permissions: 'admin_dashboard' },
+        { ID: 2, Permissions: 'admin_dashboard,components:read' },
       ])
       useTenant().setActiveTenant(1)
       useAuth().setAuth('jwt-1', { email: 'a@x.de' })
@@ -340,7 +365,7 @@ describe('PublicLayout', () => {
     })
 
     it('lädt und zeigt nichts, solange niemand angemeldet ist', async () => {
-      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard' }])
+      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard,components:read' }])
       const { wrapper } = await mountLayout()
       expect(fetchMock).not.toHaveBeenCalled()
       expect(wrapper.text()).not.toContain('Dashboard')
@@ -391,7 +416,7 @@ describe('PublicLayout', () => {
     })
 
     it('shows the link on the page that grants admin_dashboard and opens that page', async () => {
-      mockPages([{ ID: 1, Slug: 'system', Permissions: 'admin_dashboard' }, acme])
+      mockPages([{ ID: 1, Slug: 'system', Permissions: 'admin_dashboard,components:read' }, acme])
       useTenant().setActiveTenant(1)
       viewPage('acme')
       useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
@@ -440,7 +465,7 @@ describe('PublicLayout', () => {
   })
 
   it('navigiert beim Klick auf Dashboard zu /admin', async () => {
-    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard' })
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
     const { wrapper, router } = await mountLayout()
 
     const items = wrapper.findAll('.user-menu-item')
@@ -764,7 +789,7 @@ describe('PublicLayout', () => {
     expect(await axe(anonymous)).toHaveNoViolations()
     anonymous.unmount()
 
-    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard' })
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
     const { wrapper } = await mountLayout()
     expect(wrapper.find('.user-menu-item').exists()).toBe(true)
     expect(await axe(wrapper)).toHaveNoViolations()

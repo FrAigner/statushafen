@@ -201,6 +201,21 @@ func CanChange(list string) bool {
 	return false
 }
 
+// GrantsAdminArea: does the list grant any right on a known resource (any
+// action, including the legacy write)? Without one a role is "status page
+// only": its members may view and subscribe to the (private) page, but get no
+// admin area and no admin API. admin_dashboard alone does not count, it only
+// shows the Dashboard link.
+func GrantsAdminArea(list string) bool {
+	for _, p := range entries(list) {
+		res, act, ok := split(p)
+		if ok && IsResource(res) && (slices.Contains(Actions, act) || act == legacyWrite) {
+			return true
+		}
+	}
+	return false
+}
+
 // dedupe entfernt doppelte Einträge und behält die erste Position.
 func dedupe(in []string) []string {
 	seen := map[string]bool{}

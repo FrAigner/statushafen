@@ -41,8 +41,12 @@ describe('PermissionSummary', () => {
     expect(chips(w)).toEqual(['Ankündigungen: CRUD', 'Admin-Dashboard'])
   })
 
-  it('zeigt „Keine Rechte“ ohne Einträge und auf Englisch englisch', () => {
-    expect(mountSummary({ permissions: '' }).text()).toBe('Keine Rechte')
+  it('zeigt „Nur Statusseite“ ohne Admin-Recht (auch mit nur admin_dashboard) und auf Englisch englisch', () => {
+    expect(mountSummary({ permissions: '' }).text()).toBe('Nur Statusseite')
+    expect(mountSummary({ permissions: 'admin_dashboard' }).text()).toBe('Nur Statusseite')
+    i18n.global.locale.value = 'en'
+    expect(mountSummary({ permissions: '' }).text()).toBe('Status page only')
+    i18n.global.locale.value = 'de'
     i18n.global.locale.value = 'en'
     const w = mountSummary({ permissions: 'components:update' })
     expect(w.find('.perm-summary').attributes('title')).toBe('Components: Read, Update')

@@ -59,6 +59,17 @@ export function grants(list, required) {
     || (action === 'read' && ['create', 'update', 'delete'].some(a => p === perm(resource, a))))
 }
 
+// Mirror of backend permissions.GrantsAdminArea: any action (or the legacy
+// write) on a known resource opens the admin area. Without one the role is
+// "status page only": view and subscribe to the (private) page, no admin area.
+// admin_dashboard alone does not count.
+export function grantsAdminArea(list) {
+  return entries(list).some((p) => {
+    const [resource, action] = p.split(':')
+    return RESOURCES.some(r => r.key === resource) && (ACTIONS.includes(action) || action === LEGACY_WRITE)
+  })
+}
+
 // Stellt zu create/update/delete das Recht read sicher (wie Backend `Normalize`
 // für die Matrix); `:write` wird zu den vier Aktionen.
 export function normalizePermissions(list) {

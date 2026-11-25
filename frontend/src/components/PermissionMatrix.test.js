@@ -159,6 +159,42 @@ describe('PermissionMatrix', () => {
     expect(wrapper.find('.perm-access .perm-label').text()).toBe('beta_feature')
   })
 
+  // Status page only: a role without any admin right lets its members view and
+  // subscribe to the (private) status page, but not enter the admin area.
+  describe('Nur Statusseite', () => {
+    const mode = () => wrapper.find('[data-access-mode]')
+
+    it('nennt ohne Admin-Recht ausdrücklich „Nur Statusseite“, auch mit nur admin_dashboard', () => {
+      mountMatrix([])
+      expect(mode().attributes('data-access-mode')).toBe('page-only')
+      expect(mode().text()).toContain('Nur Statusseite')
+      expect(mode().text()).toContain('kein Zugang zum Admin-Bereich')
+      expect(wrapper.find('[data-page-only-reset]').exists()).toBe(false)
+      wrapper.unmount()
+      mountMatrix(['admin_dashboard'])
+      expect(mode().attributes('data-access-mode')).toBe('page-only')
+    })
+
+    it('nennt mit einem Recht den Admin-Bereich und setzt per Knopf auf „Nur Statusseite“ zurück', async () => {
+      const { model } = mountMatrix(['components:read', 'incidents:create', 'incidents:read', 'admin_dashboard', 'foreign:x'])
+      expect(mode().attributes('data-access-mode')).toBe('admin')
+      const reset = wrapper.find('button[data-page-only-reset]')
+      expect(reset.attributes('type')).toBe('button')
+      expect(reset.text()).toBe('Auf „Nur Statusseite“ setzen')
+      await reset.trigger('click')
+      // Entries the matrix does not own stay untouched.
+      expect(model.value).toEqual(['foreign:x'])
+      await wrapper.vm.$nextTick()
+      expect(mode().attributes('data-access-mode')).toBe('page-only')
+    })
+
+    it('sagt es auf Englisch englisch', () => {
+      i18n.global.locale.value = 'en'
+      mountMatrix([])
+      expect(mode().text()).toContain('Status page only')
+    })
+  })
+
   it('blendet den Abschnitt „Zugriff“ ohne Sonderrechte aus', () => {
     mountMatrix([], [])
     expect(wrapper.find('.perm-access').exists()).toBe(false)

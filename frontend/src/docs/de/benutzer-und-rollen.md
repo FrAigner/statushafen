@@ -71,7 +71,18 @@ zugeordnet (siehe Spalte „Routen“).
 | System | Systemeinstellungen | `system_settings` | global | `system_settings:create`, `system_settings:read`, `system_settings:update`, `system_settings:delete` | /settings |
 
 Zusätzlich gibt es `admin_dashboard`: Menüpunkt „Dashboard“ im Benutzermenü der öffentlichen Seite.
-Er zählt nur auf der Seite, für die die Rolle vergeben ist.
+Er zählt nur auf der Seite, für die die Rolle vergeben ist, und nur zusammen mit mindestens einem
+Recht aus der Matrix.
+
+**Nur Statusseite:** Eine Rolle ohne jedes Recht aus der Matrix (leer oder nur `admin_dashboard`)
+gibt keinen Zugang zum Admin-Bereich. Mitglieder mit dieser Rolle sehen die Statusseite, auch im
+Privat-Modus, und können sie abonnieren. Rufen sie eine Adresse unter `/admin` auf, landen sie auf
+ihrer Statusseite; nur ihr Profil (Menüpunkt „Profil“ im Benutzermenü der öffentlichen Seite)
+bleibt erreichbar. Auch die API des Admin-Bereichs lehnt solche Konten ab (403). Der Rollen-Editor
+zeigt über der Matrix, ob eine Rolle „Nur Statusseite“ ist; der Knopf „Auf „Nur Statusseite“
+setzen“ entfernt alle Rechte. In der Rollenliste steht für solche Rollen „Nur Statusseite“. Hat ein
+Konto auf mehreren Seiten Rollen, bietet die Seitenwahl im Admin-Bereich nur die Seiten mit
+mindestens einem Recht.
 
 **Anlegen, Ändern und Löschen schließen Lesen ein:** Wer `components:update` hat, darf auch lesen,
 ohne dass `components:read` eingetragen sein muss. Ändern schließt Anlegen oder Löschen nicht ein.

@@ -68,7 +68,17 @@ delete. Special actions are assigned to one action (see the "Routes" column).
 | System | System Settings | `system_settings` | global | `system_settings:create`, `system_settings:read`, `system_settings:update`, `system_settings:delete` | /settings |
 
 There is also `admin_dashboard`: the "Dashboard" entry in the user menu of the public page.
-It only counts on the page the role is assigned for.
+It only counts on the page the role is assigned for, and only together with at least one right
+from the matrix.
+
+**Status page only:** a role without any right from the matrix (empty or only `admin_dashboard`)
+gives no access to the admin area. Members with this role see the status page, also in private
+mode, and can subscribe to it. If they open an address under `/admin`, they land on their status
+page; only their profile ("Profile" in the user menu of the public page) stays reachable. The
+admin area's API also rejects such accounts (403). The role editor shows above the matrix whether
+a role is "Status page only"; the button "Set to "Status page only"" removes all rights. The role
+list shows "Status page only" for such roles. If an account has roles on several pages, the page
+selector in the admin area only offers the pages with at least one right.
 
 **Create, update and delete include read:** whoever has `components:update` may also read, without
 `components:read` being listed. Update does not include create or delete. This applies to every

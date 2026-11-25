@@ -70,6 +70,11 @@ get access. The default role must not contain permissions to create, update or d
 subscribers; Statushafen checks this when saving and again when someone joins. Someone an admin
 has removed from the page does not rejoin automatically.
 
+If users should only see and subscribe to the private page but not enter the admin area, give them
+a role without rights in the matrix ("Status page only", see
+[Users, roles and permissions](/docs/benutzer-und-rollen#permissions)). This also works as the default
+role.
+
 Without permission (not signed in, no role, not entitled to join) a private page looks no different
 from a page that does not exist: all requests answer with 404, and the interface shows "Status page
 unavailable" with a link to the login. Joining happens as before on the first request after signing in.

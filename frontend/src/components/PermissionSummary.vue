@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RESOURCES, ACTIONS } from '../utils/permissions'
+import { RESOURCES, ACTIONS, grantsAdminArea } from '../utils/permissions'
 import { NAV_GROUPS } from '../utils/adminNav'
 import { summarizePermissions } from '../utils/permissionMatrix'
 
@@ -28,6 +28,9 @@ const label = (resource) => t(`adminNav.items.${labelKeys[resource]}`)
 const specialLabel = (key) => (te(`roles.matrix.labels.${key}`) ? t(`roles.matrix.labels.${key}`) : key)
 
 const summary = computed(() => summarizePermissions(props.permissions, resourceKeys))
+// Without an admin right the role is "status page only"; admin_dashboard has
+// no effect then and is not listed.
+const pageOnly = computed(() => !grantsAdminArea(props.permissions))
 
 const everything = computed(() => summary.value.rows.length === RESOURCES.length
   && summary.value.rows.every(r => r.actions.length === ACTIONS.length))
@@ -50,7 +53,8 @@ const detail = computed(() => {
 </script>
 
 <template>
-  <span v-if="chips.length" class="perm-summary" :title="detail">
+  <span v-if="pageOnly" class="perm-summary perm-summary--none">{{ t('roles.summary.pageOnly') }}</span>
+  <span v-else-if="chips.length" class="perm-summary" :title="detail">
     <span class="sr-only">{{ detail }}</span>
     <span class="perm-summary__chips" aria-hidden="true">
       <span v-if="everything" class="tag-pill perm-summary__chip">{{ t('roles.summary.all') }}</span>
