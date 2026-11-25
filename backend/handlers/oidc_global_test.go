@@ -264,6 +264,20 @@ func TestProviderCallback_StorageErrors(t *testing.T) {
 		assertOIDCError(t, f.login(t), "/login", "internal")
 		assert.Zero(t, f.users(t), "the account is rolled back with its identity")
 	})
+	t.Run("new account itself cannot be stored", func(t *testing.T) {
+		f := newGlobalOIDCFixture(t)
+		const hook = "test:fail:create:users"
+		require.NoError(t, f.db.Callback().Create().Before("gorm:create").Register(hook, func(db *gorm.DB) {
+			if db.Statement.Table == "users" {
+				_ = db.AddError(gorm.ErrInvalidData)
+			}
+		}))
+		t.Cleanup(func() { _ = f.db.Callback().Create().Remove(hook) })
+		assertOIDCError(t, f.login(t), "/login", "internal")
+		var n int64
+		f.db.Model(&models.UserSSOIdentity{}).Count(&n)
+		assert.Zero(t, n)
+	})
 	t.Run("account lookup fails", func(t *testing.T) {
 		f := newGlobalOIDCFixture(t)
 		state, ck := f.startLogin(t, "corp")
