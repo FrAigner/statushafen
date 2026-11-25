@@ -506,6 +506,31 @@ describe('PublicLayout', () => {
     expect(router.currentRoute.value.path).toBe('/docs')
   })
 
+  // The admin area is only a login target when chosen explicitly: a quiet footer link.
+  it.each([
+    ['de', 'Verwaltung'],
+    ['en', 'Administration'],
+  ])('offers an admin link in the footer that logs in towards /admin (%s)', async (locale, label) => {
+    i18n.global.locale.value = locale
+    const { wrapper, router } = await mountLayout()
+
+    const link = wrapper.find('footer .footer-link--admin')
+    expect(link.text()).toBe(label)
+    expect(link.element.closest('header')).toBeNull()
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/admin' })
+  })
+
+  it('shows the admin link for signed-in users too (the guard skips the login page)', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('footer .footer-link--admin').exists()).toBe(true)
+  })
+
   it('zeigt im Footer das Copyright mit dem aktuellen Jahr und übersetzt den Link', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2031-05-01T12:00:00Z'))

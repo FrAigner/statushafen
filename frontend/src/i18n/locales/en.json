@@ -1751,6 +1751,7 @@
     "footer": {
       "navLabel": "Footer",
       "docs": "Documentation",
+      "admin": "Administration",
       "copyright": "© {year} Statushafen"
     }
   },

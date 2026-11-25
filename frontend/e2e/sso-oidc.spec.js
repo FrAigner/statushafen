@@ -139,7 +139,7 @@ test.describe('SSO: OIDC-Login gegen Mock-IdP', () => {
     await page.evaluate(() => localStorage.clear());
     await page.goto(`/status/sso-e2e-${run}`);
     await page.locator('.app-header').getByRole('button', { name: 'Anmelden' }).click();
-    await expect(page).toHaveURL(new RegExp(`/login\\?returnTo=%2Fstatus%2Fsso-e2e-${run}&page=sso-e2e-${run}$`));
+    await expect(page).toHaveURL(new RegExp(`/login\\?returnTo=/status/sso-e2e-${run}&page=sso-e2e-${run}$`));
     await page.locator('a.oidc-login-btn').click();
     await signInAtMock(page, subject, claims);
     const token = await sessionToken(page);

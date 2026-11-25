@@ -203,6 +203,12 @@ const goToDashboard = () => {
       <nav class="footer-nav" :aria-label="t('layout.footer.navLabel')">
         <ul class="footer-links">
           <li><router-link to="/docs" class="footer-link">{{ t('layout.footer.docs') }}</router-link></li>
+          <!-- Explicit way into the admin area; the normal login returns to the current page. -->
+          <li>
+            <router-link :to="{ path: '/login', query: { returnTo: '/admin' } }" class="footer-link footer-link--admin">
+              {{ t('layout.footer.admin') }}
+            </router-link>
+          </li>
         </ul>
       </nav>
       <p class="footer-copyright">{{ t('layout.footer.copyright', { year: currentYear }) }}</p>

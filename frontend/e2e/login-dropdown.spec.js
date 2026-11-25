@@ -18,7 +18,7 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
 
     await loginButton.click();
     // The header button returns to the status page after sign-in.
-    await expect(page).toHaveURL(/\/login\?returnTo=%2F&page=acme$/);
+    await expect(page).toHaveURL(/\/login\?returnTo=\/&page=acme$/);
   });
 
   test('zeigt nach dem Login ein User-Icon statt des Login-Buttons', async ({ page }) => {

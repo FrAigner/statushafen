@@ -30,10 +30,22 @@ test.describe('Authentication & Login', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
+  // The quiet footer link is the explicit way into the admin area.
+  test('the footer admin link logs in towards the admin area', async ({ page }) => {
+    await page.goto('/');
+    await page.locator('footer').getByRole('link', { name: 'Verwaltung' }).click();
+    await expect(page).toHaveURL(/\/login\?returnTo=\/admin$/);
+    await page.fill('input[type="email"]', 'admin@statushafen.local');
+    await page.fill('input[type="password"]', 'admin123');
+    await page.click('button.btn-login');
+
+    await expect(page).toHaveURL(/\/admin\/overview/);
+  });
+
   // A direct visit of a protected route counts as explicit: back there after login.
   test('returns to a protected route visited directly', async ({ page }) => {
     await page.goto('/admin/incidents');
-    await expect(page).toHaveURL(/\/login\?returnTo=%2Fadmin%2Fincidents$/);
+    await expect(page).toHaveURL(/\/login\?returnTo=\/admin\/incidents$/);
     await page.fill('input[type="email"]', 'admin@statushafen.local');
     await page.fill('input[type="password"]', 'admin123');
     await page.click('button.btn-login');
