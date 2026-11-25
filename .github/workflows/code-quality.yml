@@ -6,15 +6,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 # Das GITHUB_TOKEN darf nur lesen (backend/workflowlint erzwingt ausdrückliche permissions).
 permissions:
   contents: read
 
+# A new push to a pull request cancels the run of the superseded state (same pattern as ci.yml).
+concurrency:
+  group: code-quality-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   vulnscan:
     name: Schwachstellen-Scan
     # Die Werkzeuge hier brauchen weder Docker noch ein Token.
+    # Draft pull requests run no CI (Actions minutes are limited); marking the PR ready starts it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +53,8 @@ jobs:
 
   secretscan:
     name: Geheimnis-Scan (gitleaks)
+    # Draft pull requests run no CI (Actions minutes are limited); marking the PR ready starts it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

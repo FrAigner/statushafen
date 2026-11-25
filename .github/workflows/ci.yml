@@ -9,6 +9,7 @@ on:
     branches:
       - main
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 # Ein neuer Stand eines Pull Requests bricht den noch laufenden oder wartenden Lauf des alten Stands ab: Der alte
@@ -25,6 +26,8 @@ concurrency:
 
 jobs:
   build:
+    # Draft pull requests run no CI (Actions minutes are limited); marking the PR ready starts it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -150,6 +153,8 @@ jobs:
   # build-Job und ohne Coverage-Profil (das braucht der Gate nur einmal). -race verlangt cgo und damit
   # einen C-Compiler; der SQLite-Treiber der Tests (glebarez/sqlite, modernc) ist reines Go.
   race:
+    # Draft pull requests run no CI (Actions minutes are limited); marking the PR ready starts it.
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
