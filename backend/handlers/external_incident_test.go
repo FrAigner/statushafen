@@ -494,11 +494,6 @@ func TestPublicDashboard_ExternalIncidents(t *testing.T) {
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("open1", "investigating", "a"), extInc("done1", "resolved", "b"))
 	s.poll()
 	// done1 war beim ersten Auftauchen schon beendet und ist trotzdem sichtbar.
-	// The fixtures use a fixed date (extInc), which drifts out of the 14-day window over time.
-	// Pin done1's end to "just now" so the test checks the window, not the calendar.
-	recent := time.Now()
-	require.NoError(t, s.db.Model(&models.ExternalIncident{}).Where("external_id = ?", "done1").
-		Updates(map[string]any{"resolved_at": recent, "external_updated_at": recent}).Error)
 
 	dash := func() []any {
 		w := s.do(http.MethodGet, "/api/public/pages/eigene/dashboard", "", nil)
