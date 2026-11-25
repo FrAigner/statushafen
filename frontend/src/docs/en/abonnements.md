@@ -88,3 +88,16 @@ monitoring, see [API and webhooks](/docs/api-und-webhooks).
 **notification language** per subscriber there (empty: the page's default language).
 The creator's email address only appears if the creating account is itself staff of this page (or you created it yourself); if a foreign account subscribed to the page, the list only shows "linked to an account" and no further account data.
 Creating, changing and deleting require `subscribers:create`, `subscribers:update` and `subscribers:delete`.
+
+### Test message from the form
+
+In the **Add subscriber** form, and when editing, **Send test message** immediately sends a short
+message to the entered target – the email address or the Google Chat webhook – even before you
+save. Nothing is saved and no subscription is created. The message uses the language currently
+selected at the top of the admin area (German or English), not the subscriber's notification
+language. The button stays disabled until a valid email address or an https URL is entered; the
+server checks the target exactly like when creating a subscriber (no internal addresses). The
+result appears right below the button. Possible errors: the webhook target rejects the message or
+is unreachable, the email could not be sent, or sending emails is turned off in the system
+settings. It requires `subscribers:create` or `subscribers:update`; at most 5 test messages per
+minute are possible per sender.

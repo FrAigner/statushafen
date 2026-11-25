@@ -23,6 +23,7 @@ import EmptyState from '../../components/EmptyState.vue'
 import { idsFromCsv, csvFromIds, componentLabelsFromCsv } from '../../utils/subscribedComponents'
 import { fromAdminPageLanguages, hasLanguageChoice, subscriberLanguageOptions, selectableSubscriberLanguage } from '../../utils/subscriberLanguage'
 import { confirmDialog } from '../../composables/useConfirm'
+import { canSendTestMessage, testMessagePayload } from '../../utils/testMessageTarget'
 
 const { apiFetch } = useApi()
 // Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
@@ -46,6 +47,9 @@ const alertType     = ref('warning')
 const isSaving      = ref(false)
 const deletingId    = ref(null)
 const testingUrl    = ref(null)
+// Test message from the open form: result is shown inline at the form.
+const sendingTestMessage = ref(false)
+const testMessageResult  = ref(null) // { type: 'success' | 'error', text }
 const query         = ref('')
 const editName      = ref('')
 const fieldError    = ref('')
@@ -190,6 +194,32 @@ const testWebhook = async (url) => {
   }
 }
 
+const testMessageReady = computed(() => canSendTestMessage(formData.value))
+
+// A new target makes the last result meaningless.
+watch(() => [formData.value.Channel, formData.value.Email, formData.value.WebhookURL], () => {
+  testMessageResult.value = null
+})
+
+// Sends to the unsaved target in the admin UI language (locale), not in the
+// subscriber's mail language.
+const sendTestMessage = async () => {
+  if (!testMessageReady.value) return
+  sendingTestMessage.value = true
+  testMessageResult.value = null
+  try {
+    await apiFetch(`/api/pages/${activeTenantId.value}/subscribers/test`, {
+      method: 'POST',
+      body: JSON.stringify(testMessagePayload(formData.value, locale.value)),
+    })
+    testMessageResult.value = { type: 'success', text: t('subscribers.testMessageSent') }
+  } catch (err) {
+    testMessageResult.value = { type: 'error', text: t('subscribers.testMessageFailed') + err.message }
+  } finally {
+    sendingTestMessage.value = false
+  }
+}
+
 const formTitle = computed(() => currentEditId.value
   ? t('subscribers.editTitle', { name: editName.value })
   : t('subscribers.createTitle'))
@@ -313,6 +343,26 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
           <FormField v-else v-slot="f" :label="t('subscribers.fieldWebhookUrl')" required :error="fieldError || null">
             <input :id="f.id" v-model="formData.WebhookURL" type="url" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('subscribers.webhookPlaceholder')" @input="fieldError = ''">
           </FormField>
+
+          <div class="form-group test-message">
+            <button
+              type="button"
+              class="action-btn"
+              data-test="send-test-message"
+              aria-describedby="subscriber-test-message-hint"
+              :disabled="!testMessageReady || sendingTestMessage"
+              @click="sendTestMessage"
+            >
+              {{ sendingTestMessage ? t('subscribers.testMessageSending') : t('subscribers.testMessageButton') }}
+            </button>
+            <p id="subscriber-test-message-hint" class="form-field__message">{{ t('subscribers.testMessageHint') }}</p>
+            <p
+              v-if="testMessageResult"
+              data-test="test-message-result"
+              role="status"
+              :class="`alert alert-${testMessageResult.type}`"
+            >{{ testMessageResult.text }}</p>
+          </div>
 
           <FormField v-if="showLanguageChoice" v-slot="f" :label="t('subscribers.fieldLanguage')" :hint="t('subscribers.fieldLanguageHint')">
             <select :id="f.id" v-model="formData.Language" :aria-describedby="f.describedby">

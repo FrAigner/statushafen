@@ -96,6 +96,11 @@ func (h *H) OhneKontext() { h.deliverMail(cfg, "a", nil, t) }
 	assert.Equal(t, []string{"Direkt: sendOrderConfirmationEmail"}, blockingMailCalls(file))
 }
 
+// blockingMailExceptions: handlers whose response is the result of the send.
+var blockingMailExceptions = map[string]string{
+	"subscriber_test_message.go sendSubscriberTestMail: deliverMail": "test message: the admin waits for the result; authenticated, 5/min, admin-entered address",
+}
+
 func TestHandlers_SendNoMailInsideRequest(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	require.NoError(t, err)
@@ -107,7 +112,9 @@ func TestHandlers_SendNoMailInsideRequest(t *testing.T) {
 		file, err := parser.ParseFile(token.NewFileSet(), name, nil, 0)
 		require.NoError(t, err, name)
 		for _, o := range blockingMailCalls(file) {
-			offenders = append(offenders, name+" "+o)
+			if _, ok := blockingMailExceptions[name+" "+o]; !ok {
+				offenders = append(offenders, name+" "+o)
+			}
 		}
 	}
 	sort.Strings(offenders)

@@ -9,7 +9,7 @@ import (
 
 // expectedRequiredPermission ist der Wert von x-required-permission in der
 // OpenAPI-Spec für eine Route: "global-admin", "page-role", "<res>:<aktion>",
-// "a|b" (mindestens eines), "a&b" (alle) oder bei Wartung/Vorfall
+// "a|b" (mindestens eines, auch mehrere Aktionen einer Ressource), "a&b" (alle) oder bei Wartung/Vorfall
 // "incidents:<aktion>|maintenance:<aktion>" (die Art des Datensatzes entscheidet).
 func expectedRequiredPermission(info routeInfo) string {
 	perms := make([]string, len(info.Resources))
@@ -25,6 +25,12 @@ func expectedRequiredPermission(info routeInfo) string {
 		return strings.Join(perms, "&")
 	case modeAny, modeKind:
 		return strings.Join(perms, "|")
+	case modeAnyAction:
+		var alt []string
+		for _, a := range info.Actions {
+			alt = append(alt, permissions.Perm(info.Resources[0], a))
+		}
+		return strings.Join(alt, "|")
 	}
 	return perms[0]
 }
