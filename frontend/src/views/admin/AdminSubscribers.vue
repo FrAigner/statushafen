@@ -202,9 +202,8 @@ watch(() => [formData.value.Channel, formData.value.Email, formData.value.Webhoo
 })
 
 // Sends to the unsaved target in the admin UI language (locale), not in the
-// subscriber's mail language.
+// subscriber's mail language. The button is disabled without a valid target.
 const sendTestMessage = async () => {
-  if (!testMessageReady.value) return
   sendingTestMessage.value = true
   testMessageResult.value = null
   try {

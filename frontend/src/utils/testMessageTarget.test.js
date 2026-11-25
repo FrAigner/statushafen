@@ -28,4 +28,8 @@ describe('testMessagePayload', () => {
     expect(testMessagePayload({ Channel: 'google_chat', Email: 'a@b.de', WebhookURL: ' https://x/y ' }, 'de'))
       .toEqual({ Channel: 'google_chat', WebhookURL: 'https://x/y', Language: 'de' })
   })
+  it('copes with a missing target field', () => {
+    expect(testMessagePayload({ Channel: 'email' }, 'de')).toEqual({ Channel: 'email', Email: '', Language: 'de' })
+    expect(testMessagePayload({ Channel: 'google_chat' }, 'en')).toEqual({ Channel: 'google_chat', WebhookURL: '', Language: 'en' })
+  })
 })
