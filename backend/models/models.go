@@ -247,7 +247,7 @@ const (
 )
 
 // StatusPageSSOConfig: Pro-Statusseite OIDC-Konfiguration.
-// Leere Config = SSO deaktiviert. SAML wird später hinzugefügt (Phase 2).
+// Leere Config = SSO deaktiviert.
 type StatusPageSSOConfig struct {
 	gorm.Model
 	StatusPageID uint       `gorm:"not null;uniqueIndex" json:"status_page_id"`
@@ -270,25 +270,8 @@ type StatusPageSSOConfig struct {
 	// TestLogin deaktivieren wenn Live
 	TestLoginEnabled bool `gorm:"default:true" json:"test_login_enabled"`
 
-	// SAML-Konfiguration. Die IdP-Metadaten kommen entweder per
-	// URL (nur https, SSRF-Schutz wie OIDC-Discovery) oder als eingefügtes XML,
-	// nie beides. Schlüssel und Zertifikat des Service Providers erzeugt das
-	// Backend je Seite selbst (handlers/saml_keys.go). Der private Schlüssel wird
-	// wie das OIDC-Client-Secret behandelt: nur in der DB, nie in einer
-	// API-Antwort (json:"-"). Explizite Spaltennamen, weil GORM aus "SAML"
-	// sonst s_a_m_l macht.
-	SAMLEnabled        bool   `gorm:"column:saml_enabled;default:false" json:"saml_enabled"`
-	SAMLIdPMetadataURL string `gorm:"column:saml_idp_metadata_url;default:''" json:"saml_idp_metadata_url"`
-	SAMLIdPMetadataXML string `gorm:"column:saml_idp_metadata_xml;type:text;default:''" json:"saml_idp_metadata_xml"`
-	SAMLAttributeEmail string `gorm:"column:saml_attribute_email;default:'email'" json:"saml_attribute_email"`
-	SAMLAttributeName  string `gorm:"column:saml_attribute_name;default:'name'" json:"saml_attribute_name"`
-	SAMLSPKey          string `gorm:"column:saml_sp_key;type:text;default:''" json:"-"`
-	SAMLSPCertificate  string `gorm:"column:saml_sp_certificate;type:text;default:''" json:"saml_sp_certificate"`
-	// SAMLAllowUnspecifiedNameID): Standard ist nur
-	// eine persistente NameID. Mit dem Schalter nimmt der ACS auch
-	// "unspecified" an; das kann je nach IdP eine änderbare Kennung sein
-	// (Benutzername), deshalb nur auf ausdrücklichen Wunsch des Seiten-Admins.
-	SAMLAllowUnspecifiedNameID bool `gorm:"column:saml_allow_unspecified_nameid;default:false" json:"saml_allow_unspecified_nameid"`
+	// The saml_* columns from the SAML era stay in existing databases
+	// (AutoMigrate never drops columns) but are no longer read or written.
 }
 
 // OIDCLoginState hält State, Nonce und PKCE-Verifier eines
@@ -313,41 +296,12 @@ type OIDCLoginState struct {
 	CreatedAt    time.Time
 }
 
-// SAMLLoginState ist das SAML-Gegenstück zu OIDCLoginState: Es
-// hält die ID des AuthnRequests bis zur Antwort des IdP am ACS-Endpunkt.
-// State steckt als RelayState im Request und zusätzlich im Cookie saml_state
-// (gegen Login-CSRF). Der ACS löscht die Zeile hart (DELETE … RETURNING),
-// damit jede Request-ID genau einmal einlösbar ist; nur Antworten mit
-// passendem InResponseTo werden angenommen (kein IdP-initiierter Login).
-type SAMLLoginState struct {
-	ID           uint      `gorm:"primaryKey"`
-	State        string    `gorm:"not null;uniqueIndex"`
-	RequestID    string    `gorm:"not null"`
-	StatusPageID uint      `gorm:"not null"`
-	LinkUserID   uint      `gorm:"not null;default:0"`
-	TestLogin    bool      `gorm:"not null;default:false"`
-	ExpiresAt    time.Time `gorm:"not null;index"`
-	CreatedAt    time.Time
-}
+// The tables saml_login_states and saml_assertion_uses from the SAML era stay
+// in existing databases but no longer have a model.
 
-// SAMLAssertionUse merkt sich die ID jeder angenommenen Assertion
-// bis zu ihrem Ablauf (Replay-Schutz zusätzlich zur einmaligen Request-ID).
-// Der Unique-Index auf (Issuer, AssertionID) lässt ein zweites Einlösen am
-// INSERT scheitern, auch bei zwei gleichzeitigen Anfragen.
-type SAMLAssertionUse struct {
-	ID           uint      `gorm:"primaryKey"`
-	StatusPageID uint      `gorm:"not null"`
-	Issuer       string    `gorm:"not null;uniqueIndex:idx_saml_assertion_use"`
-	AssertionID  string    `gorm:"not null;uniqueIndex:idx_saml_assertion_use"`
-	ExpiresAt    time.Time `gorm:"not null;index"`
-	CreatedAt    time.Time
-}
-
-// SSO-Protokolle einer UserSSOIdentity.
-const (
-	SSOProtocolOIDC = "oidc"
-	SSOProtocolSAML = "saml"
-)
+// SSOProtocolOIDC is the protocol of a UserSSOIdentity. Rows with the former
+// value "saml" stay in place but have no effect.
+const SSOProtocolOIDC = "oidc"
 
 // UserSSOIdentity verknüpft ein Konto mit einer Identität beim
 // OIDC-Anbieter einer Statusseite. Ein Login über das Seiten-SSO findet das
@@ -358,17 +312,12 @@ const (
 // Wert des konfigurierten E-Mail-Claims (oidc_attribute_email), nur zur Anzeige
 // im Profil, nie für die Zuordnung.
 //
-// Protocol trennt OIDC- und SAML-Identitäten (Bestandszeilen
-// bekommen über den Spalten-Default "oidc"). Es gehört zum Unique-Index, weil
-// manche IdPs (z.B. Keycloak) für OIDC-Issuer und SAML-Entity-ID denselben
-// String verwenden; für SAML sind Issuer die Entity-ID des IdP und Subject die
-// NameID. Der frühere Index idx_user_sso_identity ohne Protokoll wird in
-// database.dropLegacySSOIdentityIndex entfernt.
-//
-// SubjectFormat ist das NameID-Format einer
-// SAML-Identität (persistent oder, wenn freigegeben, unspecified) und gehört
-// zum Schlüssel: Derselbe Wert in einem anderen Format ist eine andere
-// Kennung. Bei OIDC leer. Der Index heißt deshalb idx_user_sso_identity_key.
+// Protocol and SubjectFormat date from the SAML era and remain part of the
+// unique index idx_user_sso_identity_key: old SAML rows (Protocol "saml",
+// SubjectFormat = NameID format) stay in place, do not collide with OIDC rows
+// and have no effect. New rows always have Protocol "oidc" and an empty
+// SubjectFormat. The former index idx_user_sso_identity without protocol is
+// removed in database.dropLegacySSOIdentityIndex.
 type UserSSOIdentity struct {
 	ID            uint   `gorm:"primaryKey"`
 	UserID        uint   `gorm:"not null;index"`
@@ -397,15 +346,6 @@ func (sso *StatusPageSSOConfig) ToPublicResponse() map[string]interface{} {
 		// Das Secret selbst bleibt geheim; das Admin-Formular
 		// muss nur wissen, ob eins hinterlegt ist.
 		"oidc_client_secret_set": sso.OIDCClientSecret != "",
-		// SAML. Der SP-Schlüssel fehlt bewusst, das Zertifikat ist
-		// öffentlich (steht ohnehin in den SP-Metadaten).
-		"saml_enabled":                  sso.SAMLEnabled,
-		"saml_idp_metadata_url":         sso.SAMLIdPMetadataURL,
-		"saml_idp_metadata_xml":         sso.SAMLIdPMetadataXML,
-		"saml_attribute_email":          sso.SAMLAttributeEmail,
-		"saml_attribute_name":           sso.SAMLAttributeName,
-		"saml_sp_certificate":           sso.SAMLSPCertificate,
-		"saml_allow_unspecified_nameid": sso.SAMLAllowUnspecifiedNameID,
 	}
 }
 

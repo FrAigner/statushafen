@@ -2,17 +2,17 @@
 
 > English: [`en/README.md`](./en/README.md)
 
-Jede Statusseite kann ein eigenes Single Sign-on (SSO) bekommen, mit OIDC, mit SAML 2.0 oder mit
-beiden parallel. Diese Guides erklären, wie du es einrichtest, ohne in den Code zu schauen.
+Jede Statusseite kann ein eigenes Single Sign-on (SSO) über OpenID Connect (OIDC) bekommen. SAML
+wird nicht mehr unterstützt. Diese Guides erklären, wie du es einrichtest, ohne in den Code zu schauen.
 
 ## Stand
 
 | Verfahren | Stand | Guides |
 | --- | --- | --- |
-| OIDC (je Statusseite) | verfügbar | [OIDC allgemein](oidc.md), [Google](google.md), [Keycloak](keycloak.md) |
-| SAML 2.0 (je Statusseite) | verfügbar | [SAML allgemein](saml.md), [Okta](okta.md), [Azure AD](azure-ad.md) |
+| OIDC (je Statusseite) | verfügbar | [OIDC allgemein](oidc.md), [Google](google.md), [Keycloak](keycloak.md), [Okta](okta.md), [Azure AD](azure-ad.md) |
+| SAML 2.0 | entfernt | – |
 
-Für beide gilt: Über das Seiten-SSO entstehen keine neuen Konten, ein bestehendes Konto wird einmal
+Über das Seiten-SSO entstehen keine neuen Konten, ein bestehendes Konto wird einmal
 verknüpft. Global Admins und Konten mit Rolle auf einer anderen Seite sind ausgenommen, und die
 Sitzung gilt nur für diese Seite.
 
@@ -22,15 +22,13 @@ Sitzung gilt nur für diese Seite.
   Verknüpfen eines Kontos.
 - [Google](google.md): OIDC mit Google als Anbieter.
 - [Keycloak](keycloak.md): OIDC mit Keycloak als Anbieter.
-- [SAML allgemein](saml.md): SP-Werte, IdP-Metadaten, NameID-Format, Verknüpfen eines Kontos.
-- [Okta](okta.md): SAML mit Okta als Anbieter.
-- [Azure AD](azure-ad.md): SAML mit Microsoft Entra ID als Anbieter.
-- [Lokale Tests mit Mock-Anbietern](local-testing.md): OIDC- und SAML-Mock für die Entwicklung.
+- [Okta](okta.md): OIDC mit Okta als Anbieter.
+- [Azure AD](azure-ad.md): OIDC mit Microsoft Entra ID als Anbieter.
+- [Lokale Tests mit Mock-Anbieter](local-testing.md): OIDC-Mock für die Entwicklung.
 - [API](api.md): Endpunkte, Parameter und Fehlercodes.
 - [Architektur](architecture.md): Ablauf von Login und Verknüpfung als Diagramme.
 
 Alle Felder, Regeln und Fehlerbilder im Detail stehen im Admin-Handbuch:
-[OIDC-Anmeldung je Statusseite](../user-guide/sso-oidc.md),
-[SAML-Anmeldung je Statusseite](../user-guide/sso-saml.md).
+[OIDC-Anmeldung je Statusseite](../user-guide/sso-oidc.md).
 
 Zurück zum [Admin-Guide](../user-guide/admin.md).

@@ -15,7 +15,7 @@ import (
 const codeLastPageOwner = "last_page_owner"
 
 // deleteSSOIdentitiesOnPage entfernt die Seiten-SSO-Verknüpfungen
-// (OIDC/SAML) eines Kontos auf GENAU dieser Seite. Endet die Mitgliedschaft,
+// eines Kontos auf GENAU dieser Seite. Endet die Mitgliedschaft,
 // bliebe die Verknüpfung sonst verwaist stehen: Sie blockiert später die
 // SSO-Anmeldung und das Anhängen an andere Seiten (hasSSOIdentityOnOtherPage,
 // errOIDCOtherPageRole). UserSSOIdentity hat kein Soft-Delete, das Löschen ist

@@ -76,9 +76,6 @@ func TestRouter_EveryWriteRouteRejectsNULInJSONBody(t *testing.T) {
 		default:
 			continue
 		}
-		if ri.Path == "/api/auth/saml/:page_id/acs" {
-			continue // formularkodiert, kein JSON
-		}
 		checked++
 		w := f.do(ri.Method, concretePath(ri.Path, f.pageID), nulBody, "application/json")
 		assert.Equal(t, http.StatusBadRequest, w.Code, "%s %s: %s", ri.Method, ri.Path, w.Body.String())

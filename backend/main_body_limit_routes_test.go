@@ -25,7 +25,7 @@ var routeParam = regexp.MustCompile(`[:*][A-Za-z_]+`)
 func routesWithoutBodyLimit(t *testing.T, r *gin.Engine) []string {
 	t.Helper()
 	var offenders []string
-	filler := strings.Repeat("a", samlACSMaxBodyBytes+1)
+	filler := strings.Repeat("a", maxOverrideBytes+1)
 	for _, ri := range r.Routes() {
 		switch ri.Method {
 		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
@@ -62,16 +62,15 @@ func TestRoutesWithoutBodyLimit_FlagsRouterWithoutLimit(t *testing.T) {
 	assert.Equal(t, []string{"POST /offen/:id"}, routesWithoutBodyLimit(t, r))
 }
 
-// Die Grenzen selbst sind festgenagelt: Die Tests oben messen gegen die
-// Konstanten und bemerkten sonst nicht, wenn jemand sie auf einen riesigen Wert
-// setzt. Die SAML-Antwort (bis 1 MiB, formularkodiert) braucht mehr als die
-// Standardgrenze, aber keine unbegrenzte.
+// maxOverrideBytes is the upper bound of every entry in bodyLimitOverrides.
+const maxOverrideBytes = 4 << 20
+
+// The limits themselves are pinned: the tests above measure against the
+// constants and would not notice if someone set them to a huge value.
 func TestBodyLimit_ConstantsStayBounded(t *testing.T) {
 	assert.LessOrEqual(t, int64(defaultMaxBodyBytes), int64(2<<20), "Standardgrenze für JSON-Bodys")
-	assert.GreaterOrEqual(t, int64(defaultMaxBodyBytes), int64(256<<10), "größte legitime Eingabe: SAML-Metadaten mit 256 KiB")
-	assert.LessOrEqual(t, int64(samlACSMaxBodyBytes), int64(4<<20), "ACS-Pfad")
-	assert.Greater(t, int64(samlACSMaxBodyBytes), int64(1<<20), "ACS-Pfad muss die SAML-Antwort samt Formularkodierung fassen")
+	assert.GreaterOrEqual(t, int64(defaultMaxBodyBytes), int64(256<<10), "room for the largest JSON inputs")
 	for path, limit := range bodyLimitOverrides {
-		assert.LessOrEqual(t, limit, int64(4<<20), path)
+		assert.LessOrEqual(t, limit, int64(maxOverrideBytes), path)
 	}
 }

@@ -190,12 +190,6 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 		"GET /api/me/sso",
 		"DELETE /api/me/sso/:id",
 		"POST /api/admin/pages/:page_id/sso/test",
-		// SAML je Statusseite
-		"GET /api/auth/saml/login",
-		"GET /api/auth/saml/:page_id/metadata",
-		"POST /api/auth/saml/:page_id/acs",
-		"POST /api/auth/saml/link",
-		"POST /api/admin/pages/:page_id/sso/saml-test",
 		"POST /api/login",
 		"POST /api/subscribe",
 		"GET /api/public/pages",

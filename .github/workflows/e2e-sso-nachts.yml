@@ -2,10 +2,6 @@
 # spielt Verknüpfen und Anmelden gegen den Mock-OIDC-Dienst durch. Lokal braucht er docker compose (Profil
 # "sso", siehe README "Lokale SSO-Tests mit Mock-OIDC"). Deshalb läuft er einmal pro Nacht auf einem
 # GitHub-gehosteten Runner, nicht bei Pull Requests; ein Lauf braucht rund 10 Minuten.
-# Im selben Job läuft frontend/e2e/sso-saml.spec.js gegen den Mock-SAML-IdP aus dem Repo
-# (backend/cmd/mocksamlidp). Er wird wie das Backend auf dem Runner gebaut und gestartet, weil er die ACS-URL
-# des Backends (localhost:8080) aus Browser-Sicht kennen muss; ein eigener Job hätte Postgres, Backend und
-# Playwright-Installation ein zweites Mal gekostet.
 # Hinweis: Zeitpläne laufen nur aus dem Standard-Branch (main), ein manueller Lauf prüft den gewählten Branch.
 name: E2E SSO nachts
 
@@ -102,26 +98,10 @@ jobs:
           done
           echo "Backend antwortet nicht unter localhost:8080/healthz" >&2
           exit 1
-      - name: Mock-SAML bauen und starten
-        run: |
-          cd backend
-          go build -o "$RUNNER_TEMP/mock-saml" ./cmd/mocksamlidp
-          nohup "$RUNNER_TEMP/mock-saml" > "$RUNNER_TEMP/mock-saml.log" 2>&1 &
-          for _ in $(seq 1 30); do
-            if curl -fsS http://localhost:8091/metadata >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Mock-SAML antwortet nicht unter localhost:8091" >&2
-          exit 1
       # Das Frontend (Vite-Dev-Server auf 5173, /api an 8080) startet Playwright selbst (playwright.config.js,
       # webServer). Kein HTML-Report als Artifact: Der Artifact-Speicher war schon einmal voll (siehe ci.yml).
-      - name: Playwright sso-oidc und sso-saml
-        run: cd frontend && npx playwright test sso-oidc sso-saml --reporter=list
+      - name: Playwright sso-oidc
+        run: cd frontend && npx playwright test sso-oidc --reporter=list
       - name: Backend-Log
         if: always()
         run: cat "$RUNNER_TEMP/backend.log" || true
-      - name: Mock-SAML-Log
-        if: always()
-        run: cat "$RUNNER_TEMP/mock-saml.log" || true

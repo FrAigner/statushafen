@@ -98,7 +98,7 @@ func oidcErrorURL(st models.OIDCLoginState, e *oidcError) string {
 	return ssoErrorURL(st.TestLogin, st.LinkUserID, e)
 }
 
-// ssoErrorURL ist das gemeinsame Fehlerziel von OIDC und SAML.
+// ssoErrorURL is the frontend error target of the browser flows.
 func ssoErrorURL(testLogin bool, linkUserID uint, e *oidcError) string {
 	if testLogin {
 		return getFrontendURL() + "/admin/sso?oidc_test=" + e.code
@@ -377,9 +377,8 @@ func (h *Handler) OIDCLinkHandler(c *gin.Context) {
 
 var errSSONotLoggedIn = &oidcError{http.StatusUnauthorized, "internal", "Nicht angemeldet"}
 
-// ssoLinkUser (gemeinsam für OIDC und SAML) lädt das angemeldete
-// Konto für eine Verknüpfung mit dem SSO der Seite ?page=N und wendet die
-// Regeln aus OIDCLinkHandler an.
+// ssoLinkUser loads the signed-in account for a link with the SSO of page
+// ?page=N and applies the rules described at OIDCLinkHandler.
 func (h *Handler) ssoLinkUser(c *gin.Context) (models.User, *oidcError) {
 	var user models.User
 	if err := h.DB.First(&user, getUserID(c)).Error; err != nil {
@@ -479,10 +478,9 @@ func (h *Handler) linkSSOIdentity(linkUserID uint, ident models.UserSSOIdentity,
 	return ident.UserID, nil
 }
 
-// resolveSSOUser findet (bzw. verknüpft) das Konto zur geprüften Identität
-// key (Seite, Protokoll, Issuer, Subject; gemeinsam für OIDC und
-// SAML). Die E-Mail aus dem Claim bzw. Attribut landet nur an der Verknüpfung
-// (Anzeige im Profil), gesucht wird allein über key.
+// resolveSSOUser finds (or links) the account of the verified identity key
+// (page, protocol, issuer, subject). The e-mail from the claim is only stored
+// on the link (shown in the profile); the lookup uses key alone.
 func (h *Handler) resolveSSOUser(linkUserID uint, key models.UserSSOIdentity, email string) (models.User, *oidcError) {
 	var user models.User
 	// Ein Schlüsselteil, der leer ist, wäre "beliebig": nie suchen, nie anlegen.
@@ -535,14 +533,22 @@ func (h *Handler) hasRoleOnOtherPage(userID, pageID uint) bool {
 	return n > 0
 }
 
-// hasSSOIdentityOnOtherPage: Seiten-SSO-Verknüpfung (OIDC/SAML) auf einer
-// anderen Seite; bei DB-Fehler fail closed.
+// hasSSOIdentityOnOtherPage: page SSO link on another page; fails closed on a
+// DB error.
 func (h *Handler) hasSSOIdentityOnOtherPage(userID, pageID uint) bool {
 	var n int64
-	if err := h.DB.Model(&models.UserSSOIdentity{}).Where("user_id = ? AND status_page_id <> ?", userID, pageID).Count(&n).Error; err != nil {
+	if err := pageSSOIdentitiesElsewhere(h.DB, userID, pageID).Count(&n).Error; err != nil {
 		return true
 	}
 	return n > 0
+}
+
+// pageSSOIdentitiesElsewhere selects the account's effective page SSO links on
+// pages other than pageID. Rows from the SAML era (protocol "saml") stay in
+// the table but no longer count.
+func pageSSOIdentitiesElsewhere(db *gorm.DB, userID, pageID uint) *gorm.DB {
+	return db.Model(&models.UserSSOIdentity{}).
+		Where("user_id = ? AND status_page_id <> ? AND protocol = ?", userID, pageID, models.SSOProtocolOIDC)
 }
 
 // OIDCCallbackHandler schließt Login, Verknüpfung oder Testanmeldung ab.
@@ -616,11 +622,10 @@ func oidcTestResultURL(claims oidcClaims) string {
 	return target
 }
 
-// finishSSOLogin schreibt den Audit-Eintrag und gibt wie beim
-// Google/GitHub-Login einen Einmal-Code statt des JWT im Redirect aus (S5).
-// Nach einer Verknüpfung geht es zurück ins Profil (next=profile;
-// das Frontend kennt nur diesen festen Wert). protocol (oidc oder
-// saml) landet im Audit-Eintrag und im sso-Claim des JWT.
+// finishSSOLogin writes the audit entry and hands out a one-time code instead
+// of the JWT in the redirect (S5). After a link the user returns to the
+// profile (next=profile; the frontend only knows this fixed value). protocol
+// ends up in the audit entry and in the sso claim of the JWT.
 func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, pageID, linkUserID uint, protocol string) {
 	action, next := "auth.sso_login", ""
 	if linkUserID != 0 {
@@ -636,16 +641,5 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	// beendet getJWTSecret den Prozess schon vorher. Das Token
 	// gilt nur für pageID (sso_page_id-Claim).
 	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID)
-	ssoRedirect(c, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token)+next)
-}
-
-// ssoRedirect leitet nach einem GET (OIDC-Callback) wie bisher
-// mit 307 um, nach einem POST (SAML-ACS) mit 303: Ein 307 ließe den Browser
-// den POST samt SAMLResponse am Frontend wiederholen.
-func ssoRedirect(c *gin.Context, target string) {
-	code := http.StatusTemporaryRedirect
-	if c.Request.Method == http.MethodPost {
-		code = http.StatusSeeOther
-	}
-	c.Redirect(code, target)
+	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token)+next)
 }

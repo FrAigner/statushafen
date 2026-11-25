@@ -26,15 +26,15 @@ func TestInitDB_MigratesOIDCTables(t *testing.T) {
 
 	assert.True(t, DB.Migrator().HasTable(&models.OIDCLoginState{}))
 	assert.True(t, DB.Migrator().HasTable(&models.UserSSOIdentity{}))
-	// SAML-Tabellen, Protokoll im Unique-Index der Verknüpfung.
-	assert.True(t, DB.Migrator().HasTable(&models.SAMLLoginState{}))
-	assert.True(t, DB.Migrator().HasTable(&models.SAMLAssertionUse{}))
-	assert.True(t, DB.Migrator().HasIndex(&models.SAMLAssertionUse{}, "idx_saml_assertion_use"))
+	// SAML is gone: a fresh database no longer gets SAML tables (existing
+	// ones stay, AutoMigrate deletes nothing).
+	assert.False(t, DB.Migrator().HasTable("saml_login_states"))
+	assert.False(t, DB.Migrator().HasTable("saml_assertion_uses"))
 	// Security-Review: auch das NameID-Format gehört zum Schlüssel.
 	assert.True(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity_key"))
 	assert.False(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity_protocol"))
 	assert.False(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity"))
-	assert.True(t, DB.Migrator().HasColumn(&models.StatusPageSSOConfig{}, "saml_sp_key"))
+	assert.False(t, DB.Migrator().HasColumn(&models.StatusPageSSOConfig{}, "saml_sp_key"))
 }
 
 // TestDropLegacySSOIdentityIndex: Eine Bestandsdatenbank hat noch
@@ -61,9 +61,9 @@ func TestDropLegacySSOIdentityIndex(t *testing.T) {
 	require.NoError(t, db.First(&ident).Error)
 	assert.Equal(t, models.SSOProtocolOIDC, ident.Protocol)
 	// Gleicher Issuer und Subject, anderes Protokoll: jetzt erlaubt.
-	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: models.SSOProtocolSAML, Issuer: "https://idp", Subject: "sub"}).Error)
+	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: "saml", Issuer: "https://idp", Subject: "sub"}).Error)
 	// Gleicher Wert, anderes NameID-Format: eine eigene Identität.
-	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: models.SSOProtocolSAML, Issuer: "https://idp", Subject: "sub", SubjectFormat: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"}).Error)
+	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: "saml", Issuer: "https://idp", Subject: "sub", SubjectFormat: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"}).Error)
 	assert.Equal(t, "", ident.SubjectFormat)
 }
 

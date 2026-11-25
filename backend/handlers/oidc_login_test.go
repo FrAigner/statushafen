@@ -139,14 +139,7 @@ func errorOf(t *testing.T, w *httptest.ResponseRecorder) string {
 // JSON, sondern als Redirect auf eine feste Frontend-Seite mit Fehlercode.
 func assertOIDCError(t *testing.T, w *httptest.ResponseRecorder, path, code string) {
 	t.Helper()
-	assertSSOError(t, w, http.StatusTemporaryRedirect, path, code)
-}
-
-// assertSSOError prüft den Fehler-Redirect mit dem erwarteten
-// Status (307 bei GET, 303 nach dem POST an den SAML-ACS).
-func assertSSOError(t *testing.T, w *httptest.ResponseRecorder, status int, path, code string) {
-	t.Helper()
-	require.Equal(t, status, w.Code, w.Body.String())
+	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, getFrontendURL()+path, loc.Scheme+"://"+loc.Host+loc.Path)

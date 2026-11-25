@@ -4,8 +4,7 @@
 
 Jede Statusseite kann einen eigenen OpenID-Connect-Anbieter (IdP) bekommen, etwa Authentik,
 Keycloak, Microsoft Entra ID oder Google. Konten, die mit diesem Anbieter verknüpft sind, melden
-sich darüber an, ohne ein eigenes Passwort zu brauchen (Doku). SAML
-() beschreibt [`sso-saml.md`](./sso-saml.md).
+sich darüber an, ohne ein eigenes Passwort zu brauchen (Doku). SAML wird nicht mehr unterstützt.
 
 Diese Anleitung beschreibt den Stand des Backends (`backend/handlers/oidc_login.go`,
 `backend/handlers/oidc_frontend.go`, `backend/handlers/statuspage_sso.go`).
@@ -149,7 +148,7 @@ Ausgeschlossen sind, sowohl beim Verknüpfen als auch bei jeder Anmeldung (403):
 
 ### Die Sitzung gilt nur für diese Seite
 
-Die Sitzung nach einem Seiten-SSO-Login (OIDC und SAML) ist auf die Seite beschränkt, deren IdP
+Die Sitzung nach einem Seiten-SSO-Login ist auf die Seite beschränkt, deren IdP
 die Anmeldung bestätigt hat (Claim `sso_page_id` im JWT). Das gilt auch für Rechte, die
 das Konto erst nach der Anmeldung bekommt: Erhält es während der Sitzung eine Rolle auf einer
 anderen Seite oder wird es Global Admin, wirkt das in dieser Sitzung nicht.

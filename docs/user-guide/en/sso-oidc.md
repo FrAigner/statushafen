@@ -5,8 +5,7 @@
 
 Each status page can have its own OpenID Connect identity provider (IdP), for example Authentik,
 Keycloak, Microsoft Entra ID or Google. Accounts linked to this provider sign in through it
-without needing a password of their own (documentation). SAML
-is described in [`sso-saml.md`](./sso-saml.md).
+without needing a password of their own (documentation). SAML is no longer supported.
 
 This guide describes the state of the backend (`backend/handlers/oidc_login.go`,
 `backend/handlers/oidc_frontend.go`, `backend/handlers/statuspage_sso.go`).
@@ -152,7 +151,7 @@ Excluded, both when linking and at every sign-in (403), are:
 
 ### The session is valid for this page only
 
-The session after a page SSO login (OIDC and SAML) is restricted to the page whose IdP confirmed
+The session after a page SSO login is restricted to the page whose IdP confirmed
 the sign-in (claim `sso_page_id` in the JWT). This also applies to permissions the
 account only receives after signing in: if it gets a role on another page or becomes a global
 admin during the session, this has no effect in that session.

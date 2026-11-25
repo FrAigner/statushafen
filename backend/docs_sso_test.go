@@ -22,7 +22,7 @@ import (
 const ssoDocsDir = "../docs/sso"
 
 var ssoDocFiles = []string{
-	"README.md", "oidc.md", "google.md", "keycloak.md", "saml.md",
+	"README.md", "oidc.md", "google.md", "keycloak.md",
 	"okta.md", "azure-ad.md", "api.md", "architecture.md",
 }
 
@@ -152,24 +152,29 @@ func TestSSODocs_IndexLinksAllGuides(t *testing.T) {
 			t.Errorf("README.md verlinkt %s nicht", name)
 		}
 	}
-	if !strings.Contains(idx, "SAML 2.0 (je Statusseite) | verfügbar") {
-		t.Error("README.md nennt den SAML-Status (verfügbar) nicht")
+	if !strings.Contains(idx, "SAML 2.0 | entfernt") {
+		t.Error("README.md does not state that SAML was removed")
 	}
 }
 
-// SAML ist verfügbar. Die SAML-Guides dürfen deshalb
-// nicht mehr als Vorab-Doku auftreten und müssen die SP-Endpunkte nennen,
-// die der Admin beim IdP einträgt.
-func TestSSODocs_SAMLGuidesDescribeAvailableSAML(t *testing.T) {
-	for _, name := range []string{"saml.md", "okta.md", "azure-ad.md"} {
-		doc := readSSODoc(t, name)
-		lower := strings.ToLower(doc)
-		if strings.Contains(lower, "noch nicht verfügbar") || strings.Contains(doc, "TBD") {
-			t.Errorf("%s: SAML ist verfügbar, Vorab-Hinweise müssen raus", name)
-		}
-		for _, want := range []string{"/api/auth/saml/<SEITEN-ID>/acs", "/api/auth/saml/<SEITEN-ID>/metadata", "persistent"} {
-			if !strings.Contains(lower, strings.ToLower(want)) {
-				t.Errorf("%s: %q fehlt", name, want)
+// SAML has been removed. The Okta and Entra guides now describe OIDC: they
+// name the OIDC redirect URI and none of the former SAML endpoints. No guide
+// links a SAML page any more.
+func TestSSODocs_GuidesDescribeOIDCOnly(t *testing.T) {
+	for _, name := range []string{"okta.md", "azure-ad.md"} {
+		for _, dir := range []string{ssoDocsDir, ssoDocsDir + "/en"} {
+			b, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			doc := string(b)
+			if !strings.Contains(doc, "/api/auth/oidc/callback?page=") {
+				t.Errorf("%s/%s: OIDC redirect URI missing", dir, name)
+			}
+			for _, gone := range []string{"/api/auth/saml/", "saml.md", "NameID"} {
+				if strings.Contains(doc, gone) {
+					t.Errorf("%s/%s still mentions %q", dir, name, gone)
+				}
 			}
 		}
 	}
@@ -224,16 +229,11 @@ func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 		"GET /api/admin/pages/:page_id/sso",
 		"GET /api/auth/oidc/callback",
 		"GET /api/auth/oidc/login",
-		"GET /api/auth/saml/:page_id/metadata",
-		"GET /api/auth/saml/login",
 		"GET /api/auth/sso/login",
 		"GET /api/me/sso",
 		"GET /api/public/pages/:slug/sso",
-		"POST /api/admin/pages/:page_id/sso/saml-test",
 		"POST /api/admin/pages/:page_id/sso/test",
 		"POST /api/auth/oidc/link",
-		"POST /api/auth/saml/:page_id/acs",
-		"POST /api/auth/saml/link",
 		"POST /api/auth/sso-exchange",
 		"PUT /api/admin/pages/:page_id/sso",
 	}
@@ -246,7 +246,7 @@ func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 		}
 	}
 	// Umgekehrt: Jede SSO-Route des Routers steht in api.md, damit neue
-	// Endpunkte (wie die SAML-Routen) nicht undokumentiert bleiben.
+	// Endpunkte nicht undokumentiert bleiben.
 	documentedSet := map[string]bool{}
 	for _, d := range documented {
 		documentedSet[d] = true

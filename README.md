@@ -20,7 +20,7 @@ Go (Gin, GORM) · Vue 3 (Vite, sit-onyx) · PostgreSQL · [MIT license](LICENSE)
   influence your components.
 - **Subscribers:** e-mail with double opt-in or Google Chat webhook, editable mail templates per
   language and audience.
-- **Roles and permissions**, audit log, per-page single sign-on with OIDC and SAML 2.0.
+- **Roles and permissions**, audit log, per-page single sign-on with OIDC.
 - **Multilingual** interface and content (30 languages in the catalog), optional automatic
   translation (LibreTranslate or DeepL).
 - **Formatted texts** in a restricted Markdown subset, rendered safely in pages and mails.
@@ -133,9 +133,9 @@ Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Security repo
 
 ### Local single sign-on tests
 
-`docker compose --profile sso up -d mock-oidc mock-saml` starts an OIDC and a SAML mock identity
-provider; the walkthrough is in [`docs/sso/en/local-testing.md`](docs/sso/en/local-testing.md). The Playwright specs
-`sso-oidc` and `sso-saml` run the whole flow and also run nightly in
+`docker compose --profile sso up -d mock-oidc` starts an OIDC mock identity
+provider; the walkthrough is in [`docs/sso/en/local-testing.md`](docs/sso/en/local-testing.md). The Playwright spec
+`sso-oidc` runs the whole flow and also runs nightly in
 [`.github/workflows/e2e-sso-nachts.yml`](.github/workflows/e2e-sso-nachts.yml).
 
 ## License, name and third-party software

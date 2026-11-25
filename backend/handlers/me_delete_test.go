@@ -299,9 +299,6 @@ func TestDeleteMeHandler_LoeschtUndAnonymisiert(t *testing.T) {
 	require.NoError(t, e.db.Create(&models.UserSSOIdentity{UserID: other.ID, StatusPageID: page.ID, Issuer: "iss", Subject: "sub-o"}).Error)
 	require.NoError(t, e.db.Create(&models.OIDCLoginState{State: "s-u", Nonce: "n", CodeVerifier: "v", StatusPageID: page.ID, LinkUserID: u.ID}).Error)
 	require.NoError(t, e.db.Create(&models.OIDCLoginState{State: "s-o", Nonce: "n", CodeVerifier: "v", StatusPageID: page.ID, LinkUserID: other.ID}).Error)
-	// offene SAML-Verknüpfungen des Kontos verfallen mit.
-	require.NoError(t, e.db.Create(&models.SAMLLoginState{State: "saml-u", RequestID: "r", StatusPageID: page.ID, LinkUserID: u.ID}).Error)
-	require.NoError(t, e.db.Create(&models.SAMLLoginState{State: "saml-o", RequestID: "r", StatusPageID: page.ID, LinkUserID: other.ID}).Error)
 
 	require.NoError(t, e.db.Create(&models.Subscriber{StatusPageID: page.ID, Email: u.Email, Channel: "email", CreatedByUserID: &u.ID}).Error)
 	require.NoError(t, e.db.Create(&models.Subscriber{StatusPageID: page.ID, Email: other.Email, Channel: "email", CreatedByUserID: &other.ID}).Error)
@@ -342,8 +339,6 @@ func TestDeleteMeHandler_LoeschtUndAnonymisiert(t *testing.T) {
 	assert.Equal(t, int64(1), countUnscoped(&models.UserSSOIdentity{}, "user_id = ?", other.ID))
 	assert.Equal(t, int64(0), countUnscoped(&models.OIDCLoginState{}, "link_user_id = ?", u.ID))
 	assert.Equal(t, int64(1), countUnscoped(&models.OIDCLoginState{}, "link_user_id = ?", other.ID))
-	assert.Equal(t, int64(0), countUnscoped(&models.SAMLLoginState{}, "link_user_id = ?", u.ID))
-	assert.Equal(t, int64(1), countUnscoped(&models.SAMLLoginState{}, "link_user_id = ?", other.ID))
 	assert.Equal(t, int64(0), countUnscoped(&models.Subscriber{}, "email = ?", u.Email))
 	assert.Equal(t, int64(1), countUnscoped(&models.Subscriber{}, "email = ?", other.Email))
 	// Seite bleibt erhalten: other ist dort weiterhin Admin.

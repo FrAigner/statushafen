@@ -654,7 +654,7 @@ func ensureNoRoleOnOtherPage(tx *gorm.DB, userID, pageID uint) error {
 		}
 	}
 	var n int64
-	if err := tx.Model(&models.UserSSOIdentity{}).Where("user_id = ? AND status_page_id <> ?", userID, pageID).Count(&n).Error; err != nil {
+	if err := pageSSOIdentitiesElsewhere(tx, userID, pageID).Count(&n).Error; err != nil {
 		return err
 	}
 	if n > 0 {

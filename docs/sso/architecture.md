@@ -1,7 +1,7 @@
 # SSO-Architektur
 
-Ablauf des Seiten-SSO (OIDC und SAML) je Statusseite. Endpunkte und Fehler stehen in der
-[API](api.md), die Einrichtung im [OIDC-Guide](oidc.md) bzw. [SAML-Guide](saml.md).
+Ablauf des Seiten-SSO (OIDC) je Statusseite. Endpunkte und Fehler stehen in der
+[API](api.md), die Einrichtung im [OIDC-Guide](oidc.md).
 
 ## Login mit OIDC
 
@@ -31,31 +31,6 @@ Das JWT steht nie in einer URL: Der Browser bekommt nur den kurzlebigen Einmal-C
 einlöst. Das Konto wird nie über die E-Mail-Adresse gefunden. Das JWT gilt nur für diese Seite
 ().
 
-## Login mit SAML
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant B as Browser
-    participant S as Statushafen
-    participant I as IdP
-    B->>S: GET /api/auth/saml/login?page=N
-    S->>S: IdP-Metadaten laden, AuthnRequest signieren, State speichern
-    S-->>B: 307 zum IdP (Redirect-Binding, RelayState) + Cookie saml_state
-    B->>I: AuthnRequest
-    I-->>B: Anmeldung, dann Formular mit SAMLResponse
-    B->>S: POST /api/auth/saml/N/acs (SAMLResponse, RelayState)
-    S->>S: State gegen Cookie prüfen, genau einmal einlösen
-    S->>S: Signatur, Issuer, Audience, Destination, InResponseTo, Zeiten, NameID prüfen
-    S->>S: Assertion-ID gegen Replay merken
-    S->>S: Konto über (Seite, Entity-ID, NameID) suchen
-    S-->>B: 303 zum Frontend mit Einmal-Code
-    B->>S: POST /api/auth/sso-exchange (Einmal-Code)
-    S-->>B: JWT
-```
-
-IdP-initiierte Anmeldungen gibt es nicht: Jede Antwort muss zu einem eigenen AuthnRequest passen.
-
 ## Verknüpfung eines bestehenden Kontos
 
 ```mermaid
@@ -74,10 +49,8 @@ sequenceDiagram
     S-->>B: 307 zum Frontend mit Einmal-Code
 ```
 
-Bei SAML läuft die Verknüpfung genauso über `POST /api/auth/saml/link?page=N` und den ACS.
-
 Bei Global Admins oder Konten mit Rolle auf einer anderen Seite lehnt schon der Link-Aufruf mit `403`
-ab. Gehört die Identität bereits einem anderen Konto, leitet der Callback bzw. ACS mit dem Code
+ab. Gehört die Identität bereits einem anderen Konto, leitet der Callback mit dem Code
 `already_linked` ins Profil zurück.
 
 ## Bausteine
@@ -85,12 +58,9 @@ ab. Gehört die Identität bereits einem anderen Konto, leitet der Callback bzw.
 ```mermaid
 flowchart LR
     A[Seiten-Admin] -->|PUT /api/admin/pages/:id/sso| C[(SSO-Konfiguration je Seite)]
-    U[Nutzer] --> L[Login / Callback / ACS]
-    I[IdP] -->|SP-Metadaten| M[saml/:id/metadata]
-    M --> C
+    U[Nutzer] --> L[Login / Callback]
     L --> C
     L --> D[(Login-State)]
-    L --> R[(Verwendete Assertions)]
     L --> K[(Verknüpfte Identitäten)]
     L --> X[Einmal-Code-Speicher]
     X --> E[sso-exchange]

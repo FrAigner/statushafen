@@ -43,7 +43,7 @@ type Claims struct {
 	// dort nach jedem SSO-Login wieder an.
 	HideHelpTooltips bool `json:"hide_help_tooltips,omitempty"`
 	// SSOPageID: Seite, deren IdP die Sitzung ausgestellt hat
-	// (Seiten-SSO per OIDC oder SAML). Die Sitzung gilt nur für diese Seite
+	// (Seiten-SSO per OIDC). Die Sitzung gilt nur für diese Seite
 	// und nie mit Global-Admin-Rechten. Fehlt bei Passwort- und
 	// globalen SSO-Logins (Google/GitHub).
 	SSOPageID uint `json:"sso_page_id,omitempty"`
