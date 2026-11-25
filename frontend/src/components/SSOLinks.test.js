@@ -291,8 +291,8 @@ describe('SSOLinks', () => {
     expect(wrapper.find('[role="alert"]').text()).toBe('Die SSO-Anmeldung ist fehlgeschlagen.')
   })
 
-  // SAML gibt es nicht mehr: kein Protokoll-Etikett, verknüpft wird immer über OIDC.
-  it('zeigt kein Protokoll-Etikett und verknüpft über den OIDC-Endpunkt', async () => {
+  // SAML is gone: no protocol label, linking always goes through OIDC.
+  it('shows no protocol label and links through the OIDC endpoint', async () => {
     const fetchImpl = makeFetch({
       'GET /api/me/sso': jsonResponse(LIST),
       'POST /api/auth/oidc/link?page=2': jsonResponse({ url: 'https://idp.example/authorize' }),

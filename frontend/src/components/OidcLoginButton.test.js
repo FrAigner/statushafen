@@ -70,8 +70,8 @@ describe('OidcLoginButton', () => {
     expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=4')
   })
 
-  // SAML gibt es nicht mehr: Auch ein älteres Backend mit saml_enabled erzeugt keinen SAML-Knopf.
-  it('zeigt keinen SAML-Knopf, auch wenn die Auskunft noch saml_enabled meldet', async () => {
+  // SAML is gone: even an older backend reporting saml_enabled produces no SAML button.
+  it('shows no SAML button, even if the lookup still reports saml_enabled', async () => {
     const wrapper = await mountButton('acme', jsonResponse({ oidc_enabled: false, saml_enabled: true, page_id: 3 }))
 
     expect(wrapper.find('a').exists()).toBe(false)
@@ -146,7 +146,7 @@ describe('OidcLoginButton', () => {
       expect(wrapper.find('a').exists()).toBe(false)
     })
 
-    it('zeigt bei erfolgreicher Auskunft den üblichen Knopf statt des Rückfalls', async () => {
+    it('shows the usual button instead of the fallback when the lookup succeeds', async () => {
       const wrapper = await mountFallback('acme', jsonResponse({ oidc_enabled: true, page_id: 3 }))
       expect(wrapper.findAll('a')).toHaveLength(1)
       expect(wrapper.find('a.oidc-login-btn').attributes('href')).toBe('/api/auth/oidc/login?page=3')

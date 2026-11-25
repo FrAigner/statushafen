@@ -28,8 +28,8 @@ import { safeIdpRedirect } from '../../utils/safeIdpRedirect'
 // Rolle aus seinem Claim wäre eine Rechteausweitung an der Rollenverwaltung
 // vorbei. Neu ist die Testanmeldung (test_login_enabled).
 //
-// SAML gibt es nicht mehr; Seiten-SSO ist nur OIDC. Liefert ein älteres Backend
-// noch saml_*-Felder, übernimmt applyConfig nur die Schlüssel aus emptyForm.
+// SAML is gone; page SSO is OIDC only. If an older backend still sends saml_*
+// fields, applyConfig only takes over the keys of emptyForm.
 
 const { t, te } = useI18n()
 const breadcrumbs = usePageCrumbs(computed(() => t('admin.sso.title')))
@@ -51,8 +51,8 @@ const emptyForm = () => ({
 
 const form = ref(emptyForm())
 const acsUrl = ref('')
-// Zuletzt geladener Issuer. Wechselt er beim Speichern, löscht das Backend die
-// Verknüpfungen der Seite; die Seite warnt vorher.
+// Last loaded issuer. If it changes on save, the backend deletes the page's
+// links; the page warns beforehand.
 const loadedIssuer = ref('')
 const oidcIssuerOf = (url) => url.trim().replace(/\/\.well-known\/openid-configuration$/, '')
 const identityResetWarning = computed(() =>

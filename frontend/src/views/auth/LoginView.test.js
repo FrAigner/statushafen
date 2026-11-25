@@ -359,9 +359,9 @@ describe('LoginView', () => {
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'a@b.de', password: 'secret123' }) })
     )
     expect(useAuth().isLoggedIn.value).toBe(true)
-    // ohne id erkennt die Benutzerverwaltung die eigene Zeile nicht.
+    // without id the user management does not recognise the own row.
     expect(useAuth().currentUser.value.id).toBe(4)
-    // ausgeschaltete Hilfe-Tooltips gelten nach dem Login sofort.
+    // switched-off help tooltips apply right after the login.
     expect(useAuth().currentUser.value.help_tooltips).toBe(false)
     expect(router.currentRoute.value.fullPath).toBe('/')
   })
@@ -509,7 +509,7 @@ describe('LoginView', () => {
     await flushPromises()
   })
 
-  it('hält den Anmelden-Button gesperrt, bis die Navigation nach dem Login abgeschlossen ist', async () => {
+  it('keeps the sign-in button disabled until the navigation after the login has finished', async () => {
     let resolveRoute
     const router = createRouter({
       history: createMemoryHistory(),
@@ -538,7 +538,7 @@ describe('LoginView', () => {
     expect(router.currentRoute.value.path).toBe('/admin')
   })
 
-  it('zeigt bei fehlgeschlagener Navigation nach erfolgreichem Login keine Login-Fehlermeldung und lädt die Zielseite neu', async () => {
+  it('shows no login error when the navigation after a successful login fails and reloads the target', async () => {
     const assign = vi.fn()
     const router = createRouter({
       history: createMemoryHistory(),

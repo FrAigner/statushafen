@@ -486,10 +486,10 @@ describe('AdminSSO.vue', () => {
     })
   })
 
-  // SAML gibt es nicht mehr: kein Abschnitt, kein SAML-Test, keine saml_*-Felder im PUT,
-  // auch wenn ein älteres Backend sie noch mitliefert.
-  describe('ohne SAML', () => {
-    it('zeigt keinen SAML-Abschnitt und keinen SAML-Testknopf', async () => {
+  // SAML is gone: no section, no SAML test, no saml_* fields in the PUT,
+  // even if an older backend still sends them.
+  describe('without SAML', () => {
+    it('shows no SAML section and no SAML test button', async () => {
       const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ test_login_enabled: true })) }) })
 
       expect(wrapper.text()).not.toMatch(/SAML/)
@@ -498,7 +498,7 @@ describe('AdminSSO.vue', () => {
       expect(wrapper.find('.sso-test').exists()).toBe(true)
     })
 
-    it('schickt keine saml_*-Felder, auch wenn die Antwort sie noch enthält', async () => {
+    it('sends no saml_* fields, even if the answer still contains them', async () => {
       const put = vi.fn(async (body) => jsonResponse(ssoFixture(body)))
       const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ put, get: jsonResponse(ssoFixture({ saml_enabled: true, saml_idp_metadata_url: 'https://idp.example/saml' })) }) })
 
@@ -508,20 +508,20 @@ describe('AdminSSO.vue', () => {
       expect(Object.keys(put.mock.calls[0][0]).filter((k) => k.startsWith('saml_'))).toEqual([])
     })
 
-    it('wertet sso=saml im Testergebnis nicht mehr aus', async () => {
+    it('no longer evaluates sso=saml in the test result', async () => {
       const wrapper = await mountAdminSSO({ search: '?oidc_test=ok&sso=saml&missing=email' })
 
       expect(wrapper.find('[data-test="sso-test-result"]').text()).toBe('Testanmeldung erfolgreich: Anbieter, Client-Daten und Redirect-URL passen. Im ID-Token fehlten diese Claims: email')
     })
   })
 
-  // Ein Wechsel des Issuers löscht beim Speichern die Verknüpfungen; die Seite warnt vorher.
-  it('warnt vor dem Speichern, wenn der Issuer wechselt', async () => {
+  // A changed issuer deletes the links on save; the page warns beforehand.
+  it('warns before saving when the issuer changes', async () => {
     const wrapper = await mountAdminSSO()
     const warning = () => wrapper.find('[data-test="sso-identity-reset-warning"]')
     expect(warning().exists()).toBe(false)
 
-    // Gleicher Issuer, nur als Discovery-URL ohne .well-known bzw. mit Leerzeichen: kein Wechsel.
+    // Same issuer, only as discovery URL without .well-known or with spaces: no change.
     await wrapper.find('#sso-discovery-url').setValue(' https://idp.example ')
     expect(warning().exists()).toBe(false)
 
@@ -531,7 +531,7 @@ describe('AdminSSO.vue', () => {
     expect(warning().exists()).toBe(false)
   })
 
-  it('warnt bei erstmaliger Einrichtung nicht', async () => {
+  it('does not warn on the first setup', async () => {
     const wrapper = await mountAdminSSO({ fetchImpl: makeFetch({ get: jsonResponse(ssoFixture({ oidc_discovery_url: '' })) }) })
 
     await wrapper.find('#sso-discovery-url').setValue('https://idp.example')
@@ -539,8 +539,8 @@ describe('AdminSSO.vue', () => {
     expect(wrapper.find('[data-test="sso-identity-reset-warning"]').exists()).toBe(false)
   })
 
-  // Richtung C: Brotkrumen mit Seitenname, je Verfahren eine Karte im
-  // gemeinsamen Formular (OIDC, Testanmeldung).
+  // Direction C: breadcrumbs with the page name, one card per method in the
+  // shared form (OIDC, test sign-in).
   it('zeigt Brotkrumen mit Seitenname und je Verfahren eine Karte im selben Formular', async () => {
     useTenant().setMyPages([{ ID: 7, Name: 'Acme' }])
     const wrapper = await mountAdminSSO()

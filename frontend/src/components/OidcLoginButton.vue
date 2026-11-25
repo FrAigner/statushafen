@@ -12,7 +12,7 @@
   (GET /api/auth/sso/login?slug=…), den der Server selbst auflöst. Er erscheint
   für eine private und eine fehlende Seite gleichermaßen.
 
-  Der Knopf liegt in einem Element, das übergebene Attribute (class) erhält.
+  The button sits in a wrapper element that receives passed attributes (class).
 
   After each lookup the component emits `available` (true when a button is
   shown), so the login page can tell whether any sign-in method is offered.
