@@ -348,13 +348,14 @@ describe('LoginView', () => {
     expect(input.attributes('type')).toBe('text')
   })
 
-  it('leitet per SSO-Button-Klick zum Provider-Endpunkt weiter', async () => {
-    vi.stubGlobal('location', { ...window.location, search: '', href: '' })
+  // Feste Google-/GitHub-Knöpfe gibt es nicht mehr, auch keine Texte dafür.
+  it('zeigt keine festen Google-/GitHub-Knöpfe', async () => {
     const { wrapper } = await mountLogin()
 
-    await wrapper.findAll('.sso-btn')[0].trigger('click')
-
-    expect(window.location.href).toContain('/api/auth/google')
+    expect(wrapper.text()).not.toMatch(/Google|GitHub/)
+    expect(wrapper.find('.sso-btn').exists()).toBe(false)
+    expect(i18n.global.te('auth.login.googleButton')).toBe(false)
+    expect(i18n.global.te('auth.login.githubButton')).toBe(false)
   })
 
   it('hat keine axe-Funde, auch mit Fehlermeldung', async () => {

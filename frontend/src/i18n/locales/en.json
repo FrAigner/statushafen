@@ -1704,8 +1704,6 @@
       "emailLabel": "Email",
       "emailPlaceholder": "name{'@'}company.com",
       "failed": "Login failed: {message}",
-      "githubButton": "Sign in with GitHub",
-      "googleButton": "Sign in with Google",
       "hidePassword": "Hide password",
       "orDivider": "or with email & password",
       "passwordLabel": "Password",

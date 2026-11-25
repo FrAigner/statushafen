@@ -33,12 +33,6 @@ const oidcErrorMessage = computed(() => {
   return te(key) ? t(key) : t('auth.oidcErrors.unknown')
 })
 
-// SSO-Provider-URLs
-const ssoProviders = computed(() => [
-  { key: 'google', label: t('auth.login.googleButton'), icon: 'google' },
-  { key: 'github', label: t('auth.login.githubButton'), icon: 'github' },
-])
-
 const doLogin = async (email, password) => {
   // Doppel-Submit (Doppelklick, Enter) sendet sonst zwei Login-Requests.
   if (isSubmitting.value) return
@@ -85,11 +79,6 @@ const doLogin = async (email, password) => {
   }
   isSubmitting.value = false
 }
-
-const doSSOLogin = (provider) => {
-  const apiBase = import.meta.env.VITE_API_URL || ''
-  window.location.href = `${apiBase}/api/auth/${provider}`
-}
 </script>
 
 <template>
@@ -112,15 +101,6 @@ const doSSOLogin = (provider) => {
       <!-- SSO Buttons -->
       <div class="sso-section entry-actions">
         <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback />
-        <button
-          v-for="p in ssoProviders"
-          :key="p.key"
-          class="sso-btn entry-btn entry-btn--secondary"
-          @click="doSSOLogin(p.key)"
-        >
-          <span class="sso-icon"><AppIcon :name="p.icon" :size="18" /></span>
-          {{ p.label }}
-        </button>
       </div>
 
       <!-- Trennlinie -->

@@ -48,4 +48,11 @@ describe('AppIcon', () => {
     const wrapper = mount(AppIcon, { props: { name: 'more' } })
     expect(wrapper.findAll('circle')).toHaveLength(3)
   })
+
+  // Feste Google-/GitHub-Anmeldung gibt es nicht mehr, ihre Markenzeichen auch nicht.
+  it.each(['google', 'github'])('kennt das Markenzeichen „%s“ nicht mehr (Rückfall auf den Punkt)', (name) => {
+    const wrapper = mount(AppIcon, { props: { name } })
+    expect(wrapper.findAll('svg > *')).toHaveLength(1)
+    expect(wrapper.find('circle').attributes('r')).toBe('2')
+  })
 })
