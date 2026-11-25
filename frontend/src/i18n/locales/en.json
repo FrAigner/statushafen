@@ -806,7 +806,12 @@
     "languageDefault": "Page default ({name})",
     "tableAdded": "Added",
     "emailRequired": "Please enter an email address.",
-    "webhookRequired": "Please enter a webhook URL."
+    "webhookRequired": "Please enter a webhook URL.",
+    "testMessageButton": "Send test message",
+    "testMessageSending": "Sending…",
+    "testMessageHint": "Sends a test message to the entered target – in the language currently selected in the admin area. Nothing is saved.",
+    "testMessageSent": "Test message sent.",
+    "testMessageFailed": "Test message failed: "
   },
   "auditLog": {
     "title": "Audit Log",
@@ -963,7 +968,8 @@
         "confirmed": "Subscription confirmed",
         "unsubscribed": "Unsubscribed",
         "deleted": "Subscriber deleted",
-        "confirmation_email_failed": "Confirmation email failed"
+        "confirmation_email_failed": "Confirmation email failed",
+        "test_message_failed": "Test message failed"
       },
       "system_setting": {
         "updated": "System setting updated"
@@ -1564,6 +1570,9 @@
       "server_error": "A server error occurred. Please try again later.",
       "forbidden": "You do not have permission to do this.",
       "email_invalid": "Please enter a valid email address.",
+      "channel_invalid": "Unknown channel.",
+      "mail_send_failed": "The email could not be sent. Please check the SMTP settings or try again later.",
+      "email_disabled": "Sending emails is turned off in the system settings.",
       "email_taken": "A user with this email address already exists.",
       "name_required": "Please enter a name.",
       "slug_required": "Please enter a slug.",

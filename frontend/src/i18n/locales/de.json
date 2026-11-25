@@ -806,7 +806,12 @@
     "languageDefault": "Seitenstandard ({name})",
     "tableAdded": "Hinzugefügt",
     "emailRequired": "Bitte eine E-Mail-Adresse eingeben.",
-    "webhookRequired": "Bitte eine Webhook-URL eingeben."
+    "webhookRequired": "Bitte eine Webhook-URL eingeben.",
+    "testMessageButton": "Testnachricht senden",
+    "testMessageSending": "Wird gesendet…",
+    "testMessageHint": "Schickt eine Testnachricht an das eingetragene Ziel – in der Sprache, die gerade im Admin-Bereich eingestellt ist. Es wird nichts gespeichert.",
+    "testMessageSent": "Testnachricht gesendet.",
+    "testMessageFailed": "Testnachricht fehlgeschlagen: "
   },
   "auditLog": {
     "title": "Audit-Log",
@@ -963,7 +968,8 @@
         "confirmed": "Abonnement bestätigt",
         "unsubscribed": "Abonnement beendet",
         "deleted": "Abonnent gelöscht",
-        "confirmation_email_failed": "Bestätigungs-E-Mail fehlgeschlagen"
+        "confirmation_email_failed": "Bestätigungs-E-Mail fehlgeschlagen",
+        "test_message_failed": "Testnachricht fehlgeschlagen"
       },
       "system_setting": {
         "updated": "Systemeinstellung geändert"
@@ -1564,6 +1570,9 @@
       "server_error": "Auf dem Server ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
       "forbidden": "Dafür fehlt dir die Berechtigung.",
       "email_invalid": "Bitte gib eine gültige E-Mail-Adresse an.",
+      "channel_invalid": "Unbekannter Kanal.",
+      "mail_send_failed": "Die E-Mail konnte nicht gesendet werden. Bitte prüfe die SMTP-Einstellungen oder versuche es später erneut.",
+      "email_disabled": "Der E-Mail-Versand ist in den Systemeinstellungen abgeschaltet.",
       "email_taken": "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.",
       "name_required": "Bitte gib einen Namen an.",
       "slug_required": "Bitte gib einen Slug an.",

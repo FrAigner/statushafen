@@ -28,6 +28,8 @@ const (
 	modePageRole guardMode = "page_role"
 	// modeAny: mindestens eines der Rechte (RequireAnyPermission).
 	modeAny guardMode = "any"
+	// modeAnyAction: one of several actions on one resource (RequireAnyPermission).
+	modeAnyAction guardMode = "any_action"
 	// modeAll: alle Rechte (RequireAllPermissions).
 	modeAll guardMode = "all"
 	// modeKind: Ressource folgt der Art des Datensatzes (Vorfall/Wartung).
@@ -39,8 +41,10 @@ type routeGuard struct {
 	Mode      guardMode
 	Resources []string
 	Action    string
-	mw        gin.HandlerFunc
-	pre       []gin.HandlerFunc
+	// Actions: all accepted actions (modeAnyAction only).
+	Actions []string
+	mw      gin.HandlerFunc
+	pre     []gin.HandlerFunc
 }
 
 // routeInfo ist der Registry-Eintrag einer Route.
@@ -48,6 +52,7 @@ type routeInfo struct {
 	Mode      guardMode
 	Resources []string
 	Action    string
+	Actions   []string
 }
 
 var (
@@ -103,6 +108,17 @@ func anyOf(action string, resources ...string) routeGuard {
 		mw: middleware.RequireAnyPermission(perms...)}
 }
 
+// anyAction requires one of actions on resource. The first action is the one
+// the HTTP method check compares against.
+func anyAction(resource string, actions ...string) routeGuard {
+	perms := make([]string, len(actions))
+	for i, a := range actions {
+		perms[i] = permissions.Perm(resource, a)
+	}
+	return routeGuard{Mode: modeAnyAction, Resources: []string{resource}, Action: actions[0], Actions: actions,
+		mw: middleware.RequireAnyPermission(perms...)}
+}
+
 // allOf verlangt action auf allen Ressourcen.
 func allOf(action string, resources ...string) routeGuard {
 	perms := make([]string, len(resources))
@@ -140,6 +156,6 @@ func guarded(group *gin.RouterGroup, method, path string, guard routeGuard, hand
 		full = strings.TrimRight(full, "/") + path
 	}
 	routeRegistryMu.Lock()
-	routeRegistry[method+" "+full] = routeInfo{Mode: guard.Mode, Resources: guard.Resources, Action: guard.Action}
+	routeRegistry[method+" "+full] = routeInfo{Mode: guard.Mode, Resources: guard.Resources, Action: guard.Action, Actions: guard.Actions}
 	routeRegistryMu.Unlock()
 }

@@ -562,6 +562,8 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	// Subscribers – scoped under /pages/:page_id
 	guarded(authGroup, http.MethodGet, "/pages/:page_id/subscribers", need("subscribers", permissions.Read), h.GetSubscribersHandler)
 	guarded(authGroup, http.MethodPost, "/pages/:page_id/subscribers", need("subscribers", permissions.Create), middleware.NewRateLimiter(20, time.Minute), h.CreateSubscriberAdminHandler)
+	// Test message from the subscriber form (create or edit), before saving.
+	guarded(authGroup, http.MethodPost, "/pages/:page_id/subscribers/test", anyAction("subscribers", permissions.Create, permissions.Update), middleware.NewRateLimiter(5, time.Minute), h.SendSubscriberTestMessageHandler)
 	guarded(authGroup, http.MethodPut, "/pages/:page_id/subscribers/:id", need("subscribers", permissions.Update), notifyChange, h.UpdateSubscriberHandler)
 	guarded(authGroup, http.MethodDelete, "/pages/:page_id/subscribers/:id", need("subscribers", permissions.Delete), h.DeleteSubscriberHandler)
 

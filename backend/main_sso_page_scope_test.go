@@ -221,6 +221,7 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"DELETE /api/pages/:page_id/ui-overrides":                                           ssoPageRoute,
 	"GET /api/pages/:page_id/subscribers":                                               ssoPageRoute,
 	"POST /api/pages/:page_id/subscribers":                                              ssoPageRoute,
+	"POST /api/pages/:page_id/subscribers/test":                                         ssoPageRoute,
 	"PUT /api/pages/:page_id/subscribers/:id":                                           ssoPageRoute,
 	"DELETE /api/pages/:page_id/subscribers/:id":                                        ssoPageRoute,
 }
