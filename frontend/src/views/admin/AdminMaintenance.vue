@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
+import { vHelp } from '../../directives/vHelp'
 import { useApi, isForbidden } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
 import { useResourcePerms } from '../../composables/useResourcePerms'
@@ -327,12 +328,12 @@ const onMenuSelect = (item, key) => {
     <!-- Alert -->
     <div v-if="alertMsg" :class="`alert alert-${alertType} fade-in mb-16`">
       <span>{{ alertMsg }}</span>
-      <button class="alert-close" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+      <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
     </div>
 
     <PageHeader :level="2" :title="t('maintenance.title')" :subtitle="forbidden ? null : subtitle" :breadcrumbs="breadcrumbs">
       <template v-if="canCreate" #actions>
-        <OnyxButton :label="t('maintenance.newButton')" @click="openNew" />
+        <OnyxButton v-help="'maintenance.newWindow'" :label="t('maintenance.newButton')" @click="openNew" />
       </template>
     </PageHeader>
 
@@ -343,7 +344,7 @@ const onMenuSelect = (item, key) => {
       <ListCard :title="t('maintenance.cardTitle')" class="split__main">
         <template #tools>
           <SegmentControl v-model="filter" :options="filterOptions" :label="t('maintenance.filterLabel')" />
-          <SearchBox v-model="query" :label="t('maintenance.searchLabel')" :placeholder="t('maintenance.searchPlaceholder')" />
+          <SearchBox v-model="query" v-help="'maintenance.search'" :label="t('maintenance.searchLabel')" :placeholder="t('maintenance.searchPlaceholder')" />
         </template>
         <p v-if="searching" class="sr-only" role="status">{{ t('patterns.searchResult', { n: rows.length }, rows.length) }}</p>
 
@@ -360,13 +361,13 @@ const onMenuSelect = (item, key) => {
           <template #cell-ScheduledStartAt="{ item }"><span class="cell-changed">{{ formatDate(item.ScheduledStartAt) }}</span></template>
           <template #cell-ScheduledEndAt="{ item }"><span class="cell-changed">{{ formatDate(item.ScheduledEndAt) }}</span></template>
           <template #actions="{ item }">
-            <RowMenu :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
+            <RowMenu v-help="'maintenance.rowActions'" :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
           </template>
         </ResponsiveTable>
         <EmptyState v-else-if="items.length" :title="t('maintenance.noResults')" :text="t('maintenance.noResultsText')" />
         <ListState v-else :loading="loading" :error="loadFailed" :count="items.length" :empty-text="t('maintenance.empty')" icon="clock" />
         <div v-if="hasMore" class="list-more">
-          <OnyxButton :label="t('incidents.loadMore')" mode="outline" :disabled="loadingMore" data-test="load-more" @click="loadMore" />
+          <OnyxButton v-help="'maintenance.loadMore'" :label="t('incidents.loadMore')" mode="outline" :disabled="loadingMore" data-test="load-more" @click="loadMore" />
         </div>
       </ListCard>
 
@@ -376,18 +377,18 @@ const onMenuSelect = (item, key) => {
           <FormLanguageSwitch :trans="trans" />
           <fieldset class="form-lock" :disabled="formReadOnly">
 
-          <FormField v-if="currentEditId === null && templates.length > 0" v-slot="f" :label="t('maintenance.templateLabel')">
+          <FormField v-if="currentEditId === null && templates.length > 0" v-slot="f" :label="t('maintenance.templateLabel')" help="maintenance.template">
             <select :id="f.id" :value="selectedTemplateId" @change="onTemplateChange">
               <option value="">{{ t('maintenance.noTemplatePlaceholder') }}</option>
               <option v-for="tpl in templates" :key="tpl.ID" :value="String(tpl.ID)">{{ tpl.Name }}</option>
             </select>
           </FormField>
 
-          <FormField v-slot="f" required :label="t('maintenance.fieldTitle')" :error="onDefaultLang ? errors.Title || null : null">
+          <FormField v-slot="f" required :label="t('maintenance.fieldTitle')" help="maintenance.title" :error="onDefaultLang ? errors.Title || null : null">
             <input :id="f.id" v-model="titleModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('maintenance.titlePlaceholder')" @input="clearError('Title')">
           </FormField>
 
-          <FormField v-slot="f" required :label="t('maintenance.fieldMessage')" :error="onDefaultLang ? errors.Message || null : null">
+          <FormField v-slot="f" required :label="t('maintenance.fieldMessage')" help="maintenance.message" :error="onDefaultLang ? errors.Message || null : null">
             <RichTextEditor :id="f.id" v-model="messageModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('maintenance.messagePlaceholder')" @input="clearError('Message')" />
           </FormField>
 
@@ -398,28 +399,29 @@ const onMenuSelect = (item, key) => {
           <FormMultiSelect
             v-model="formData.ComponentIDs"
             :label="t('maintenance.fieldComponents')"
+            help="maintenance.components"
             :options="componentOptions(components, formData.ComponentIDs)"
             required
             :error="errors.ComponentIDs || null"
             @update:model-value="clearError('ComponentIDs')"
           />
 
-          <TagField v-if="canSelectTags" :label="t('maintenance.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
+          <TagField v-if="canSelectTags" v-help="'maintenance.tags'" :label="t('maintenance.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
 
           <div class="form-grid">
-            <FormField v-slot="f" required :label="t('maintenance.fieldStart')" :error="errors.ScheduledStartAt || null">
+            <FormField v-slot="f" required :label="t('maintenance.fieldStart')" help="maintenance.start" :error="errors.ScheduledStartAt || null">
               <input :id="f.id" v-model="formData.ScheduledStartAt" type="datetime-local" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" @input="clearError('ScheduledStartAt')">
             </FormField>
-            <FormField v-slot="f" required :label="t('maintenance.fieldEnd')" :error="errors.ScheduledEndAt || null">
+            <FormField v-slot="f" required :label="t('maintenance.fieldEnd')" help="maintenance.end" :error="errors.ScheduledEndAt || null">
               <input :id="f.id" v-model="formData.ScheduledEndAt" type="datetime-local" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" @input="clearError('ScheduledEndAt')">
             </FormField>
           </div>
 
           <div class="form-grid">
-            <FormField v-slot="f" :label="t('maintenance.fieldReminderValue')">
+            <FormField v-slot="f" :label="t('maintenance.fieldReminderValue')" help="maintenance.reminder">
               <input :id="f.id" v-model="formData.reminderValue" type="number" min="0">
             </FormField>
-            <FormField v-slot="f" :label="t('maintenance.fieldReminderUnit')">
+            <FormField v-slot="f" :label="t('maintenance.fieldReminderUnit')" help="maintenance.reminder">
               <select :id="f.id" v-model="formData.reminderUnit">
                 <option v-for="opt in reminderUnitOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
               </select>
@@ -428,8 +430,8 @@ const onMenuSelect = (item, key) => {
 
           </fieldset>
           <div class="form-actions">
-            <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
-            <OnyxButton v-if="!formReadOnly" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
+            <OnyxButton v-help="'maintenance.cancel'" :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
+            <OnyxButton v-if="!formReadOnly" v-help="'maintenance.save'" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
       </FormPanel>

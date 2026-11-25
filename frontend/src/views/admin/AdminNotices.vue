@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { OnyxButton, OnyxCheckbox } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
+import { vHelp } from '../../directives/vHelp'
 import { useApi } from '../../composables/useApi'
 import { useResourcePerms } from '../../composables/useResourcePerms'
 import { useTenant } from '../../composables/useTenant'
@@ -211,12 +212,12 @@ const onMenuSelect = (item, key) => {
     <!-- Alert -->
     <div v-if="alertMsg" :class="`alert alert-${alertType} fade-in mb-16`">
       <span>{{ alertMsg }}</span>
-      <button class="alert-close" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+      <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
     </div>
 
     <PageHeader :level="2" :title="t('notices.title')" :subtitle="subtitle" :breadcrumbs="breadcrumbs">
       <template v-if="canCreate" #actions>
-        <OnyxButton :label="t('notices.newButton')" @click="openNew" />
+        <OnyxButton v-help="'notices.newNotice'" :label="t('notices.newButton')" @click="openNew" />
       </template>
     </PageHeader>
 
@@ -225,7 +226,7 @@ const onMenuSelect = (item, key) => {
       <ListCard :title="t('notices.cardTitle')" class="split__main">
         <template #tools>
           <SegmentControl v-model="filter" :options="filterOptions" :label="t('notices.filterLabel')" />
-          <SearchBox v-model="query" :label="t('notices.searchLabel')" :placeholder="t('notices.searchPlaceholder')" />
+          <SearchBox v-model="query" v-help="'notices.search'" :label="t('notices.searchLabel')" :placeholder="t('notices.searchPlaceholder')" />
         </template>
         <p v-if="searching" class="sr-only" role="status">{{ t('patterns.searchResult', { n: rows.length }, rows.length) }}</p>
 
@@ -249,7 +250,7 @@ const onMenuSelect = (item, key) => {
           <template #cell-CreatedAt="{ item }"><RelativeTime :value="item.CreatedAt" /></template>
           <template #actions="{ item }">
             <!-- Übersetzungen nur noch über das Zeilenmenü. -->
-            <RowMenu :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
+            <RowMenu v-help="'notices.rowActions'" :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
           </template>
         </ResponsiveTable>
         <EmptyState v-else-if="items.length" :title="t('notices.noResults')" :text="t('notices.noResultsText')" />
@@ -262,44 +263,44 @@ const onMenuSelect = (item, key) => {
           <FormLanguageSwitch :trans="trans" />
           <fieldset class="form-lock" :disabled="formReadOnly">
 
-          <FormField v-slot="f" required :label="t('notices.fieldTitle')" :error="onDefaultLang ? errors.Title || null : null">
+          <FormField v-slot="f" required :label="t('notices.fieldTitle')" help="notices.title" :error="onDefaultLang ? errors.Title || null : null">
             <input :id="f.id" v-model="titleModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('notices.titlePlaceholder')" @input="clearError('Title')">
           </FormField>
 
-          <FormField v-slot="f" required :label="t('notices.fieldMessage')" :error="onDefaultLang ? errors.Message || null : null">
+          <FormField v-slot="f" required :label="t('notices.fieldMessage')" help="notices.message" :error="onDefaultLang ? errors.Message || null : null">
             <RichTextEditor :id="f.id" v-model="messageModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('notices.messagePlaceholder')" @input="clearError('Message')" />
           </FormField>
 
           <FormLanguageDone :trans="trans" />
 
-          <FormField v-slot="f" required :label="t('notices.fieldLevel')">
+          <FormField v-slot="f" required :label="t('notices.fieldLevel')" help="notices.level">
             <select :id="f.id" v-model="formData.Level" :required="f.required">
               <option v-for="opt in levelOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
           </FormField>
 
           <div class="notice-options">
-            <OnyxCheckbox v-model="formData.IsActive" :label="t('notices.fieldActive')" />
-            <OnyxCheckbox v-model="formData.Collapsed" :label="t('notices.fieldCollapsed')" />
+            <OnyxCheckbox v-model="formData.IsActive" v-help="'notices.active'" :label="t('notices.fieldActive')" />
+            <OnyxCheckbox v-model="formData.Collapsed" v-help="'notices.collapsed'" :label="t('notices.fieldCollapsed')" />
             <!-- Opt-in-Mailversand. Beim Anlegen (bzw. Erst-Aktivierung
                  einer inaktiven Notice) wird eine Mail an alle Email-Subscriber
                  dieser Statusseite geschickt. -->
-            <OnyxCheckbox v-model="formData.NotifySubscribers" :label="t('notices.fieldNotifySubscribers')" />
+            <OnyxCheckbox v-model="formData.NotifySubscribers" v-help="'notices.notifySubscribers'" :label="t('notices.fieldNotifySubscribers')" />
           </div>
 
           <div class="form-grid">
-            <FormField v-slot="f" :label="t('notices.fieldStart')">
+            <FormField v-slot="f" :label="t('notices.fieldStart')" help="notices.start">
               <input :id="f.id" v-model="formData.StartAt" type="datetime-local">
             </FormField>
-            <FormField v-slot="f" :label="t('notices.fieldEnd')">
+            <FormField v-slot="f" :label="t('notices.fieldEnd')" help="notices.end">
               <input :id="f.id" v-model="formData.EndAt" type="datetime-local">
             </FormField>
           </div>
 
           </fieldset>
           <div class="form-actions">
-            <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
-            <OnyxButton v-if="!formReadOnly" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
+            <OnyxButton v-help="'notices.cancel'" :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
+            <OnyxButton v-if="!formReadOnly" v-help="'notices.save'" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
       </FormPanel>

@@ -1827,6 +1827,145 @@
     "saveError": "Hilfe-Einstellung konnte nicht gespeichert werden. Sie gilt nur, bis die Seite neu geladen wird."
   },
   "help": {
+    "maintenance": {
+      "newWindow": {
+        "what": "Öffnet ein leeres Formular, um ein neues Wartungsfenster auf der gerade gewählten Statusseite zu planen.",
+        "effect": "Angelegt wird erst mit „Speichern“. Den Status setzt Statushafen danach selbst aus Start und Ende: Geplant, Läuft, Abgeschlossen.",
+        "example": "Für das Datenbank-Update am Samstag von 02:00 bis 03:00 Uhr ein Wartungsfenster anlegen."
+      },
+      "search": {
+        "what": "Filtert die Liste nach Titel, Nachricht und betroffenen Komponenten.",
+        "effect": "Es ändert sich nur die Ansicht, nichts wird gespeichert. Die Suche wirkt zusammen mit dem Zustandsfilter daneben.",
+        "example": "„API“ eingeben, um alle Wartungen zu sehen, die die API betreffen."
+      },
+      "rowActions": {
+        "what": "Das Menü „…“ in der Zeile bietet „Bearbeiten“ (nur bei geplanten Fenstern; ohne Änderungsrecht „Ansehen“) und „Löschen“ (nach einer Rückfrage).",
+        "effect": "Laufende und abgeschlossene Fenster lassen sich nicht mehr bearbeiten, weil der Ablauf schon begonnen hat. Löschen entfernt das Fenster samt Erinnerung von der Statusseite und lässt sich in der Oberfläche nicht rückgängig machen; der Status der Komponenten wird dabei nicht zurückgesetzt.",
+        "example": "Eine abgesagte Wartung löschen, bevor sie startet, damit sie nicht mehr unter „Geplante Wartungsarbeiten“ steht."
+      },
+      "loadMore": {
+        "what": "Lädt die nächsten bis zu 200 Wartungsfenster nach. Erscheint nur, wenn es weitere gibt.",
+        "effect": "Die neuen Einträge werden an die Liste angehängt; Suche und Filter wirken danach auch auf sie. Gespeichert wird nichts.",
+        "example": "Ein Fenster aus dem Vorjahr wird nicht gefunden: „Weitere laden“ klicken und erneut suchen."
+      },
+      "template": {
+        "what": "Wählt eine Wartungsvorlage (aus „Vorlagen“) als Ausgangspunkt. Erscheint nur beim Neuanlegen und wenn es Vorlagen gibt.",
+        "effect": "Titel, Nachricht und betroffene Komponenten werden aus der Vorlage übernommen, mit Sprachumschalter auch die Texte der weiteren Sprachen. Start und Ende kommen nie aus der Vorlage. Danach bleibt alles frei änderbar.",
+        "example": "Vorlage „DB-Wartung“ wählen, nur noch die Zeiten setzen und speichern."
+      },
+      "title": {
+        "what": "Die Überschrift des Wartungsfensters. Pflichtfeld.",
+        "effect": "Steht auf der öffentlichen Statusseite unter „Geplante Wartungsarbeiten“, ab dem Start bei den aktuellen Vorfällen, und in den Benachrichtigungen.",
+        "example": "„Datenbank-Update EU-West“."
+      },
+      "message": {
+        "what": "Die Beschreibung für Besucher, mit Formatierung über die Werkzeugleiste (fett, Listen, Links). Pflichtfeld; „Vorschau“ zeigt das Ergebnis.",
+        "effect": "Erscheint auf der öffentlichen Statusseite beim Wartungsfenster und in den Benachrichtigungen an interne Nutzer und Abonnenten.",
+        "example": "„Die Datenbank wird aktualisiert. Zwischen 02:00 und 03:00 Uhr sind kurze Unterbrechungen der API möglich.“"
+      },
+      "components": {
+        "what": "Die Komponenten, die während der Wartung betroffen sind. Mehrfachauswahl, mindestens eine.",
+        "effect": "Ab dem Start stehen sie auf „Wartung“, ab dem Ende wieder auf „Betriebsbereit“, auch wenn sie vorher gestört waren. Benachrichtigt werden Abonnenten, die mindestens eine davon abonniert haben.",
+        "example": "„API“ und „Web-App“ wählen, wenn beide während des Datenbank-Updates ausfallen können."
+      },
+      "tags": {
+        "what": "Grenzt die Reichweite des Wartungsfensters über Tags ein, etwa nach Region. Optional, nur für Global Admins sichtbar.",
+        "effect": "Besucher können auf der Statusseite nach diesen Tags filtern, und interne Mails gehen nur an Nutzer mit passenden Tags. Wer selbst Tags hat, darf nur Fenster mit einem gemeinsamen Tag bearbeiten.",
+        "example": "Tag „EU“ setzen: Die Wartung erscheint im Filter „EU“, ein Bearbeiter mit nur „US“ kann sie nicht ändern."
+      },
+      "start": {
+        "what": "Beginn der geplanten Arbeiten, in deiner lokalen Zeit. Pflichtfeld.",
+        "effect": "Zum Start (geprüft jede Minute) wechselt das Fenster auf „Läuft“, die Komponenten gehen auf „Wartung“, und es wird „Gestartet“ benachrichtigt. Liegt der Start beim Anlegen schon in der Vergangenheit, läuft die Wartung sofort.",
+        "example": "Samstag, 02:00 Uhr."
+      },
+      "end": {
+        "what": "Geplantes Ende der Arbeiten. Pflichtfeld; muss nach dem Start liegen.",
+        "effect": "Zum Ende wechselt das Fenster auf „Abgeschlossen“, die Komponenten gehen auf „Betriebsbereit“ zurück, und es wird „Beendet“ benachrichtigt. In der 90-Tage-Verfügbarkeit zählt die Zeit nicht als Ausfall.",
+        "example": "Samstag, 03:00 Uhr."
+      },
+      "reminder": {
+        "what": "Vorlauf für eine Erinnerung vor dem Start: Zahl und Einheit (Minuten, Stunden, Tage). 0 bedeutet keine Erinnerung.",
+        "effect": "Statushafen schickt die Erinnerung einmalig, sobald der Start näher ist als der Vorlauf, an interne Nutzer und betroffene Abonnenten. Ist der Vorlauf beim Speichern schon unterschritten, geht sie innerhalb einer Minute raus.",
+        "example": "„1“ und „Tage“: Abonnenten werden einen Tag vor dem Datenbank-Update erinnert."
+      },
+      "save": {
+        "what": "Speichert das Formular.",
+        "effect": "Legt das Wartungsfenster an oder übernimmt die Änderungen. Es gilt sofort auf der Statusseite, interne Nutzer und betroffene Abonnenten werden benachrichtigt, und der Eintrag steht im Audit-Log. Ohne Titel, Nachricht, Komponente, Start und Ende wird nicht gespeichert.",
+        "example": "Das Ende von 03:00 auf 04:00 Uhr verschieben und speichern."
+      },
+      "cancel": {
+        "what": "Schließt das Formular, ohne zu speichern.",
+        "effect": "Ungespeicherte Eingaben gehen verloren, das Wartungsfenster bleibt, wie es war.",
+        "example": "Versehentlich „Bearbeiten“ geklickt: „Abbrechen“ führt ohne Änderung zurück zur Liste."
+      }
+    },
+    "notices": {
+      "newNotice": {
+        "what": "Öffnet ein leeres Formular für eine neue Ankündigung auf der gerade gewählten Statusseite.",
+        "effect": "Angelegt wird erst mit „Speichern“. Ankündigungen sind allgemeine Hinweise ohne Komponenten und ohne Status-Verlauf.",
+        "example": "Auf geänderte Supportzeiten hinweisen."
+      },
+      "search": {
+        "what": "Filtert die Liste nach Titel und Nachricht.",
+        "effect": "Es ändert sich nur die Ansicht, nichts wird gespeichert. Die Suche wirkt zusammen mit dem Filter Aktiv/Inaktiv daneben.",
+        "example": "„Support“ eingeben, um alle Ankündigungen zu Supportzeiten zu finden."
+      },
+      "rowActions": {
+        "what": "Das Menü „…“ in der Zeile bietet „Bearbeiten“ (ohne Änderungsrecht „Ansehen“), bei mehreren Sprachen „Übersetzungen“ und „Löschen“ (nach einer Rückfrage).",
+        "effect": "Löschen entfernt die Ankündigung sofort von der Statusseite und lässt sich in der Oberfläche nicht rückgängig machen; Mails werden dabei nicht verschickt. Wer sie nur ausblenden will, nimmt „Aktiv“ heraus.",
+        "example": "Eine veraltete Ankündigung zu einer längst eingeführten Funktion löschen."
+      },
+      "title": {
+        "what": "Die Überschrift der Ankündigung. Pflichtfeld.",
+        "effect": "Steht auf der öffentlichen Statusseite im Abschnitt „Ankündigungen“ und im Betreff der Mails an Abonnenten.",
+        "example": "„Neue Supportzeiten“."
+      },
+      "message": {
+        "what": "Der Text der Ankündigung, mit Formatierung über die Werkzeugleiste (fett, Listen, Links). Pflichtfeld; „Vorschau“ zeigt das Ergebnis.",
+        "effect": "Erscheint auf der öffentlichen Statusseite unter dem Titel und, falls eingeschaltet, in den Mails an Abonnenten.",
+        "example": "„Ab 1. 11. sind wir rund um die Uhr erreichbar.“"
+      },
+      "level": {
+        "what": "Die Stufe der Ankündigung: Info, Warnung oder Kritisch.",
+        "effect": "Bestimmt Farbe und Symbol auf der öffentlichen Statusseite und das Präfix im Standard-Betreff der Mails ([INFO], [WARN], [CRITICAL]). Ob und wann sie erscheint, hängt nicht davon ab.",
+        "example": "Neue Funktion: „Info“. Abschaltung eines alten Zugangs nächste Woche: „Warnung“."
+      },
+      "active": {
+        "what": "Schaltet die Ankündigung ein oder aus.",
+        "effect": "Nur aktive Ankündigungen erscheinen öffentlich, und nur innerhalb von Beginn und Ende. Ist „Subscriber per E-Mail benachrichtigen“ gesetzt, löst das Einschalten die Mail „Erstellt“ und das Ausschalten die Mail „Beendet“ aus.",
+        "example": "Eine vorbereitete Ankündigung erst inaktiv speichern und am Stichtag aktivieren."
+      },
+      "collapsed": {
+        "what": "Zeigt die Ankündigung eingeklappt an, um Platz zu sparen.",
+        "effect": "Sie steht auf der Statusseite nicht direkt sichtbar, sondern gesammelt hinter „… weitere Ankündigung(en) anzeigen“.",
+        "example": "Einen dauerhaften, weniger wichtigen Hinweis zu Datenschutz-Änderungen einklappen."
+      },
+      "notifySubscribers": {
+        "what": "Verschickt Mails zu dieser Ankündigung an alle aktiven E-Mail-Abonnenten der Statusseite.",
+        "effect": "Gemailt wird beim Anlegen oder Aktivieren („Erstellt“), beim Bearbeiten einer aktiven Ankündigung („Aktualisiert“) und beim Deaktivieren („Beendet“). Ohne Haken geht keine Mail raus; Webhook-Abonnenten erhalten Ankündigungen nie.",
+        "example": "Bei geänderten Supportzeiten einschalten, bei einem kleinen Hinweis zur Darstellung aus lassen."
+      },
+      "start": {
+        "what": "Ab wann die Ankündigung angezeigt wird, in deiner lokalen Zeit. Optional.",
+        "effect": "Vor diesem Zeitpunkt ist sie auch aktiv nicht öffentlich sichtbar. Leer bedeutet: sofort.",
+        "example": "1. 11., 00:00 Uhr, damit der Hinweis erst ab dem Stichtag erscheint."
+      },
+      "end": {
+        "what": "Bis wann die Ankündigung angezeigt wird. Optional; muss nach dem Beginn liegen.",
+        "effect": "Danach verschwindet sie von der Statusseite, bleibt aber in dieser Liste und gilt weiter als aktiv. Leer bedeutet: unbegrenzt.",
+        "example": "Ende der Aktionswoche, damit der Hinweis nicht von Hand entfernt werden muss."
+      },
+      "save": {
+        "what": "Speichert das Formular.",
+        "effect": "Legt die Ankündigung an oder übernimmt die Änderungen. Sie gilt sofort auf der Statusseite und steht im Audit-Log; je nach „Subscriber per E-Mail benachrichtigen“ gehen Mails raus. Ohne Titel und Nachricht wird nicht gespeichert.",
+        "example": "Die Stufe von „Info“ auf „Warnung“ ändern und speichern."
+      },
+      "cancel": {
+        "what": "Schließt das Formular, ohne zu speichern.",
+        "effect": "Ungespeicherte Eingaben gehen verloren, die Ankündigung bleibt, wie sie war.",
+        "example": "Versehentlich „Bearbeiten“ geklickt: „Abbrechen“ führt ohne Änderung zurück zur Liste."
+      }
+    },
     "parts": {
       "what": "Was",
       "effect": "Auswirkung",

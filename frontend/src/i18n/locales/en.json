@@ -1827,6 +1827,145 @@
     "saveError": "Could not save the help setting. It only applies until the page is reloaded."
   },
   "help": {
+    "maintenance": {
+      "newWindow": {
+        "what": "Opens an empty form to schedule a new maintenance window on the currently selected status page.",
+        "effect": "Nothing is created until you click “Save”. Statushafen then sets the status itself from start and end: Scheduled, In Progress, Completed.",
+        "example": "Create a maintenance window for the database update on Saturday from 02:00 to 03:00."
+      },
+      "search": {
+        "what": "Filters the list by title, message and affected components.",
+        "effect": "Only the view changes, nothing is saved. The search combines with the state filter next to it.",
+        "example": "Type “API” to see all maintenance windows affecting the API."
+      },
+      "rowActions": {
+        "what": "The “…” menu in the row offers “Edit” (scheduled windows only; “View” without edit permission) and “Delete” (after a confirmation).",
+        "effect": "Running and completed windows can no longer be edited because their flow has already started. Deleting removes the window and its reminder from the status page and cannot be undone in the interface; the components' status is not reset.",
+        "example": "Delete a cancelled maintenance before it starts so it no longer shows under “Scheduled Maintenance”."
+      },
+      "loadMore": {
+        "what": "Loads the next up to 200 maintenance windows. Only shown when there are more.",
+        "effect": "The new entries are appended to the list; search and filter then apply to them as well. Nothing is saved.",
+        "example": "A window from last year is not found: click “Load more” and search again."
+      },
+      "template": {
+        "what": "Picks a maintenance template (from “Templates”) as a starting point. Only shown when creating and when templates exist.",
+        "effect": "Title, message and affected components are taken from the template, with the language switch also the texts of the other languages. Start and end never come from the template. Everything stays editable afterwards.",
+        "example": "Pick the template “DB maintenance”, set only the times and save."
+      },
+      "title": {
+        "what": "The heading of the maintenance window. Required.",
+        "effect": "Shown on the public status page under “Scheduled Maintenance”, from the start with the current incidents, and in the notifications.",
+        "example": "“Database update EU-West”."
+      },
+      "message": {
+        "what": "The description for visitors, with formatting via the toolbar (bold, lists, links). Required; “Preview” shows the result.",
+        "effect": "Appears on the public status page with the maintenance window and in the notifications to internal users and subscribers.",
+        "example": "“The database is being updated. Short API interruptions are possible between 02:00 and 03:00.”"
+      },
+      "components": {
+        "what": "The components affected during the maintenance. Multiple choice, at least one.",
+        "effect": "From the start they are set to “Maintenance”, from the end back to “Operational”, even if they had an outage before. Subscribers who subscribed to at least one of them are notified.",
+        "example": "Pick “API” and “Web app” if both may be unavailable during the database update."
+      },
+      "tags": {
+        "what": "Limits the scope of the maintenance window via tags, for example by region. Optional, only visible to global admins.",
+        "effect": "Visitors can filter by these tags on the status page, and internal emails only go to users with matching tags. Users who have tags themselves may only edit windows that share a tag with them.",
+        "example": "Set the tag “EU”: the maintenance shows up under the filter “EU”, and an editor with only “US” cannot change it."
+      },
+      "start": {
+        "what": "Start of the planned work, in your local time. Required.",
+        "effect": "At the start (checked every minute) the window switches to “In Progress”, the components go to “Maintenance” and a “Started” notification is sent. If the start is already in the past when you create it, the maintenance runs immediately.",
+        "example": "Saturday, 02:00."
+      },
+      "end": {
+        "what": "Planned end of the work. Required; must be after the start.",
+        "effect": "At the end the window switches to “Completed”, the components return to “Operational” and an “Ended” notification is sent. The time does not count as downtime in the 90-day availability.",
+        "example": "Saturday, 03:00."
+      },
+      "reminder": {
+        "what": "Lead time for a reminder before the start: number and unit (minutes, hours, days). 0 means no reminder.",
+        "effect": "Statushafen sends the reminder once, as soon as the start is closer than the lead time, to internal users and affected subscribers. If the lead time has already passed when you save, it goes out within a minute.",
+        "example": "“1” and “Days”: subscribers are reminded one day before the database update."
+      },
+      "save": {
+        "what": "Saves the form.",
+        "effect": "Creates the maintenance window or applies your changes. It takes effect on the status page immediately, internal users and affected subscribers are notified, and the entry is recorded in the audit log. Nothing is saved without title, message, component, start and end.",
+        "example": "Move the end from 03:00 to 04:00 and save."
+      },
+      "cancel": {
+        "what": "Closes the form without saving.",
+        "effect": "Unsaved input is discarded; the maintenance window stays as it was.",
+        "example": "Clicked “Edit” by mistake: “Cancel” takes you back to the list without changes."
+      }
+    },
+    "notices": {
+      "newNotice": {
+        "what": "Opens an empty form for a new notice on the currently selected status page.",
+        "effect": "Nothing is created until you click “Save”. Notices are general messages without components and without a status history.",
+        "example": "Announce changed support hours."
+      },
+      "search": {
+        "what": "Filters the list by title and message.",
+        "effect": "Only the view changes, nothing is saved. The search combines with the active/inactive filter next to it.",
+        "example": "Type “support” to find all notices about support hours."
+      },
+      "rowActions": {
+        "what": "The “…” menu in the row offers “Edit” (“View” without edit permission), “Translations” when there are several languages, and “Delete” (after a confirmation).",
+        "effect": "Deleting removes the notice from the status page immediately and cannot be undone in the interface; no emails are sent. To just hide it, untick “Active”.",
+        "example": "Delete an outdated notice about a feature that was introduced long ago."
+      },
+      "title": {
+        "what": "The heading of the notice. Required.",
+        "effect": "Shown on the public status page in the “Announcements” section and in the subject of emails to subscribers.",
+        "example": "“New support hours”."
+      },
+      "message": {
+        "what": "The text of the notice, with formatting via the toolbar (bold, lists, links). Required; “Preview” shows the result.",
+        "effect": "Appears on the public status page below the title and, if enabled, in the emails to subscribers.",
+        "example": "“From 1 Nov we are available around the clock.”"
+      },
+      "level": {
+        "what": "The level of the notice: Info, Warning or Critical.",
+        "effect": "Determines color and icon on the public status page and the prefix in the default email subject ([INFO], [WARN], [CRITICAL]). Whether and when the notice appears does not depend on it.",
+        "example": "New feature: “Info”. Shutdown of an old access next week: “Warning”."
+      },
+      "active": {
+        "what": "Switches the notice on or off.",
+        "effect": "Only active notices appear publicly, and only between start and end. If “Notify subscribers by email” is set, switching on triggers the “Created” email and switching off the “Ended” email.",
+        "example": "Save a prepared notice as inactive first and activate it on the due date."
+      },
+      "collapsed": {
+        "what": "Shows the notice collapsed to save space.",
+        "effect": "It is not shown directly on the status page but grouped behind “Show … more announcement(s)”.",
+        "example": "Collapse a permanent, less important note about privacy changes."
+      },
+      "notifySubscribers": {
+        "what": "Sends emails about this notice to all active email subscribers of the status page.",
+        "effect": "Emails go out on creation or activation (“Created”), when an active notice is edited (“Updated”) and on deactivation (“Ended”). Without the tick no email is sent; webhook subscribers never receive notices.",
+        "example": "Switch it on for changed support hours, leave it off for a small note about the layout."
+      },
+      "start": {
+        "what": "From when the notice is shown, in your local time. Optional.",
+        "effect": "Before this time it is not publicly visible, even when active. Empty means: immediately.",
+        "example": "1 Nov, 00:00, so the note only appears from the due date."
+      },
+      "end": {
+        "what": "Until when the notice is shown. Optional; must be after the start.",
+        "effect": "Afterwards it disappears from the status page but stays in this list and still counts as active. Empty means: unlimited.",
+        "example": "End of the promotion week, so the note does not have to be removed by hand."
+      },
+      "save": {
+        "what": "Saves the form.",
+        "effect": "Creates the notice or applies your changes. It takes effect on the status page immediately and is recorded in the audit log; emails go out depending on “Notify subscribers by email”. Nothing is saved without title and message.",
+        "example": "Change the level from “Info” to “Warning” and save."
+      },
+      "cancel": {
+        "what": "Closes the form without saving.",
+        "effect": "Unsaved input is discarded; the notice stays as it was.",
+        "example": "Clicked “Edit” by mistake: “Cancel” takes you back to the list without changes."
+      }
+    },
     "parts": {
       "what": "What",
       "effect": "Effect",

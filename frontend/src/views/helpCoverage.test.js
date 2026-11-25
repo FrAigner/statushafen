@@ -14,6 +14,8 @@ import AdminExternalSources from './admin/AdminExternalSources.vue'
 import AdminOverview from './admin/AdminOverview.vue'
 import AdminIncidents from './admin/AdminIncidents.vue'
 import AdminIncidentDetail from './admin/AdminIncidentDetail.vue'
+import AdminMaintenance from './admin/AdminMaintenance.vue'
+import AdminNotices from './admin/AdminNotices.vue'
 
 // Abdeckungs-Test für Hilfetexte (Was / Auswirkung / Beispiel).
 //
@@ -171,6 +173,46 @@ export const HELP_COMPLETE_VIEWS = [
       await flushPromises()
       expect(wrapper.find('.alert-success').exists()).toBe(true)
       await check('Entwurf gespeichert')
+    },
+  },
+  {
+    file: 'views/admin/AdminMaintenance.vue',
+    async states(check) {
+      const window = (id) => ({
+        ID: id, Title: `Datenbank-Upgrade ${id}`, Message: 'Kurze Unterbrechung.', Status: 'scheduled', IsMaintenance: true,
+        Components: [{ ID: 10, Name: 'API' }], Tags: [{ ID: 5, Name: 'EU' }],
+        ScheduledStartAt: '2026-08-01T10:00:00Z', ScheduledEndAt: '2026-08-01T12:00:00Z', ReminderLeadMinutes: 120,
+      })
+      const routes = {
+        '/incident-templates$': [{ ID: 1, Name: 'DB-Wartung', Kind: 'maintenance', Title: 'Datenbank-Wartung', Message: 'Kurze Unterbrechung.', ComponentIDs: '10' }],
+        '/incidents\\?is_maintenance=true': [window(1)],
+        '/components$': [{ ID: 10, Name: 'API', Status: 'operational' }],
+        '/api/tags': [{ ID: 5, Name: 'EU' }],
+      }
+      const wrapper = await mountAdminView(AdminMaintenance, routes)
+      await check('Liste')
+      await wrapper.findAll('[role="menuitem"]').find(i => i.text().includes(i18n.global.t('common.edit'))).trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('maintenance.newButton'))).trigger('click')
+      await check('Neu (mit Vorlagen)')
+      // A full first page (ADMIN_PAGE_SIZE) shows "Load more".
+      await mountAdminView(AdminMaintenance, { ...routes, '/incidents\\?is_maintenance=true': Array.from({ length: 200 }, (_, i) => window(i + 1)) })
+      await check('Weitere laden')
+    },
+  },
+  {
+    file: 'views/admin/AdminNotices.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminNotices, {
+        '/notices/all$': [{ ID: 1, Title: 'Neue Supportzeiten', Message: 'Ab 1. 11. rund um die Uhr.', Level: 'info', IsActive: true, Collapsed: false, NotifySubscribers: false, StartAt: null, EndAt: null, CreatedAt: '2026-07-01T10:00:00Z' }],
+      })
+      await check('Liste')
+      await wrapper.findAll('[role="menuitem"]').find(i => i.text().includes(i18n.global.t('common.edit'))).trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('notices.newButton'))).trigger('click')
+      await check('Neu')
     },
   },
 ]
