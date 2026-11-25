@@ -59,8 +59,9 @@ Admin-Bereich direkt aufruft, landet nach der Anmeldung ebenfalls dort.
 - **Benutzermenü:** zeigt E-Mail und Rolle auf der gewählten Seite und enthält den Schalter
   „Hilfe-Tooltips anzeigen“, „Profil“, „Öffentliche Ansicht“ und „Abmelden“.
 - **Hilfe-Tooltips:** Bleibt man kurz auf einem Feld oder Knopf stehen, erklärt ein Hinweis, was
-  das Feld bewirkt, welche Folgen es hat und ein Beispiel. Jeder Nutzer kann das im Benutzermenü
-  abschalten.
+  das Feld bewirkt, welche Folgen es hat und ein Beispiel. Die Hinweise gibt es auf allen Seiten
+  des Bereichs „Betrieb“ (Übersicht, Komponenten, Externe Quellen, Vorfälle, Wartungsfenster,
+  Ankündigungen, Vorlagen, Abonnenten). Jeder Nutzer kann das im Benutzermenü abschalten.
 - **Ausfall-Banner:** Fällt eine [externe Quelle](/docs/externe-quellen#ausfall-einer-quelle) aus,
   steht oben im Inhaltsbereich ein Hinweis mit Link auf die Quellenseite.
 - **Dokumentation:** Der Menüpunkt „Dokumentation“ im Bereich System öffnet diese Seite.
