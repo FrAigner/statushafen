@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { OnyxButton } from 'sit-onyx'
 
 import { useAuth } from '../../composables/useAuth'
 import { useApi } from '../../composables/useApi'
+import { useAuthConfig } from '../../composables/useAuthConfig'
 import { safeReturnTo } from '../../utils/safeReturnTo'
 import AppIcon from '../../components/AppIcon.vue'
 import OidcLoginButton from '../../components/OidcLoginButton.vue'
@@ -14,6 +16,10 @@ const router = useRouter()
 const { t, te } = useI18n()
 const { setAuth } = useAuth()
 const { apiFetch } = useApi()
+// Allowed sign-in methods come from the backend; without an answer there are no buttons.
+const { authConfig, loadFailed: authConfigFailed, loadAuthConfig } = useAuthConfig()
+const providers = computed(() => authConfig.value?.providers ?? [])
+onMounted(loadAuthConfig)
 
 const loginEmail = ref('')
 const loginPass = ref('')
@@ -32,6 +38,12 @@ const oidcErrorMessage = computed(() => {
   const key = `auth.oidcErrors.${oidcErrorCode}`
   return te(key) ? t(key) : t('auth.oidcErrors.unknown')
 })
+
+// Global OIDC provider: real browser navigation, the server redirects to the provider.
+const startProviderLogin = (id) => {
+  const apiBase = import.meta.env.VITE_API_URL || ''
+  window.location.assign(`${apiBase}/api/auth/provider/${encodeURIComponent(id)}/login`)
+}
 
 const doLogin = async (email, password) => {
   // Doppel-Submit (Doppelklick, Enter) sendet sonst zwei Login-Requests.
@@ -97,10 +109,22 @@ const doLogin = async (email, password) => {
         {{ t('auth.login.ssoFailed') }}
       </div>
       <div v-if="oidcErrorMessage" class="login-alert error entry-alert" role="alert">{{ oidcErrorMessage }}</div>
+      <div v-if="authConfigFailed" class="login-alert error entry-alert" role="alert" data-test="auth-config-error">
+        {{ t('auth.login.configLoadError') }}
+      </div>
 
       <!-- SSO Buttons -->
       <div class="sso-section entry-actions">
         <OidcLoginButton v-if="pageSlug" :slug="pageSlug" fallback />
+        <OnyxButton
+          v-for="p in providers"
+          :key="p.id"
+          class="provider-login-btn"
+          type="button"
+          mode="outline"
+          :label="t('auth.login.providerButton', { name: p.name })"
+          @click="startProviderLogin(p.id)"
+        />
       </div>
 
       <!-- Trennlinie -->

@@ -1711,7 +1711,9 @@
       "ssoFailed": "SSO-Login fehlgeschlagen. Bitte versuche es erneut.",
       "submit": "Anmelden",
       "subtitle": "Anmelden um fortzufahren",
-      "oidcButton": "Mit SSO anmelden"
+      "oidcButton": "Mit SSO anmelden",
+      "providerButton": "Mit {name} anmelden",
+      "configLoadError": "Die Anmeldemethoden konnten nicht geladen werden. Bitte lade die Seite neu."
     },
     "sso": {
       "loadingAria": "Wird geladen",

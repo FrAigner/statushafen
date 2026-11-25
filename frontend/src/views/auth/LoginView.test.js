@@ -3,7 +3,9 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
+import { useAuthConfig, resetAuthConfig } from '../../composables/useAuthConfig'
 import LoginView from './LoginView.vue'
+import loginSource from './LoginView.vue?raw'
 import { axe } from '../../test-support/axe.js'
 
 function jsonResponse(body, status = 200) {
@@ -31,14 +33,100 @@ async function mountLogin(search = '') {
   return { wrapper, router }
 }
 
+// The auth config is cached module-wide; once seeded the view does not load it,
+// and global.fetch only sees the login request.
+function seedAuthConfig(config = {}) {
+  useAuthConfig().authConfig.value = { passwordLogin: true, providers: [], ...config }
+}
+
 describe('LoginView', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'de'
+    seedAuthConfig()
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     useAuth().logout()
+    resetAuthConfig()
+  })
+
+  // Global OIDC providers come from GET /api/public/auth-config.
+  describe('global providers', () => {
+    const GITLAB = { id: 'gitlab', name: 'GitLab' }
+
+    it('shows one button per active provider with its name', async () => {
+      seedAuthConfig({ providers: [GITLAB, { id: 'corp', name: 'Corp SSO' }] })
+      const { wrapper } = await mountLogin()
+
+      const buttons = wrapper.findAll('.provider-login-btn')
+      expect(buttons.map((b) => b.text())).toEqual(['Mit GitLab anmelden', 'Mit Corp SSO anmelden'])
+    })
+
+    it('starts the login by browser navigation to the provider endpoint', async () => {
+      seedAuthConfig({ providers: [GITLAB] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '', assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign).toHaveBeenCalledTimes(1)
+      expect(assign.mock.calls[0][0]).toMatch(/^\/api\/auth\/provider\/gitlab\/login(\?|$)/)
+    })
+
+    it('uses VITE_API_URL and encodes the provider id', async () => {
+      vi.stubEnv('VITE_API_URL', 'https://api.example.org')
+      seedAuthConfig({ providers: [{ id: 'a/b?c', name: 'Odd' }] })
+      const assign = vi.fn()
+      vi.stubGlobal('location', { ...window.location, search: '', assign })
+      const router = makeRouter()
+      router.push('/login')
+      await router.isReady()
+      const wrapper = mount(LoginView, { global: { plugins: [i18n, router] } })
+
+      await wrapper.find('.provider-login-btn').trigger('click')
+
+      expect(assign.mock.calls[0][0]).toMatch(/^https:\/\/api\.example\.org\/api\/auth\/provider\/a%2Fb%3Fc\/login(\?|$)/)
+    })
+
+    // The name comes from the server and is only rendered as text, never as HTML.
+    it('renders the provider name as text, not as HTML', async () => {
+      seedAuthConfig({ providers: [{ id: 'x', name: '<img src=x onerror=alert(1)>' }] })
+      const { wrapper } = await mountLogin()
+
+      const button = wrapper.find('.provider-login-btn')
+      expect(button.text()).toBe('Mit <img src=x onerror=alert(1)> anmelden')
+      expect(button.find('img').exists()).toBe(false)
+      expect(loginSource).not.toContain('v-html')
+    })
+
+    it('loads the config from the server once when it is not known yet', async () => {
+      resetAuthConfig()
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ password_login: true, providers: [GITLAB] }))
+      const { wrapper } = await mountLogin()
+      await flushPromises()
+
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+      expect(global.fetch).toHaveBeenCalledWith('/api/public/auth-config', expect.anything())
+      expect(wrapper.find('.provider-login-btn').text()).toBe('Mit GitLab anmelden')
+    })
+
+    it('shows a notice on a load error and invents no buttons', async () => {
+      resetAuthConfig()
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'broken' }, 500))
+      const { wrapper } = await mountLogin()
+      await flushPromises()
+
+      expect(wrapper.find('[data-test="auth-config-error"]').text())
+        .toBe('Die Anmeldemethoden konnten nicht geladen werden. Bitte lade die Seite neu.')
+      expect(wrapper.find('.provider-login-btn').exists()).toBe(false)
+    })
   })
 
   // Branding: Der Login-Titel führt den echten Produktnamen
@@ -348,8 +436,8 @@ describe('LoginView', () => {
     expect(input.attributes('type')).toBe('text')
   })
 
-  // Feste Google-/GitHub-Knöpfe gibt es nicht mehr, auch keine Texte dafür.
-  it('zeigt keine festen Google-/GitHub-Knöpfe', async () => {
+  // Fixed Google/GitHub buttons are gone, and so are their texts.
+  it('shows no fixed Google/GitHub buttons', async () => {
     const { wrapper } = await mountLogin()
 
     expect(wrapper.text()).not.toMatch(/Google|GitHub/)

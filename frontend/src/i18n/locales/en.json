@@ -1711,7 +1711,9 @@
       "ssoFailed": "SSO login failed. Please try again.",
       "submit": "Sign in",
       "subtitle": "Sign in to continue",
-      "oidcButton": "Sign in with SSO"
+      "oidcButton": "Sign in with SSO",
+      "providerButton": "Sign in with {name}",
+      "configLoadError": "The sign-in methods could not be loaded. Please reload the page."
     },
     "sso": {
       "loadingAria": "Loading",
