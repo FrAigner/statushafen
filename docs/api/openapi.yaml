@@ -336,6 +336,18 @@ paths:
         `provider_unknown`; außerdem `provider_unreachable`, `internal`).
       security: []
       x-rate-limit: 20/min pro IP
+      parameters:
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -425,8 +437,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token]
+                required: [token, return_to]
                 properties:
+                  return_to: { type: string, description: "Geprüfter Rücksprungpfad aus dem Login-Start (`return_to`), sonst leer. Nach einer Verknüpfung immer leer (dort gilt `next=profile`)." }
                   token: { type: string, description: "JWT für `X-Auth-Token` (oder `Authorization: Bearer`). Nach OIDC einer Statusseite mit Claim `sso_page_id`: Das Token gilt nur für diese Seite und nie mit Global-Admin-Rechten." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -449,6 +462,17 @@ paths:
           required: true
           description: ID der Statusseite.
           schema: { type: integer, minimum: 1 }
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.
@@ -470,6 +494,17 @@ paths:
       x-rate-limit: 20/min pro IP
       parameters:
         - { name: slug, in: query, required: true, description: Slug der Statusseite., schema: { type: string } }
+        - name: return_to
+          in: query
+          required: false
+          description: |
+            Frontend-Pfad, auf den das Frontend nach der Anmeldung zurückkehrt
+            (kommt über `POST /api/auth/sso-exchange` zurück). Serverseitig
+            geprüft: höchstens 2048 Byte, beginnt mit genau einem `/` (auch nach
+            einmaligem Dekodieren kein `//` oder `/\`), keine Steuer- oder
+            Leerzeichen und kein Backslash, nicht unter `/api`. Ungültige Werte
+            werden verworfen (leer), der Login läuft weiter.
+          schema: { type: string, maxLength: 2048 }
       responses:
         "307":
           description: Weiterleitung zum Anbieter bzw. bei Fehlern ins Frontend.

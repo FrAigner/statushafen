@@ -297,6 +297,9 @@ type OIDCLoginState struct {
 	// Provider is the ID of the global OIDC provider (OIDC_PROVIDERS) of this
 	// login; empty for a page SSO login (StatusPageID is 0 otherwise).
 	Provider string `gorm:"not null;default:''"`
+	// ReturnTo is the validated frontend path the login started from
+	// (handlers.sanitizeReturnTo); handed out with the one-time code.
+	ReturnTo string `gorm:"not null;default:''"`
 }
 
 // The tables saml_login_states and saml_assertion_uses from the SAML era stay

@@ -86,6 +86,9 @@ func (h *Handler) beginProviderFlow(c *gin.Context, linkUserID uint) (string, *o
 		return "", errOIDCProviderUnknown
 	}
 	st := models.OIDCLoginState{Provider: p.ID, LinkUserID: linkUserID}
+	if linkUserID == 0 {
+		st.ReturnTo = sanitizeReturnTo(c.Query("return_to"))
+	}
 	return h.startOIDCFlow(c, p.client(), st, providerStateCookiePath)
 }
 
@@ -168,7 +171,7 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	h.RecordAudit(c, action, "auth", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, "provider="+p.ID)
 	// HS256 with a configured JWT_SECRET cannot fail (see finishSSOLogin).
 	token, _ := middleware.GenerateTokenFull(user, user.Role.Permissions, claims.name, models.SSOProtocolOIDC)
-	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token)+next)
+	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
 	return nil
 }
 

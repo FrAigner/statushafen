@@ -81,14 +81,14 @@ func TestSweepExpiredSSOCodes(t *testing.T) {
 		ssoCodeMu.Unlock()
 	})
 
-	expiredCode := storeSSOCode("expired-token")
+	expiredCode := storeSSOCode("expired-token", "")
 	ssoCodeMu.Lock()
 	entry := ssoCodeStore[expiredCode]
 	entry.expires = time.Now().Add(-time.Minute) // in der Vergangenheit, nie konsumiert
 	ssoCodeStore[expiredCode] = entry
 	ssoCodeMu.Unlock()
 
-	freshCode := storeSSOCode("fresh-token")
+	freshCode := storeSSOCode("fresh-token", "")
 
 	sweepExpiredSSOCodes()
 

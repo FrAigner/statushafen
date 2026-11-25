@@ -371,7 +371,11 @@ func (h *Handler) beginOIDC(c *gin.Context, linkUserID uint) (string, *oidcError
 	if !ok {
 		return "", errOIDCNotConfigured
 	}
-	return h.startOIDCFlow(c, pageOIDCClient(cfg), models.OIDCLoginState{StatusPageID: cfg.StatusPageID, LinkUserID: linkUserID}, oidcStateCookiePath)
+	st := models.OIDCLoginState{StatusPageID: cfg.StatusPageID, LinkUserID: linkUserID}
+	if linkUserID == 0 {
+		st.ReturnTo = sanitizeReturnTo(c.Query("return_to"))
+	}
+	return h.startOIDCFlow(c, pageOIDCClient(cfg), st, oidcStateCookiePath)
 }
 
 // startOIDCFlow adds state, nonce and PKCE verifier to st, stores it and sets
@@ -687,7 +691,7 @@ func (h *Handler) completeOIDC(c *gin.Context, st models.OIDCLoginState) *oidcEr
 	if e != nil {
 		return e
 	}
-	h.finishSSOLogin(c, user, claims.name, st.StatusPageID, st.LinkUserID, models.SSOProtocolOIDC)
+	h.finishSSOLogin(c, user, claims.name, st, models.SSOProtocolOIDC)
 	return nil
 }
 
@@ -713,7 +717,8 @@ func oidcTestResultURL(claims oidcClaims) string {
 // of the JWT in the redirect (S5). After a link the user returns to the
 // profile (next=profile; the frontend only knows this fixed value). protocol
 // ends up in the audit entry and in the sso claim of the JWT.
-func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, pageID, linkUserID uint, protocol string) {
+func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, st models.OIDCLoginState, protocol string) {
+	pageID, linkUserID := st.StatusPageID, st.LinkUserID
 	action, next := "auth.sso_login", ""
 	if linkUserID != 0 {
 		action, next = "auth.sso_linked", "&next=profile"
@@ -728,5 +733,5 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	// beendet getJWTSecret den Prozess schon vorher. Das Token
 	// gilt nur für pageID (sso_page_id-Claim).
 	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID)
-	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token)+next)
+	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, st.ReturnTo)+next)
 }

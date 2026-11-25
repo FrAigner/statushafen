@@ -67,7 +67,8 @@ func (h *Handler) beginSSOBySlug(c *gin.Context) (string, *oidcError) {
 		return "", errOIDCNotConfigured
 	}
 	if cfg, ok := h.activeOIDCConfig(uint64(page.ID)); ok {
-		return h.startOIDCFlow(c, pageOIDCClient(cfg), models.OIDCLoginState{StatusPageID: cfg.StatusPageID}, oidcStateCookiePath)
+		st := models.OIDCLoginState{StatusPageID: cfg.StatusPageID, ReturnTo: sanitizeReturnTo(c.Query("return_to"))}
+		return h.startOIDCFlow(c, pageOIDCClient(cfg), st, oidcStateCookiePath)
 	}
 	return "", errOIDCNotConfigured
 }

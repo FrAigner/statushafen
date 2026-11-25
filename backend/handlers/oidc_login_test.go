@@ -163,8 +163,9 @@ func jwtFromRedirectStatus(t *testing.T, w *httptest.ResponseRecorder, status in
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, getFrontendURL()+"/auth/sso-callback", loc.Scheme+"://"+loc.Host+loc.Path)
-	token, ok := consumeSSOCode(loc.Query().Get("code"))
+	login, ok := consumeSSOCode(loc.Query().Get("code"))
 	require.True(t, ok)
+	token := login.token
 	claims := &middleware.Claims{}
 	_, err = jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
 		return []byte("test-jwt-secret-not-for-production"), nil

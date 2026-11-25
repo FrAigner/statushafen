@@ -23,9 +23,13 @@ func randomToken(nBytes int) string {
 // eintauscht (S5 — Token wandert nicht mehr per Redirect-Query durch Browser-History/
 // Referrer/Logs). Bewusst simpel gehalten (in-memory, Prozess-lokal), analog zum
 // Visitor-Store in middleware.NewRateLimiter.
+//
+// returnTo is the validated frontend path the login started from (see
+// sanitizeReturnTo), "" if none.
 type ssoCodeEntry struct {
-	token   string
-	expires time.Time
+	token    string
+	returnTo string
+	expires  time.Time
 }
 
 var (
@@ -33,23 +37,24 @@ var (
 	ssoCodeStore = map[string]ssoCodeEntry{}
 )
 
-func storeSSOCode(token string) string {
+func storeSSOCode(token, returnTo string) string {
 	code := randomToken(32)
 	ssoCodeMu.Lock()
-	ssoCodeStore[code] = ssoCodeEntry{token: token, expires: time.Now().Add(ssoCodeExpiry())}
+	ssoCodeStore[code] = ssoCodeEntry{token: token, returnTo: returnTo, expires: time.Now().Add(ssoCodeExpiry())}
 	ssoCodeMu.Unlock()
 	return code
 }
 
-func consumeSSOCode(code string) (string, bool) {
+// consumeSSOCode redeems a one-time code exactly once (also when expired).
+func consumeSSOCode(code string) (ssoCodeEntry, bool) {
 	ssoCodeMu.Lock()
 	defer ssoCodeMu.Unlock()
 	entry, ok := ssoCodeStore[code]
-	delete(ssoCodeStore, code) // Einmalgebrauch, auch wenn abgelaufen
+	delete(ssoCodeStore, code)
 	if !ok || time.Now().After(entry.expires) {
-		return "", false
+		return ssoCodeEntry{}, false
 	}
-	return entry.token, true
+	return entry, true
 }
 
 // StartSSOCleanupWorker startet den periodischen ssoCodeStore-Aufräum-Loop
@@ -163,11 +168,13 @@ func (h *Handler) SSOExchangeHandler(c *gin.Context) {
 		return
 	}
 
-	token, ok := consumeSSOCode(req.Code)
+	entry, ok := consumeSSOCode(req.Code)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Ungültiger oder abgelaufener Code", "code": "login_code_invalid"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	// return_to: where the frontend continues after the login ("" = its
+	// default); always present.
+	c.JSON(http.StatusOK, gin.H{"token": entry.token, "return_to": entry.returnTo})
 }
