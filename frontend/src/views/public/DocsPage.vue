@@ -88,10 +88,11 @@ if (!embedded) {
   })
 }
 
-// Inside the admin frame the sticky admin top bar covers the top of the window; anchors and the
-// sticky sidebar are offset by its height (it changes with the window width), not the landing header's.
+// Inside the admin frame the sticky admin top bar covers the top of the window, so anchored
+// headings are offset by its height (it changes with the window width). The sticky sidebar is not:
+// it sticks inside the admin content area, which already starts below the top bar.
 const topbarHeight = ref(null)
-const docsStyle = computed(() => (topbarHeight.value === null ? undefined : { '--lp-header-height': `${topbarHeight.value}px` }))
+const docsStyle = computed(() => (topbarHeight.value === null ? undefined : { '--docs-anchor-offset': `${topbarHeight.value}px` }))
 let topbarObserver
 const watchTopbar = () => {
   const bar = document.querySelector('.admin-topbar')
@@ -401,7 +402,7 @@ const backToTop = () => {
 
 .docs-markdown :deep(h2),
 .docs-markdown :deep(h3) {
-  scroll-margin-top: calc(var(--lp-header-height) + 16px);
+  scroll-margin-top: calc(var(--docs-anchor-offset, var(--lp-header-height)) + 16px);
 }
 
 .docs-markdown :deep(p),
