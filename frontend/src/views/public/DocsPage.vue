@@ -126,7 +126,7 @@ const onContentClick = (event) => {
   } else if (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/api/')) {
     event.preventDefault()
     // Docs links in the Markdown are written as /docs/...; keep them below the current base.
-    router.push(href.startsWith('/docs/') || href === '/docs' ? docsBase + href.slice('/docs'.length) : href)
+    router.push(href.replace(/^\/docs(?=[/#?]|$)/, docsBase))
   }
 }
 

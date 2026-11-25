@@ -132,6 +132,54 @@ describe('DocsPage', () => {
       }
     })
 
+    it('follows height changes of the admin top bar and stops watching on unmount', async () => {
+      const bar = document.createElement('header')
+      bar.className = 'admin-topbar'
+      let height = 125
+      Object.defineProperty(bar, 'offsetHeight', { get: () => height })
+      document.body.appendChild(bar)
+      const observers = []
+      const original = globalThis.ResizeObserver
+      globalThis.ResizeObserver = class {
+        constructor(cb) { this.cb = cb; this.disconnect = vi.fn(); observers.push(this) }
+        observe(el) { this.el = el }
+      }
+      try {
+        ;({ wrapper } = await mountDocs('/admin/docs/faq'))
+        expect(observers[0].el).toBe(bar)
+        height = 180
+        observers[0].cb()
+        await flushPromises()
+        expect(wrapper.find('.docs').attributes('style')).toContain('--lp-header-height: 180px')
+        wrapper.unmount()
+        wrapper = undefined
+        expect(observers[0].disconnect).toHaveBeenCalled()
+      } finally {
+        globalThis.ResizeObserver = original
+        bar.remove()
+      }
+    })
+
+    it('keeps links outside the docs unchanged', async () => {
+      let router
+      ;({ wrapper, router } = await mountDocs('/admin/docs/faq'))
+      const md = wrapper.find('.docs-markdown')
+      md.element.insertAdjacentHTML('beforeend', '<a id="ext-link" href="/admin/pages">x</a>')
+      await md.find('#ext-link').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/admin/pages')
+    })
+
+    it('maps the docs root link to the admin docs root', async () => {
+      let router
+      ;({ wrapper, router } = await mountDocs('/admin/docs/faq'))
+      const md = wrapper.find('.docs-markdown')
+      md.element.insertAdjacentHTML('beforeend', '<a id="docs-root" href="/docs">y</a>')
+      await md.find('#docs-root').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/admin/docs')
+    })
+
     it('links the not-found page back to the admin docs', async () => {
       ;({ wrapper } = await mountDocs('/admin/docs/gibt-es-nicht'))
       expect(wrapper.find('.docs-not-found a').attributes('href')).toBe('/admin/docs')
