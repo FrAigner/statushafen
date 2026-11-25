@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick, inject } from 'vue'
+import { routeLocationKey, routerKey } from 'vue-router'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../../composables/useApi'
@@ -219,9 +220,28 @@ const loadPageUsers = async (pageId) => {
   pageInvitations.value = invitations.status === 'fulfilled' ? invitations.value : []
 }
 
-onMounted(loadData)
+// Quick search deep link: ?edit=<page id> opens that page's edit form (the
+// search then focuses the wanted field). The parameter is removed afterwards so
+// the same link works again. Injected without warning when mounted without router.
+const route = inject(routeLocationKey, null)
+const router = inject(routerKey, null)
+const openFromQuery = () => {
+  const id = route?.query.edit
+  if (id == null) return
+  const page = pages.value.find(p => String(p.ID) === String(id))
+  if (!page) return
+  openEdit(page, { focus: false })
+  const { edit: _edit, ...rest } = route.query
+  router?.replace({ query: rest })
+}
+watch(() => route?.query.edit, openFromQuery)
 
-const openEdit = (item) => {
+onMounted(async () => {
+  await loadData()
+  openFromQuery()
+})
+
+const openEdit = (item, { focus = true } = {}) => {
   formData.value = item === 'new'
     ? {
       // Stryker disable next-line StringLiteral: Der Name-Watcher überschreibt den Slug beim Öffnen sofort (undefined -> ''), der Startwert ist nicht beobachtbar
@@ -254,7 +274,7 @@ const openEdit = (item) => {
   formErrors.value = { name: '', slug: '' }
   showUsers.value = null
   isEditing.value = true
-  focusForm()
+  if (focus) focusForm()
 }
 
 // Formular öffnen: Fokus auf das Namensfeld; unter 860 px liegt das Formular
@@ -630,7 +650,7 @@ const removeUser = async (assignment) => {
           </FormField>
 
           <!-- Seiten-Layout mit kleiner Vorschau je Variante -->
-          <fieldset class="form-group layout-picker">
+          <fieldset id="page-layout" class="form-group layout-picker">
             <legend>{{ t('statusPages.fieldPageLayout') }}</legend>
             <label
               v-for="opt in pageLayoutOptions"
@@ -686,7 +706,7 @@ const removeUser = async (assignment) => {
 
         <!-- Monitoring-Webhook-Token: nur für bereits gespeicherte Seiten, -->
         <!-- eine "neue" Seite hat noch keine ID, gegen die ein Token generiert werden könnte. -->
-        <section v-if="currentEditItem !== 'new'" class="adm-section">
+        <section v-if="currentEditItem !== 'new'" id="page-webhook" class="adm-section">
           <h4 class="adm-subhead">{{ t('statusPages.webhookHeading') }}</h4>
           <p class="section-text">
             {{ t('statusPages.webhookDescPrefix') }}

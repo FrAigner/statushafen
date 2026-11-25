@@ -99,7 +99,7 @@ const save = async () => {
 
       <!-- Richtung C: Einstellungen in einer Karte, jeder Schalter ein Abschnitt (h4 unter dem Kartentitel). -->
       <ListCard v-else :title="t('systemSettings.cardTitle')" padded>
-        <section v-for="section in SECTIONS" :key="section.field" :data-setting="section.field" class="setting">
+        <section v-for="section in SECTIONS" :id="`setting-${section.field}`" :key="section.field" :data-setting="section.field" class="setting">
           <h4 class="setting__title">{{ t(`systemSettings.${section.i18n}SectionTitle`) }}</h4>
           <p class="setting__text">{{ t(`systemSettings.${section.i18n}SectionDescription`) }}</p>
           <OnyxCheckbox v-model="form[section.field]" :label="t(`systemSettings.${section.i18n}EnabledLabel`)" />

@@ -67,6 +67,22 @@
     "outageBannerMore": "and {n} more",
     "outageBannerLink": "Open external sources"
   },
+  "quickSearch": {
+    "label": "Quick search",
+    "placeholder": "Search pages and settings …",
+    "shortcut": "Ctrl K",
+    "open": "Open quick search",
+    "close": "Close quick search",
+    "resultsLabel": "Search results",
+    "groups": {
+      "pages": "Pages",
+      "settings": "Settings",
+      "docs": "Documentation"
+    },
+    "noResults": "No results for “{query}”",
+    "resultCount": "One result | {n} results",
+    "hint": "Use the arrow keys to choose, Enter opens, Escape closes."
+  },
   "confirm": {
     "title": "Please confirm",
     "confirm": "Confirm",

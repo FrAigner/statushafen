@@ -82,7 +82,7 @@ const onTest = async () => {
 </script>
 
 <template>
-  <section class="setting" data-setting="translation">
+  <section id="setting-translation" class="setting" data-setting="translation">
     <h4 class="setting__title">{{ t('translationSettings.title') }}</h4>
     <p class="setting__text">{{ t('translationSettings.description') }}</p>
     <p class="setting__text" data-test="translation-status">{{ statusText }}</p>

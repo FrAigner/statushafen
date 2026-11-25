@@ -67,6 +67,22 @@
     "outageBannerMore": "und {n} weitere",
     "outageBannerLink": "Externe Quellen öffnen"
   },
+  "quickSearch": {
+    "label": "Schnellsuche",
+    "placeholder": "Seiten und Einstellungen suchen …",
+    "shortcut": "Strg K",
+    "open": "Schnellsuche öffnen",
+    "close": "Schnellsuche schließen",
+    "resultsLabel": "Suchergebnisse",
+    "groups": {
+      "pages": "Seiten",
+      "settings": "Einstellungen",
+      "docs": "Dokumentation"
+    },
+    "noResults": "Keine Treffer für „{query}“",
+    "resultCount": "Ein Treffer | {n} Treffer",
+    "hint": "Pfeiltasten wählen, Eingabe öffnet, Escape schließt."
+  },
   "confirm": {
     "title": "Bitte bestätigen",
     "confirm": "Bestätigen",

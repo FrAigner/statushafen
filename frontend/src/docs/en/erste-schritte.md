@@ -50,9 +50,9 @@ address in the admin area directly, you also end up there after signing in.
 
 ## The admin area
 
-- **Header:** the tenant switcher on the left; light/dark mode, language selection and the user
-  menu on the right. On narrow screens the menu icon on the left of the header opens the
-  navigation.
+- **Header:** the tenant switcher on the left, next to it the quick search; light/dark mode,
+  language selection and the user menu on the right. On narrow screens the menu icon on the left
+  of the header opens the navigation.
 - **Areas:** below it are the tabs **Operations**, **Content**, **Management** and **System**.
   A click shows the menu items of that area. Items without the matching permission are hidden,
   see [Users, roles and permissions](/docs/benutzer-und-rollen).
@@ -67,3 +67,20 @@ address in the admin area directly, you also end up there after signing in.
 On the public status page, the entry "Dashboard" in the user menu leads to the admin area. It only
 appears when your role on exactly this status page has the `admin_dashboard` permission; a role on
 another page is not enough (global admins always see it).
+
+## Quick search
+
+The quick search in the header finds admin pages, individual settings and sections of this
+documentation, so you don't need to know where a setting lives. Examples: "reply-to", "private",
+"Discovery URL", "order" or "auto-join".
+
+- **Open:** click the search field, press `Ctrl+K` (Mac: `Cmd+K`) or `/` while the focus is not in
+  an input field. On narrow screens the magnifier icon opens the field.
+- **Results:** grouped into pages, settings and documentation. The search uses the current UI
+  language and also common German and English terms (e.g. "Antwortadresse"). Only what your
+  permissions let you open is listed.
+- **Keyboard:** arrow keys choose a result, `Enter` opens it, `Escape` closes the list.
+- **Jump to a setting:** the search opens the page, for status page settings also the edit form
+  (of the selected status page), scrolls to the field, focuses it and highlights it briefly. If a
+  field only appears after a switch (e.g. the options of a private page), the search jumps to that
+  switch.
