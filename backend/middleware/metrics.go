@@ -10,42 +10,42 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GoldenSignals: zentrale Instrumentierungs-Middleware (Schritt 1/4).
-// Erfasst für JEDEN Request Route (normalisiert, siehe unten), HTTP-Methode,
-// Status-Code und Latenz und schreibt sie in die übergebene metrics.Registry.
+// GoldenSignals: central instrumentation middleware (step 1/4).
+// Records for EVERY request the route (normalized, see below), HTTP method,
+// status code and latency and writes them to the supplied metrics.Registry.
 //
-// In main.go global einhängen, analog zu CORSMiddleware()/SecurityHeaders():
+// Mount globally in main.go, analogous to CORSMiddleware()/SecurityHeaders():
 //
 //	r.Use(middleware.GoldenSignals(metrics.Default))
 //
-// Bewusst eine einzige zentrale Middleware statt Änderungen an einzelnen
-// Handlern, damit alle ~45-50 Endpunkte einheitlich erfasst werden.
+// Deliberately a single central middleware instead of changes to individual
+// handlers, so that all ~45-50 endpoints are recorded uniformly.
 //
-// Route-Normalisierung: c.FullPath() liefert das Gin-Routen-Template (z.B.
-// "/api/pages/:page_id/incidents"), NICHT die konkrete URL mit echten IDs –
-// das ist entscheidend, um eine Kardinalitätsexplosion in der Aggregation zu
-// vermeiden (sonst ein eigener Zähler pro Incident-/Page-ID). Für Requests,
-// die auf keine Route matchen (404 via NoRoute), ist c.FullPath() leer; die
-// werden bewusst unter der festen Konstante "NOT_FOUND" gebündelt statt unter
-// dem rohen Pfad, aus demselben Kardinalitätsgrund.
+// Route normalization: c.FullPath() returns the Gin route template (e.g.
+// "/api/pages/:page_id/incidents"), NOT the concrete URL with real IDs –
+// this is essential to avoid a cardinality explosion in the aggregation
+// (otherwise a separate counter per incident/page ID). For requests
+// that match no route (404 via NoRoute), c.FullPath() is empty; these
+// are deliberately bundled under the fixed constant "NOT_FOUND" instead of under
+// the raw path, for the same cardinality reason.
 //
-// Performance: Die Middleware hält selbst keinerlei Locks – sie berechnet
-// nur die Latenz und delegiert an metrics.Registry.Observe, das pro Route
-// ausschließlich atomare Zähler aktualisiert (siehe backend/metrics/metrics.go).
+// Performance: the middleware itself holds no locks at all – it computes
+// only the latency and delegates to metrics.Registry.Observe, which updates
+// only atomic counters per route (see backend/metrics/metrics.go).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// notFoundRouteLabel bündelt alle nicht gematchten Routen, damit ein
-// Angreifer nicht durch beliebige Pfade beliebig viele Aggregations-Einträge
-// erzeugen kann.
+// notFoundRouteLabel bundles all unmatched routes, so that an
+// attacker cannot create arbitrarily many aggregation entries
+// via arbitrary paths.
 const notFoundRouteLabel = "NOT_FOUND"
 
-// otherMethodLabel bündelt alle HTTP-Methoden außerhalb von knownMethods. Die
-// Methode ist ein frei wählbarer Token; als Label würde jede erfundene
-// Methode (auch bis rund 1 MB lang) eine neue Zeitreihe anlegen.
+// otherMethodLabel bundles all HTTP methods outside knownMethods. The
+// method is a freely choosable token; as a label every invented
+// method (even up to about 1 MB long) would create a new time series.
 const otherMethodLabel = "OTHER"
 
-// knownMethods sind die Methoden, die die API verwendet oder sinnvoll
-// beantwortet.
+// knownMethods are the methods the API uses or sensibly
+// answers.
 var knownMethods = map[string]struct{}{
 	http.MethodGet: {}, http.MethodPost: {}, http.MethodPut: {}, http.MethodPatch: {},
 	http.MethodDelete: {}, http.MethodHead: {}, http.MethodOptions: {},
@@ -58,10 +58,10 @@ func methodLabel(method string) string {
 	return otherMethodLabel
 }
 
-// GoldenSignals gibt eine Gin-Middleware zurück, die jeden Request in reg
-// aggregiert. reg ist typischerweise metrics.Default; Tests können eine
-// isolierte metrics.NewRegistry() übergeben, um nicht mit anderen Tests zu
-// interferieren.
+// GoldenSignals returns a Gin middleware that aggregates every request into reg.
+// reg is typically metrics.Default; tests can pass an
+// isolated metrics.NewRegistry() to avoid interfering with
+// other tests.
 func GoldenSignals(reg *metrics.Registry) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

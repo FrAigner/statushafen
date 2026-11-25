@@ -18,9 +18,9 @@ func haertung(t *testing.T, yaml string) []Finding {
 
 const checkoutSHA = "actions/checkout@" + sha + " # v4"
 
-// Ohne permissions bekommt das GITHUB_TOKEN die Standardrechte des Repositorys,
-// oft Schreibrechte. Jeder Job braucht eine ausdrückliche Angabe, im Workflow
-// oder im Job.
+// Without permissions the GITHUB_TOKEN gets the repository's default permissions,
+// often write permissions. Every job needs an explicit setting, in the workflow
+// or in the job.
 func TestHaertung_PermissionsFehlen(t *testing.T) {
 	f := haertung(t, `
 on: push
@@ -44,7 +44,7 @@ jobs:
   a: {runs-on: ubuntu-latest, steps: [{run: echo}]}
   b: {runs-on: ubuntu-latest, steps: [{run: echo}]}
 `))
-	// Auch ein leerer Block (alle Rechte aus) ist eine ausdrückliche Angabe.
+	// An empty block (all permissions off) is also an explicit setting.
 	require.Empty(t, haertung(t, `
 on: push
 permissions: {}
@@ -103,7 +103,7 @@ jobs:
 	require.Contains(t, f[0].Message, `Job "a"`)
 	require.Contains(t, f[0].Message, "write-all")
 
-	// auch mit Leerraum in Anführungszeichen
+	// also with whitespace in quotes
 	f = haertung(t, `
 on: push
 permissions: " write-all "
@@ -114,8 +114,8 @@ jobs:
 	require.Contains(t, f[0].Message, "write-all")
 }
 
-// actions/checkout legt das Token sonst in .git/config ab, wo es jeder spätere
-// Schritt (und jeder Code des Repositorys) lesen kann.
+// actions/checkout otherwise stores the token in .git/config, where every later
+// step (and any code of the repository) can read it.
 func TestHaertung_CheckoutOhnePersistCredentialsFalse(t *testing.T) {
 	kopf := "on: push\npermissions: {contents: read}\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n"
 	faelle := []struct {
@@ -188,15 +188,15 @@ func TestHaertung_RunMeldetFehlendePermissions(t *testing.T) {
 	require.Contains(t, errOut.String(), "permissions")
 }
 
-// Die Workflows dieses Repositorys erfüllen die Regeln.
+// The workflows of this repository satisfy the rules.
 func TestHaertung_EigeneWorkflowsSindSauber(t *testing.T) {
 	f, err := CheckHardeningDir(filepath.Join("..", "..", ".github", "workflows"))
 	require.NoError(t, err)
 	require.Empty(t, f)
 }
 
-// Passt eine Datei nicht zum Schema der Härtungsregeln (hier: with ist keine Map),
-// ist das ein Lesefehler (Exit 2), kein stiller Erfolg.
+// If a file does not match the schema of the hardening rules (here: with is not a map),
+// that is a read error (exit 2), not a silent success.
 func TestHaertung_RunMeldetNichtLesbareStruktur(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.yml"),

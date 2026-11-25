@@ -14,7 +14,7 @@ var (
 	start = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
-func at(day, hour, min int) time.Time { // Oktober 2026
+func at(day, hour, min int) time.Time { // October 2026
 	return time.Date(2026, 10, day, hour, min, 0, 0, time.UTC)
 }
 
@@ -35,9 +35,9 @@ func find(t *testing.T, days []Day, date string) Day {
 	return Day{}
 }
 
-// Weniger als 1 s nach 00:00 UTC war ObservedSeconds (ganze
-// Sekunden) 0 und die Verfügbarkeit NaN (0/0). Kein NaN, kein Inf; die
-// Beobachtung zählt in Bruchteilen von Sekunden.
+// Less than 1 s after 00:00 UTC, ObservedSeconds (whole
+// seconds) was 0 and the availability NaN (0/0). No NaN, no Inf; the
+// observation counts in fractions of seconds.
 func TestCompute_KnappNachMitternachtKeinNaN(t *testing.T) {
 	n := time.Date(2026, 10, 29, 0, 0, 0, 400*int(time.Millisecond), time.UTC)
 	days := Compute(nil, start, n, 3)
@@ -48,14 +48,14 @@ func TestCompute_KnappNachMitternachtKeinNaN(t *testing.T) {
 	near(t, 100, today.Availability)
 	assert.InDelta(t, 0.4, today.ObservedSeconds, 1e-9)
 
-	// Mit Ausfall in diesen 400 ms: Verfügbarkeit weiter endlich.
+	// With an outage in these 400 ms: availability still finite.
 	iv := []Interval{{Start: n.Add(-200 * time.Millisecond), End: n, Status: "major_outage"}}
 	d := find(t, Compute(iv, start, n, 3), "2026-10-29")
 	require.NotNil(t, d.Availability)
 	assert.False(t, math.IsNaN(*d.Availability))
 	near(t, 50, d.Availability)
 
-	// Genau Mitternacht: nichts beobachtet, NoData statt 0/0.
+	// Exactly midnight: nothing observed, NoData instead of 0/0.
 	z := find(t, Compute(nil, start, time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC), 3), "2026-10-29")
 	assert.Equal(t, NoData, z.Status)
 	assert.Nil(t, z.Availability)
@@ -76,8 +76,8 @@ func TestCompute_Fenster(t *testing.T) {
 
 func sev(status string, s, e time.Time) Interval { return Interval{Start: s, End: e, Status: status} }
 
-// Verfügbarkeit = 1 - gewichtete Ausfallzeit / beobachtete Zeit.
-// Die Gewichte sind festgeschrieben; eine Änderung muss bewusst erfolgen.
+// Availability = 1 - weighted downtime / observed time.
+// The weights are pinned down; a change must be made deliberately.
 func TestWeight_Festgeschrieben(t *testing.T) {
 	assert.Equal(t, 0.3, WeightDegradedPerformance)
 	assert.Equal(t, 0.6, WeightPartialOutage)
@@ -102,7 +102,7 @@ func TestCompute_Tagesaggregate(t *testing.T) {
 		wantDown   int64
 	}{
 		{"kein Vorfall: operational 100 %", nil, start, "2026-10-20", "operational", ptr(100), 0},
-		// 6 h Eingeschränkt = 1,8 h gewichtet = 7,5 % von 24 h (vorher 25 %: voller Ausfall).
+		// 6 h degraded = 1.8 h weighted = 7.5 % of 24 h (previously 25 %: full outage).
 		{"Vorfall 6 h degraded gewichtet 0,3", []Interval{inc(at(20, 6, 0), at(20, 12, 0))}, start, "2026-10-20", "degraded_performance", ptr(100 - 100*1.8/24), h(1.8)},
 		{"6 h Teilausfall gewichtet 0,6", []Interval{sev("partial_outage", at(20, 6, 0), at(20, 12, 0))}, start, "2026-10-20", "partial_outage", ptr(100 - 100*3.6/24), h(3.6)},
 		{"6 h Totalausfall gewichtet 1,0", []Interval{sev("major_outage", at(20, 6, 0), at(20, 12, 0))}, start, "2026-10-20", "major_outage", ptr(75), h(6)},
@@ -138,8 +138,8 @@ func TestCompute_Tagesaggregate(t *testing.T) {
 	}
 }
 
-// Dauer je Schweregrad (Tooltip): ungewichtet, schlimmster zuerst, Überlappung
-// zählt nur beim schwereren Status, Wartung fehlt.
+// Duration per severity (tooltip): unweighted, worst first, overlap
+// counts only for the more severe status, maintenance is absent.
 func TestCompute_DauerJeSchweregrad(t *testing.T) {
 	d := find(t, Compute([]Interval{
 		inc(at(20, 0, 0), at(20, 10, 0)),
@@ -166,16 +166,16 @@ func TestMerge_DurchschnittDerKomponenten(t *testing.T) {
 	assert.Equal(t, "major_outage", got[0].Status, "Status bleibt der schlimmste des Tages")
 	assert.Equal(t, []Impairment{{Status: "major_outage", Seconds: 12 * 3600}}, got[0].Impairments)
 	near(t, 100, got[1].Availability)
-	// Summary über den Durchschnitt: 6 h gewichtete Ausfallzeit von 36 h beobachtet.
+	// Summary over the average: 6 h weighted downtime out of 36 h observed.
 	near(t, 100*30.0/36, Summary(got))
-	// Komponenten ohne Daten gehen nicht ein; ohne jede Komponente bleibt die Seite.
+	// Components without data are not included; without any component the page remains.
 	noData := Compute(nil, now.Add(time.Hour), now, 2)
 	assert.NotNil(t, Merge(page, [][]Day{noData})[0].Availability, "kein Komponentenwert: Seitenwert bleibt")
 	assert.Equal(t, page, Merge(page, nil))
 }
 
 func TestCompute_KeineDatenStattHundertProzent(t *testing.T) {
-	days := Compute(nil, now.Add(time.Hour), now, 3) // Beobachtung beginnt erst nach jetzt
+	days := Compute(nil, now.Add(time.Hour), now, 3) // observation starts only after now
 	for _, d := range days {
 		assert.Equal(t, NoData, d.Status)
 		assert.Nil(t, d.Availability)
@@ -184,8 +184,8 @@ func TestCompute_KeineDatenStattHundertProzent(t *testing.T) {
 }
 
 func TestSummary_GewichtetNachDauer(t *testing.T) {
-	// Gestern 24 h beobachtet, 12 h Ausfall; heute 12 h ohne Ausfall:
-	// 36 h beobachtet, 12 h down = 66,67 %, nicht der Mittelwert 75 %.
+	// Yesterday 24 h observed, 12 h outage; today 12 h without outage:
+	// 36 h observed, 12 h down = 66.67 %, not the mean of 75 %.
 	days := Compute([]Interval{sev("major_outage", at(28, 0, 0), at(28, 12, 0))}, at(28, 0, 0), now, 2)
 	near(t, 100*24.0/36, Summary(days))
 }
@@ -194,7 +194,7 @@ func TestSweep_UeberlappungenUndGrenzen(t *testing.T) {
 	by, w := sweep(nil)
 	assert.Empty(t, by)
 	assert.Zero(t, w)
-	// ineinander liegend, aneinander grenzend, getrennt: 12 h degraded
+	// nested, adjacent, separate: 12 h degraded
 	by, w = sweep([]Interval{
 		inc(at(1, 0, 0), at(1, 10, 0)),
 		inc(at(1, 2, 0), at(1, 3, 0)),

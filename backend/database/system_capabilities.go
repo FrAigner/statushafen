@@ -8,36 +8,36 @@ import (
 	"gorm.io/gorm"
 )
 
-// Capability ist eine Funktion, die Statushafen anbietet, und zugleich eine
-// Komponente der Systemstatusseite (Dogfooding). Doc ist der Name der
-// Hilfeseite unter frontend/src/docs/de (ohne .md) und der stabile Schlüssel:
-// daraus wird der Komponenten-Slug "feature-<Doc>".
+// Capability is a feature that Statushafen offers, and at the same time a
+// component of the system status page (dogfooding). Doc is the name of the
+// help page under frontend/src/docs/de (without .md) and the stable key:
+// the component slug "feature-<Doc>" is derived from it.
 type Capability struct {
 	Doc  string
 	Name string
-	// LegacyName: bereits vorhandene Komponente gleichen Namens (oberste Ebene)
-	// wird einmalig in die Gruppe übernommen statt eine zweite anzulegen.
+	// LegacyName: an already existing component of the same name (top level)
+	// is adopted into the group once instead of creating a second one.
 	LegacyName string
 }
 
-// CapabilityGroup bündelt Funktionen zu einer Gruppe der Systemseite.
+// CapabilityGroup bundles features into a group of the system page.
 type CapabilityGroup struct {
 	Key   string
 	Name  string
 	Items []Capability
 }
 
-// SystemCapabilities ist das Verzeichnis aller angebotenen Funktionen. NEUE
-// FUNKTION = NEUER EINTRAG HIER (zusammen mit ihrer Hilfeseite); ein Test
-// (system_capabilities_test.go) schlägt fehl, wenn eine Hilfeseite fehlt.
-// Der Start trägt neue Einträge auf der Systemseite nach (SyncSystemCapabilities).
+// SystemCapabilities is the directory of all offered features. NEW
+// FEATURE = NEW ENTRY HERE (together with its help page); a test
+// (system_capabilities_test.go) fails if a help page is missing.
+// On startup new entries are added to the system page (SyncSystemCapabilities).
 var SystemCapabilities = []CapabilityGroup{
 	{Key: "plattform", Name: "Plattform", Items: []Capability{
 		{Doc: "plattform-api", Name: "API", LegacyName: "API"},
 		{Doc: "plattform-datenbank", Name: "Datenbank", LegacyName: "Datenbank"},
 		{Doc: "plattform-frontend", Name: "Frontend", LegacyName: "Frontend"},
 		{Doc: "plattform-email", Name: "E-Mail-Versand", LegacyName: "E-Mail-Versand"},
-		{Doc: "plattform-backup", Name: "Datenbank-Backup"}, // Alter des nächtlichen Backups
+		{Doc: "plattform-backup", Name: "Datenbank-Backup"}, // age of the nightly backup
 	}},
 	{Key: "statusseiten", Name: "Statusseiten", Items: []Capability{
 		{Doc: "statusseiten", Name: "Statusseiten und Mandanten"},
@@ -69,12 +69,12 @@ var SystemCapabilities = []CapabilityGroup{
 	}},
 }
 
-// DocsWithoutCapability sind Hilfeseiten, die keine eigene Funktion beschreiben.
-// Plattform-Einträge haben keine eigene Hilfeseite (Doc beginnt mit "plattform-").
+// DocsWithoutCapability are help pages that do not describe a feature of their own.
+// Platform entries have no help page of their own (Doc starts with "plattform-").
 var DocsWithoutCapability = map[string]bool{"faq": true, "was-ist-statushafen": true, "erste-schritte": true}
 
-// CapabilitySlug ist der Komponenten-Slug einer Funktion auf der Systemseite
-// ("feature-<Doc>"); die Selbstüberwachung adressiert darüber ihre Komponenten.
+// CapabilitySlug is the component slug of a feature on the system page
+// ("feature-<Doc>"); self-monitoring uses it to address its components.
 func CapabilitySlug(doc string) string { return capabilityItemSlugPrefix + doc }
 
 const (
@@ -82,19 +82,19 @@ const (
 	capabilityItemSlugPrefix  = "feature-"
 )
 
-// SyncSystemCapabilities trägt das Verzeichnis auf der Systemseite nach: je
-// Gruppe eine Gruppen-Komponente, je Funktion eine Komponente darunter. Der Slug
-// ist der stabile Schlüssel. Idempotent und Admin-freundlich: Die Suche läuft
-// Unscoped, eine umbenannte oder gelöschte Komponente kommt also nicht zurück;
-// nur wirklich neue Einträge (neue Funktionen) werden ergänzt. Vorhandene
-// Plattform-Komponenten (LegacyName) wandern einmalig in ihre Gruppe.
+// SyncSystemCapabilities adds the directory to the system page: one
+// group component per group, one component below it per feature. The slug
+// is the stable key. Idempotent and admin-friendly: the lookup runs
+// Unscoped, so a renamed or deleted component does not come back;
+// only genuinely new entries (new features) are added. Existing
+// platform components (LegacyName) move into their group once.
 func SyncSystemCapabilities(db *gorm.DB, pageID uint) {
 	for gi, group := range SystemCapabilities {
 		groupComp, ok := ensureComponent(db, pageID, capabilityGroupSlugPrefix+group.Key, models.Component{
 			Name: group.Name, Status: "group", SortOrder: 100 + gi,
 		})
 		if !ok {
-			continue // Gruppe vom Admin gelöscht: ihre Funktionen nicht daneben neu anlegen
+			continue // group deleted by the admin: do not re-create its features next to it
 		}
 		for ii, item := range group.Items {
 			slug := CapabilitySlug(item.Doc)
@@ -108,8 +108,8 @@ func SyncSystemCapabilities(db *gorm.DB, pageID uint) {
 	}
 }
 
-// ensureComponent liefert die Komponente mit dem Slug (auch eine gelöschte, dann
-// ok=false) oder legt sie an (ok=true).
+// ensureComponent returns the component with the slug (also a deleted one, then
+// ok=false) or creates it (ok=true).
 func ensureComponent(db *gorm.DB, pageID uint, slug string, c models.Component) (models.Component, bool) {
 	var found []models.Component
 	if err := db.Unscoped().Where("status_page_id = ? AND slug = ?", pageID, slug).Limit(1).Find(&found).Error; err == nil && len(found) > 0 {
@@ -124,9 +124,9 @@ func ensureComponent(db *gorm.DB, pageID uint, slug string, c models.Component) 
 	return c, true
 }
 
-// adoptLegacyComponent übernimmt eine vorhandene Komponente der obersten Ebene
-// (nur beim ersten Mal: danach trägt sie den Slug und wird nicht mehr angefasst).
-// Liefert true, wenn der Eintrag damit erledigt ist (übernommen oder schon da).
+// adoptLegacyComponent adopts an existing top-level component
+// (only the first time: afterwards it carries the slug and is not touched again).
+// Returns true if the entry is thereby done (adopted or already there).
 func adoptLegacyComponent(db *gorm.DB, pageID uint, slug string, item Capability, groupID uint, order int) bool {
 	var byslug int64
 	db.Unscoped().Model(&models.Component{}).Where("status_page_id = ? AND slug = ?", pageID, slug).Count(&byslug)

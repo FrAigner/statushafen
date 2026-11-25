@@ -80,7 +80,7 @@ func TestRejectInvalidCharacters_AllowsEscapedBackslashBeforeU0000(t *testing.T)
 
 func TestRejectInvalidCharacters_TruncatedEscapeIsNoNUL(t *testing.T) {
 	probe := &guardProbe{}
-	// „\u00“ am Ende: kein NUL (der JSON-Parser des Handlers lehnt es selbst ab).
+	// „\u00“ at the end: no NUL (the handler's JSON parser rejects it itself).
 	w := guardCall(guardRouter(probe, 1<<20), http.MethodPost, "/x/1", `"\u00`, "application/json")
 	assert.Equal(t, http.StatusOK, w.Code)
 	w = guardCall(guardRouter(probe, 1<<20), http.MethodPost, "/x/1", `"\`, "application/json")
@@ -112,8 +112,8 @@ func TestRejectInvalidCharacters_ChecksQueryAndPath(t *testing.T) {
 	}
 }
 
-// Formularkodierte Bodys (SAML-Rückkanal) liest die Prüfung nicht, sonst wäre
-// die zweite Million Byte doppelt im Speicher.
+// The check does not read form-encoded bodies (SAML back channel), otherwise
+// the second million bytes would be in memory twice.
 func TestRejectInvalidCharacters_SkipsFormBodies(t *testing.T) {
 	for _, ct := range []string{"application/x-www-form-urlencoded", "multipart/form-data; boundary=x"} {
 		probe := &guardProbe{}
@@ -130,7 +130,7 @@ func TestRejectInvalidCharacters_BodylessRequestsPass(t *testing.T) {
 	assert.True(t, probe.reached)
 }
 
-// Ohne bekannte Länge (chunked) greift die Grenze beim Lesen: 413 statt 400.
+// Without a known length (chunked) the limit applies while reading: 413 instead of 400.
 func TestRejectInvalidCharacters_ChunkedOversizeIs413(t *testing.T) {
 	probe := &guardProbe{}
 	r := guardRouter(probe, 16)
@@ -160,19 +160,19 @@ func TestRejectInvalidCharacters_ReadErrorIs400(t *testing.T) {
 	assert.False(t, probe.reached)
 }
 
-// Nur die Folge \u0000 ist ein NUL. Andere \u-Escapes (auch solche, die mit
-// 000 beginnen) sind gültiger Text, und ein \u0000 am Ende des Bodys zählt.
+// Only the sequence \u0000 is a NUL. Other \u escapes (including those that start with
+// 000) are valid text, and a \u0000 at the end of the body counts.
 func TestRejectInvalidCharacters_OnlyU0000IsRejected(t *testing.T) {
 	for body, want := range map[string]bool{
 		`"\u0000"`:   false,
-		`\u0000`:     false, // genau am Ende, ohne schließendes Zeichen
+		`\u0000`:     false, // exactly at the end, without a closing character
 		`"\u00000"`:  false,
 		`"\u0001"`:   true,
 		`"\u000a"`:   true,
 		`"\u00e4"`:   true,
 		`"\u0010"`:   true,
-		`"\u000"`:    true, // zu kurz
-		`"\\u0000"`:  true, // maskierter Backslash
+		`"\u000"`:    true, // too short
+		`"\\u0000"`:  true, // escaped backslash
 		`"\\\u0000"`: false,
 		`"a\nb\"c"`:  true,
 		"plain":      true,

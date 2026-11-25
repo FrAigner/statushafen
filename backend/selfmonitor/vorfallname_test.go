@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// vorfall liefert den einzigen Vorfall der Fixture samt Updates.
+// vorfall returns the single incident of the fixture including updates.
 func vorfall(t *testing.T, f *fixture) (models.Incident, []models.IncidentUpdate) {
 	t.Helper()
 	var inc models.Incident
@@ -21,8 +21,8 @@ func vorfall(t *testing.T, f *fixture) (models.Incident, []models.IncidentUpdate
 	return inc, ups
 }
 
-// uebersetzungen legt je eine bestätigte Übersetzung für den Vorfall und das
-// Eröffnungs-Update an (beide nennen den Prüfungsnamen).
+// uebersetzungen creates one confirmed translation each for the incident and the
+// opening update (both name the check name).
 func uebersetzungen(t *testing.T, f *fixture) {
 	t.Helper()
 	inc, ups := vorfall(t, f)
@@ -32,9 +32,9 @@ func uebersetzungen(t *testing.T, f *fixture) {
 		Message: "Self-monitoring reports an outage of API.", Status: "confirmed"}).Error)
 }
 
-// Wird die Komponente während einer Störung archiviert/versteckt,
-// bleibt der Vorfall öffentlich in der Historie. Titel, Meldung, Updates und
-// Übersetzungen dürfen danach weder den Prüfungsnamen noch das Fehlerdetail nennen.
+// If the component is archived/hidden during an outage,
+// the incident stays public in the history. Title, message, updates and
+// translations must afterwards name neither the check name nor the error detail.
 func TestMonitor_AusblendenNeutralisiertVorfalltexte(t *testing.T) {
 	for name, hide := range map[string]func(*testing.T, *fixture){"archiviert": archiviere, "unsichtbar": verstecke} {
 		t.Run(name, func(t *testing.T) {
@@ -60,9 +60,9 @@ func TestMonitor_AusblendenNeutralisiertVorfalltexte(t *testing.T) {
 	}
 }
 
-// Nur die unveränderten Texte des Monitors werden ersetzt. Ein vom
-// Admin geänderter Titel und eigene Updates bleiben, ebenso die Übersetzungen,
-// wenn am Vorfall selbst nichts ersetzt wurde.
+// Only the monitor's unchanged texts are replaced. A title
+// changed by the admin and own updates stay, as do the translations
+// if nothing was replaced on the incident itself.
 func TestMonitor_AusblendenLaesstAdminTexteStehen(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -82,7 +82,7 @@ func TestMonitor_AusblendenLaesstAdminTexteStehen(t *testing.T) {
 	assert.Zero(t, f.count(t, &models.IncidentUpdateTranslation{}, "1 = 1"))
 }
 
-// Hat der Admin nur die Meldung geändert, wird allein der Titel ersetzt.
+// If the admin only changed the message, only the title is replaced.
 func TestMonitor_AusblendenErsetztNurUnveraendertenTitel(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -95,8 +95,8 @@ func TestMonitor_AusblendenErsetztNurUnveraendertenTitel(t *testing.T) {
 	assert.Equal(t, "Eigene Meldung", inc.Message)
 }
 
-// Auch ein vom Admin schon geschlossener Vorfall bleibt öffentlich
-// und wird beim Freigeben neutralisiert.
+// An incident already closed by the admin also stays public
+// and is neutralized on release.
 func TestMonitor_AusblendenNeutralisiertGeschlossenenVorfall(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -108,8 +108,8 @@ func TestMonitor_AusblendenNeutralisiertGeschlossenenVorfall(t *testing.T) {
 	assert.Zero(t, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Gelöschter Vorfall oder unbrauchbare Vorfall-Marke: nichts zu
-// neutralisieren, die Freigabe gelingt trotzdem.
+// Deleted incident or unusable incident marker: nothing to
+// neutralize, the release still succeeds.
 func TestMonitor_AusblendenOhneVorfallGibtFrei(t *testing.T) {
 	for name, prep := range map[string]func(*testing.T, *fixture){
 		"gelöscht": func(t *testing.T, f *fixture) {
@@ -131,8 +131,8 @@ func TestMonitor_AusblendenOhneVorfallGibtFrei(t *testing.T) {
 	}
 }
 
-// Scheitert ein Schritt des Neutralisierens, wird die ganze Freigabe
-// zurückgerollt (Marken bleiben, Vorfall offen) und im nächsten Takt wiederholt.
+// If a step of the neutralizing fails, the whole release is
+// rolled back (markers stay, incident open) and repeated on the next tick.
 func TestMonitor_AusblendenNeutralisierenFehlerWirdWiederholt(t *testing.T) {
 	trigger := func(sql string) func(*testing.T, *fixture) func() {
 		return func(t *testing.T, f *fixture) func() {
@@ -180,8 +180,8 @@ func TestMonitor_AusblendenNeutralisierenFehlerWirdWiederholt(t *testing.T) {
 	}
 }
 
-// Review A: Die Meldung gilt nur als unverändert, wenn sie exakt der
-// Originalmeldung des Monitors entspricht. Ein Anhang des Admins bleibt stehen.
+// Review A: the message only counts as unchanged if it exactly equals the
+// monitor's original message. An admin's appendix stays.
 func TestMonitor_AusblendenLaesstErgaenzteMeldungStehen(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -196,10 +196,10 @@ func TestMonitor_AusblendenLaesstErgaenzteMeldungStehen(t *testing.T) {
 	assert.Equal(t, neutralMessage, ups[0].Message, "das Eröffnungs-Update des Monitors wird trotzdem ersetzt")
 }
 
-// Review B: Ändert der Admin Titel und Meldung, nachdem der Monitor den
-// Vorfall gelesen hat, darf das UPDATE den neuen Text nicht überschreiben. Der
-// Edit wird unmittelbar vor dem Ersetzen des Titels in derselben Verbindung
-// eingespielt.
+// Review B: if the admin changes title and message after the monitor has
+// read the incident, the UPDATE must not overwrite the new text. The
+// edit is injected immediately before replacing the title in the same
+// connection.
 func TestMonitor_AusblendenUeberschreibtZwischenzeitlichenAdminEditNicht(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -225,7 +225,7 @@ func TestMonitor_AusblendenUeberschreibtZwischenzeitlichenAdminEditNicht(t *test
 	assert.Equal(t, "Admin-Meldung", inc.Message)
 }
 
-// Review C: Die Übersetzung eines nicht ersetzten Updates bleibt stehen.
+// Review C: the translation of a non-replaced update stays.
 func TestMonitor_AusblendenLaesstUebersetzungFremderUpdatesStehen(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -239,7 +239,7 @@ func TestMonitor_AusblendenLaesstUebersetzungFremderUpdatesStehen(t *testing.T) 
 	assert.EqualValues(t, 1, f.count(t, &models.IncidentUpdateTranslation{}, "update_id = ?", admin.ID))
 }
 
-// Andere Abschlussgründe (Erholung) lassen die Texte unverändert.
+// Other closing reasons (recovery) leave the texts unchanged.
 func TestMonitor_ErholungBehaeltVorfalltexte(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)

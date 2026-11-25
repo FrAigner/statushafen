@@ -14,8 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// fixture: zwei Statusseiten mit je einer Quelle, damit jede Abfrage auch
-// gegen die Mandantengrenze geprüft wird.
+// fixture: two status pages with one source each, so every query is also
+// checked against the tenant boundary.
 type storeFixture struct {
 	db              *gorm.DB
 	page, otherPage models.StatusPage
@@ -62,9 +62,9 @@ func (f *storeFixture) setExtStatus(t *testing.T, ext models.ExternalComponent, 
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", ext.ID).Update("status", status).Error)
 }
 
-// failOn lässt die nächsten GORM-Operationen op ("create", "update",
-// "query") auf table scheitern, bis die Rückgabefunktion aufgerufen wird.
-// skip überspringt die ersten Treffer.
+// failOn makes the next GORM operations op ("create", "update",
+// "query") on table fail until the returned function is called.
+// skip skips the first hits.
 func failOn(t *testing.T, db *gorm.DB, op, table string, skip int) {
 	t.Helper()
 	name := "test:fail:" + op + ":" + table
@@ -148,13 +148,13 @@ func TestUpsertComponents_VerschwindenUndWiederauftauchen(t *testing.T) {
 	assert.Equal(t, "Service 04", rows["db"].Name, "erstes Vorkommen gewinnt")
 	assert.True(t, rows["g"].IsGroup)
 
-	// Zweimal hintereinander: idempotent.
+	// Twice in a row: idempotent.
 	res, err = upsertComponents(f.db, f.src, sum, now)
 	require.NoError(t, err)
 	assert.Equal(t, UpsertResult{Seen: 3}, res)
 	assert.Len(t, extRows(t, f.db, f.src.ID), 3)
 
-	// db fehlt → verschwunden, nicht gelöscht.
+	// db is missing → vanished, not deleted.
 	later := now.Add(time.Minute)
 	res, err = upsertComponents(f.db, f.src, summaryOf(sum.Components[0], sum.Components[3]), later)
 	require.NoError(t, err)
@@ -165,12 +165,12 @@ func TestUpsertComponents_VerschwindenUndWiederauftauchen(t *testing.T) {
 	assert.True(t, db.VanishedAt.Equal(later))
 	assert.True(t, db.LastSeenAt.Equal(now), "LastSeenAt bleibt der letzte Sichtkontakt")
 
-	// Nochmals ohne db: bereits verschwunden, zählt nicht erneut.
+	// Once more without db: already vanished, does not count again.
 	res, err = upsertComponents(f.db, f.src, summaryOf(sum.Components[0], sum.Components[3]), later)
 	require.NoError(t, err)
 	assert.Equal(t, 0, res.Vanished)
 
-	// Wiederauftauchen: Markierung zurück, keine neue Zeile.
+	// Reappearing: mark reverted, no new row.
 	res, err = upsertComponents(f.db, f.src, sum, later)
 	require.NoError(t, err)
 	assert.Equal(t, 0, res.Created)
@@ -179,7 +179,7 @@ func TestUpsertComponents_VerschwindenUndWiederauftauchen(t *testing.T) {
 	assert.False(t, db2.Vanished)
 	assert.Nil(t, db2.VanishedAt)
 
-	// Fremde Quelle bleibt unberührt.
+	// Foreign source stays untouched.
 	other := extRows(t, f.db, f.otherSrc.ID)["vm"]
 	assert.Equal(t, "Fremd-VM", other.Name)
 	assert.False(t, other.Vanished)
@@ -215,8 +215,8 @@ func TestUpsertComponents_DBFehler(t *testing.T) {
 func TestLinkedRefs_Mandantentrennung(t *testing.T) {
 	f := newStoreFixture(t)
 	f.link(t, f.page.ID, f.comp.ID, f.ext.ID)
-	// Manipulierte Kopplung: Link auf Seite 1, externe Komponente aus der
-	// Quelle von Seite 2 - darf nie zählen.
+	// Tampered link: link on page 1, external component from the
+	// source of page 2 - must never count.
 	f.link(t, f.page.ID, f.comp.ID, f.otherExt.ID)
 	f.link(t, f.otherPage.ID, f.otherComp.ID, f.otherExt.ID)
 
@@ -235,19 +235,19 @@ func TestLinkedRefs_Mandantentrennung(t *testing.T) {
 	assert.Len(t, other[f.otherComp.ID], 1)
 	assert.Equal(t, "Fremd-VM", other[f.otherComp.ID][0].Name)
 
-	// Verschwunden: enthalten, mit Markierung.
+	// Vanished: included, with mark.
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", f.ext.ID).Update("vanished", true).Error)
 	refs, err = LinkedRefs(f.db, f.page.ID)
 	require.NoError(t, err)
 	assert.True(t, refs[f.comp.ID][0].Vanished)
 
-	// Inaktive Quelle zählt nicht.
+	// Inactive source does not count.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("active", false).Error)
 	refs, err = LinkedRefs(f.db, f.page.ID)
 	require.NoError(t, err)
 	assert.Empty(t, refs)
 
-	// Gelöschte Kopplung zählt nicht.
+	// Deleted link does not count.
 	require.NoError(t, f.db.Where("component_id = ?", f.otherComp.ID).Delete(&models.ExternalComponentLink{}).Error)
 	other, err = LinkedRefs(f.db, f.otherPage.ID)
 	require.NoError(t, err)
@@ -270,7 +270,7 @@ func TestLinkedRefs_GeloeschteQuelleUndKomponente(t *testing.T) {
 	assert.Empty(t, refs, "gelöschte Quelle")
 }
 
-// Effective: alle Kombinationen eigener × externer Status.
+// Effective: all combinations of own × external status.
 func TestEffective_AlleKombinationen(t *testing.T) {
 	all := []string{componentstatus.Operational, componentstatus.UnderMaintenance, componentstatus.DegradedPerformance,
 		componentstatus.PartialOutage, componentstatus.MajorOutage, componentstatus.Unknown}
@@ -310,7 +310,7 @@ func TestEffectiveStatuses(t *testing.T) {
 	assert.Equal(t, map[uint]string{f.comp.ID: componentstatus.Operational, second.ID: componentstatus.DegradedPerformance}, got,
 		"Gruppen fehlen, offener Vorfall überlagert")
 
-	// der Schweregrad des Vorfalls bestimmt den Status.
+	// the severity of the incident determines the status.
 	require.NoError(t, f.db.Model(&inc).Update("severity", componentstatus.PartialOutage).Error)
 	got, err = EffectiveStatuses(f.db, f.page.ID)
 	require.NoError(t, err)

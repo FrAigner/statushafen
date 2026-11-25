@@ -1,8 +1,8 @@
 package models
 
-// HiddenComponentIDs liefert die IDs aller unsichtbaren Komponenten
-// einschließlich ihrer Nachfahren: Wer eine Gruppe ausblendet, blendet
-// deren Mitglieder mit aus.
+// HiddenComponentIDs returns the IDs of all invisible components
+// including their descendants: hiding a group also hides
+// its members.
 func HiddenComponentIDs(all []Component) map[uint]bool {
 	children := map[uint][]uint{}
 	for _, comp := range all {
@@ -14,7 +14,7 @@ func HiddenComponentIDs(all []Component) map[uint]bool {
 	var mark func(id uint)
 	mark = func(id uint) {
 		if hidden[id] {
-			return // schützt vor Zyklen in Altdaten
+			return // protects against cycles in legacy data
 		}
 		hidden[id] = true
 		for _, ch := range children[id] {
@@ -22,7 +22,7 @@ func HiddenComponentIDs(all []Component) map[uint]bool {
 		}
 	}
 	for _, comp := range all {
-		// archivierte Komponenten gelten öffentlich wie unsichtbare.
+		// archived components count as invisible publicly.
 		if !comp.Visible || comp.ArchivedAt != nil {
 			mark(comp.ID)
 		}

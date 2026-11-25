@@ -15,8 +15,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Subscriber-Tokens (lange gültig, 400 Tage) dürfen nie als
-// Login-Token durchgehen, und Login-Tokens nicht als Subscriber-Token.
+// Subscriber tokens (long-lived, 400 days) must never pass as a
+// login token, and login tokens not as a subscriber token.
 
 func authRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -72,7 +72,7 @@ func TestOptionalAuthMiddleware_IgnoresSubscriberToken(t *testing.T) {
 
 func TestAuthMiddleware_RejectsLegacySubscriberTokenWithoutAudience(t *testing.T) {
 	testutils.SetupTestDB()
-	// Altes Format aus bereits verschickten Mails: weder aud noch exp.
+	// Old format from already sent emails: neither aud nor exp.
 	legacy := signRaw(t, &middleware.SubscriberClaims{SubscriberID: 1, StatusPageID: 2})
 	if w := doGet(authRouter(), "/protected", legacy); w.Code != http.StatusUnauthorized {
 		t.Fatalf("Legacy-Subscriber-Token: want 401, got %d", w.Code)
@@ -92,7 +92,7 @@ func TestAuthMiddleware_RequiresExpiration(t *testing.T) {
 
 func TestAuthMiddleware_AcceptsRegularLoginToken(t *testing.T) {
 	db := testutils.SetupTestDB()
-	// Das Konto muss existieren: AuthMiddleware gleicht das Token mit der DB ab.
+	// The account must exist: AuthMiddleware checks the token against the DB.
 	if err := db.Create(&models.User{Email: "a@example.com"}).Error; err != nil {
 		t.Fatal(err)
 	}

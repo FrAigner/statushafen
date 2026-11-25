@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Der Altwert "completed" wird auf "resolved" umgestellt.
+// The legacy value "completed" is switched to "resolved".
 
 func newIncidentStatusDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -73,7 +73,7 @@ func TestMigrateCompletedIncidentStatus(t *testing.T) {
 	require.NoError(t, db.Model(&models.IncidentUpdate{}).Order("id").Pluck("status", &updStatus).Error)
 	assert.Equal(t, []string{"resolved", "monitoring"}, updStatus)
 
-	// Idempotent: zweiter Lauf ändert nichts.
+	// Idempotent: second run changes nothing.
 	var before, after []models.Incident
 	require.NoError(t, db.Unscoped().Order("id").Find(&before).Error)
 	migrateCompletedIncidentStatus(db)
@@ -88,7 +88,7 @@ func TestMigrateCompletedIncidentStatus_FehlerSindNichtFatal(t *testing.T) {
 	migrateCompletedIncidentStatus(db)
 	assert.Contains(t, out.String(), "Failed to migrate legacy incident status")
 
-	// Nur die Updates-Tabelle fehlt.
+	// Only the updates table is missing.
 	db = newIncidentStatusDB(t)
 	require.NoError(t, db.Migrator().DropTable(&models.IncidentUpdate{}))
 	out = captureLog(t)

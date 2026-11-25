@@ -2,20 +2,20 @@ package models
 
 import "time"
 
-// Admin-Nachrichtencenter (Glocke im Admin-Bereich).
+// Admin message center (bell in the admin area).
 //
-// AdminNotification ist eine Nachricht an die Admins einer Statusseite
-// (StatusPageID gesetzt) oder an alle Global Admins (StatusPageID nil,
-// systemweit). Die Texte stehen NICHT in der Datenbank: TitleKey/BodyKey sind
-// i18n-Schlüssel (adminNotifications.*), die das Frontend mit Params
-// übersetzt. Params enthält nur unkritische Werte (Kanal, ID, Sekunden), nie
-// Webhook-URLs, Schlüssel, Tokens oder E-Mail-Adressen von Abonnenten
-// (siehe handlers.NotifyAdmins).
+// AdminNotification is a message to the admins of a status page
+// (StatusPageID set) or to all global admins (StatusPageID nil,
+// system-wide). The texts are NOT in the database: TitleKey/BodyKey are
+// i18n keys (adminNotifications.*) that the frontend translates with params.
+// Params contains only non-critical values (channel, ID, seconds), never
+// webhook URLs, keys, tokens or email addresses of subscribers
+// (see handlers.NotifyAdmins).
 //
-// Gleiche Meldungen fasst der Dienst zusammen: DedupKey (mit Seitenpräfix)
-// identifiziert eine offene Meldung; innerhalb von 15 Minuten zählt Count
-// hoch. Erledigte oder abgelaufene Zeilen haben einen leeren DedupKey und
-// nehmen so nicht mehr am partiellen Unique-Index teil
+// The service merges identical messages: DedupKey (with page prefix)
+// identifies an open message; within 15 minutes Count
+// is incremented. Resolved or expired rows have an empty DedupKey and
+// thus no longer take part in the partial unique index
 // (database.CreateAdminNotificationIndexes).
 type AdminNotification struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
@@ -29,13 +29,13 @@ type AdminNotification struct {
 	Severity string `gorm:"not null;default:'info'" json:"severity"`
 	TitleKey string `gorm:"not null" json:"title_key"`
 	BodyKey  string `gorm:"not null;default:''" json:"body_key"`
-	// Params: JSON-Objekt als Text (portabel zwischen Postgres und SQLite).
+	// Params: JSON object as text (portable between Postgres and SQLite).
 	Params   string `gorm:"type:text;not null;default:'{}'" json:"-"`
 	LinkPath string `gorm:"not null;default:''" json:"link_path"`
 
-	// DedupKey: Schlüssel der OFFENEN Meldung (partiell eindeutig, leer nach
-	// Ablösung/Erledigung). GroupKey bleibt dauerhaft und erlaubt, auch
-	// abgelöste, aber noch offene Zeilen derselben Meldung zu erledigen.
+	// DedupKey: key of the OPEN message (partially unique, empty after
+	// replacement/resolution). GroupKey remains permanently and allows resolving
+	// also replaced but still open rows of the same message.
 	DedupKey    string     `gorm:"not null;default:''" json:"-"`
 	GroupKey    string     `gorm:"not null;default:'';index" json:"-"`
 	Count       int        `gorm:"column:count;not null;default:1" json:"count"`
@@ -44,18 +44,18 @@ type AdminNotification struct {
 	ResolvedAt  *time.Time `json:"resolved_at"`
 }
 
-// Schweregrade einer AdminNotification.
+// Severity levels of an AdminNotification.
 const (
 	AdminNotificationInfo    = "info"
 	AdminNotificationWarning = "warning"
 	AdminNotificationError   = "error"
 )
 
-// NotificationRead: Lesestatus je Benutzer. Eindeutig über
-// (notification_id, user_id), angelegt per Raw-SQL in
-// database.CreateAdminNotificationIndexes. Wird eine Nachricht erneut
-// ausgelöst, löscht der Dienst die Zeilen und sie gilt für alle wieder als
-// ungelesen.
+// NotificationRead: read status per user. Unique over
+// (notification_id, user_id), created via raw SQL in
+// database.CreateAdminNotificationIndexes. If a message is triggered
+// again, the service deletes the rows and it counts as
+// unread for everyone again.
 type NotificationRead struct {
 	ID             uint               `gorm:"primaryKey" json:"-"`
 	NotificationID uint               `gorm:"not null;index" json:"notification_id"`

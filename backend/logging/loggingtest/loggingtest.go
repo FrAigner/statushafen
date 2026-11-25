@@ -1,5 +1,5 @@
-// Package loggingtest stellt Testhilfen für logging.Fatal bereit:
-// Fatal-Pfade sollen getestet werden, ohne den Testprozess zu beenden.
+// Package loggingtest provides test helpers for logging.Fatal:
+// Fatal paths should be testable without terminating the test process.
 package loggingtest
 
 import (
@@ -11,7 +11,7 @@ import (
 	"github.com/fraigner/statushafen/logging"
 )
 
-// FatalCall beschreibt einen abgefangenen logging.Fatal-Aufruf.
+// FatalCall describes an intercepted logging.Fatal call.
 type FatalCall struct {
 	Code    int
 	Message string
@@ -20,7 +20,7 @@ type FatalCall struct {
 
 type exitSignal struct{ code int }
 
-// captureHandler merkt sich den letzten Error-Eintrag.
+// captureHandler remembers the last error entry.
 type captureHandler struct {
 	mu   *sync.Mutex
 	last *FatalCall
@@ -41,9 +41,9 @@ func (h captureHandler) Handle(_ context.Context, r slog.Record) error {
 	return nil
 }
 
-// ExpectFatal führt fn aus und erwartet, dass sie logging.Fatal aufruft. Der
-// Exit wird per panic abgefangen, damit der Code nach Fatal (wie in der
-// Produktion nach os.Exit) nicht weiterläuft. Ohne Fatal schlägt der Test fehl.
+// ExpectFatal runs fn and expects it to call logging.Fatal. The
+// exit is intercepted via panic, so that code after Fatal (as in
+// production after os.Exit) does not keep running. Without Fatal the test fails.
 func ExpectFatal(t testing.TB, fn func()) (got FatalCall) {
 	t.Helper()
 	var last FatalCall

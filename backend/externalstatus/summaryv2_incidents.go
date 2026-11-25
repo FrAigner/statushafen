@@ -14,12 +14,12 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Teil B2: Vorfälle und Wartungen der Summary-API v2 (GET {base}/api/v2/incidents.json und
-// scheduled-maintenances.json; beide liefern die jüngsten 50 Einträge samt
-// Updates).
+// Part B2: incidents and maintenances of the Summary API v2 (GET {base}/api/v2/incidents.json and
+// scheduled-maintenances.json; both return the latest 50 entries including
+// updates).
 
-// Grenzen gegen fehlerhafte oder bösartige Antworten (zusätzlich zu
-// MaxResponseBytes): Was darüber hinausgeht, wird verworfen, nicht gespeichert.
+// Limits against faulty or malicious responses (in addition to
+// MaxResponseBytes): anything beyond them is discarded, not stored.
 const (
 	maxIncidentsPerFeed   = 200
 	maxUpdatesPerIncident = 100
@@ -29,24 +29,24 @@ const (
 	maxIDBytes            = 100
 )
 
-// Normalisierte Status gespiegelter Meldungen.
+// Normalized statuses of mirrored reports.
 const (
 	incidentResolved   = "resolved"
 	maintenanceDone    = "completed"
 	maintenanceRunning = "in_progress"
 )
 
-// IncidentRequest beschreibt den Abruf eines Feeds (Vorfälle oder Wartungen).
+// IncidentRequest describes the fetch of a feed (incidents or maintenances).
 type IncidentRequest struct {
 	BaseURL string
-	// Kind: models.ExternalIncidentKindIncident oder ...Maintenance.
+	// Kind: models.ExternalIncidentKindIncident or ...Maintenance.
 	Kind         string
 	ETag         string
 	LastModified string
 }
 
-// Incident ist ein Vorfall oder eine Wartung, wie ein Provider sie liefert;
-// Status ist bereits normalisiert, RawStatus der Originalwert.
+// Incident is an incident or a maintenance as a provider returns it;
+// Status is already normalized, RawStatus is the original value.
 type Incident struct {
 	ExternalID  string
 	Kind        string
@@ -65,13 +65,13 @@ type Incident struct {
 	Updates     []IncidentUpdate
 }
 
-// IncidentComponent: betroffene externe Komponente (externe ID und Name).
+// IncidentComponent: affected external component (external ID and name).
 type IncidentComponent struct {
 	ExternalID string
 	Name       string
 }
 
-// IncidentUpdate ist ein Update einer Meldung.
+// IncidentUpdate is an update of a report.
 type IncidentUpdate struct {
 	ExternalID string
 	Status     string
@@ -79,7 +79,7 @@ type IncidentUpdate struct {
 	DisplayAt  time.Time
 }
 
-// IncidentFeed ist das Ergebnis eines Feed-Abrufs. NotModified = 304.
+// IncidentFeed is the result of a feed fetch. NotModified = 304.
 type IncidentFeed struct {
 	NotModified  bool
 	ETag         string
@@ -87,8 +87,8 @@ type IncidentFeed struct {
 	Items        []Incident
 }
 
-// IncidentProvider ist die optionale Erweiterung eines Providers um
-// Vorfälle und Wartungen. Ein Provider ohne sie liefert nur Komponenten.
+// IncidentProvider is the optional extension of a provider for
+// incidents and maintenances. A provider without it only returns components.
 type IncidentProvider interface {
 	FetchIncidents(ctx context.Context, req IncidentRequest) (*IncidentFeed, error)
 }
@@ -139,9 +139,9 @@ var summaryV2MaintenanceStatus = map[string]string{
 
 var summaryV2Impact = map[string]bool{"none": true, "minor": true, "major": true, "critical": true, "maintenance": true}
 
-// NormalizeIncidentStatus bildet einen Status der Summary-API ab. closed = behoben
-// bzw. abgeschlossen. Unbekannte Werte bleiben unverändert (klein
-// geschrieben), gelten als offen und werden geloggt - nie ein Abbruch.
+// NormalizeIncidentStatus maps a status of the summary API. closed = resolved
+// or completed. Unknown values stay unchanged (lower-cased),
+// count as open and are logged - never an abort.
 func NormalizeIncidentStatus(kind, raw string) (status string, closed bool) {
 	table := summaryV2IncidentStatus
 	done := incidentResolved
@@ -156,7 +156,7 @@ func NormalizeIncidentStatus(kind, raw string) (status string, closed bool) {
 	return key, false
 }
 
-// FetchIncidents implementiert IncidentProvider.
+// FetchIncidents implements IncidentProvider.
 func (p SummaryV2Provider) FetchIncidents(ctx context.Context, req IncidentRequest) (*IncidentFeed, error) {
 	file := "incidents.json"
 	if req.Kind == models.ExternalIncidentKindMaintenance {
@@ -194,8 +194,8 @@ func (p SummaryV2Provider) FetchIncidents(ctx context.Context, req IncidentReque
 	return feed, nil
 }
 
-// convertIncident wandelt einen Eintrag um; ok=false bei fehlender oder
-// überlanger ID (nicht verwertbar).
+// convertIncident converts an entry; ok=false for a missing or
+// overlong ID (not usable).
 func convertIncident(req IncidentRequest, r summaryV2Incident) (Incident, bool) {
 	id := cleanText(r.ID, maxIDBytes)
 	if id == "" || len(r.ID) > maxIDBytes {
@@ -253,15 +253,15 @@ func convertIncident(req IncidentRequest, r summaryV2Incident) (Incident, bool) 
 	return it, true
 }
 
-// incidentURL: Original-Meldung auf der Fremdseite, {base}/incidents/{id}
-// (gilt auch für Wartungen). Die Basis ist die vom Admin
-// geprüfte https-URL; die ID wird als Pfadsegment escaped.
+// incidentURL: original report on the third-party site, {base}/incidents/{id}
+// (also applies to maintenances). The base is the https URL checked by
+// the admin; the ID is escaped as a path segment.
 func incidentURL(base, id string) string {
 	return safeLinkURL(strings.TrimRight(base, "/") + "/incidents/" + url.PathEscape(id))
 }
 
-// cleanText kürzt auf n Bytes, entfernt NUL (Postgres lehnt sie ab) und
-// ungültiges UTF-8 und trimmt Leerraum an den Rändern.
+// cleanText shortens to n bytes, removes NUL (Postgres rejects it) and
+// invalid UTF-8, and trims whitespace at the edges.
 func cleanText(s string, n int) string {
 	s = strings.ReplaceAll(s, "\x00", "")
 	return strings.TrimSpace(truncate(strings.ToValidUTF8(s, ""), n))
@@ -274,11 +274,11 @@ var (
 	trailingSpace = regexp.MustCompile(`[ \t]+\n`)
 )
 
-// plainText macht aus dem Update-Text der Fremdseite Klartext: Die API
-// liefert HTML-Schnipsel ("<br>", "<b>Deutsch</b>"). Zeilenumbruch-Tags werden
-// zu Zeilenumbrüchen, alle übrigen Tags entfernt, Entities aufgelöst. Gespeichert
-// und ausgeliefert wird nur Klartext - damit kann kein Markup der Fremdseite
-// auf unserer Seite oder in unseren Mails landen (dort wird zusätzlich escaped).
+// plainText turns the update text of the third-party site into plain text: the API
+// returns HTML snippets ("<br>", "<b>Deutsch</b>"). Line-break tags become
+// line breaks, all other tags are removed, entities resolved. Only plain text
+// is stored and delivered - so no markup from the third-party site can
+// end up on our page or in our mails (which are additionally escaped).
 func plainText(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = htmlBreak.ReplaceAllString(s, "\n")
@@ -289,8 +289,8 @@ func plainText(s string) string {
 	return strings.TrimSpace(s)
 }
 
-// parseTimePtr liest einen RFC-3339-Zeitstempel (mit beliebigem Zonen-Offset,
-// auch mit Sekundenbruchteilen) und liefert UTC; unlesbar = nil.
+// parseTimePtr reads an RFC 3339 timestamp (with any zone offset,
+// also with fractional seconds) and returns UTC; unreadable = nil.
 func parseTimePtr(s string) *time.Time {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -312,7 +312,7 @@ func parseOptTime(s *string) *time.Time {
 	return parseTimePtr(*s)
 }
 
-// firstTime liefert den ersten lesbaren Zeitstempel.
+// firstTime returns the first readable timestamp.
 func firstTime(candidates ...*string) *time.Time {
 	for _, c := range candidates {
 		if t := parseOptTime(c); t != nil {

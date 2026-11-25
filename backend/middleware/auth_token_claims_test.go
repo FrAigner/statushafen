@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Prüfung von exp und Audience muss auch greifen, wenn das Konto im Token
-// existiert. Ein Token für eine unbekannte Nutzer-ID scheitert ohnehin an der
-// Kontosuche und würde den Fehler der Token-Prüfung verdecken.
+// The check of exp and audience must also apply when the account exists in the token.
+// A token for an unknown user ID fails at the
+// account lookup anyway and would mask the error of the token check.
 func TestAuthMiddleware_TokenWithoutExpirationIsRejectedForExistingAccount(t *testing.T) {
 	db := testutils.SetupTestDB()
 	user := models.User{Email: "konto@example.com"}
@@ -32,8 +32,8 @@ func TestAuthMiddleware_TokenWithoutExpirationIsRejectedForExistingAccount(t *te
 	assert.Equal(t, "anon", doGet(authRouter(), "/optional", noExp).Body.String())
 }
 
-// Ein Token mit Subscriber-Audience trägt zwar ein exp, ist aber nie eine
-// Sitzung, auch nicht mit der ID eines vorhandenen Kontos.
+// A token with the subscriber audience does carry an exp, but is never a
+// session, not even with the ID of an existing account.
 func TestAuthMiddleware_SubscriberAudienceIsRejectedEvenWithExistingAccountID(t *testing.T) {
 	db := testutils.SetupTestDB()
 	user := models.User{Email: "konto2@example.com"}
@@ -50,8 +50,8 @@ func TestAuthMiddleware_SubscriberAudienceIsRejectedEvenWithExistingAccountID(t 
 	assert.Equal(t, "anon", doGet(authRouter(), "/optional", mixed).Body.String())
 }
 
-// Subscriber-ID und Seiten-ID sind beide Pflicht: Fehlt eine, ist das Token
-// ungültig (ein Login-Token trüge beide als 0).
+// Subscriber ID and page ID are both required: if one is missing, the token is
+// invalid (a login token would carry both as 0).
 func TestParseSubscriberToken_BothIDsAreRequired(t *testing.T) {
 	testutils.SetupTestDB()
 	claimsWith := func(subscriberID, pageID uint) *middleware.SubscriberClaims {
@@ -71,9 +71,9 @@ func TestParseSubscriberToken_BothIDsAreRequired(t *testing.T) {
 	assert.Error(t, err, "ohne beide")
 }
 
-// Der Algorithmus ist auf HS256 festgelegt: Ein mit demselben Geheimnis, aber
-// per HS384 signiertes Subscriber-Token wird abgelehnt, statt den vom Token
-// behaupteten Algorithmus zu übernehmen.
+// The algorithm is pinned to HS256: a subscriber token signed with the same secret but
+// with HS384 is rejected instead of adopting the algorithm
+// claimed by the token.
 func TestParseSubscriberToken_OnlyHS256IsAccepted(t *testing.T) {
 	testutils.SetupTestDB()
 	claims := &middleware.SubscriberClaims{SubscriberID: 7, StatusPageID: 9,

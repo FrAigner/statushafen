@@ -1,6 +1,6 @@
 package coveragegate
 
-// baseline-check prüft nur die Gesamtquoten (Push auf develop/main), ohne Diff.
+// baseline-check only checks the overall rates (push to develop/main), without diff.
 
 import (
 	"path/filepath"
@@ -46,7 +46,7 @@ func TestBaselineCheck_FrontendToleranz(t *testing.T) {
 	require.Equal(t, 1, code)
 	require.Contains(t, out, "Frontend-Zeilen: 100.00 % < Baseline 101.00 % (Toleranz 0.50 Punkte)")
 
-	// Go bleibt auch mit Toleranz exakt.
+	// Go stays exact even with tolerance.
 	code, _, _ = baselineCheck(t, `{"go_statements": 51}`, "-frontend-tolerance", "1.5")
 	require.Equal(t, 1, code)
 }

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// testAdminPassword ist ein reines Testpasswort, kein echtes Geheimnis.
+// testAdminPassword is a pure test password, not a real secret.
 const testAdminPassword = "ein-langes-testpasswort"
 
 func newCreateAdminDB(t *testing.T) *gorm.DB {
@@ -91,7 +91,7 @@ func TestCreateGlobalAdmin_DatenbankfehlerBrichtAb(t *testing.T) {
 	assert.False(t, errors.Is(err, ErrAdminExists))
 }
 
-// Jeder Datenbankfehler mitten im Ablauf bricht ab und legt nichts an.
+// Any database error in the middle of the flow aborts and creates nothing.
 func TestCreateGlobalAdmin_FehlerInEinzelnenSchrittenBrechenAb(t *testing.T) {
 	t.Run("Konten nicht lesbar", func(t *testing.T) {
 		db := newCreateAdminDB(t)

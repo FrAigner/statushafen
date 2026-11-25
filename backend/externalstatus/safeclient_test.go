@@ -26,8 +26,8 @@ func get(t *testing.T, c *http.Client, url string) (*http.Response, error) {
 	return resp, err
 }
 
-// redirectHandler: /redirect?to=<ziel> leitet weiter, /chain/<n> leitet n-mal
-// weiter, sonst 200 "ok" (Cookie wird gesetzt, darf nie zurückkommen).
+// redirectHandler: /redirect?to=<target> redirects, /chain/<n> redirects n
+// times, otherwise 200 "ok" (cookie is set, must never come back).
 func redirectHandler(seenCookie *bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
@@ -114,8 +114,8 @@ func TestSafeClient_DreiWeiterleitungenErlaubt(t *testing.T) {
 	assert.False(t, cookie, "kein Cookie-Jar: der gesetzte Cookie kommt bei der Weiterleitung nicht zurück")
 }
 
-// DNS-Rebinding: Jede Verbindung löst neu auf und prüft erneut - die zweite
-// Antwort (interne IP) wird abgelehnt, obwohl die erste öffentlich war.
+// DNS rebinding: every connection resolves anew and checks again - the second
+// answer (internal IP) is rejected although the first was public.
 func TestSafeClient_DNSRebinding(t *testing.T) {
 	var cookie bool
 	tt := newTestTarget(t, redirectHandler(&cookie))
@@ -257,7 +257,7 @@ func TestGetJSON(t *testing.T) {
 	require.ErrorIs(t, err, ErrBlockedTarget)
 }
 
-// abbrechenderBody liefert einen Lesefehler mitten in der Antwort.
+// abortingBody delivers a read error in the middle of the response.
 func TestGetJSON_Lesefehler(t *testing.T) {
 	tt := newTestTarget(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Length", "100")
@@ -267,8 +267,8 @@ func TestGetJSON_Lesefehler(t *testing.T) {
 	require.Error(t, err)
 }
 
-// Der User-Agent nennt das Projekt, aber keine Betreiber-Domain: Das Repository ist
-// für alle Installationen gleich, ein fest verdrahteter Betreibername wäre falsch.
+// The user agent names the project but no operator domain: the repository is
+// the same for all installations, a hard-wired operator name would be wrong.
 func TestUserAgentNenntKeineBetreiberDomain(t *testing.T) {
 	assert.Contains(t, UserAgent, "Statushafen")
 	assert.NotContains(t, UserAgent, "statushafen.de")

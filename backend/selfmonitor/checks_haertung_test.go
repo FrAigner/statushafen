@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// testMaxMetrics spiegelt das Limit der Metrikdatei (64 KiB).
+// testMaxMetrics mirrors the limit of the metrics file (64 KiB).
 const testMaxMetrics = 64 << 10
 
 func backupCheckFuer(dir string) func(context.Context) Result {
@@ -21,9 +21,9 @@ func backupCheckFuer(dir string) func(context.Context) Result {
 	return BackupCheck(dir, "backup-prod", 36*time.Hour, func() time.Time { return now })
 }
 
-// Betreiber-Entscheidung: Fehlt das Metrik-Verzeichnis bei gesetztem
-// Job (Mount fehlt), ist das ein Fehlschlag mit festem Text ohne Pfad. Eine fehlende
-// Datei im vorhandenen Verzeichnis bleibt "nicht prüfbar".
+// Operator decision: if the metrics directory is missing with a
+// job set (mount missing), that is a failure with fixed text without a path. A missing
+// file in the existing directory stays "not checkable".
 func TestBackupCheck_FehlendesVerzeichnisIstFehlschlag(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "geheim-mount")
 	res := backupCheckFuer(dir)(context.Background())
@@ -36,7 +36,7 @@ func TestBackupCheck_FehlendesVerzeichnisIstFehlschlag(t *testing.T) {
 	assert.True(t, backupCheckFuer(dir)(context.Background()).Skip, "Verzeichnis da, Datei fehlt: weiter nicht prüfbar")
 }
 
-// Ein Symlink wird nicht verfolgt.
+// A symlink is not followed.
 func TestBackupCheck_SymlinkWirdNichtVerfolgt(t *testing.T) {
 	dir := t.TempDir()
 	ziel := filepath.Join(t.TempDir(), "echt.prom")
@@ -49,13 +49,13 @@ func TestBackupCheck_SymlinkWirdNichtVerfolgt(t *testing.T) {
 	assert.NotContains(t, res.Detail, dir)
 }
 
-// Ein FIFO blockiert den Monitor nicht (os.ReadFile hängt ohne Schreiber).
+// A FIFO does not block the monitor (os.ReadFile hangs without a writer).
 func TestBackupCheck_FifoBlockiertNicht(t *testing.T) {
 	dir := t.TempDir()
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
 	require.NoError(t, syscall.Mkfifo(pfad, 0o600))
-	t.Cleanup(func() { // hängenden Leser (alter Stand) freigeben
-		if f, err := os.OpenFile(pfad, os.O_RDWR, 0); err == nil { //nolint:gosec // Testpfad
+	t.Cleanup(func() { // release the hanging reader (old state)
+		if f, err := os.OpenFile(pfad, os.O_RDWR, 0); err == nil { //nolint:gosec // Test path
 			_ = f.Close()
 		}
 	})
@@ -71,13 +71,13 @@ func TestBackupCheck_FifoBlockiertNicht(t *testing.T) {
 	}
 }
 
-// Eine riesige Datei wird nicht eingelesen, sondern abgelehnt.
+// A huge file is not read in but rejected.
 func TestBackupCheck_ZuGrosseDateiWirdAbgelehnt(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	writeProm(t, dir, "backup-prod", now.Unix(), now.Unix(), 0)
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
-	alt, err := os.ReadFile(pfad) //nolint:gosec // Testpfad
+	alt, err := os.ReadFile(pfad) //nolint:gosec // Test path
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(pfad, append(alt, []byte(strings.Repeat("# fuellung\n", 10000))...), 0o600))
 	res := backupCheckFuer(dir)(context.Background())
@@ -85,13 +85,13 @@ func TestBackupCheck_ZuGrosseDateiWirdAbgelehnt(t *testing.T) {
 	assert.Equal(t, "Backup-Metrik ist zu groß", res.Detail)
 }
 
-// Grenze genau am Limit bleibt lesbar.
+// A boundary exactly at the limit stays readable.
 func TestBackupCheck_DateiAmLimitIstLesbar(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	writeProm(t, dir, "backup-prod", now.Unix(), now.Unix(), 0)
 	pfad := filepath.Join(dir, "job_backup-prod.prom")
-	alt, err := os.ReadFile(pfad) //nolint:gosec // Testpfad
+	alt, err := os.ReadFile(pfad) //nolint:gosec // Test path
 	require.NoError(t, err)
 	fuell := strings.Repeat("#", testMaxMetrics-len(alt)-1) + "\n"
 	require.NoError(t, os.WriteFile(pfad, append(alt, []byte(fuell)...), 0o600))
@@ -101,7 +101,7 @@ func TestBackupCheck_DateiAmLimitIstLesbar(t *testing.T) {
 	assert.True(t, backupCheckFuer(dir)(context.Background()).OK)
 }
 
-// nicht lesbare Datei (kein Leserecht) bleibt Fehlschlag mit festem Text.
+// unreadable file (no read permission) stays a failure with fixed text.
 func TestBackupCheck_NichtLesbarOhnePfad(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignoriert Dateirechte")
@@ -120,16 +120,16 @@ type kaputterLeser struct{}
 
 func (kaputterLeser) Read([]byte) (int, error) { return 0, syscall.EAGAIN }
 
-// Ein Lesefehler (z. B. EAGAIN eines untergeschobenen FIFO) ist
-// "nicht lesbar" mit festem Text.
+// A read error (e.g. EAGAIN of a planted FIFO) is
+// "not readable" with fixed text.
 func TestReadLimited_LesefehlerIstFehlschlag(t *testing.T) {
 	_, res, ok := readLimited(kaputterLeser{})
 	assert.False(t, ok)
 	assert.Equal(t, "Backup-Metrik nicht lesbar", res.Detail)
 }
 
-// Ist der Metrik-"Ordner" eine Datei, scheitert die Prüfung mit
-// festem Text (ENOTDIR ist nicht "Datei fehlt").
+// If the metrics "folder" is a file, the check fails with
+// fixed text (ENOTDIR is not "file missing").
 func TestBackupCheck_VerzeichnisIstDatei(t *testing.T) {
 	datei := filepath.Join(t.TempDir(), "keinordner")
 	require.NoError(t, os.WriteFile(datei, []byte("x"), 0o600))

@@ -1,16 +1,16 @@
-// Package coveragegate prüft in der CI, ob jede in einem PR geänderte Zeile
-// von Tests abgedeckt ist (Coverage- und Mutations-Gate).
+// Package coveragegate checks in CI whether every line changed in a PR
+// is covered by tests (coverage and mutation gate).
 //
-// Design-Entscheidung: Der Gate wertet nur die Zeilen aus, die der PR
-// hinzufügt oder ändert (git diff -U0 gegen den Ziel-Branch). Für den
-// Bestandscode gilt stattdessen eine Baseline der Gesamtquoten, die nur
-// steigen darf. So wird neuer Code sofort zu 100 % abgedeckt, ohne dass
-// Altlasten jeden PR blockieren.
+// Design decision: the gate only evaluates the lines the PR
+// adds or changes (git diff -U0 against the target branch). For
+// existing code a baseline of overall rates applies instead, which may only
+// increase. This way new code is immediately covered 100 %, without
+// legacy debt blocking every PR.
 //
-// Go kennt nur Statement-Coverage (Blöcke), keine echte Branch-Coverage.
-// Ein nicht ausgeführter if-Zweig fällt trotzdem auf, weil sein Block den
-// Zähler 0 hat. Den "Zweig nicht genommen"-Fall ohne eigenen Block (if ohne
-// else) decken die Mutationstests (gremlins, CONDITIONALS_NEGATION) ab.
+// Go only knows statement coverage (blocks), no real branch coverage.
+// An unexecuted if branch still stands out, because its block has
+// counter 0. The "branch not taken" case without its own block (if without
+// else) is covered by the mutation tests (gremlins, CONDITIONALS_NEGATION).
 package coveragegate
 
 import (
@@ -26,15 +26,15 @@ import (
 	"strings"
 )
 
-// maxDiffLine erlaubt sehr lange Diff-Zeilen (z. B. minifizierte Dateien);
-// bufio.Scanner bricht sonst bei 64 KiB ab.
+// maxDiffLine allows very long diff lines (e.g. minified files);
+// bufio.Scanner otherwise aborts at 64 KiB.
 const maxDiffLine = 16 << 20
 
-// ChangedLines enthält je Datei (Pfad relativ zur Repo-Wurzel) die Zeilen-
-// nummern, die der Diff auf der neuen Seite hinzufügt.
+// ChangedLines contains, per file (path relative to the repo root), the line
+// numbers that the diff adds on the new side.
 type ChangedLines map[string]map[int]bool
 
-// Finding ist eine geänderte Zeile ohne ausreichende Testabdeckung.
+// Finding is a changed line without sufficient test coverage.
 type Finding struct {
 	File   string
 	Line   int
@@ -45,15 +45,15 @@ func (f Finding) String() string {
 	return fmt.Sprintf("%s:%d: %s", f.File, f.Line, f.Reason)
 }
 
-// ParseDiff liest die Ausgabe von `git diff -U0` und sammelt die neuen
-// Zeilen. Gelöschte Dateien (+++ /dev/null) tauchen nicht auf.
+// ParseDiff reads the output of `git diff -U0` and collects the new
+// lines. Deleted files (+++ /dev/null) do not appear.
 func ParseDiff(r io.Reader) (ChangedLines, error) {
 	changed := ChangedLines{}
 	current := ""
 	inFile := false
-	// Noch offene Zeilen des aktuellen Hunk-Rumpfs (alte/neue Seite). Nur
-	// außerhalb des Rumpfs ist "+++ " ein Dateikopf; eine hinzugefügte
-	// Inhaltszeile "++ x" steht im Diff ebenfalls als "+++ x".
+	// Remaining open lines of the current hunk body (old/new side). Only
+	// outside the body is "+++ " a file header; an added
+	// content line "++ x" also appears in the diff as "+++ x".
 	remOld, remNew := 0, 0
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, maxDiffLine)
@@ -63,7 +63,7 @@ func ParseDiff(r io.Reader) (ChangedLines, error) {
 			if consumeHunkLine(line, &remOld, &remNew) {
 				continue
 			}
-			// Unerwartete Zeile: Hunk war kürzer als angekündigt.
+			// Unexpected line: hunk was shorter than announced.
 			remOld, remNew = 0, 0
 		}
 		switch {
@@ -100,12 +100,12 @@ func ParseDiff(r io.Reader) (ChangedLines, error) {
 	return changed, nil
 }
 
-// consumeHunkLine zählt eine Rumpfzeile von den offenen Zeilen ab und
-// meldet, ob sie zum Rumpf gehörte.
+// consumeHunkLine counts a body line off the open lines and
+// reports whether it belonged to the body.
 func consumeHunkLine(line string, remOld, remNew *int) bool {
-	// Bewusst if + switch auf den Wert statt switch mit Bedingungen: gremlins
-	// ordnet Bedingungen in case-Ausdrücken keinem Coverage-Block zu und
-	// meldet sie sonst als NOT COVERED.
+	// Deliberately if + switch on the value instead of switch with conditions: gremlins
+	// does not assign conditions in case expressions to any coverage block and
+	// would otherwise report them as NOT COVERED.
 	if line == "" || line[0] == ' ' {
 		*remOld--
 		*remNew--
@@ -123,8 +123,8 @@ func consumeHunkLine(line string, remOld, remNew *int) bool {
 	return true
 }
 
-// parseHunkHeader liest aus "@@ -a,b +c,d @@ ..." die alte Zeilenanzahl b
-// sowie Start c und Anzahl d der neuen Seite.
+// parseHunkHeader reads from "@@ -a,b +c,d @@ ..." the old line count b
+// as well as start c and count d of the new side.
 func parseHunkHeader(header string) (int, int, int, error) {
 	fields := strings.Fields(header)
 	if len(fields) < 3 || !strings.HasPrefix(fields[1], "-") || !strings.HasPrefix(fields[2], "+") {
@@ -141,7 +141,7 @@ func parseHunkHeader(header string) (int, int, int, error) {
 	return oldCount, start, count, nil
 }
 
-// parseRange liest "start[,count]"; ohne count ist es eine Zeile.
+// parseRange reads "start[,count]"; without count it is one line.
 func parseRange(spec string) (int, int, error) {
 	startStr, countStr, hasCount := strings.Cut(spec, ",")
 	start, err := strconv.Atoi(startStr)
@@ -164,15 +164,15 @@ type goBlock struct {
 	covered            bool
 }
 
-// GoProfile ist ein eingelesenes `go test -coverprofile`-Profil.
+// GoProfile is a parsed `go test -coverprofile` profile.
 type GoProfile struct {
-	blocks map[string]map[string]*goBlock // Datei -> Blockschlüssel -> Block
+	blocks map[string]map[string]*goBlock // file -> block key -> block
 }
 
-// ParseGoProfile liest ein Coverprofile. modulePath ist der Modulname aus
-// go.mod, repoDir das Verzeichnis des Moduls relativ zur Repo-Wurzel. Mit
-// -coverpkg=./... schreibt jedes Testpaket dieselben Blöcke erneut; ein
-// Block gilt als abgedeckt, sobald irgendein Eintrag ihn ausgeführt hat.
+// ParseGoProfile reads a cover profile. modulePath is the module name from
+// go.mod, repoDir the directory of the module relative to the repo root. With
+// -coverpkg=./... every test package writes the same blocks again; a
+// block counts as covered as soon as any entry has executed it.
 func ParseGoProfile(r io.Reader, modulePath, repoDir string) (*GoProfile, error) {
 	p := &GoProfile{blocks: map[string]map[string]*goBlock{}}
 	sc := bufio.NewScanner(r)
@@ -201,7 +201,7 @@ func ParseGoProfile(r io.Reader, modulePath, repoDir string) (*GoProfile, error)
 	return p, nil
 }
 
-// parseGoProfileLine zerlegt "datei.go:10.20,12.3 2 1".
+// parseGoProfileLine splits "file.go:10.20,12.3 2 1".
 func parseGoProfileLine(line string) (string, *goBlock, string, error) {
 	idx := strings.LastIndex(line, ":")
 	if idx <= 0 {
@@ -236,7 +236,7 @@ func parseGoProfileLine(line string) (string, *goBlock, string, error) {
 	return file, b, fields[0], nil
 }
 
-// lineOf liest die Zeile aus "zeile.spalte".
+// lineOf reads the line from "line.column".
 func lineOf(pos string) (int, error) {
 	l, _, ok := strings.Cut(pos, ".")
 	if !ok {
@@ -245,7 +245,7 @@ func lineOf(pos string) (int, error) {
 	return strconv.Atoi(l)
 }
 
-// Percent liefert die Statement-Coverage über alle Blöcke.
+// Percent returns the statement coverage over all blocks.
 func (p *GoProfile) Percent() float64 {
 	total, covered := 0, 0
 	for _, blocks := range p.blocks {
@@ -259,9 +259,9 @@ func (p *GoProfile) Percent() float64 {
 	return percent(covered, total)
 }
 
-// Uncovered meldet geänderte Zeilen, die ein nicht ausgeführter Block
-// berührt. Zeilen außerhalb jedes Blocks (Deklarationen, Kommentare) und
-// Dateien ohne Statements tauchen im Profil nicht auf und zählen nicht.
+// Uncovered reports changed lines touched by an unexecuted
+// block. Lines outside any block (declarations, comments) and
+// files without statements do not appear in the profile and do not count.
 func (p *GoProfile) Uncovered(changed ChangedLines) []Finding {
 	var findings []Finding
 	for file, lines := range changed {
@@ -281,16 +281,16 @@ func (p *GoProfile) Uncovered(changed ChangedLines) []Finding {
 
 type lcovFile struct {
 	lines    map[int]int
-	branches map[int][]int // -1 steht für "-" (Zweig nie erreicht)
+	branches map[int][]int // -1 stands for "-" (branch never reached)
 }
 
-// LCOV ist ein eingelesener lcov-Report (vitest/v8).
+// LCOV is a parsed lcov report (vitest/v8).
 type LCOV struct {
 	files map[string]*lcovFile
 }
 
-// ParseLCOV liest lcov.info. repoDir ist das Verzeichnis, relativ zu dem
-// die SF-Pfade stehen (bei vitest: frontend).
+// ParseLCOV reads lcov.info. repoDir is the directory relative to which
+// the SF paths are given (for vitest: frontend).
 func ParseLCOV(r io.Reader, repoDir string) (*LCOV, error) {
 	l := &LCOV{files: map[string]*lcovFile{}}
 	var cur *lcovFile
@@ -349,7 +349,7 @@ func ParseLCOV(r io.Reader, repoDir string) (*LCOV, error) {
 	return l, nil
 }
 
-// LinePercent liefert die Zeilenabdeckung über alle Dateien.
+// LinePercent returns the line coverage over all files.
 func (l *LCOV) LinePercent() float64 {
 	total, covered := 0, 0
 	for _, f := range l.files {
@@ -363,7 +363,7 @@ func (l *LCOV) LinePercent() float64 {
 	return percent(covered, total)
 }
 
-// BranchPercent liefert die Zweigabdeckung über alle Dateien.
+// BranchPercent returns the branch coverage over all files.
 func (l *LCOV) BranchPercent() float64 {
 	total, covered := 0, 0
 	for _, f := range l.files {
@@ -379,10 +379,10 @@ func (l *LCOV) BranchPercent() float64 {
 	return percent(covered, total)
 }
 
-// Uncovered meldet geänderte Zeilen, die nie ausgeführt wurden oder an denen
-// ein Zweig nie durchlaufen wurde. Dateien ohne Eintrag im Report (Tests,
-// Konfiguration, JSON) zählen nicht: vitest nimmt per coverage.include alle
-// Quelldateien unter src/ auf, auch ungetestete.
+// Uncovered reports changed lines that were never executed or at which
+// a branch was never taken. Files without an entry in the report (tests,
+// configuration, JSON) do not count: vitest includes all source files
+// under src/ via coverage.include, even untested ones.
 func (l *LCOV) Uncovered(changed ChangedLines) []Finding {
 	var findings []Finding
 	for file, lines := range changed {
@@ -407,19 +407,19 @@ func (l *LCOV) Uncovered(changed ChangedLines) []Finding {
 	return findings
 }
 
-// Baseline hält die Gesamtquoten, unter die der Bestandscode nicht fallen
-// darf (coverage-baseline.json in der Repo-Wurzel).
+// Baseline holds the overall rates below which the existing code must not
+// fall (coverage-baseline.json in the repo root).
 type Baseline struct {
 	GoStatements     float64 `json:"go_statements"`
 	FrontendLines    float64 `json:"frontend_lines"`
 	FrontendBranches float64 `json:"frontend_branches"`
 }
 
-// CompareBaseline meldet jede Quote, die (auf zwei Nachkommastellen
-// gerundet) unter der Baseline liegt. frontendTolerance (Prozentpunkte) gilt
-// nur für die Frontend-Quoten: v8 misst auf identischem Code je nach Timing
-// unterschiedlich viel.
-// Go ist deterministisch und wird immer exakt verglichen.
+// CompareBaseline reports every rate that is below the baseline (rounded to
+// two decimal places). frontendTolerance (percentage points) applies
+// only to the frontend rates: v8 measures identical code with varying
+// results depending on timing.
+// Go is deterministic and is always compared exactly.
 func CompareBaseline(base, current Baseline, frontendTolerance float64) []string {
 	var regressions []string
 	check := func(name string, b, c, tol float64) {
@@ -438,9 +438,9 @@ func CompareBaseline(base, current Baseline, frontendTolerance float64) []string
 	return regressions
 }
 
-// MutateRanges baut die --mutate-Angaben für StrykerJS: zusammenhängende
-// geänderte Zeilen je Quelldatei unter <dir>/src, relativ zu dir.
-// Tests, Test-Hilfen und Nicht-Code-Dateien werden nicht mutiert.
+// MutateRanges builds the --mutate arguments for StrykerJS: contiguous
+// changed lines per source file under <dir>/src, relative to dir.
+// Tests, test helpers and non-code files are not mutated.
 func MutateRanges(changed ChangedLines, dir string) []string {
 	var ranges []string
 	for file, lines := range changed {
@@ -493,8 +493,8 @@ func percent(covered, total int) float64 {
 	return float64(covered) * 100 / float64(total)
 }
 
-// gremlinsReport ist der Ausschnitt aus `gremlins unleash -o <datei>`, den
-// der Gate braucht.
+// gremlinsReport is the excerpt of `gremlins unleash -o <file>` that
+// the gate needs.
 type gremlinsReport struct {
 	Files []struct {
 		FileName  string `json:"file_name"`
@@ -507,13 +507,13 @@ type gremlinsReport struct {
 	} `json:"files"`
 }
 
-// ParseGremlinsReport liest den JSON-Report von gremlins und liefert die
-// überlebenden (LIVED) und nicht abgedeckten (NOT COVERED) Mutanten sowie
-// die Gesamtzahl. Den Report werten wir selbst aus, statt gremlins'
-// Schwellwerte zu nutzen: v0.5.1 prüft "efficacy <= threshold" (100 % kann
-// also nie bestehen) und wertet "keine Mutanten" als 0 %.
-// TIMED OUT zählt wie bei StrykerJS als getötet, SKIPPED und NOT VIABLE
-// zählen gar nicht.
+// ParseGremlinsReport reads the JSON report from gremlins and returns the
+// surviving (LIVED) and uncovered (NOT COVERED) mutants as well as
+// the total count. We evaluate the report ourselves instead of using gremlins'
+// thresholds: v0.5.1 checks "efficacy <= threshold" (so 100 % can
+// never pass) and counts "no mutants" as 0 %.
+// TIMED OUT counts as killed, as with StrykerJS; SKIPPED and NOT VIABLE
+// do not count at all.
 func ParseGremlinsReport(r io.Reader, repoDir string) ([]Finding, int, error) {
 	var rep gremlinsReport
 	if err := json.NewDecoder(r).Decode(&rep); err != nil {
@@ -532,7 +532,7 @@ func ParseGremlinsReport(r io.Reader, repoDir string) ([]Finding, int, error) {
 				reason = "Mutant überlebt"
 			case "NOT COVERED":
 				reason = "Mutant nicht abgedeckt"
-			default: // SKIPPED (nicht im Diff), NOT VIABLE (kompiliert nicht)
+			default: // SKIPPED (not in the diff), NOT VIABLE (does not compile)
 				continue
 			}
 			total++
@@ -547,7 +547,7 @@ func ParseGremlinsReport(r io.Reader, repoDir string) ([]Finding, int, error) {
 	return survivors, total, nil
 }
 
-// Round2 rundet eine (nicht negative) Quote auf zwei Nachkommastellen.
+// Round2 rounds a (non-negative) rate to two decimal places.
 func Round2(v float64) float64 {
 	return float64(int64(v*100+0.5)) / 100
 }

@@ -18,7 +18,7 @@ func envMap(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
 
-// lastJSON dekodiert die letzte Zeile eines JSON-Logs.
+// lastJSON decodes the last line of a JSON log.
 func lastJSON(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -61,7 +61,7 @@ func TestNew_JSONHasTimestampWithZone(t *testing.T) {
 	out := lastJSON(t, &buf)
 	ts, ok := out["time"].(string)
 	require.True(t, ok)
-	// RFC3339 mit Zonen-Offset bzw. "Z".
+	// RFC3339 with zone offset or "Z".
 	assert.Regexp(t, `T\d\d:\d\d:\d\d.*(Z|[+-]\d\d:\d\d)$`, ts)
 	assert.Equal(t, "INFO", out["level"])
 }
@@ -169,7 +169,7 @@ func TestContextLogger(t *testing.T) {
 	assert.Equal(t, "abc", lastJSON(t, &buf)["request_id"])
 
 	assert.Same(t, slog.Default(), FromContext(context.Background()))
-	//nolint:staticcheck // bewusst nil-Context: Fallback muss greifen
+	//nolint:staticcheck // deliberately nil context: the fallback must apply
 	assert.Same(t, slog.Default(), FromContext(nil))
 }
 
@@ -195,13 +195,13 @@ func TestSetExitForTest_Restores(t *testing.T) {
 	called := false
 	restore := SetExitForTest(func(int) { called = true })
 	restore()
-	// Nach restore muss wieder os.Exit hinterlegt sein - prüfen über den
-	// Funktionszeiger, ohne den Prozess tatsächlich zu beenden.
+	// After restore, os.Exit must be registered again - check via the
+	// function pointer, without actually terminating the process.
 	assert.False(t, called)
 	assert.True(t, isOSExit())
 }
 
-// isOSExit prüft, ob exit (wieder) auf os.Exit zeigt.
+// isOSExit checks whether exit points (again) to os.Exit.
 func isOSExit() bool {
 	return reflect.ValueOf(exit).Pointer() == reflect.ValueOf(os.Exit).Pointer()
 }

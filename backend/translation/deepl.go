@@ -11,17 +11,17 @@ const (
 	deeplProURL  = "https://api.deepl.com"
 )
 
-// DeepL spricht die DeepL-API an (eigener Zugang des Betreibers).
-// Die Texte gehen an DeepL; das steht auch im Hinweis der Oberfläche.
+// DeepL talks to the DeepL API (the operator's own account).
+// The texts go to DeepL; this is also stated in the notice in the UI.
 type DeepL struct {
 	baseURL string
 	apiKey  string
 	client  *http.Client
 }
 
-// NewDeepL baut den Client. Schlüssel mit Endung ":fx" gehören zum Free-
-// Angebot und haben einen eigenen Host. baseURL überschreibt den Host (nur
-// Tests); leer = fester DeepL-Host, also kein frei eingebbares Ziel.
+// NewDeepL builds the client. Keys ending in ":fx" belong to the free
+// tier and have their own host. baseURL overrides the host (tests
+// only); empty = fixed DeepL host, so no freely enterable target.
 func NewDeepL(apiKey, baseURL string, client *http.Client) *DeepL {
 	if baseURL == "" {
 		baseURL = deeplProURL
@@ -32,8 +32,8 @@ func NewDeepL(apiKey, baseURL string, client *http.Client) *DeepL {
 	return &DeepL{baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, client: client}
 }
 
-// deeplTarget bildet einen Sprachcode des Katalogs auf DeepLs Zielsprache ab:
-// DeepL verlangt für Englisch und Portugiesisch eine Variante.
+// deeplTarget maps a language code of the catalog to DeepL's target language:
+// DeepL requires a variant for English and Portuguese.
 func deeplTarget(code string) string {
 	switch c := strings.ToUpper(code); c {
 	case "EN":
@@ -45,7 +45,7 @@ func deeplTarget(code string) string {
 	}
 }
 
-// Translate übersetzt text von sourceLang nach targetLang.
+// Translate translates text from sourceLang to targetLang.
 func (p *DeepL) Translate(text, sourceLang, targetLang string) (string, error) {
 	body := map[string]any{
 		"text":        []string{text},
@@ -70,7 +70,7 @@ func (p *DeepL) Translate(text, sourceLang, targetLang string) (string, error) {
 	return resp.Translations[0].Text, nil
 }
 
-// TranslateMany übersetzt mehrere Texte in einer Anfrage (DeepL nimmt "text" als Liste).
+// TranslateMany translates several texts in one request (DeepL takes "text" as a list).
 func (p *DeepL) TranslateMany(texts []string, sourceLang, targetLang string) ([]string, error) {
 	body := map[string]any{
 		"text":        texts,

@@ -29,8 +29,8 @@ func hitFrom(r *gin.Engine, remoteAddr string) int {
 	return w.Code
 }
 
-// Ein IPv6-Anschluss besitzt ein ganzes /64-Netz. Wechselt der Absender die
-// Hostadresse darin, darf er nicht jedes Mal einen frischen Bucket bekommen.
+// An IPv6 connection owns an entire /64 network. If the sender changes the
+// host address within it, they must not get a fresh bucket every time.
 func TestRateLimiter_IPv6HostsOfSame64ShareBucket(t *testing.T) {
 	r := limitedRouter(3)
 	var limited int
@@ -46,7 +46,7 @@ func TestRateLimiter_Different64NetworksAreIndependent(t *testing.T) {
 	r := limitedRouter(1)
 	assert.Equal(t, http.StatusOK, hitFrom(r, "[2001:db8:1:1::1]:1"))
 	assert.Equal(t, http.StatusTooManyRequests, hitFrom(r, "[2001:db8:1:1::2]:1"))
-	// Gegenprobe: ein anderes /64 und eine IPv4-Adresse haben eigene Buckets.
+	// Control check: a different /64 and an IPv4 address have their own buckets.
 	assert.Equal(t, http.StatusOK, hitFrom(r, "[2001:db8:1:2::1]:1"))
 	assert.Equal(t, http.StatusOK, hitFrom(r, "192.0.2.1:1"))
 	assert.Equal(t, http.StatusTooManyRequests, hitFrom(r, "192.0.2.1:2"))

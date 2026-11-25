@@ -13,20 +13,20 @@ import (
 )
 
 const (
-	// MinAdminPasswordLength gilt wie bei jedem anderen Weg, ein Passwort zu setzen.
+	// MinAdminPasswordLength applies as for every other way to set a password.
 	MinAdminPasswordLength = 8
 	maxAdminEmailLength    = 254
 	globalAdminRoleName    = "Global Admin"
 )
 
-// ErrAdminExists meldet, dass die Adresse schon ein aktives Konto hat. Ein
-// bestehendes Konto wird nie überschrieben oder zum Admin befördert.
+// ErrAdminExists reports that the address already has an active account. An
+// existing account is never overwritten or promoted to admin.
 var ErrAdminExists = errors.New("für diese E-Mail-Adresse besteht bereits ein Konto")
 
-// CreateGlobalAdmin legt ein Konto mit Passwort und Global-Admin-Recht an. Es
-// ist der Weg zum ersten Admin in Produktion, wo das Seeden gesperrt ist und
-// kein SSO nötig sein soll. Alle Eingaben werden geprüft, bevor etwas
-// geschrieben wird; bei jedem Fehler bleibt die Datenbank unverändert.
+// CreateGlobalAdmin creates an account with password and global admin permission. It
+// is the way to the first admin in production, where seeding is blocked and
+// no SSO is supposed to be needed. All inputs are validated before anything is
+// written; on any error the database stays unchanged.
 func CreateGlobalAdmin(db *gorm.DB, email, password string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if err := validateAdminEmail(email); err != nil {
@@ -52,8 +52,8 @@ func CreateGlobalAdmin(db *gorm.DB, email, password string) error {
 			return ErrAdminExists
 		}
 		user := models.User{Email: email, PasswordHash: hash, IsGlobalAdmin: true}
-		// Die Rolle gibt es nur, wenn die Datenbank sie kennt; das Admin-Recht
-		// hängt am Flag (wie beim Bootstrap-Admin über SSO).
+		// The role exists only if the database knows it; the admin permission
+		// depends on the flag (as with the bootstrap admin via SSO).
 		var role models.Role
 		if err := tx.Where("name = ?", globalAdminRoleName).Limit(1).Find(&role).Error; err != nil {
 			return fmt.Errorf("rolle lesen: %w", err)

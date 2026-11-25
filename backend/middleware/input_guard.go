@@ -13,21 +13,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RejectInvalidCharacters weist Anfragen mit einem NUL-Byte oder ungültigem
-// UTF-8 ab, bevor ein Handler läuft. PostgreSQL lehnt beides beim Schreiben ab
-// (SQLSTATE 22021); ohne diese Prüfung wurde daraus an rund 25 Schreibrouten ein
-// 500 statt eines 400. Die Prüfung sitzt zentral, weil sie sonst für jedes Feld
-// jedes Handlers einzeln nachzurüsten wäre.
+// RejectInvalidCharacters rejects requests with a NUL byte or invalid
+// UTF-8 before a handler runs. PostgreSQL rejects both on write
+// (SQLSTATE 22021); without this check about 25 write routes returned a
+// 500 instead of a 400. The check sits centrally because it would otherwise have to be retrofitted
+// for every field of every handler individually.
 //
-// Geprüft werden
-//   - der Body jeder Anfrage, außer formularkodierten (SAML-Rückkanal): rohes
-//     NUL-Byte, ungültiges UTF-8 und die JSON-Schreibweise \u0000, auch in
-//     Schlüsseln und verschachtelten Werten. Gin bindet JSON unabhängig vom
-//     Content-Type, deshalb gilt die Prüfung auch ohne JSON-Kopfzeile;
-//   - die Query-Parameter (Schlüssel und Werte) und der entschlüsselte Pfad.
+// Checked are
+//   - the body of every request, except form-encoded ones (SAML back channel): raw
+//     NUL byte, invalid UTF-8 and the JSON notation \u0000, also in
+//     keys and nested values. Gin binds JSON regardless of the
+//     Content-Type, so the check also applies without a JSON header;
+//   - the query parameters (keys and values) and the decoded path.
 //
-// Der Body wird einmal gelesen (die Grenze setzt BodyLimit davor) und dem
-// Handler danach unverändert wieder angeboten.
+// The body is read once (BodyLimit sets the limit before this) and then offered
+// to the handler again unchanged.
 func RejectInvalidCharacters() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !validRequestTarget(c.Request.URL) {
@@ -61,20 +61,20 @@ func abortInvalidCharacters(c *gin.Context) {
 	c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Eine Eingabe enthält unzulässige Zeichen.", "code": "input_invalid_characters"})
 }
 
-// isFormContent: formularkodierte Bodys (nur der SAML-Rückkanal) tragen Base64,
-// kein JSON, und werden vom Handler selbst geparst.
+// isFormContent: form-encoded bodies (only the SAML back channel) carry Base64,
+// not JSON, and are parsed by the handler itself.
 func isFormContent(contentType string) bool {
 	mt, _, err := mime.ParseMediaType(contentType)
 	return err == nil && (mt == "application/x-www-form-urlencoded" || strings.HasPrefix(mt, "multipart/"))
 }
 
-// validText: kein NUL-Byte und gültiges UTF-8.
+// validText: no NUL byte and valid UTF-8.
 func validText(s string) bool {
 	return utf8.ValidString(s) && strings.IndexByte(s, 0) < 0
 }
 
-// validRequestTarget prüft den entschlüsselten Pfad sowie Schlüssel und Werte
-// der Query. Ohne Query und ohne Prozentkodierung im Pfad kostet das fast nichts.
+// validRequestTarget checks the decoded path as well as keys and values
+// of the query. Without a query and without percent-encoding in the path this costs almost nothing.
 func validRequestTarget(u *url.URL) bool {
 	if !validText(u.Path) {
 		return false
@@ -82,8 +82,8 @@ func validRequestTarget(u *url.URL) bool {
 	if u.RawQuery == "" {
 		return true
 	}
-	// Fehlerhafte Kodierungen überspringt ParseQuery wie auch Gin; geprüft wird,
-	// was ein Handler daraus tatsächlich lesen kann.
+	// ParseQuery skips malformed encodings, as does Gin; what is checked is
+	// what a handler can actually read from it.
 	q, _ := url.ParseQuery(u.RawQuery)
 	for k, vs := range q {
 		if !validText(k) {
@@ -98,9 +98,9 @@ func validRequestTarget(u *url.URL) bool {
 	return true
 }
 
-// validBodyText: gültiges UTF-8, kein rohes NUL-Byte und kein JSON-Escape
-// \u0000. Der Scan folgt den Escape-Folgen, damit ein maskierter Backslash
-// (\\u0000, also der Text „\u0000“) nicht fälschlich zählt.
+// validBodyText: valid UTF-8, no raw NUL byte and no JSON escape
+// \u0000. The scan follows the escape sequences so that an escaped backslash
+// (\\u0000, i.e. the text „\u0000“) is not wrongly counted.
 func validBodyText(b []byte) bool {
 	if !utf8.Valid(b) || bytes.IndexByte(b, 0) >= 0 {
 		return false
@@ -114,12 +114,12 @@ func validBodyText(b []byte) bool {
 		if i+1 < len(b) && b[i+1] == 'u' && isEscapedNUL(b[i+2:]) {
 			return false
 		}
-		i += 2 // der Backslash und das maskierte Zeichen
+		i += 2 // the backslash and the escaped character
 	}
 	return true
 }
 
-// isEscapedNUL: Auf „\u“ folgen die vier Hexziffern 0000.
+// isEscapedNUL: „\u“ is followed by the four hex digits 0000.
 func isEscapedNUL(rest []byte) bool {
 	return len(rest) >= 4 && string(rest[:4]) == "0000"
 }

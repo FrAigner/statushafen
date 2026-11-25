@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Sperre eines Paars wächst durch Verdopplung, bleibt aber unter der
-// Obergrenze: Hier würde 30 s -> 60 s -> 120 s die Grenze von 100 s überschreiten.
+// A pair's block grows by doubling but stays under the
+// upper bound: here 30 s -> 60 s -> 120 s would exceed the 100 s limit.
 func TestAccountThrottle_BackoffNeverExceedsMaxDelay(t *testing.T) {
 	clock := newClock()
 	th := NewAccountThrottle(2, 30*time.Second, 100*time.Second, 15*time.Minute)
@@ -19,7 +19,7 @@ func TestAccountThrottle_BackoffNeverExceedsMaxDelay(t *testing.T) {
 
 	var waits []time.Duration
 	for i := 0; i < 5; i++ {
-		// Der erste Versuch jeder Runde ist zugelassen, der zweite löst die Sperre aus.
+		// The first attempt of each round is admitted, the second triggers the block.
 		for {
 			adm := th.Admit(acct, srcAttacker)
 			if adm.Blocked {
@@ -35,8 +35,8 @@ func TestAccountThrottle_BackoffNeverExceedsMaxDelay(t *testing.T) {
 	assert.Equal(t, 100*time.Second, waits[len(waits)-1], "die Obergrenze wird erreicht: %v", waits)
 }
 
-// Ein erfolgreicher Login nimmt seinen Versuch am Zähler des Kontos zurück,
-// sonst verzögerte der echte Nutzer sich mit jedem Login selbst.
+// A successful login takes its attempt back from the account's counter,
+// otherwise the real user would delay themselves with every login.
 func TestAccountThrottle_SuccessRevokesOwnAttemptAtAccountCounter(t *testing.T) {
 	th := newTestThrottle(newClock())
 	th.WithAccountDelay(2, 100*time.Millisecond, 10*time.Second)
@@ -45,22 +45,22 @@ func TestAccountThrottle_SuccessRevokesOwnAttemptAtAccountCounter(t *testing.T) 
 	for i := 1; i <= 4; i++ {
 		th.Admit(acct, fmt.Sprintf("198.51.100.%d", i))
 	}
-	own := th.Admit(acct, srcOwner) // fünfter Versuch: 3 über der Schwelle
+	own := th.Admit(acct, srcOwner) // fifth attempt: 3 over the threshold
 	require.Equal(t, 300*time.Millisecond, own.Delay)
 	own.Succeeded()
 
-	// Ohne Rücknahme wäre dies der sechste Versuch (400 ms).
+	// Without the rollback this would be the sixth attempt (400 ms).
 	assert.Equal(t, 300*time.Millisecond, th.Admit(acct, "198.51.100.50").Delay)
 }
 
-// Fehlversuche verfallen erst nach dem Fenster, nicht schon an dessen Grenze.
+// Failed attempts expire only after the window, not already at its boundary.
 func TestAccountThrottle_FailuresExpireOnlyAfterWindow(t *testing.T) {
 	clock := newClock()
-	th := newTestThrottle(clock) // Schwelle 3, Fenster 15 min
+	th := newTestThrottle(clock) // threshold 3, window 15 min
 	const acct = "fenster@example.com"
 
 	failAttempts(th, acct, srcOwner, 2)
-	clock.advance(15 * time.Minute) // genau am Rand: die zwei Versuche zählen noch
+	clock.advance(15 * time.Minute) // exactly at the edge: the two attempts still count
 	assert.False(t, th.Admit(acct, srcOwner).Blocked, "der dritte Versuch ist noch zugelassen")
 	assert.True(t, th.Admit(acct, srcOwner).Blocked, "und löst die Sperre aus")
 }

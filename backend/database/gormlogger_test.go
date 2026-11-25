@@ -14,8 +14,8 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Weder "SLOW SQL" noch Fehlerzeilen dürfen Parameterwerte
-// (Webhook-URL mit key=/token=, Token-Hash, E-Mail) enthalten.
+// Neither "SLOW SQL" nor error lines may contain parameter values
+// (webhook URL with key=/token=, token hash, email).
 const (
 	secretWebhook = "https://chat.googleapis.com/v1/spaces/AAA/messages?key=GEHEIMKEY&token=GEHEIMTOKEN"
 	secretToken   = "confirm-token-hash-0123456789abcdef"

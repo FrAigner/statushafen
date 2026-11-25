@@ -8,16 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// backfillSubscriberStatus markiert (Double-Opt-in) alle Abos ohne
-// Status als bestätigt. Die Abos stammen aus der Zeit vor dem Double-Opt-in
-// und sollen ihre Benachrichtigungen behalten. Normalerweise füllt schon der
-// Spalten-Default "active" beim AutoMigrate alle Bestandszeilen; der Backfill
-// fängt Zeilen mit NULL/leerem Status ab (z.B. Spalte ohne Default angelegt).
+// backfillSubscriberStatus marks (double opt-in) all subscriptions without
+// status as confirmed. The subscriptions date from the time before double opt-in
+// and are supposed to keep their notifications. Normally the
+// column default "active" already fills all existing rows during AutoMigrate; the backfill
+// catches rows with NULL/empty status (e.g. column created without default).
 //
-// Idempotent und admin-sicher (Muster: backfillStatusPageLanguages): Er
-// berührt nur Zeilen ohne Status. "pending" bleibt unangetastet, sonst würde
-// jeder Neustart das Double-Opt-in aushebeln. Ein Fehler wird nur geloggt,
-// nicht fatal: Die Spalte hat ohnehin den Default "active".
+// Idempotent and admin-safe (pattern: backfillStatusPageLanguages): it
+// touches only rows without status. "pending" stays untouched, otherwise
+// every restart would undermine the double opt-in. An error is only logged,
+// not fatal: the column has the default "active" anyway.
 // backfillMembershipOrigin marks memberships from before joined_via existed as
 // legacy (their origin is unknown, they may stem from an auto-join). New rows
 // always get a value (UserStatusPageRole.BeforeCreate), so it touches only

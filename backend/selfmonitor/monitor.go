@@ -1,18 +1,18 @@
-// Package selfmonitor überwacht Statushafen selbst und setzt das
-// Ergebnis als Komponentenstatus auf der Systemseite.
+// Package selfmonitor monitors Statushafen itself and sets the
+// result as component status on the system page.
 //
-// Ablauf je Takt: jede fällige Prüfung (Check) liefert ok/fehlgeschlagen/nicht
-// prüfbar. Erst nach Threshold Fehlschlägen in Folge (Entprellung) wird die
-// zugehörige Komponente auf den Ausfall-Status der Prüfung gesetzt; hält die
-// Störung IncidentAfter an, legt der Monitor zusätzlich einen Vorfall an. Bei
-// Erholung geht die Komponente zurück auf "operational" und der Vorfall wird
-// geschlossen. Jeder Schritt steht im Audit-Log (Akteur "system").
+// Flow per tick: every due check (Check) returns ok/failed/not
+// checkable. Only after Threshold consecutive failures (debouncing) is the
+// associated component set to the check's outage status; if the
+// outage persists for IncidentAfter, the monitor additionally creates an incident. On
+// recovery the component goes back to "operational" and the incident is
+// closed. Every step is in the audit log (actor "system").
 //
-// Der Monitor fasst eine Komponente nur an, wenn sie "operational" ist (z. B.
-// kein Überschreiben einer Wartung oder eines manuell gesetzten Status) oder
-// er sie selbst auf Störung gesetzt hat. Dieses "gehört dem Monitor" steht
-// dauerhaft in SystemSetting (Schlüssel selfmonitor.failing.<slug>), damit ein
-// Neustart mitten in einer Störung nichts verwaist zurücklässt.
+// The monitor only touches a component if it is "operational" (e.g.
+// no overwriting of a maintenance or a manually set status) or
+// it set it to outage itself. This "belongs to the monitor" is stored
+// durably in SystemSetting (key selfmonitor.failing.<slug>), so that a
+// restart in the middle of an outage leaves nothing orphaned.
 package selfmonitor
 
 import (
@@ -35,11 +35,11 @@ import (
 const recoveredReason = "Die automatische Selbstüberwachung meldet: wieder erreichbar."
 
 const (
-	// DefaultInterval ist der Takt der Schleife.
+	// DefaultInterval is the loop's tick.
 	DefaultInterval = time.Minute
-	// DefaultThreshold: Fehlschläge in Folge, bevor der Status kippt.
+	// DefaultThreshold: consecutive failures before the status flips.
 	DefaultThreshold = 3
-	// DefaultIncidentAfter: so lange muss die Störung anhalten, bis ein Vorfall entsteht.
+	// DefaultIncidentAfter: how long the outage must persist until an incident is created.
 	DefaultIncidentAfter = 15 * time.Minute
 
 	failingKeyPrefix  = "selfmonitor.failing."
@@ -47,37 +47,37 @@ const (
 	systemActor       = "system"
 )
 
-// Result ist das Ergebnis einer Prüfung. Skip bedeutet "nicht prüfbar" (z. B.
-// Versand abgeschaltet, Messdatei fehlt): der Zustand bleibt unverändert.
+// Result is the result of a check. Skip means "not checkable" (e.g.
+// sending switched off, measurement file missing): the state stays unchanged.
 type Result struct {
 	OK   bool
 	Skip bool
-	// Off: die Prüfung ist abgeschaltet (z. B. Mailversand aus). Anders als Skip
-	// gibt der Monitor eine von ihm gesetzte Störung frei: sonst
-	// blieben Status, Marker und offener Vorfall ewig stehen.
+	// Off: the check is switched off (e.g. mail sending off). Unlike Skip,
+	// the monitor releases an outage it set: otherwise
+	// status, marker and open incident would remain forever.
 	Off    bool
 	Detail string
 }
 
-// Check ist eine Prüfung samt Komponente, die sie steuert.
+// Check is a check together with the component it controls.
 type Check struct {
-	// Slug der Komponente auf der Systemseite (database.CapabilitySlug).
+	// Slug of the component on the system page (database.CapabilitySlug).
 	Slug string
 	Name string
-	// FailedStatus ist der Komponentenstatus bei Ausfall; zugleich der
-	// Schweregrad des automatischen Vorfalls (degraded_performance|partial_outage|major_outage).
+	// FailedStatus is the component status on failure; also the
+	// severity of the automatic incident (degraded_performance|partial_outage|major_outage).
 	FailedStatus string
-	// Every: Prüfung nur in jedem n-ten Takt (0/1 = jedes Mal).
+	// Every: check only every n-th tick (0/1 = every time).
 	Every int
 	Run   func(ctx context.Context) Result
 }
 
-// Monitor führt die Prüfungen aus und schreibt die Ergebnisse.
+// Monitor runs the checks and writes the results.
 type Monitor struct {
 	DB     *gorm.DB
 	Checks []Check
-	// Enabled liefert den Schalter; ein Lesefehler ist NICHT "aus":
-	// der Takt entfällt, nichts wird freigegeben. nil = immer an.
+	// Enabled returns the switch; a read error is NOT "off":
+	// the tick is skipped, nothing is released. nil = always on.
 	Enabled       func() (bool, error)
 	Threshold     int
 	IncidentAfter time.Duration
@@ -89,7 +89,7 @@ type Monitor struct {
 	tick  int
 }
 
-// New liefert einen Monitor mit den Standardwerten.
+// New returns a monitor with the default values.
 func New(db *gorm.DB, checks []Check, enabled func() (bool, error)) *Monitor {
 	return &Monitor{
 		DB: db, Checks: checks, Enabled: enabled,
@@ -99,8 +99,8 @@ func New(db *gorm.DB, checks []Check, enabled func() (bool, error)) *Monitor {
 	}
 }
 
-// Start startet die Schleife (erster Takt nach einem Intervall, damit der
-// eigene HTTP-Server beim Start schon lauscht) und liefert die Stopp-Funktion.
+// Start starts the loop (first tick after one interval, so that the
+// own HTTP server is already listening at startup) and returns the stop function.
 func (m *Monitor) Start(ctx context.Context) (stop func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
@@ -123,22 +123,22 @@ func (m *Monitor) Start(ctx context.Context) (stop func()) {
 	}
 }
 
-// neutralizeEvery: jeder n-te Takt (Minuten) bereinigt Vorfalltexte ausgeblendeter
-// Komponenten (Review).
+// neutralizeEvery: every n-th tick (minutes) cleans up incident texts of hidden
+// components (review).
 const neutralizeEvery = 10
 
-// RunOnce ist ein Takt.
+// RunOnce is one tick.
 func (m *Monitor) RunOnce(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.tick++
 	if m.tick%neutralizeEvery == 0 {
-		// Review Wird eine Komponente erst nach regulärer
-		// Erholung ausgeblendet/gelöscht/verschoben, gehört der Vorfall dem Monitor
-		// nicht mehr und bliebe bis zum nächsten Start mit Namen öffentlich. Vor der
-		// Schalterprüfung, weil die Texte öffentlich sind (wie der Backfill beim
-		// Start); idempotent und eine Abfrage-Runde je 10 Takte. Fehler: geloggt,
-		// nichts geschrieben, der Takt läuft weiter.
+		// Review: if a component is hidden/deleted/moved only after a regular
+		// recovery, the incident no longer belongs to the monitor
+		// and would remain public with names until the next start. Before the
+		// switch check, because the texts are public (like the backfill at
+		// startup); idempotent and one query round per 10 ticks. Errors: logged,
+		// nothing written, the tick continues.
 		if err := NeutralizeHiddenIncidents(m.DB); err != nil {
 			slog.Error("Selbstüberwachung: Vorfalltexte nicht bereinigt", "error", err)
 		}
@@ -146,12 +146,12 @@ func (m *Monitor) RunOnce(ctx context.Context) {
 	if m.Enabled != nil {
 		on, err := m.Enabled()
 		if err != nil {
-			// Wackelnde DB darf keine echte Störung freigeben.
+			// A flaky DB must not release a real outage.
 			slog.Warn("Selbstüberwachung: Schalter nicht lesbar, Takt entfällt", "error", err)
 			return
 		}
 		if !on {
-			m.fails = map[string]int{} // Zähler nicht über eine Abschaltung hinweg mitschleppen
+			m.fails = map[string]int{} // do not carry the counter across a switch-off
 			m.releaseAll(offReason)
 			return
 		}
@@ -169,17 +169,17 @@ func (m *Monitor) RunOnce(ctx context.Context) {
 	}
 }
 
-// offReason ist die Meldung im Vorfall, wenn der Monitor eine Störung wegen
-// einer Abschaltung freigibt (statt wegen Erholung).
+// offReason is the message in the incident when the monitor releases an outage because of
+// a switch-off (instead of because of recovery).
 const offReason = "Automatische Verfolgung beendet."
 
-// hiddenReason: Abschlusstext, wenn die Komponente archiviert/ausgeblendet wurde
-// bewusst ohne Komponentennamen, der Vorfall ist öffentlich.
+// hiddenReason: closing text when the component was archived/hidden,
+// deliberately without the component name, the incident is public.
 const hiddenReason = "Automatische Verfolgung beendet. Die Komponente wird nicht mehr angezeigt."
 
-// releaseAll gibt alle vom Monitor gesetzten Störungen frei, wenn
-// die Überwachung ausgeschaltet wurde. Ohne Marker kostet das nur eine Abfrage
-// je Prüfung.
+// releaseAll releases all outages set by the monitor when
+// monitoring was switched off. Without markers it costs only one query
+// per check.
 func (m *Monitor) releaseAll(reason string) {
 	var page models.StatusPage
 	if err := m.DB.Where("is_system = ?", true).First(&page).Error; err != nil {
@@ -197,7 +197,7 @@ func (m *Monitor) releaseAll(reason string) {
 		var comp models.Component
 		if err := m.DB.Where("status_page_id = ? AND slug = ?", page.ID, c.Slug).First(&comp).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				m.releaseOrphan(page.ID, c) // Komponente gelöscht
+				m.releaseOrphan(page.ID, c) // component deleted
 			}
 			continue
 		}
@@ -209,10 +209,10 @@ func (m *Monitor) apply(pageID uint, c Check, res Result) {
 	var comp models.Component
 	if err := m.DB.Where("status_page_id = ? AND slug = ?", pageID, c.Slug).First(&comp).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Komponente vom Admin gelöscht. Hatte der Monitor sie besetzt,
-			// blieben Marker und offener Vorfall sonst ewig stehen.
-			// Auch bei "nicht prüfbar" (Skip), sonst bleibt die Waise
-			// stehen, solange die Prüfung nie wieder ein Ergebnis liefert.
+			// Component deleted by the admin. If the monitor had occupied it,
+			// marker and open incident would otherwise remain forever.
+			// Also on "not checkable" (Skip), otherwise the orphan remains
+			// as long as the check never yields a result again.
 			m.releaseOrphan(pageID, c)
 		}
 		return
@@ -222,12 +222,12 @@ func (m *Monitor) apply(pageID uint, c Check, res Result) {
 		return
 	}
 	if hidden {
-		// Öffentlich ausgeblendete Komponenten (archiviert, unsichtbar
-		// oder Nachfahre davon, dieselbe Regel wie die Statusseite) werden nicht
-		// ausgewertet: Ein öffentlicher Vorfall nennt den Prüfungsnamen (c.Name)
-		// und gehört zu einer Komponente, die es öffentlich nicht gibt. Eine
-		// laufende eigene Störung wird freigegeben (auch bei Skip); ohne Besitz
-		// passiert nichts.
+		// Publicly hidden components (archived, invisible
+		// or a descendant thereof, same rule as the status page) are not
+		// evaluated: a public incident names the check name (c.Name)
+		// and belongs to a component that does not exist publicly. An
+		// ongoing own outage is released (also on Skip); without ownership
+		// nothing happens.
 		m.fails[c.Slug] = 0
 		m.recover(c, comp, hiddenReason)
 		return
@@ -251,9 +251,9 @@ func (m *Monitor) apply(pageID uint, c Check, res Result) {
 	}
 }
 
-// publiclyHidden wendet die öffentliche Regel (models.HiddenComponentIDs, inkl.
-// Nachfahren) auf die Komponenten der Systemseite an. ok=false: Liste nicht
-// lesbar, der Schritt entfällt (nächster Takt wiederholt ihn).
+// publiclyHidden applies the public rule (models.HiddenComponentIDs, incl.
+// descendants) to the components of the system page. ok=false: list not
+// readable, the step is skipped (the next tick repeats it).
 func (m *Monitor) publiclyHidden(pageID uint, c Check, comp models.Component) (hidden, ok bool) {
 	var all []models.Component
 	if err := m.DB.Where("status_page_id = ?", pageID).Find(&all).Error; err != nil {
@@ -267,19 +267,19 @@ func (m *Monitor) fail(pageID uint, c Check, comp models.Component, detail strin
 	now := m.Now()
 	since, owned, err := m.getTime(failingKeyPrefix + c.Slug)
 	if err != nil {
-		logReadError(failingKeyPrefix+c.Slug, err) // Schritt entfällt, nächster Takt wiederholt ihn
+		logReadError(failingKeyPrefix+c.Slug, err) // step is skipped, the next tick repeats it
 		return
 	}
 	if !owned {
 		if comp.Status != componentstatus.Operational {
-			return // manuell gesetzt (Wartung, Admin): nicht überschreiben
+			return // set manually (maintenance, admin): do not overwrite
 		}
-		// Status und Besitzmarke in EINER Transaktion. Scheitert die
-		// Marke, bliebe die Komponente sonst ohne Besitzer auf Störung stehen.
+		// Status and ownership marker in ONE transaction. If the
+		// marker fails, the component would otherwise remain in outage without an owner.
 		err = m.DB.Transaction(func(tx *gorm.DB) error {
-			// Bedingtes Update: ein zwischenzeitlich vom Admin gesetzter Status
-			// (z. B. Wartung) wird nicht überschrieben.
-			// Status und Historieneintrag über statushistory (bedingt).
+			// Conditional update: a status set by the admin in the meantime
+			// (e.g. maintenance) is not overwritten.
+			// Status and history entry via statushistory (conditional).
 			changed, err := statushistory.Set(tx, comp.ID, componentstatus.Operational, c.FailedStatus, models.StatusSourceSelfMonitor, now)
 			if err != nil {
 				return err
@@ -301,8 +301,8 @@ func (m *Monitor) fail(pageID uint, c Check, comp models.Component, detail strin
 	}
 	_, has, err := m.getValue(incidentKeyPrefix + c.Slug)
 	if err != nil {
-		// Ein Lesefehler ist NICHT "keine Marke", sonst entstünde ein
-		// zweiter Vorfall und der erste bliebe öffentlich offen.
+		// A read error is NOT "no marker", otherwise a
+		// second incident would arise and the first would remain publicly open.
 		logReadError(incidentKeyPrefix+c.Slug, err)
 		return
 	}
@@ -312,15 +312,15 @@ func (m *Monitor) fail(pageID uint, c Check, comp models.Component, detail strin
 	m.openIncident(pageID, c, comp, since, detail)
 }
 
-// incidentTitle und incidentMessagePrefix bilden Titel und Meldung des
-// automatischen Vorfalls. neutralizeIncident erkennt daran die
-// unveränderten Texte des Monitors, deshalb an EINER Stelle.
+// incidentTitle and incidentMessagePrefix form the title and message of the
+// automatic incident. neutralizeIncident recognizes from them the
+// unchanged texts of the monitor, hence in ONE place.
 func incidentTitle(c Check) string { return "Störung: " + c.Name }
 
 func incidentMessagePrefix(c Check) string { return incidentMessageHead + c.Name + " (" }
 
-// incidentMessageHead ist der feste Anfang der Meldung (der Backfill
-// liest daraus den Prüfungsnamen zurück).
+// incidentMessageHead is the fixed beginning of the message (the backfill
+// reads the check name back from it).
 const incidentMessageHead = "Die automatische Selbstüberwachung meldet eine Störung bei "
 
 func (m *Monitor) openIncident(pageID uint, c Check, comp models.Component, since time.Time, detail string) {
@@ -330,9 +330,9 @@ func (m *Monitor) openIncident(pageID uint, c Check, comp models.Component, sinc
 		Status: "investigating", Severity: c.FailedStatus, StartedAt: &since,
 	}
 	err := m.DB.Transaction(func(tx *gorm.DB) error {
-		// Review Die Störungs-Marke in der Transaktion erneut lesen (Zeilensperre
-		// in Postgres, SQLite ignoriert sie): hat eine andere Replika inzwischen
-		// die Erholung gespeichert, entsteht kein Vorfall mehr, den nie jemand schließt.
+		// Review: read the outage marker again in the transaction (row lock
+		// in Postgres, SQLite ignores it): if another replica has meanwhile
+		// saved the recovery, no incident is created that nobody would ever close.
 		var own models.SystemSetting
 		lerr := tx.Unscoped().Clauses(clause.Locking{Strength: "UPDATE"}).Where("key = ?", failingKeyPrefix+c.Slug).First(&own).Error
 		if errors.Is(lerr, gorm.ErrRecordNotFound) {
@@ -350,11 +350,11 @@ func (m *Monitor) openIncident(pageID uint, c Check, comp models.Component, sinc
 		if err := tx.Create(&models.IncidentUpdate{IncidentID: inc.ID, Status: "investigating", Message: msg, AuthorEmail: systemActor}).Error; err != nil {
 			return err
 		}
-		// Die Vorfall-Marke gehört in dieselbe Transaktion. Scheitert
-		// sie, entstünde sonst bei jedem Takt ein neuer Vorfall.
-		// Insert mit DO NOTHING statt Upsert: Existiert die Marke schon
-		// (zweite Replika, übergangene Lesung), wird zurückgerollt, statt den
-		// ersten Vorfall zu verwaisen.
+		// The incident marker belongs in the same transaction. If
+		// it fails, a new incident would otherwise arise on every tick.
+		// Insert with DO NOTHING instead of upsert: if the marker already exists
+		// (second replica, skipped read), it is rolled back instead of
+		// orphaning the first incident.
 		mark := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "key"}}, DoNothing: true}).
 			Create(&models.SystemSetting{Key: incidentKeyPrefix + c.Slug, Value: strconv.FormatUint(uint64(inc.ID), 10)})
 		if mark.Error != nil {
@@ -379,21 +379,21 @@ func (m *Monitor) openIncident(pageID uint, c Check, comp models.Component, sinc
 	m.audit("selfmonitor.incident_opened", comp, "Vorfall "+strconv.FormatUint(uint64(inc.ID), 10))
 }
 
-// errStaleStatus: der Status hat sich seit dem Lesen geändert (Admin).
+// errStaleStatus: the status has changed since reading (admin).
 var errStaleStatus = errors.New("komponentenstatus zwischenzeitlich geändert")
 
-// errNotOwned: die Störungs-Marke fehlt inzwischen (Erholung/Freigabe gespeichert).
+// errNotOwned: the outage marker is now missing (recovery/release saved).
 var errNotOwned = errors.New("störungs-marke fehlt")
 
-// errIncidentExists: die Vorfall-Marke gibt es schon.
+// errIncidentExists: the incident marker already exists.
 var errIncidentExists = errors.New("vorfall-marke existiert bereits")
 
-// orphanReason ist die Meldung im Vorfall, wenn die Komponente gelöscht wurde.
+// orphanReason is the message in the incident when the component was deleted.
 const orphanReason = "Die überwachte Komponente ist nicht mehr vorhanden. Automatische Verfolgung beendet."
 
-// releaseOrphan räumt auf, wenn die Komponente gelöscht wurde, während der
-// Monitor sie besaß: Vorfall schließen, beide Marker löschen, alles
-// in EINER Transaktion; Scheitern wird beim nächsten Takt wiederholt.
+// releaseOrphan cleans up when the component was deleted while the
+// monitor owned it: close the incident, delete both markers, all
+// in ONE transaction; a failure is repeated on the next tick.
 func (m *Monitor) releaseOrphan(pageID uint, c Check) {
 	var incID string
 	released, closed := false, false
@@ -413,8 +413,8 @@ func (m *Monitor) releaseOrphan(pageID uint, c Check) {
 			if closed, rerr = resolveIncident(tx, pageID, m.Now(), raw, orphanReason); rerr != nil {
 				return rerr
 			}
-			// Auch der Vorfall einer gelöschten oder verschobenen
-			// Komponente bleibt öffentlich in der Historie (wie).
+			// The incident of a deleted or moved
+			// component also remains public in the history (as).
 			if err := neutralizeIncident(tx, pageID, raw, c); err != nil {
 				return err
 			}
@@ -441,9 +441,9 @@ func (m *Monitor) releaseOrphan(pageID uint, c Check) {
 			details += "; Vorfall " + incID + " geschlossen"
 		}
 		if where == compMoved {
-			// Die Komponente ist per ID bekannt und trägt noch den
-			// Ausfallstatus, den der Monitor gesetzt hat: Das gehört ihm, er setzt
-			// ihn bedingt zurück (wie recover). Jeder andere Status bleibt.
+			// The component is known by ID and still carries the
+			// outage status the monitor set: that belongs to it, it resets
+			// it conditionally (like recover). Any other status stays.
 			changed, serr := statushistory.Set(m.DB, comp.ID, c.FailedStatus, componentstatus.Operational, models.StatusSourceSelfMonitor, m.Now())
 			if serr == nil && changed {
 				details += "; Status zurückgesetzt"
@@ -456,16 +456,16 @@ func (m *Monitor) releaseOrphan(pageID uint, c Check) {
 }
 
 const (
-	compUnknown = iota // Identität nicht bekannt
-	compDeleted        // auf der Systemseite gelöscht
-	compMoved          // auf eine andere Seite verschoben
+	compUnknown = iota // identity not known
+	compDeleted        // deleted on the system page
+	compMoved          // moved to another page
 )
 
-// identify bestimmt, was aus der Komponente wurde. Exakt ist nur die
-// ID aus dem markierten Vorfall (IncidentComponent); nach dem Slug allein wird
-// auf fremden Seiten NICHT geraten, dort kann zufällig eine fremde Komponente
-// denselben Slug tragen. Ohne Vorfall bleibt nur die (soft) gelöschte Komponente
-// der Systemseite; sonst ist die Identität unbekannt (Slug dient als Name).
+// identify determines what became of the component. Only the
+// ID from the marked incident (IncidentComponent) is exact; on foreign pages
+// it is NOT guessed by slug alone, since a foreign component may by chance
+// carry the same slug there. Without an incident only the (soft) deleted component
+// of the system page remains; otherwise the identity is unknown (slug serves as name).
 func (m *Monitor) identify(pageID uint, slug, incID string) (models.Component, int) {
 	if id, err := strconv.ParseUint(incID, 10, 64); err == nil {
 		var link models.IncidentComponent
@@ -479,23 +479,23 @@ func (m *Monitor) identify(pageID uint, slug, incID string) (models.Component, i
 		}
 	}
 	comp := models.Component{Name: slug}
-	// Order id DESC: bei mehreren gelöschten Komponenten mit gleichem Slug die jüngste.
+	// Order id DESC: with several deleted components with the same slug, the most recent.
 	if m.DB.Unscoped().Where("status_page_id = ? AND slug = ?", pageID, slug).Order("id DESC").First(&comp).Error == nil {
 		return comp, compDeleted
 	}
 	return models.Component{Name: slug}, compUnknown
 }
 
-// logReadError meldet einen Lesefehler auf einer Marke (der Fehlertext wird vom
-// Logger bereinigt, siehe Logging-Regeln).
+// logReadError reports a read error on a marker (the error text is sanitized by the
+// logger, see logging rules).
 func logReadError(key string, err error) {
 	slog.Error("Selbstüberwachung: Marke nicht lesbar, Schritt entfällt", "key", key, "error", err)
 }
 
-// recover setzt Status zurück, schließt den Vorfall und löscht beide Marker in
-// EINER Transaktion. Sonst blieben Status "operational" und Marke
-// "failing" widersprüchlich stehen. Scheitert etwas, wird beim nächsten Takt
-// alles erneut versucht; die Audit-Meldung gibt es erst nach dem Commit.
+// recover resets the status, closes the incident and deletes both markers in
+// ONE transaction. Otherwise status "operational" and marker
+// "failing" would remain contradictory. If anything fails, everything is retried
+// on the next tick; the audit message is only produced after the commit.
 func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 	_, owned, rerr := m.getValue(failingKeyPrefix + c.Slug)
 	if rerr != nil {
@@ -507,13 +507,13 @@ func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 	}
 	var incID string
 	err := m.DB.Transaction(func(tx *gorm.DB) error {
-		// Re-Review Dieselbe Sperre wie in openIncident zuerst (gleiche
-		// Reihenfolge, kein Deadlock): Eine zweite Replika liest die Vorfall-Marke
-		// erst nach dem Commit dieser Erholung.
+		// Re-review: the same lock as in openIncident first (same
+		// order, no deadlock): a second replica reads the incident marker
+		// only after the commit of this recovery.
 		if _, _, lerr := readValueLocked(tx, failingKeyPrefix+c.Slug); lerr != nil {
 			return lerr
 		}
-		if comp.Status == c.FailedStatus { // hat der Admin inzwischen etwas anderes gesetzt, bleibt es
+		if comp.Status == c.FailedStatus { // if the admin has meanwhile set something else, it stays
 			if _, err := statushistory.Set(tx, comp.ID, c.FailedStatus, componentstatus.Operational, models.StatusSourceSelfMonitor, m.Now()); err != nil {
 				return err
 			}
@@ -529,9 +529,9 @@ func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 				return err
 			}
 			if reason == hiddenReason {
-				// Der Vorfall bleibt in der öffentlichen Historie, nur die
-				// Zuordnung zur Komponente blendet die Seite aus. Titel und Meldung
-				// nennen sonst weiter den Prüfungsnamen.
+				// The incident remains in the public history, only the
+				// assignment to the component is hidden by the page. Title and message
+				// would otherwise keep naming the check name.
 				if err := neutralizeIncident(tx, comp.StatusPageID, inc.Value, c); err != nil {
 					return err
 				}
@@ -548,7 +548,7 @@ func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 	}
 	details := ""
 	if reason == offReason {
-		details = "Überwachung abgeschaltet" // von echter Erholung unterscheidbar
+		details = "Überwachung abgeschaltet" // distinguishable from a real recovery
 	}
 	if reason == hiddenReason {
 		details = "Komponente archiviert oder ausgeblendet"
@@ -556,17 +556,17 @@ func (m *Monitor) recover(c Check, comp models.Component, reason string) {
 	m.audit("selfmonitor.component_recovered", comp, details)
 }
 
-// resolveIncident schließt den Vorfall. Ein DB-Fehler wird zurückgegeben (der
-// Aufrufer behält dann die Vorfall-Marke); "0 Zeilen" (Admin schloss schon oder
-// löschte) ist Erfolg.
-// nur Vorfälle der Systemseite (pageID). Der Rückgabewert sagt, ob
-// dieser Aufruf den Vorfall wirklich geschlossen hat.
+// resolveIncident closes the incident. A DB error is returned (the
+// caller then keeps the incident marker); "0 rows" (admin already closed or
+// deleted) is success.
+// Only incidents of the system page (pageID). The return value says whether
+// this call actually closed the incident.
 func resolveIncident(tx *gorm.DB, pageID uint, now time.Time, rawID, reason string) (bool, error) {
-	// Bitgröße 0 = Größe von uint: Werte, die nicht in uint passen, werden hier
-	// abgelehnt, statt bei uint(id) unten abgeschnitten zu werden (32-Bit).
+	// Bit size 0 = size of uint: values that do not fit in uint are rejected here
+	// instead of being truncated at uint(id) below (32-bit).
 	id, err := strconv.ParseUint(rawID, 10, 0)
 	if err != nil {
-		return false, nil //nolint:nilerr // ungültige Kennung: nichts zu schließen, Marke wird entfernt
+		return false, nil //nolint:nilerr // invalid identifier: nothing to close, marker is removed
 	}
 	res := tx.Model(&models.Incident{}).Where("id = ? AND status_page_id = ? AND status <> ?", id, pageID, "resolved").
 		Updates(map[string]any{"status": "resolved", "resolved_at": now})
@@ -574,41 +574,41 @@ func resolveIncident(tx *gorm.DB, pageID uint, now time.Time, rawID, reason stri
 		return false, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return false, nil // schon vom Admin geschlossen oder gelöscht
+		return false, nil // already closed or deleted by the admin
 	}
 	if err := tx.Create(&models.IncidentUpdate{IncidentID: uint(id), Status: "resolved", AuthorEmail: systemActor,
 		Message: reason}).Error; err != nil {
-		return false, err // in Postgres würde der Fehler die Transaktion ohnehin abbrechen
+		return false, err // in Postgres the error would abort the transaction anyway
 	}
 	return true, nil
 }
 
-// neutrale Texte für Vorfälle einer ausgeblendeten Komponente,
-// ohne Prüfungsnamen und ohne Fehlerdetail.
+// neutral texts for incidents of a hidden component,
+// without check names and without error detail.
 const (
 	neutralTitle   = "Störung: automatische Überwachung"
 	neutralMessage = "Die automatische Selbstüberwachung meldete eine Störung."
 )
 
-// neutralizeIncident ersetzt Titel und Meldungen des automatischen Vorfalls
-// durch neutrale Texte. Nur, was der Monitor geschrieben hat und
-// unverändert ist: Als Originalmeldung gilt die des Eröffnungs-Updates (erstes
-// Update des Akteurs "system" mit dem Präfix des Monitors); verglichen wird
-// exakt, ein vom Admin ergänzter Text bleibt also stehen (Review), ebenso
-// ein geänderter Titel und Updates des Admins. Die Bedingung steht im UPDATE
-// selbst: Ein Admin-Edit zwischen Lesen und Schreiben wird nicht überschrieben.
-// Übersetzungen ersetzter Texte werden gelöscht, sie nennen den Namen ebenfalls
-// und passen nicht mehr zum Text. Fehler brechen die Transaktion ab, der
-// nächste Takt wiederholt die Freigabe.
+// neutralizeIncident replaces title and messages of the automatic incident
+// with neutral texts. Only what the monitor wrote and
+// is unchanged: the original message is that of the opening update (first
+// update by the actor "system" with the monitor's prefix); comparison is
+// exact, so text added by an admin stays (review), as do
+// a changed title and updates by the admin. The condition is in the UPDATE
+// itself: an admin edit between read and write is not overwritten.
+// Translations of replaced texts are deleted, they also name the name
+// and no longer match the text. Errors abort the transaction, the
+// next tick repeats the release.
 func neutralizeIncident(tx *gorm.DB, pageID uint, rawID string, c Check) error {
 	id, err := strconv.ParseUint(rawID, 10, 64)
 	if err != nil {
-		return nil //nolint:nilerr // ungültige Kennung: nichts zu neutralisieren (wie resolveIncident)
+		return nil //nolint:nilerr // invalid identifier: nothing to neutralize (like resolveIncident)
 	}
 	var inc models.Incident
 	if err := tx.Where("id = ? AND status_page_id = ?", id, pageID).First(&inc).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil // vom Admin gelöscht
+			return nil // deleted by the admin
 		}
 		return err
 	}
@@ -651,9 +651,9 @@ func neutralizeIncident(tx *gorm.DB, pageID uint, rawID string, c Check) error {
 	return nil
 }
 
-// replaceIf setzt col auf to, aber nur, solange dort noch genau want steht
-// (Review Bedingung im UPDATE, kein Überschreiben eines
-// zwischenzeitlichen Admin-Edits). Ein leeres want ersetzt nie etwas.
+// replaceIf sets col to to, but only as long as it still holds exactly want
+// (review: condition in the UPDATE, no overwriting of an
+// admin edit in the meantime). An empty want never replaces anything.
 func replaceIf(tx *gorm.DB, model any, id uint, col, want, to string) (bool, error) {
 	res := tx.Model(model).Where("id = ? AND "+col+" = ? AND "+col+" <> ''", id, want).Update(col, to)
 	return res.RowsAffected > 0, res.Error
@@ -667,15 +667,15 @@ func (m *Monitor) audit(action string, comp models.Component, details string) {
 	}
 }
 
-// getValue liefert den Wert einer Marke. Ein Lesefehler wird zurückgegeben und
-// ist NICHT "keine Marke".
+// getValue returns the value of a marker. A read error is returned and
+// is NOT "no marker".
 func (m *Monitor) getValue(key string) (string, bool, error) { return readValue(m.DB, key) }
 
-// readValue liest auch soft-gelöschte Zeilen (Review): ON CONFLICT (key)
-// greift ebenfalls auf sie, "keine Marke" wäre sonst ein stiller Dauer-Rollback.
+// readValue also reads soft-deleted rows (review): ON CONFLICT (key)
+// also hits them, "no marker" would otherwise be a silent permanent rollback.
 func readValue(db *gorm.DB, key string) (string, bool, error) { return readValueWith(db, key, false) }
 
-// readValueLocked liest mit Zeilensperre (FOR UPDATE in Postgres, SQLite ignoriert sie).
+// readValueLocked reads with a row lock (FOR UPDATE in Postgres, SQLite ignores it).
 func readValueLocked(tx *gorm.DB, key string) (string, bool, error) {
 	return readValueWith(tx, key, true)
 }
@@ -702,9 +702,9 @@ func (m *Monitor) getTime(key string) (time.Time, bool, error) {
 	}
 	t, err := time.Parse(time.RFC3339, v)
 	if err != nil {
-		// Beschädigter Wert gilt als "gerade begonnen" UND wird neu
-		// geschrieben. Sonst lieferte jeder Takt wieder "jetzt" und IncidentAfter
-		// würde nie erreicht.
+		// A corrupted value counts as "just started" AND is rewritten.
+		// Otherwise every tick would again return "now" and IncidentAfter
+		// would never be reached.
 		now := m.Now()
 		if werr := setValue(m.DB, key, now.UTC().Format(time.RFC3339)); werr != nil {
 			slog.Error("Selbstüberwachung: Zeitwert nicht repariert", "key", key, "error", werr)
@@ -721,31 +721,31 @@ func setValue(db *gorm.DB, key, value string) error {
 	}).Create(&models.SystemSetting{Key: key, Value: value}).Error
 }
 
-// NeutralizeHiddenIncidents ist der Backfill: Monitor-Vorfälle der
-// Systemseite, die schon GESCHLOSSEN sind (vor dem Fix beim Ausblenden
-// oder nach regulärer Erholung) und deren Komponente inzwischen öffentlich
-// ausgeblendet, gelöscht oder verschoben ist, behalten sonst Prüfungsnamen und
-// Fehlerdetail in der öffentlichen Historie.
+// NeutralizeHiddenIncidents is the backfill: monitor incidents of the
+// system page that are already CLOSED (before the fix when hiding
+// or after regular recovery) and whose component is now publicly
+// hidden, deleted or moved otherwise keep check names and
+// error detail in the public history.
 //
-// Design-Entscheidungen:
-//   - Erkannt wird der Vorfall am Eröffnungs-Update des Akteurs "system" mit dem
-//     festen Meldungsanfang; der Prüfungsname wird daraus gelesen. So braucht der
-//     Backfill keine Liste der Prüfungen und läuft auch, wenn eine Prüfung
-//     inzwischen entfällt. Nach dem Ersetzen passt das Update nicht mehr: ein
-//     zweiter Lauf findet nichts (idempotent), ohne Marker in SystemSetting.
-//   - Ersetzt wird über neutralizeIncident: nur Unverändertes vom Monitor, Texte
-//     und Updates des Admins bleiben.
-//   - Nur Vorfälle der Systemseite (Mandantentrennung), nur geschlossene: offene
-//     gehören dem Monitor, der sie beim Freigeben selbst neutralisiert.
-//   - Ohne auffindbare Zuordnung oder Komponente gilt der Vorfall als verwaist und
-//     wird neutralisiert (konservativ: neutraler Text schadet nie).
-//   - Alles in EINER Transaktion; jeder DB-Fehler rollt zurück und wird
-//     zurückgegeben (fail closed, der nächste Start wiederholt den Lauf).
+// Design decisions:
+//   - The incident is recognized by the opening update of the actor "system" with the
+//     fixed message beginning; the check name is read from it. This way the
+//     backfill needs no list of checks and also runs when a check
+//     has meanwhile been dropped. After replacing, the update no longer matches: a
+//     second run finds nothing (idempotent), without markers in SystemSetting.
+//   - Replacing goes through neutralizeIncident: only unchanged monitor text, texts
+//     and updates by the admin stay.
+//   - Only incidents of the system page (tenant separation), only closed ones: open ones
+//     belong to the monitor, which neutralizes them itself when releasing.
+//   - Without a findable assignment or component the incident counts as orphaned and
+//     is neutralized (conservative: neutral text never hurts).
+//   - All in ONE transaction; every DB error rolls back and is
+//     returned (fail closed, the next start repeats the run).
 func NeutralizeHiddenIncidents(db *gorm.DB) error {
 	var page models.StatusPage
 	if err := db.Where("is_system = ?", true).First(&page).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil // keine Systemseite, nichts zu tun
+			return nil // no system page, nothing to do
 		}
 		return err
 	}
@@ -784,10 +784,10 @@ func NeutralizeHiddenIncidents(db *gorm.DB) error {
 	})
 }
 
-// componentGone sagt, ob die Komponente des Vorfalls öffentlich nicht (mehr)
-// erscheint: ausgeblendet (hidden, Regel der Statusseite), gelöscht, auf eine
-// andere Seite verschoben oder gar nicht mehr auffindbar. Die Zuordnung wird
-// Unscoped gelesen, damit eine entfernte Zuordnung nicht wie "sichtbar" wirkt.
+// componentGone says whether the incident's component no longer
+// appears publicly: hidden (hidden, status page rule), deleted, moved to a
+// different page or no longer findable at all. The assignment is read
+// unscoped, so that a removed assignment does not look like "visible".
 func componentGone(tx *gorm.DB, pageID, incidentID uint, hidden map[uint]bool) (bool, error) {
 	var link models.IncidentComponent
 	if err := tx.Unscoped().Where("incident_id = ?", incidentID).Order("id").First(&link).Error; err != nil {
@@ -800,7 +800,7 @@ func componentGone(tx *gorm.DB, pageID, incidentID uint, hidden map[uint]bool) (
 	return comp.StatusPageID != pageID || comp.DeletedAt.Valid || hidden[comp.ID], nil
 }
 
-// onlyReadError gibt err zurück, außer "nicht gefunden" (das ist hier ein Ergebnis).
+// onlyReadError returns err, except "not found" (that is a result here).
 func onlyReadError(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil

@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// offeneStoerung bringt die Fixture in den Zustand "Störung und Vorfall offen".
+// offeneStoerung brings the fixture into the state "outage and incident open".
 func offeneStoerung(t *testing.T, f *fixture) {
 	t.Helper()
 	f.fail()
@@ -22,8 +22,8 @@ func offeneStoerung(t *testing.T, f *fixture) {
 	require.EqualValues(t, 1, f.count(t, &models.Incident{}, "status <> ?", "resolved"))
 }
 
-// A: Scheitert das Schließen des Vorfalls, darf die Vorfall-Marke
-// nicht verloren gehen; spätere Takte schließen ihn.
+// A: if closing the incident fails, the incident marker must
+// not be lost; later ticks close it.
 func TestMonitor_VorfallSchliessenScheitertWirdWiederholt(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -36,9 +36,9 @@ func TestMonitor_VorfallSchliessenScheitertWirdWiederholt(t *testing.T) {
 	assert.Equal(t, "operational", f.status(t))
 }
 
-// B: Scheitert das Löschen der Störungs-Marke, bleibt der Status
-// auf Störung (Erholung ist atomar) und der nächste Fehlschlag legt keinen
-// widersprüchlichen Zustand an.
+// B: if deleting the outage marker fails, the status stays
+// on outage (recovery is atomic) and the next failure does not create a
+// contradictory state.
 func TestMonitor_ErholungIstAtomar(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -50,14 +50,14 @@ func TestMonitor_ErholungIstAtomar(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.SystemSetting{}, "key = ?", failingKeyPrefix+testSlug))
 }
 
-// D: Hat der Admin den Status zwischenzeitlich gesetzt (Wartung),
-// überschreibt weder fail noch recover ihn.
+// D: if the admin set the status in the meantime (maintenance),
+// neither fail nor recover overwrites it.
 func TestMonitor_VeralteterStatusWirdNichtUeberschrieben(t *testing.T) {
 	f := newFixture(t)
 	check := f.m.Checks[0]
 	require.NoError(t, f.db.Model(&models.Component{}).Where("id = ?", f.comp.ID).Update("status", "under_maintenance").Error)
 
-	stale := f.comp // Status "operational" im alten Lesestand
+	stale := f.comp // status "operational" in the old read state
 	f.m.fail(f.page.ID, check, stale, "x")
 	assert.Equal(t, "under_maintenance", f.status(t))
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"), "keine Marke ohne Statusänderung")
@@ -72,7 +72,7 @@ func TestMonitor_AbschaltTextIstNeutral(t *testing.T) {
 	assert.Equal(t, "Automatische Verfolgung beendet.", offReason)
 }
 
-// Scheitert der Status-Reset, bleibt alles unverändert (Rollback).
+// If the status reset fails, everything stays unchanged (rollback).
 func TestMonitor_StatusResetScheitertRollback(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -83,8 +83,8 @@ func TestMonitor_StatusResetScheitertRollback(t *testing.T) {
 	assert.EqualValues(t, 2, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Ein Lesefehler beim Vorfall-Marker bricht die Erholung ab, statt
-// den Marker zu übergehen und die Störungs-Marke zu löschen.
+// A read error on the incident marker aborts the recovery, instead of
+// skipping the marker and deleting the outage marker.
 func TestMonitor_VorfallMarkerLesefehlerBrichtErholungAb(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -92,22 +92,22 @@ func TestMonitor_VorfallMarkerLesefehlerBrichtErholungAb(t *testing.T) {
 	require.NoError(t, f.db.Callback().Query().Before("gorm:query").Register("test:lesefehler", func(d *gorm.DB) {
 		if d.Statement.Table == "system_settings" {
 			n++
-			if n == 3 { // 1. Besitzprüfung, 2. gesperrte Störungs-Marke, 3. Vorfall-Marke
+			if n == 3 { // 1. ownership check, 2. locked outage marker, 3. incident marker
 				_ = d.AddError(errors.New("lesefehler"))
 			}
 		}
 	}))
 	f.res = &Result{OK: true}
 	comp := f.comp
-	comp.Status = f.m.Checks[0].FailedStatus // aktueller Lesestand: der Status-Reset-Zweig läuft wirklich
+	comp.Status = f.m.Checks[0].FailedStatus // current read state: the status-reset branch really runs
 	f.m.recover(f.m.Checks[0], comp, recoveredReason)
 	assert.Equal(t, 3, n)
 	assert.EqualValues(t, 2, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 	assert.Equal(t, "major_outage", f.status(t))
 }
 
-// Logging-Regel: Der Lesefehler des Schalters enthält ein
-// Geheimnis; es darf nicht im Log stehen.
+// Logging rule: the switch's read error contains a
+// secret; it must not appear in the log.
 func TestMonitor_SchalterLesefehlerLogOhneGeheimnis(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -119,7 +119,7 @@ func TestMonitor_SchalterLesefehlerLogOhneGeheimnis(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Weicht der Status ab (Admin), gibt es weder Marke noch Audit.
+// If the status differs (admin), there is neither marker nor audit.
 func TestMonitor_VeralteterStatusSchreibtKeinFailedAudit(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Model(&models.Component{}).Where("id = ?", f.comp.ID).Update("status", "under_maintenance").Error)

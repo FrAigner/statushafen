@@ -8,12 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// dedupeUserStatusPageRoles bereinigt Doppelzeilen je (Konto,
-// Seite) vor dem Unique-Index. Behalten wird die BISHER WIRKSAME Zeile: die mit
-// der kleinsten ID, denn RequirePermission und actorPagePermissions lesen per
-// First() (nach ID). So ändert der Backfill keine Berechtigung (kein stilles
-// Ausweiten oder Entziehen). Alle weiteren aktiven Zeilen werden soft-gelöscht;
-// kein Zeitvergleich, daher auch mit NULL in updated_at robust. Idempotent.
+// dedupeUserStatusPageRoles cleans up duplicate rows per (account,
+// page) before the unique index. The row that has been EFFECTIVE SO FAR is kept: the one with
+// the smallest ID, because RequirePermission and actorPagePermissions read via
+// First() (by ID). This way the backfill changes no permission (no silent
+// widening or revoking). All other active rows are soft-deleted;
+// no time comparison, hence also robust with NULL in updated_at. Idempotent.
 func dedupeUserStatusPageRoles(db *gorm.DB) {
 	sql := `UPDATE user_status_page_roles SET deleted_at = CURRENT_TIMESTAMP
 WHERE deleted_at IS NULL AND EXISTS (
@@ -31,11 +31,11 @@ WHERE deleted_at IS NULL AND EXISTS (
 	}
 }
 
-// CreateUserStatusPageRoleUniqueIndex legt den partiellen
-// Unique-Index (user_id, status_page_id) für nicht gelöschte Zeilen an: Ein
-// Konto hat je Seite genau eine Rolle, auch bei gleichzeitigem Hinzufügen.
-// Vorher werden Duplikate bereinigt. Idempotent (IF NOT EXISTS); Raw-SQL, weil
-// AutoMigrate keine partiellen Indizes kann.
+// CreateUserStatusPageRoleUniqueIndex creates the partial
+// unique index (user_id, status_page_id) for non-deleted rows: an
+// account has exactly one role per page, even with simultaneous adding.
+// Duplicates are cleaned up beforehand. Idempotent (IF NOT EXISTS); raw SQL, because
+// AutoMigrate cannot do partial indexes.
 func CreateUserStatusPageRoleUniqueIndex(db *gorm.DB) {
 	dedupeUserStatusPageRoles(db)
 	sql := `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_status_page_role_active ON user_status_page_roles (user_id, status_page_id) WHERE deleted_at IS NULL`

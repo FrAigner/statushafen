@@ -6,20 +6,20 @@ import (
 	"gorm.io/gorm"
 )
 
-// StatusPage repräsentiert eine eigene Statusseite (Mandant)
+// StatusPage represents a dedicated status page (tenant)
 type StatusPage struct {
 	gorm.Model
 	Name string `gorm:"not null"`
-	// Slug ist unter den aktiven Seiten eindeutig. Bewusst KEIN gorm-Tag
-	// uniqueIndex: Ein regulärer Index sieht auch soft-gelöschte
-	// Seiten und sperrt deren Slug für immer. Der partielle Index
-	// idx_status_pages_slug_active entsteht per Raw-SQL in
+	// Slug is unique among active pages. Deliberately NO gorm tag
+	// uniqueIndex: a regular index also sees soft-deleted
+	// pages and would block their slug forever. The partial index
+	// idx_status_pages_slug_active is created via raw SQL in
 	// database.CreateSoftDeleteUniqueIndexes.
 	Slug string `gorm:"not null"`
-	// IsSystem kennzeichnet die Systemseite. Der Seed
-	// findet sie über dieses Kennzeichen statt über den Slug: Ein geänderter Slug
-	// ließ sonst beim nächsten Start eine zweite Systemseite entstehen. Höchstens
-	// eine aktive Seite trägt das Kennzeichen (partieller Index
+	// IsSystem marks the system page. The seed
+	// finds it through this flag instead of the slug: a changed slug
+	// used to produce a second system page on the next start. At most
+	// one active page carries the flag (partial index
 	// idx_status_pages_system_active in database.CreateSoftDeleteUniqueIndexes).
 	IsSystem        bool `gorm:"not null;default:false"`
 	Description     string
@@ -28,111 +28,111 @@ type StatusPage struct {
 	IsPublicIndexed bool  `gorm:"default:true"`
 	IsPrivate       bool  `gorm:"default:false"`
 	DefaultRoleID   *uint `gorm:"default:null"`
-	// AutoJoinEmailDomains: kommagetrennte, kleingeschriebene
-	// Allowlist von E-Mail-Domains. Auto-Join per DefaultRoleID greift nur für
-	// Konten mit passender Domain; leer = kein Auto-Join.
+	// AutoJoinEmailDomains: comma-separated, lowercase
+	// allowlist of email domains. Auto-join via DefaultRoleID only applies to
+	// accounts with a matching domain; empty = no auto-join.
 	AutoJoinEmailDomains string `gorm:"default:''"`
 
-	// WebhookTokenHash authentifiziert den eingehenden Monitoring-Webhook,
-	// der Component-Status ohne normale Session/JWT-Auth setzen darf. Gespeichert
-	// wird nur der Hash (HashToken, Spalte webhook_token); der Klartext wird bei
-	// der Erzeugung einmal ausgeliefert. Leer =
-	// kein Token vergeben, Webhook-Endpunkt lehnt dann jede Anfrage ab. Bewusst
-	// per json:"-" von der normalen StatusPage-JSON-Repräsentation ausgeschlossen,
-	// damit der Token nie über die generischen Read-Endpunkte (GET /api/pages, ...)
-	// oder ein unbedachtes PUT-Bind mitgeschickt/überschrieben werden kann - er wird
-	// ausschließlich über die dedizierten Generate/Revoke-Endpunkte gesetzt bzw.
-	// einmalig zurückgegeben.
+	// WebhookTokenHash authenticates the incoming monitoring webhook,
+	// which may set the component status without normal session/JWT auth. Only
+	// the hash is stored (HashToken, column webhook_token); the plaintext is
+	// delivered once at creation. Empty =
+	// no token issued, the webhook endpoint then rejects every request. Deliberately
+	// excluded from the normal StatusPage JSON representation via json:"-",
+	// so the token can never be sent or overwritten through the generic read endpoints (GET /api/pages, ...)
+	// or an unwary PUT bind - it is set exclusively through the
+	// dedicated generate/revoke endpoints and
+	// returned once.
 	WebhookTokenHash string `gorm:"column:webhook_token;default:null" json:"-"`
 
-	// Branding: rein additive Felder für seiten-spezifisches
-	// Aussehen der öffentlichen Statusseite (Logo, Farben, Header-Layout).
-	// Die Defaults entsprechen exakt den bisherigen globalen CSS-Werten
-	// (--primary / --text-secondary aus frontend/src/style.css und
-	// "classic" als bisher einzigem Header-Layout), damit bestehende Seiten
-	// nach der Migration optisch unverändert bleiben, bis ein Admin die
-	// Felder aktiv setzt.
+	// Branding: purely additive fields for page-specific
+	// appearance of the public status page (logo, colors, header layout).
+	// The defaults match exactly the previous global CSS values
+	// (--primary / --text-secondary from frontend/src/style.css and
+	// "classic" as the only header layout so far), so that existing pages
+	// look unchanged after the migration until an admin sets the
+	// fields actively.
 	PrimaryColor   string `gorm:"default:'#4c6ef5'"`
 	SecondaryColor string `gorm:"default:'#5e6c84'"`
-	// HeaderStyle: "classic" (Standard, bisheriges Layout), "centered",
-	// "minimal" - siehe frontend/src/views/public/StatusPage.vue.
+	// HeaderStyle: "classic" (default, previous layout), "centered",
+	// "minimal" - see frontend/src/views/public/StatusPage.vue.
 	HeaderStyle string `gorm:"not null;default:'classic'"`
-	// PageLayout: Seiten-Layout der öffentlichen Seite,
-	// "standard" (Default, bisheriges Aussehen) oder "liste". Additiv und
-	// unabhängig von HeaderStyle.
+	// PageLayout: layout of the public page,
+	// "standard" (default, previous look) or "liste". Additive and
+	// independent of HeaderStyle.
 	PageLayout string `gorm:"not null;default:'standard'"`
 
-	// CustomDomainStatus (TXT-Verifizierung seit):
-	// Verifikations-Pipeline für CustomDomain.
-	// "" (leer)   -> keine Custom Domain gesetzt.
-	// "pending"   -> Domain eingetragen, DNS-TXT-Eintrag (Owner-Nachweis) noch
-	//                nicht (erfolgreich) geprüft.
-	// "verified"  -> TXT-Eintrag mit CustomDomainVerificationToken gefunden;
-	//                Owner-Nachweis erbracht. Caddys On-Demand-TLS darf für
-	//                diese Domain ein Zertifikat anfordern, der Kunde muss nun
-	//                noch den CNAME auf den Edge-Server setzen.
-	// "active"    -> zusätzlich mind. einmal echter öffentlicher Traffic über die
-	//                Domain beobachtet (Beweis, dass DNS+TLS Ende-zu-Ende funktionieren).
-	// "check_failed" -> die letzte DNS-Prüfung ist fehlgeschlagen;
-	//                CustomDomainCheckedAt/CustomDomainCheckError nennen Zeitpunkt
-	//                und Grund. Wie "pending" nicht auflösbar. Bestehende
-	//                Datensätze bleiben "pending", bis geprüft wird.
+	// CustomDomainStatus (TXT verification since):
+	// verification pipeline for CustomDomain.
+	// "" (empty)   -> no custom domain set.
+	// "pending"   -> domain entered, DNS TXT record (proof of ownership) not yet
+	//                (successfully) checked.
+	// "verified"  -> TXT record with CustomDomainVerificationToken found;
+	//                ownership proven. Caddy's on-demand TLS may request
+	//                a certificate for this domain; the customer must now
+	//                still set the CNAME to the edge server.
+	// "active"    -> additionally, real public traffic over the
+	//                domain was observed at least once (proof that DNS+TLS work end to end).
+	// "check_failed" -> the last DNS check failed;
+	//                CustomDomainCheckedAt/CustomDomainCheckError give the time
+	//                and reason. Not resolvable, like "pending". Existing
+	//                records stay "pending" until checked.
 	CustomDomainStatus     string     `gorm:"default:''"`
 	CustomDomainVerifiedAt *time.Time `gorm:"default:null"`
-	// CustomDomainCheckedAt/-CheckError: Zeitpunkt der letzten
-	// DNS-Prüfung und bei Fehlschlag der Grund als stabiler Code
-	// ("txt_not_found" | "dns_lookup_failed"; die Texte kommen aus den
-	// Sprachdateien). Beides leer, solange nie geprüft wurde.
+	// CustomDomainCheckedAt/-CheckError: time of the last
+	// DNS check and, on failure, the reason as a stable code
+	// ("txt_not_found" | "dns_lookup_failed"; the texts come from the
+	// language files). Both empty as long as it was never checked.
 	CustomDomainCheckedAt  *time.Time `gorm:"default:null"`
 	CustomDomainCheckError string     `gorm:"default:''"`
 
-	// CustomDomainVerificationToken: zufälliger, pro Domain-
-	// Eintrag neu generierter Wert, den der Kunde als TXT-Record bei seinem
-	// DNS-Provider hinterlegen muss (Wert: "statushafen-verify=<token>"),
-	// um den Besitz der Domain nachzuweisen - unabhängig vom CNAME, der erst
-	// danach für das eigentliche Routing gesetzt wird (Standard-Verfahren wie
-	// bei Google Search Console/Mailgun). json:"-" wie WebhookToken, da der
-	// Wert nur über die dedizierten Set/Verify-Endpunkte ausgegeben werden
-	// soll, nicht über generische Read-Endpunkte inkl. öffentlicher Seiten.
+	// CustomDomainVerificationToken: random value, newly generated for each domain
+	// entry, which the customer must publish as a TXT record at their
+	// DNS provider (value: "statushafen-verify=<token>")
+	// to prove ownership of the domain - independent of the CNAME, which is only
+	// set afterwards for the actual routing (standard procedure as
+	// with Google Search Console/Mailgun). json:"-" like WebhookToken, since the
+	// value should only be returned through the dedicated set/verify endpoints,
+	// not through generic read endpoints including public pages.
 	CustomDomainVerificationToken string `gorm:"default:''" json:"-"`
 
-	// NotificationFromAddress: optionaler, seiten-spezifischer
-	// Absender für Incident-/Wartungsfenster-Benachrichtigungsmails, im selben
-	// "Anzeigename <adresse>"-Format wie die globale SMTP_FROM-Env-Var (siehe
-	// smtp.go). Leer = Fallback auf SMTP_FROM (bisheriges Verhalten,
-	// unverändert für Seiten ohne eigene Konfiguration).
+	// NotificationFromAddress: optional, page-specific
+	// sender for incident/maintenance-window notification emails, in the same
+	// "Display Name <address>" format as the global SMTP_FROM env var (see
+	// smtp.go). Empty = fall back to SMTP_FROM (previous behavior,
+	// unchanged for pages without their own configuration).
 	NotificationFromAddress string `gorm:"default:''"`
 }
 
 type Role struct {
 	gorm.Model
-	// Name ist unter den aktiven Rollen eindeutig. Bewusst KEIN gorm-Tag
-	// uniqueIndex: Der partielle Index idx_roles_name_active
-	// entsteht per Raw-SQL in database.CreateSoftDeleteUniqueIndexes, damit der
-	// Name einer gelöschten Rolle wieder frei ist.
+	// Name is unique among active roles. Deliberately NO gorm tag
+	// uniqueIndex: the partial index idx_roles_name_active
+	// is created via raw SQL in database.CreateSoftDeleteUniqueIndexes, so that the
+	// name of a deleted role is free again.
 	Name        string `gorm:"not null"`
 	Permissions string `gorm:"not null"`
 }
 
-// GlobalAdminRoleName: Name der Rolle, die Seed und SSO-Bootstrap
-// als globale Rolle (User.RoleID) eines Global Admins setzen. Global Admin ist
-// eine globale Eigenschaft (User.IsGlobalAdmin); als Seitenrolle vergeben,
-// suggerierte sie Plattformrechte, gab aber nur die Permissions der Rolle auf
-// dieser einen Seite. Sie ist deshalb nicht als Seitenrolle vergebbar.
+// GlobalAdminRoleName: name of the role that the seed and SSO bootstrap
+// set as the global role (User.RoleID) of a Global Admin. Global Admin is
+// a global property (User.IsGlobalAdmin); assigned as a page role,
+// it would suggest platform rights but only granted the role's permissions
+// on that one page. It is therefore not assignable as a page role.
 const GlobalAdminRoleName = "Global Admin"
 
-// GlobalOnly: true für die Rolle, die nicht als Seitenrolle
-// (UserStatusPageRole, StatusPage.DefaultRoleID) vergeben werden darf.
+// GlobalOnly: true for the role that must not be assigned as a page role
+// (UserStatusPageRole, StatusPage.DefaultRoleID).
 func (r Role) GlobalOnly() bool {
 	return r.Name == GlobalAdminRoleName
 }
 
-// SystemSetting: generische globale Key/Value-Systemeinstellungen.
-// Erste Einstellung ist orders.enabled (Self-Service-Bestellung an/aus). Bewusst
-// als erweiterbare Key/Value-Tabelle statt als einzelne Spalte, damit weitere
-// globale Schalter ohne Schemaänderung folgen können. Konvention:
-// ein fehlender Key bedeutet den jeweiligen Default (für orders.enabled "an"),
-// damit bestehende Deployments unverändert bleiben.
+// SystemSetting: generic global key/value system settings.
+// The first setting is orders.enabled (self-service ordering on/off). Deliberately
+// an extensible key/value table instead of single columns, so that further
+// global switches can follow without a schema change. Convention:
+// a missing key means the respective default (for orders.enabled "on"),
+// so that existing deployments stay unchanged.
 type SystemSetting struct {
 	gorm.Model
 	Key   string `gorm:"uniqueIndex;not null"`
@@ -141,41 +141,41 @@ type SystemSetting struct {
 
 type User struct {
 	gorm.Model
-	// Email ist unter den aktiven Benutzern eindeutig (partieller
-	// Index idx_users_email_active statt gorm-uniqueIndex, s. Role.Name).
+	// Email is unique among active users (partial
+	// index idx_users_email_active instead of gorm uniqueIndex, see Role.Name).
 	Email        string `gorm:"not null"`
 	PasswordHash string `json:"-"`
 	RoleID       uint   `gorm:"default:null"`
 	Role         Role   `gorm:"foreignKey:RoleID"`
-	// AllowedCountries wurde durch UserTag ersetzt (Country → Tags
-	// Schritt 4/4). Die alte DB-Spalte bleibt vorerst bestehen (Rollback-
-	// Sicherheitsnetz), wird aber nicht mehr gelesen/geschrieben.
+	// AllowedCountries was replaced by UserTag (Country → Tags
+	// step 4/4). The old DB column remains for now (rollback
+	// safety net) but is no longer read or written.
 	SSOProvider   string `gorm:"default:null"`
 	SSOSubject    string `gorm:"default:null"`
 	IsGlobalAdmin bool   `gorm:"default:false"`
-	// PreferredLanguage speichert die vom eingeloggten User gewählte UI-Sprache
-	// (i18n-Infrastruktur). Rein additiv - AutoMigrate legt die Spalte
-	// automatisch an, bestehende Nutzer erhalten den leeren Default (Frontend
-	// fällt dann auf den Browser-/Fallback-Wert zurück). Anonyme Besucher
-	// speichern ihre Sprachwahl stattdessen im localStorage des Browsers.
+	// PreferredLanguage stores the UI language chosen by the logged-in user
+	// (i18n infrastructure). Purely additive - AutoMigrate creates the column
+	// automatically, existing users get the empty default (the frontend
+	// then falls back to the browser/fallback value). Anonymous visitors
+	// store their language choice in the browser's localStorage instead.
 	PreferredLanguage string `gorm:"default:''"`
-	// HideHelpTooltips: Hilfe-Tooltips im Admin-Bereich für
-	// diesen User ausgeschaltet. Bewusst negiert gespeichert: der Default
-	// "an" ist so der Nullwert false. Ein bool mit gorm-Default true würde
-	// GORM beim Create mit false stillschweigend durch den Default ersetzen,
-	// und AutoMigrate legt die Spalte für bestehende Nutzer mit false an.
+	// HideHelpTooltips: help tooltips in the admin area switched off for
+	// this user. Deliberately stored negated: the default
+	// "on" is thus the zero value false. A bool with gorm default true would
+	// be silently replaced by the default when GORM creates it with false,
+	// and AutoMigrate creates the column for existing users with false.
 	HideHelpTooltips bool `gorm:"default:false"`
-	// TokenVersion wandert als Claim in jedes Login-Token und wird bei jeder
-	// Anfrage mit dem Konto verglichen. Eine Erhöhung (Passwortwechsel,
-	// Entzug von Rechten, Löschung) macht alle bis dahin ausgestellten Tokens
-	// sofort ungültig, ohne dass dafür eine Sperrliste nötig ist.
+	// TokenVersion travels as a claim in every login token and is compared
+	// with the account on every request. An increase (password change,
+	// revocation of rights, deletion) immediately invalidates all tokens issued
+	// until then, without needing a blocklist.
 	TokenVersion uint `gorm:"not null;default:0"`
 
-	// Die verknüpften Rollen pro Statusseite
+	// The linked roles per status page
 	UserStatusPageRoles []UserStatusPageRole `gorm:"foreignKey:UserID"`
 }
 
-// UserStatusPageRole: granulare Rechte pro Statusseite und User
+// UserStatusPageRole: granular rights per status page and user
 type UserStatusPageRole struct {
 	gorm.Model
 	UserID       uint       `gorm:"not null;index"`
@@ -208,43 +208,43 @@ func (r *UserStatusPageRole) BeforeCreate(*gorm.DB) error {
 	return nil
 }
 
-// PageOrder: Self-Service-Bestellung einer neuen Statusseite über die
-// öffentliche Startseite ("Eingangstor"-Homepage). Trackt den
-// kompletten Lauf vom Bestellformular bis zur fertig provisionierten Seite,
-// ohne vor der Email-Bestätigung schon einen einloggbaren User anzulegen -
-// sonst wäre das öffentliche Formular selbst schon ein Vektor für beliebig
-// viele leere User-Zeilen. Status-Übergänge: "pending_confirmation" (Formular
-// abgeschickt, Bestätigungsmail raus) -> "confirmed" (Link geklickt,
-// StatusPage/User/Rolle angelegt, Passwort noch nicht gesetzt) -> "active"
-// (Passwort gesetzt, Login möglich). Abgelaufene, nie bestätigte Bestellungen
-// zählen in den Prüfungen von CreateOrderHandler (Slug, Kontingent) sofort als
-// abgelaufen; der Wartungs-Tick setzt sie auf "expired" und löscht sie später.
+// PageOrder: self-service order of a new status page via the
+// public landing page ("entry gate" homepage). Tracks the
+// complete run from the order form to the fully provisioned page,
+// without creating a loginable user before email confirmation -
+// otherwise the public form itself would be a vector for arbitrarily
+// many empty user rows. Status transitions: "pending_confirmation" (form
+// submitted, confirmation mail sent) -> "confirmed" (link clicked,
+// StatusPage/user/role created, password not yet set) -> "active"
+// (password set, login possible). Expired, never-confirmed orders
+// count as expired immediately in the checks of CreateOrderHandler (slug, quota);
+// the maintenance tick sets them to "expired" and deletes them later.
 type PageOrder struct {
 	gorm.Model
 	CompanyName string `gorm:"not null"`
-	// Email ist bewusst NICHT unique - ein Kontakt darf mehrere (historische)
-	// Bestellungen haben. Der Missbrauchsschutz gegen Massen-Bestellungen
-	// erfolgt stattdessen über den Pending-Cap in CreateOrderHandler (max. 3
-	// gleichzeitig offene Bestellungen je Email) plus IP-Rate-Limiting.
+	// Email is deliberately NOT unique - a contact may have several (historical)
+	// orders. Abuse protection against mass orders
+	// is instead provided by the pending cap in CreateOrderHandler (max. 3
+	// simultaneously open orders per email) plus IP rate limiting.
 	Email string `gorm:"not null;index"`
-	// Slug: optionaler Wunsch-Slug aus dem Formular. Leer = wird beim
-	// Bestätigen automatisch aus CompanyName generiert (wie bei
-	// CreateStatusPageHandler ohne Slug-Angabe).
+	// Slug: optional desired slug from the form. Empty = generated automatically
+	// from CompanyName on confirmation (as with
+	// CreateStatusPageHandler without a slug).
 	Slug string `gorm:"default:null"`
 
 	Status string `gorm:"not null;default:'pending_confirmation';index"`
 
-	// ConfirmTokenHash/SetPasswordTokenHash: gleiches Muster wie
-	// StatusPage.WebhookTokenHash. Die Token sind 32 Byte Zufall (hex-kodiert);
-	// die Spalten confirm_token und set_password_token halten nur den Hash, der
-	// Klartext steht in der Mail beziehungsweise in der Antwort. Bewusst nur
-	// "index" statt "uniqueIndex": nach Verbrauch wird der Token auf ""
-	// zurückgesetzt (siehe ConfirmOrderHandler/SetOrderPasswordHandler) - bei
-	// mehreren bereits verbrauchten Bestellungen würde ein uniqueIndex auf
-	// leeren Strings kollidieren (GORM/Postgres/SQLite behandeln "" als
-	// normalen Wert, nicht wie NULL). Die faktische Eindeutigkeit ist über die
-	// kryptografische Zufälligkeit der 256-Bit-Tokens gegeben, ein
-	// DB-Constraint ist hier nicht nötig.
+	// ConfirmTokenHash/SetPasswordTokenHash: same pattern as
+	// StatusPage.WebhookTokenHash. The tokens are 32 bytes of randomness (hex-encoded);
+	// the columns confirm_token and set_password_token hold only the hash, the
+	// plaintext is in the mail or in the response. Deliberately only
+	// "index" instead of "uniqueIndex": after use the token is reset to ""
+	// (see ConfirmOrderHandler/SetOrderPasswordHandler) - with
+	// several already used orders a uniqueIndex on
+	// empty strings would collide (GORM/Postgres/SQLite treat "" as a
+	// normal value, not like NULL). Uniqueness in practice is given by the
+	// cryptographic randomness of the 256-bit tokens, a
+	// DB constraint is not needed here.
 	ConfirmTokenHash   string     `gorm:"column:confirm_token;index;default:null" json:"-"`
 	ConfirmTokenExpiry *time.Time `gorm:"default:null" json:"-"`
 
@@ -254,28 +254,28 @@ type PageOrder struct {
 	StatusPageID *uint `gorm:"default:null"`
 	UserID       *uint `gorm:"default:null"`
 
-	// RequestIP: c.ClientIP() zum Bestellzeitpunkt, ausschließlich für die
-	// Missbrauchs-Analyse im Audit-Log - keine funktionale Verwendung.
+	// RequestIP: c.ClientIP() at order time, solely for
+	// abuse analysis in the audit log - no functional use.
 	RequestIP string `gorm:"default:null" json:"-"`
 }
 
-// Defaults der SSO-Config: gleiche Werte wie die default-Tags
-// unten, damit der Handler leere Eingaben beim Anlegen und Aktualisieren
-// gleich behandelt und GET ohne Config dieselben Werte meldet.
+// Defaults of the SSO config: same values as the default tags
+// below, so that the handler treats empty input on create and update
+// the same and GET without a config reports the same values.
 const (
 	SSODefaultScopes         = "openid email profile"
 	SSODefaultAttributeEmail = "email"
 	SSODefaultAttributeName  = "name"
 )
 
-// StatusPageSSOConfig: Pro-Statusseite OIDC-Konfiguration.
-// Leere Config = SSO deaktiviert.
+// StatusPageSSOConfig: per-status-page OIDC configuration.
+// Empty config = SSO disabled.
 type StatusPageSSOConfig struct {
 	gorm.Model
 	StatusPageID uint       `gorm:"not null;uniqueIndex" json:"status_page_id"`
 	StatusPage   StatusPage `gorm:"foreignKey:StatusPageID" json:"-"`
 
-	// OIDC-Konfiguration (OpenID Connect Discovery)
+	// OIDC configuration (OpenID Connect Discovery)
 	OIDCEnabled        bool   `gorm:"default:false" json:"oidc_enabled"`
 	OIDCDiscoveryURL   string `gorm:"default:''" json:"oidc_discovery_url"`
 	OIDCClientID       string `gorm:"default:''" json:"oidc_client_id"`
@@ -283,29 +283,29 @@ type StatusPageSSOConfig struct {
 	OIDCScopes         string `gorm:"default:'openid email profile'" json:"oidc_scopes"`
 	OIDCAttributeEmail string `gorm:"default:'email'" json:"oidc_attribute_email"`
 	OIDCAttributeName  string `gorm:"default:'name'" json:"oidc_attribute_name"`
-	// OIDCAttributeRole: nicht unterstützt. Eine Rolle aus einem
-	// Claim des Seiten-IdP wäre eine Rechteausweitung an der Rollenverwaltung
-	// vorbei; die Spalte bleibt nur für bestehende Daten und die API-Form.
+	// OIDCAttributeRole: not supported. A role from a
+	// claim of the page IdP would be a privilege escalation bypassing
+	// role management; the column remains only for existing data and the API shape.
 	OIDCAttributeRole string `gorm:"default:''" json:"oidc_attribute_role"`
-	// Rückruf-URL (vom System generiert, schreibgeschützt)
+	// Callback URL (generated by the system, read-only)
 	OIDCACSUrl string `gorm:"column:oidc_acs_url;default:''" json:"oidc_acs_url"`
-	// TestLogin deaktivieren wenn Live
+	// Disable TestLogin when live
 	TestLoginEnabled bool `gorm:"default:true" json:"test_login_enabled"`
 
 	// The saml_* columns from the SAML era stay in existing databases
 	// (AutoMigrate never drops columns) but are no longer read or written.
 }
 
-// OIDCLoginState hält State, Nonce und PKCE-Verifier eines
-// laufenden OIDC-Logins einer Statusseite bis zum Callback. Bewusst in der DB
-// statt im Prozessspeicher (wie ssoCodeStore), weil zwischen Start und
-// Callback der IdP-Login liegt und ein Neustart des Backends sonst jeden
-// offenen Login abbräche. Ohne gorm.Model (kein Soft-Delete): Der Callback
-// löscht die Zeile hart, damit ein State genau einmal einlösbar ist.
-// LinkUserID != 0 markiert einen Verknüpfungs-Login aus einem bestehenden,
-// angemeldeten Konto. TestLogin markiert die Testanmeldung eines
-// Seiten-Admins aus der SSO-Seite: Sie prüft nur den Ablauf beim Anbieter,
-// ohne Sitzung und ohne Verknüpfung.
+// OIDCLoginState holds the state, nonce and PKCE verifier of an
+// ongoing OIDC login of a status page until the callback. Deliberately in the DB
+// instead of process memory (like ssoCodeStore), because the IdP login lies between start and
+// callback and a backend restart would otherwise abort every
+// open login. Without gorm.Model (no soft delete): the callback
+// deletes the row hard, so that a state can be redeemed exactly once.
+// LinkUserID != 0 marks a linking login from an existing,
+// signed-in account. TestLogin marks the test sign-in of a
+// page admin from the SSO page: it only checks the flow at the provider,
+// without a session and without linking.
 type OIDCLoginState struct {
 	ID           uint      `gorm:"primaryKey"`
 	State        string    `gorm:"not null;uniqueIndex"`
@@ -335,14 +335,14 @@ type OIDCLoginState struct {
 // value "saml" stay in place but have no effect.
 const SSOProtocolOIDC = "oidc"
 
-// UserSSOIdentity verknüpft ein Konto mit einer Identität beim
-// OIDC-Anbieter einer Statusseite. Ein Login über das Seiten-SSO findet das
-// Konto nur über (Seite, Issuer, Subject), nie über die E-Mail:
-// Den IdP einer Seite pflegt deren Admin, eine E-Mail-Zuordnung erlaubte ihm
-// sonst die Übernahme fremder Konten. Kein gorm.Model, damit eine gelöschte
-// Verknüpfung den Unique-Index nicht weiter belegt. Email hält den
-// Wert des konfigurierten E-Mail-Claims (oidc_attribute_email), nur zur Anzeige
-// im Profil, nie für die Zuordnung.
+// UserSSOIdentity links an account to an identity at the
+// OIDC provider of a status page. A login via page SSO finds the
+// account only via (page, issuer, subject), never via the email:
+// the IdP of a page is maintained by its admin, an email mapping would
+// otherwise allow them to take over foreign accounts. No gorm.Model, so that a deleted
+// link does not keep occupying the unique index. Email holds the
+// value of the configured email claim (oidc_attribute_email), for display only
+// in the profile, never for the mapping.
 //
 // Protocol and SubjectFormat date from the SAML era and remain part of the
 // unique index idx_user_sso_identity_key: old SAML rows (Protocol "saml",
@@ -375,77 +375,77 @@ func (sso *StatusPageSSOConfig) ToPublicResponse() map[string]interface{} {
 		"oidc_attribute_role":  sso.OIDCAttributeRole,
 		"oidc_acs_url":         sso.OIDCACSUrl,
 		"test_login_enabled":   sso.TestLoginEnabled,
-		// Das Secret selbst bleibt geheim; das Admin-Formular
-		// muss nur wissen, ob eins hinterlegt ist.
+		// The secret itself stays secret; the admin form
+		// only needs to know whether one is stored.
 		"oidc_client_secret_set": sso.OIDCClientSecret != "",
 	}
 }
 
-// Component unterstützt beliebig tiefe Verschachtelung über ParentID (Ordnerstruktur)
-// Wenn ParentID == nil → Top-Level Gruppe oder Einzelkomponente
-// Wenn Status == "group" → reine Gruppe (kein eigener Status, ergibt sich aus Kindern)
+// Component supports arbitrarily deep nesting via ParentID (folder structure)
+// If ParentID == nil → top-level group or single component
+// If Status == "group" → pure group (no status of its own, derived from children)
 type Component struct {
 	gorm.Model
 	StatusPageID uint `gorm:"not null;index"`
-	// Pointer + omitempty, damit die API kein leeres, nie
-	// geladenes StatusPage-Objekt pro Komponente ausliefert.
+	// Pointer + omitempty, so that the API does not return an empty, never
+	// loaded StatusPage object per component.
 	StatusPage *StatusPage `gorm:"foreignKey:StatusPageID" json:",omitempty"`
 
-	// Selbstreferenz: nil = Root-Element
+	// Self-reference: nil = root element
 	ParentID *uint      `gorm:"index;default:null"`
 	Parent   *Component `gorm:"foreignKey:ParentID"`
-	// Children werden per API-Handler befüllt (nicht direkt in GORM geladen, um N+1 zu vermeiden)
-	Children []Component `gorm:"-"` // wird manuell befüllt
-	// Tags (Ersatz für das frühere Country-Feld) - wie Children
-	// bewusst nicht als GORM-Relation, sondern manuell im Handler befüllt
-	// (siehe handlers/tag_access.go, tagsForComponent), um die vorhandene
-	// ComponentTag-Join-Tabelle ohne implizites many2many-Tag anzusprechen.
+	// Children are filled by the API handler (not loaded directly in GORM, to avoid N+1)
+	Children []Component `gorm:"-"` // filled manually
+	// Tags (replacement for the former Country field) - like Children
+	// deliberately not a GORM relation but filled manually in the handler
+	// (see handlers/tag_access.go, tagsForComponent), to address the existing
+	// ComponentTag join table without an implicit many2many tag.
 	Tags []Tag `gorm:"-"`
 
 	Name string `gorm:"not null"`
-	// Slug: Kennung für API und Integrationen, je Statusseite
-	// unter aktiven Zeilen eindeutig (partieller Unique-Index per Raw-SQL in
-	// database/db.go, bewusst kein uniqueIndex-Tag) und nach dem Anlegen
-	// unveränderlich. Leer nur bei Altzeilen vor dem Backfill.
+	// Slug: identifier for API and integrations, unique per status page
+	// among active rows (partial unique index via raw SQL in
+	// database/db.go, deliberately no uniqueIndex tag) and immutable
+	// after creation. Empty only for old rows before the backfill.
 	Slug        string `gorm:"not null;default:''"`
 	Description string
-	// Visible: false blendet die Komponente (bei einer Gruppe samt
-	// Mitgliedern) auf der öffentlichen Statusseite, in der Verfügbarkeit, im
-	// Abonnement-Assistenten und im öffentlichen Gesamtstatus aus. Im Admin
-	// bleibt sie sichtbar, Webhook und Statusänderung funktionieren weiter.
-	// Default true, damit Bestandszeilen beim AutoMigrate (ADD COLUMN ... DEFAULT
-	// true) sichtbar bleiben. Achtung GORM: false ist der Nullwert und wird beim
-	// Create durch den Default ersetzt; ein unsichtbar anzulegender Eintrag
-	// braucht danach ein explizites Update (siehe CreateComponentHandler).
+	// Visible: false hides the component (for a group together with its
+	// members) on the public status page, in availability, in the
+	// subscription wizard and in the public overall status. In the admin
+	// it stays visible, webhook and status changes keep working.
+	// Default true, so that existing rows stay visible on AutoMigrate (ADD COLUMN ... DEFAULT
+	// true). Beware GORM: false is the zero value and is replaced by the default on
+	// create; an entry to be created invisible
+	// needs an explicit update afterwards (see CreateComponentHandler).
 	Visible bool `gorm:"not null;default:true"`
-	// ArchivedAt: nicht nil = archiviert. Anders als der
-	// GORM-Soft-Delete (DeletedAt, nicht abrufbar) bleibt die Komponente samt
-	// Verlauf, Verfügbarkeit, Vorfall-Zuordnungen und Übersetzungen
-	// erhalten und ist wiederherstellbar. Archivierte Komponenten verhalten sich
-	// öffentlich wie unsichtbare (Statusseite, Verfügbarkeit, Gesamtstatus) und
-	// fehlen im Admin in den Auswahlen; die Liste zeigt sie nur im Segment
-	// „Archiviert“. Eine Gruppe archiviert ihre Mitglieder mit (gleicher Zeitpunkt).
+	// ArchivedAt: not nil = archived. Unlike the
+	// GORM soft delete (DeletedAt, not retrievable) the component stays, including
+	// history, availability, incident assignments and translations,
+	// and is restorable. Archived components behave
+	// publicly like invisible ones (status page, availability, overall status) and
+	// are missing from the selections in the admin; the list shows them only in the
+	// "Archived" segment. A group archives its members too (same timestamp).
 	ArchivedAt *time.Time `gorm:"index"`
 	// Status: "operational","degraded_performance","partial_outage","major_outage","group"
-	// "group" = reine Ordner-Ebene, Status wird aus Kindern aggregiert
+	// "group" = pure folder level, status is aggregated from children
 	Status string `gorm:"not null;default:'operational'"`
-	// IsGroup kennzeichnet in API-Antworten eine Gruppe. Nötig,
-	// weil buildTree Status bei Gruppen durch den schlechtesten Kindstatus
-	// ersetzt; der Admin erkannte die Gruppe sonst nicht und machte sie beim
-	// Speichern zur normalen Komponente. Nicht in der DB, im Handler gesetzt
-	// wie Children/Tags.
+	// IsGroup marks a group in API responses. Needed
+	// because buildTree replaces the status of groups with the worst child status;
+	// otherwise the admin would not recognize the group and would turn it into a
+	// normal component on save. Not in the DB, set in the handler
+	// like Children/Tags.
 	IsGroup bool `gorm:"-"`
-	// Country wurde durch ComponentTag ersetzt (Country → Tags
-	// Schritt 4/4). Die alte DB-Spalte bleibt vorerst bestehen (Rollback-
-	// Sicherheitsnetz), wird aber nicht mehr gelesen/geschrieben.
-	// Sortierung innerhalb einer Gruppe
+	// Country was replaced by ComponentTag (Country → Tags
+	// step 4/4). The old DB column remains for now (rollback
+	// safety net) but is no longer read or written.
+	// Sort order within a group
 	SortOrder int `gorm:"default:0"`
 
-	// effektiver Status (schlimmster aus eigenem Status, offenen
-	// Vorfällen und gekoppelten externen Komponenten) samt Herkunft. Nicht
-	// persistiert, nur in den Listen-Antworten (Komponentenbaum, Dashboard)
-	// befüllt; Status selbst bleibt der gespeicherte Wert, damit beim
-	// Entkoppeln nichts verloren geht und bestehende Clients unverändert bleiben.
+	// effective status (worst of own status, open
+	// incidents and coupled external components) including origin. Not
+	// persisted, filled only in the list responses (component tree, dashboard);
+	// Status itself stays the stored value, so that nothing is lost when
+	// uncoupling and existing clients stay unchanged.
 	EffectiveStatus string              `gorm:"-" json:"effective_status,omitempty"`
 	ExternalSources []ExternalStatusRef `gorm:"-" json:"external_sources,omitempty"`
 }
@@ -453,51 +453,51 @@ type Component struct {
 type Incident struct {
 	gorm.Model
 	StatusPageID uint `gorm:"not null;index"`
-	// Pointer + omitempty wie Component.StatusPage
-	// - die nie geladene Relation lieferte sonst in jeder
-	// (auch öffentlichen) Vorfall-Antwort ein leeres StatusPage-Objekt mit
-	// dem kompletten internen Konfigurations-Schema der Seite.
+	// Pointer + omitempty like Component.StatusPage
+	// - the never-loaded relation would otherwise deliver in every
+	// (also public) incident response an empty StatusPage object with
+	// the complete internal configuration schema of the page.
 	StatusPage *StatusPage `gorm:"foreignKey:StatusPageID" json:",omitempty"`
 	Title      string      `gorm:"not null"`
 	Message    string      `gorm:"not null"`
 	Status     string      `gorm:"not null;default:'investigating'"`
-	// Severity: Schweregrad des Vorfalls für die gewichtete
-	// Verfügbarkeit (degraded_performance | partial_outage | major_outage).
-	// Altdaten und Wartungen tragen den Default.
+	// Severity: severity of the incident for the weighted
+	// availability (degraded_performance | partial_outage | major_outage).
+	// Old data and maintenance windows carry the default.
 	Severity string `gorm:"not null;default:'degraded_performance'"`
-	// Country wurde durch IncidentTag ersetzt (Country → Tags
-	// Schritt 4/4). Die alte DB-Spalte bleibt vorerst bestehen (Rollback-
-	// Sicherheitsnetz), wird aber nicht mehr gelesen/geschrieben.
-	// Mehrfachzuordnung zu Komponenten (ersetzt die frühere 1:1-FK
-	// ComponentID/Component). Bewusst als explizites Join-Modell
-	// (IncidentComponent) statt GORM many2many-Tag, analog zu
-	// UserStatusPageRole - vermeidet Tabellen-Kollisionen und lässt sich um
-	// weitere Felder (SortOrder) erweitern.
+	// Country was replaced by IncidentTag (Country → Tags
+	// step 4/4). The old DB column remains for now (rollback
+	// safety net) but is no longer read or written.
+	// Multi-assignment to components (replaces the former 1:1 FK
+	// ComponentID/Component). Deliberately an explicit join model
+	// (IncidentComponent) instead of a GORM many2many tag, analogous to
+	// UserStatusPageRole - avoids table collisions and can be extended with
+	// further fields (SortOrder).
 	IncidentComponents []IncidentComponent `gorm:"foreignKey:IncidentID" json:"-"`
 
-	// Wartungsfenster: erweitert Incident statt eines eigenen
-	// Modells zu sein, damit Timeline/Notifications/Komponenten-Zuordnung des
-	// Incidents direkt mitgenutzt werden. Status-Lebenszyklus für Wartungsfenster:
-	// "scheduled" -> "in_progress" -> "resolved" (bewusst derselbe Terminal-
-	// Status wie bei Incidents, damit der bestehende "aktive Incidents"-Filter
-	// (models.IsResolvedIncidentStatus: resolved) auf der öffentlichen Statusseite unverändert
-	// funktioniert). Wird vom Scheduler in backend/scheduler/maintenance.go
-	// automatisch weitergeschaltet.
+	// Maintenance windows: extends Incident instead of being a separate
+	// model, so that the incident's timeline/notifications/component assignment
+	// can be reused directly. Status lifecycle for maintenance windows:
+	// "scheduled" -> "in_progress" -> "resolved" (deliberately the same terminal
+	// status as for incidents, so that the existing "active incidents" filter
+	// (models.IsResolvedIncidentStatus: resolved) on the public status page keeps
+	// working unchanged). Advanced automatically by the scheduler in
+	// backend/scheduler/maintenance.go.
 	IsMaintenance       bool       `gorm:"not null;default:false"`
 	ScheduledStartAt    *time.Time `gorm:""`
 	ScheduledEndAt      *time.Time `gorm:""`
-	ReminderLeadMinutes int        `gorm:"not null;default:0"` // 0 = keine Erinnerung
+	ReminderLeadMinutes int        `gorm:"not null;default:0"` // 0 = no reminder
 	ReminderSentAt      *time.Time `gorm:""`
 
-	// Ereigniszeiten normaler Vorfälle: optionaler Beginn/Ende,
-	// damit sich Historie nachtragen lässt. CreatedAt bleibt der technische
-	// Zeitstempel; für Wartungen gelten ScheduledStartAt/ScheduledEndAt.
+	// Event times of normal incidents: optional start/end,
+	// so that history can be filled in retroactively. CreatedAt remains the technical
+	// timestamp; for maintenance windows ScheduledStartAt/ScheduledEndAt apply.
 	StartedAt  *time.Time `gorm:""`
 	ResolvedAt *time.Time `gorm:""`
 }
 
-// IncidentComponent: explizite Join-Tabelle Incident <-> Component (many-to-many).
-// Ersetzt die frühere 1:1-FK Incident.ComponentID/Component.
+// IncidentComponent: explicit join table incident <-> component (many-to-many).
+// Replaces the former 1:1 FK Incident.ComponentID/Component.
 type IncidentComponent struct {
 	gorm.Model
 	IncidentID  uint      `gorm:"not null;index"`
@@ -507,21 +507,21 @@ type IncidentComponent struct {
 	SortOrder   int       `gorm:"default:0"`
 }
 
-// Tag ist das neue, frei definierbare Pendant zu den bisherigen
-// Country-Strings (Schritt 1/4 - Country → Tags). Rein
-// additiv: läuft zunächst nur parallel zu Component.Country, Incident.Country
-// und User.AllowedCountries mit, ohne dass die bestehende Zugriffsprüfung
-// (UserHasAccessToCountry) davon Gebrauch macht - das folgt erst in Schritt
+// Tag is the new, freely definable counterpart to the previous
+// country strings (step 1/4 - Country → Tags). Purely
+// additive: initially runs only in parallel to Component.Country, Incident.Country
+// and User.AllowedCountries, without the existing access check
+// (UserHasAccessToCountry) making use of it - that follows only in step
 // 2/4.
 //
-// StatusPageID == nil markiert einen globalen (repo-/instanzweiten) Tag,
-// andernfalls ist der Tag an genau eine Statusseite gebunden. Da Postgres
-// NULL-Werte in einem normalen Unique-Index als paarweise verschieden
-// behandelt, reicht ein Unique-Index auf (Name, StatusPageID) NICHT aus, um
-// doppelte globale Tags zu verhindern - siehe die beiden partiellen
-// Unique-Indizes idx_tags_global_name_active / idx_tags_scoped_name_active (nur aktive Zeilen), die
-// CreateSoftDeleteUniqueIndexes() in backend/database/db.go per Raw-SQL anlegt
-// (GORM AutoMigrate erzeugt keine partiellen Indizes).
+// StatusPageID == nil marks a global (repo-/instance-wide) tag,
+// otherwise the tag is bound to exactly one status page. Since Postgres
+// treats NULL values in a normal unique index as pairwise distinct,
+// a unique index on (Name, StatusPageID) is NOT enough to prevent
+// duplicate global tags - see the two partial
+// unique indexes idx_tags_global_name_active / idx_tags_scoped_name_active (active rows only), which
+// CreateSoftDeleteUniqueIndexes() in backend/database/db.go creates via raw SQL
+// (GORM AutoMigrate does not create partial indexes).
 type Tag struct {
 	gorm.Model
 	Name         string      `gorm:"not null"`
@@ -529,8 +529,8 @@ type Tag struct {
 	StatusPage   *StatusPage `gorm:"foreignKey:StatusPageID"`
 }
 
-// ComponentTag: explizite Join-Tabelle Component <-> Tag (many-to-many),
-// analog zu IncidentComponent - bewusst kein GORM many2many-Tag.
+// ComponentTag: explicit join table component <-> tag (many-to-many),
+// analogous to IncidentComponent - deliberately no GORM many2many tag.
 type ComponentTag struct {
 	gorm.Model
 	ComponentID uint      `gorm:"not null;index"`
@@ -539,8 +539,8 @@ type ComponentTag struct {
 	Tag         Tag       `gorm:"foreignKey:TagID;constraint:OnDelete:CASCADE"`
 }
 
-// IncidentTag: explizite Join-Tabelle Incident <-> Tag (many-to-many),
-// analog zu IncidentComponent - bewusst kein GORM many2many-Tag.
+// IncidentTag: explicit join table incident <-> tag (many-to-many),
+// analogous to IncidentComponent - deliberately no GORM many2many tag.
 type IncidentTag struct {
 	gorm.Model
 	IncidentID uint     `gorm:"not null;index"`
@@ -549,8 +549,8 @@ type IncidentTag struct {
 	Tag        Tag      `gorm:"foreignKey:TagID;constraint:OnDelete:CASCADE"`
 }
 
-// UserTag: explizite Join-Tabelle User <-> Tag (many-to-many), analog zu
-// UserStatusPageRole - bewusst kein GORM many2many-Tag.
+// UserTag: explicit join table user <-> tag (many-to-many), analogous to
+// UserStatusPageRole - deliberately no GORM many2many tag.
 type UserTag struct {
 	gorm.Model
 	UserID uint `gorm:"not null;index"`
@@ -559,45 +559,45 @@ type UserTag struct {
 	Tag    Tag  `gorm:"foreignKey:TagID;constraint:OnDelete:CASCADE"`
 }
 
-// GeneralNotice: seitenweite Ankündigungen, die nicht an einen
-// konkreten Incident/Wartungsfenster gebunden sind (z.B. Richtlinien-
-// änderungen, organisatorische Hinweise). Bewusst ein eigenes, schlankes
-// Modell statt einer Erweiterung von Incident (anders als bei Wartungs-
-// fenstern): Notices haben keinen Status-Lebenszyklus und keine
-// Komponenten-Zuordnung, sondern nur einen Sichtbarkeits-Schalter (IsActive)
-// und ein optionales Zeitfenster (StartAt/EndAt).
+// GeneralNotice: site-wide announcements not tied to a
+// specific incident/maintenance window (e.g. policy
+// changes, organizational notices). Deliberately a separate, lean
+// model instead of an extension of Incident (unlike for maintenance
+// windows): notices have no status lifecycle and no
+// component assignment, only a visibility switch (IsActive)
+// and an optional time window (StartAt/EndAt).
 type GeneralNotice struct {
 	gorm.Model
 	StatusPageID uint `gorm:"not null;index"`
-	// siehe Incident.StatusPage.
+	// see Incident.StatusPage.
 	StatusPage *StatusPage `gorm:"foreignKey:StatusPageID" json:",omitempty"`
 	Title      string      `gorm:"not null"`
-	Message    string      `gorm:"not null"` // Markdown-fähig, wird als reiner String gespeichert
+	Message    string      `gorm:"not null"` // Markdown-capable, stored as a plain string
 	// Level: "info" | "warning" | "critical"
 	Level string `gorm:"not null;default:'info'"`
-	// IsActive: bewusst KEIN gorm "default:true" - GORM behandelt bool-
-	// ZeroValues (false) bei "default"-Tags als "nicht gesetzt" und würde sie
-	// beim Insert stillschweigend auf den DB-Default zurücksetzen, sodass sich
-	// eine explizit inaktive Notice nie anlegen ließe. Der Default "aktiv" wird
-	// stattdessen anwendungsseitig in CreateNoticeHandler erzwungen.
+	// IsActive: deliberately NO gorm "default:true" - GORM treats bool
+	// zero values (false) with "default" tags as "not set" and would reset them
+	// silently to the DB default on insert, so that an explicitly inactive
+	// notice could never be created. The default "active" is enforced
+	// on the application side in CreateNoticeHandler instead.
 	IsActive bool `gorm:"not null"`
-	// Collapsed: reduziert Platz auf der Statusseite - Notice erscheint
-	// hinter einem aufklappbaren Header statt direkt ausgeschrieben.
+	// Collapsed: reduces space on the status page - the notice appears
+	// behind a collapsible header instead of being written out directly.
 	Collapsed bool       `gorm:"not null;default:false"`
 	StartAt   *time.Time `gorm:""`
 	EndAt     *time.Time `gorm:""`
 
-	// NotifySubscribers: steuert, ob das Anlegen/Aktivieren
-	// dieser Notice eine Mail-Benachrichtigung an alle passenden Subscriber
-	// auslöst. Bewusst opt-in (Default false) - rein kosmetische Notices
-	// (z.B. "wir haben ein neues Logo") sollen niemanden ungefragt
-	// zuspammen. Existierende Notices behalten das bisherige Verhalten
-	// (kein Mailversand), da AutoMigrate die neue Spalte auf false setzt.
+	// NotifySubscribers: controls whether creating/activating
+	// this notice triggers a mail notification to all matching subscribers.
+	// Deliberately opt-in (default false) - purely cosmetic notices
+	// (e.g. "we have a new logo") should not spam anyone
+	// unasked. Existing notices keep the previous behavior
+	// (no mail sending), since AutoMigrate sets the new column to false.
 	NotifySubscribers bool `gorm:"not null;default:false"`
 }
 
-// IncidentTranslation (Stage 2): Übersetzungen von Incident-Title/Message
-// mit Draft/Confirmed-Status. Nur bestätigte werden auf der öffentlichen Seite gezeigt.
+// IncidentTranslation (Stage 2): translations of incident title/message
+// with draft/confirmed status. Only confirmed ones are shown on the public page.
 type IncidentTranslation struct {
 	gorm.Model
 	IncidentID   uint     `gorm:"not null"`
@@ -609,8 +609,8 @@ type IncidentTranslation struct {
 	Source       string   `gorm:"not null;default:'manual'"`
 }
 
-// ComponentTranslation (Stage 3): Übersetzungen von Component-Name/Description
-// mit Draft/Confirmed-Status. Nur bestätigte werden auf der öffentlichen Seite gezeigt.
+// ComponentTranslation (Stage 3): translations of component name/description
+// with draft/confirmed status. Only confirmed ones are shown on the public page.
 type ComponentTranslation struct {
 	gorm.Model
 	ComponentID  uint      `gorm:"not null"`
@@ -622,8 +622,8 @@ type ComponentTranslation struct {
 	Source       string    `gorm:"not null;default:'manual'"`
 }
 
-// GeneralNoticeTranslation (Stage 4): Übersetzungen von Notice-Title/Message
-// mit Draft/Confirmed-Status. Nur bestätigte werden auf der öffentlichen Seite gezeigt.
+// GeneralNoticeTranslation (Stage 4): translations of notice title/message
+// with draft/confirmed status. Only confirmed ones are shown on the public page.
 type GeneralNoticeTranslation struct {
 	gorm.Model
 	GeneralNoticeID uint          `gorm:"not null"`
@@ -635,32 +635,32 @@ type GeneralNoticeTranslation struct {
 	Source          string        `gorm:"not null;default:'manual'"`
 }
 
-// IncidentTemplate: Vorlage für wiederkehrende Vorfälle/
-// Wartungsfenster, damit Title/Message/Status/Komponenten nicht jedes Mal neu
-// eingetippt werden müssen. Bewusst KEINE FK-Beziehung von Incident zurück
-// zur Vorlage - beim Anlegen werden die Feldwerte nur kopiert
-// (siehe CreateIncidentHandler/TemplateID-Handling), damit das Löschen einer
-// Vorlage nie bereits erstellte Incidents/Wartungsfenster beeinflusst.
+// IncidentTemplate: template for recurring incidents/
+// maintenance windows, so that title/message/status/components do not have to be
+// retyped every time. Deliberately NO FK relation from Incident back
+// to the template - on creation the field values are only copied
+// (see CreateIncidentHandler/TemplateID handling), so that deleting a
+// template never affects already created incidents/maintenance windows.
 type IncidentTemplate struct {
 	gorm.Model
 	StatusPageID  uint       `gorm:"not null;index"`
 	StatusPage    StatusPage `gorm:"foreignKey:StatusPageID"`
-	Name          string     `gorm:"not null"`                    // interner Vorlagenname, z.B. "DB-Wartung"
+	Name          string     `gorm:"not null"`                    // internal template name, e.g. "DB-Wartung"
 	Kind          string     `gorm:"not null;default:'incident'"` // "incident" | "maintenance"
 	Title         string     `gorm:"not null"`
 	Message       string     `gorm:"not null"`
 	DefaultStatus string     `gorm:""`
-	// ComponentIDs: vorausgewählte Komponenten, komma-getrennt (analog zu
-	// Subscriber.SubscribedComponentIDs) statt eigener Join-Tabelle, da hier
-	// keine referenzielle Integrität benötigt wird - die IDs werden beim
-	// Anlegen eines Incidents nur einmalig als Vorbefüllung ausgelesen.
+	// ComponentIDs: preselected components, comma-separated (analogous to
+	// Subscriber.SubscribedComponentIDs) instead of a separate join table, since
+	// no referential integrity is needed here - the IDs are read out only once as
+	// prefill when creating an incident.
 	ComponentIDs string `gorm:""`
 }
 
-// IncidentTemplateTranslation: Übersetzung von Titel und Nachricht
-// einer Vorlage in eine weitere Sprache der Seite. Die Standardsprache ist die
-// Vorlage selbst. Beim „Vorlage verwenden“ werden die Texte mit ins Formular
-// übernommen. Status wie bei den anderen Übersetzungen: draft | confirmed.
+// IncidentTemplateTranslation: translation of the title and message
+// of a template into a further language of the page. The default language is the
+// template itself. On "use template" the texts are also
+// carried over into the form. Status as with the other translations: draft | confirmed.
 type IncidentTemplateTranslation struct {
 	gorm.Model
 	IncidentTemplateID uint             `gorm:"not null"`
@@ -671,31 +671,31 @@ type IncidentTemplateTranslation struct {
 	Status             string           `gorm:"not null;default:'draft'"`
 }
 
-// NotificationTemplate: pro Statusseite und Benachrichtigungstyp
-// hinterlegbare Vorlage für Subject und HTML-Body von Benachrichtigungs-Mails,
-// gerendert per Go html/template. Fehlt für einen (StatusPageID, Kind,
-// Audience, Language)-Tupel ein Eintrag, greift der hartkodierte
-// Default-Renderer (buildNotificationEmailHTML) - bestehendes Verhalten
-// bleibt so unverändert, solange kein Admin ein eigenes Template hinterlegt.
+// NotificationTemplate: template, storable per status page and notification type,
+// for the subject and HTML body of notification mails,
+// rendered via Go html/template. If an entry is missing for a (StatusPageID, Kind,
+// Audience, Language) tuple, the hard-coded
+// default renderer (buildNotificationEmailHTML) applies - existing behavior
+// thus stays unchanged as long as no admin stores their own template.
 //
-// Kind identifiziert den Anlass (Incident-/Wartungsfenster-/Notice-
-// Benachrichtigungen, siehe die NotificationKind*-Konstanten in
+// Kind identifies the occasion (incident/maintenance-window/notice
+// notifications, see the NotificationKind* constants in
 // handlers/notification_template.go).
 //
-// Audience (Stage 5 der Mehrsprachigkeit): "staff" (interne
-// User) | "subscriber" (öffentliche Abonnenten). Vorher steckte diese
-// Unterscheidung implizit im Language-Feld selbst (Language=en meinte
-// "interne Kopie", Language=de meinte "Subscriber-Kopie" - siehe
-// handlers/incident.go buildNotificationDispatchContext) und kollidierte
-// dadurch mit jeder weiteren echten Sprache, die nicht zufällig "en"/"de"
-// hieß. Mit Audience als eigenem Feld ist Language jetzt ein echter,
-// gegen den Sprachkatalog (models.Language/StatusPageLanguage)
-// validierter Locale-Code statt einer verkappten Zielgruppen-Angabe.
+// Audience (stage 5 of multilingual support): "staff" (internal
+// users) | "subscriber" (public subscribers). Previously this
+// distinction was implicit in the Language field itself (Language=en meant
+// "internal copy", Language=de meant "subscriber copy" - see
+// handlers/incident.go buildNotificationDispatchContext) and thereby collided
+// with every further real language that happened not to be called
+// "en"/"de". With Audience as its own field, Language is now a real
+// locale code validated against the language catalog (models.Language/StatusPageLanguage)
+// instead of a disguised audience indication.
 //
-// (StatusPageID, Kind, Audience, Language) ist unter den aktiven Zeilen unique
-// (partieller Index idx_notification_template_active in
-// database.CreateSoftDeleteUniqueIndexes, kein gorm-Tag) - ein Tenant hat pro
-// Kombination höchstens ein Custom-Template.
+// (StatusPageID, Kind, Audience, Language) is unique among active rows
+// (partial index idx_notification_template_active in
+// database.CreateSoftDeleteUniqueIndexes, no gorm tag) - a tenant has at most
+// one custom template per combination.
 type NotificationTemplate struct {
 	gorm.Model
 	StatusPageID uint       `gorm:"not null"`
@@ -711,35 +711,35 @@ type Subscriber struct {
 	gorm.Model
 	StatusPageID           uint       `gorm:"not null;index"`
 	StatusPage             StatusPage `gorm:"foreignKey:StatusPageID"`
-	Email                  string     `gorm:"default:null"`             // leer bei Google Chat
-	WebhookURL             string     `gorm:"default:null"`             // leer bei E-Mail
+	Email                  string     `gorm:"default:null"`             // empty for Google Chat
+	WebhookURL             string     `gorm:"default:null"`             // empty for email
 	Channel                string     `gorm:"not null;default:'email'"` // "email" | "google_chat"
 	SubscribedComponentIDs string     `gorm:"not null;default:'all'"`
-	// Language: gewünschte Sprache der Benachrichtigungsmails, ein
-	// bei der Seite aktiver Sprachcode. Leer = Standardsprache der Statusseite.
+	// Language: desired language of the notification mails, a
+	// language code active for the page. Empty = default language of the status page.
 	Language string `gorm:"not null;default:''"`
-	// CreatedByUserID verknüpft das Abo mit dem anlegenden User (falls angemeldet),
-	// damit dieser es später über /me/subscription wiederfinden und bearbeiten kann
-	// – vorher gab es dafür nur den fragilen Email-String-Abgleich, der bei
-	// admin-angelegten Webhook-Abos (ohne Email) komplett ins Leere lief.
+	// CreatedByUserID links the subscription to the creating user (if signed in),
+	// so that they can find and edit it later via /me/subscription
+	// – previously there was only the fragile email string matching, which
+	// came to nothing entirely for admin-created webhook subscriptions (without email).
 	CreatedByUserID *uint `gorm:"default:null;index"`
 	CreatedBy       *User `gorm:"foreignKey:CreatedByUserID"`
 
-	// Double-Opt-in: Status "pending" = E-Mail-Adresse noch nicht
-	// per Link bestätigt, "active" = bestätigt bzw. ohne Bestätigung gültig
-	// (eigene Konto-Adresse, Webhook-Kanäle). Benachrichtigungen gehen nur an
-	// "active". Der DB-Default "active" sorgt dafür, dass AutoMigrate alle
-	// Bestandsabos beim Anlegen der Spalte als bestätigt übernimmt (zusätzlich
-	// abgesichert per database.backfillSubscriberStatus).
+	// Double opt-in: status "pending" = email address not yet
+	// confirmed via link, "active" = confirmed or valid without confirmation
+	// (own account address, webhook channels). Notifications go only to
+	// "active". The DB default "active" ensures that AutoMigrate adopts all
+	// existing subscriptions as confirmed when creating the column (additionally
+	// secured via database.backfillSubscriberStatus).
 	Status string `gorm:"not null;default:'active';index"`
-	// ConfirmTokenHash: SHA-256 (hex) des Bestätigungstokens. Der Klartext
-	// steht nur im Mail-Link, damit ein DB-Leak keine offenen Abos bestätigen
-	// kann. Nach der Bestätigung leer, wie PageOrder.ConfirmToken.
+	// ConfirmTokenHash: SHA-256 (hex) of the confirmation token. The plaintext
+	// is only in the mail link, so that a DB leak cannot confirm any open subscriptions.
+	// Empty after confirmation, like PageOrder.ConfirmToken.
 	ConfirmTokenHash   string     `gorm:"index;default:null" json:"-"`
 	ConfirmTokenExpiry *time.Time `gorm:"default:null" json:"-"`
 }
 
-// Subscriber-Status-Werte.
+// Subscriber status values.
 const (
 	SubscriberStatusPending = "pending"
 	SubscriberStatusActive  = "active"

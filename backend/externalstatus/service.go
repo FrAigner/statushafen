@@ -16,43 +16,43 @@ import (
 )
 
 const (
-	// DefaultPollIntervalSeconds/MinPollIntervalSeconds: Abfrage-Intervall
-	// einer Quelle. Unter einer Minute würden wir Anbieter unnötig belasten
-	// (die Summary-API wird oft nur alle 10 s neu erzeugt).
+	// DefaultPollIntervalSeconds/MinPollIntervalSeconds: polling interval
+	// of a source. Below one minute we would burden vendors needlessly
+	// (the summary API is often regenerated only every 10 s).
 	DefaultPollIntervalSeconds = 120
 	MinPollIntervalSeconds     = 60
-	// MaxPollIntervalSeconds: ein Tag; mehr ergibt für einen Status keinen Sinn.
+	// MaxPollIntervalSeconds: one day; more makes no sense for a status.
 	MaxPollIntervalSeconds = 86400
 
-	// PollingEnabledEnv schaltet den Hintergrund-Abruf ab ("false", "0",
-	// "no", "off"); Default an. "Jetzt abrufen" im Admin funktioniert weiter.
+	// PollingEnabledEnv turns off background polling ("false", "0",
+	// "no", "off"); default on. "Fetch now" in the admin keeps working.
 	PollingEnabledEnv = "EXTERNAL_STATUS_POLLING_ENABLED"
 
 	defaultTick       = 15 * time.Second
 	defaultMaxBackoff = 30 * time.Minute
-	// advisoryLockKey: anwendungsweit eindeutiger Schlüssel (frei gewählte Zahl).
+	// advisoryLockKey: application-wide unique key (freely chosen number).
 	advisoryLockKey int64 = 507484
-	// ErrFetchInProgress ist der Fehlertext im FetchResult, wenn für die
-	// Quelle gerade ein Abruf läuft.
+	// ErrFetchInProgress is the error text in FetchResult when a fetch for the
+	// source is currently running.
 	ErrFetchInProgress = "fetch_in_progress"
-	// maxErrorLen begrenzt den gespeicherten Fehlertext.
+	// maxErrorLen limits the stored error text.
 	maxErrorLen = 500
 )
 
-// sourceLockKey: Schlüssel der Sperre für den Abruf einer einzelnen Quelle.
-// Oben im Schlüsselraum der Leader-Sperre (advisoryLockKey), damit beide sich
-// nie überschneiden.
+// sourceLockKey: key of the lock for fetching a single source.
+// At the top of the key space of the leader lock (advisoryLockKey), so the two
+// never overlap.
 func sourceLockKey(id uint) int64 { return advisoryLockKey<<32 | int64(id) }
 
-// Locker verhindert, dass mehrere Instanzen gleichzeitig abfragen
-// (Standard: database.AdvisoryLock).
+// Locker prevents multiple instances from polling at the same time
+// (default: database.AdvisoryLock).
 type Locker interface {
 	TryLock(ctx context.Context) (bool, error)
 	Unlock()
 }
 
-// Options konfiguriert NewService. Leere Felder = Produktionswerte; Tests
-// setzen Fake-Provider, Fake-Uhr und festen Jitter.
+// Options configures NewService. Empty fields = production values; tests
+// set a fake provider, fake clock and fixed jitter.
 type Options struct {
 	Providers    map[string]Provider
 	Listener     ChangeListener
@@ -61,20 +61,20 @@ type Options struct {
 	Jitter       func(max time.Duration) time.Duration
 	TickInterval time.Duration
 	MaxBackoff   time.Duration
-	// SourceLocker liefert die Sperre, die einen Abruf genau einer Quelle
-	// gegen Überschneidung schützt; Standard: database.AdvisoryLock
-	// mit sourceLockKey. Tests setzen eine Fake-Sperre.
+	// SourceLocker provides the lock that protects a fetch of exactly one source
+	// against overlap; default: database.AdvisoryLock
+	// with sourceLockKey. Tests set a fake lock.
 	SourceLocker func(sourceID uint) Locker
-	// Outage empfängt Ausfall-Ereignisse; nil = nur Logeintrag.
+	// Outage receives outage events; nil = log entry only.
 	Outage OutageNotifier
-	// Incidents empfängt Vorfall-/Wartungs-Ereignisse; nil = nur spiegeln.
+	// Incidents receives incident/maintenance events; nil = mirror only.
 	Incidents IncidentNotifier
-	// Retention: Aufbewahrung beendeter gespiegelter Meldungen;
+	// Retention: retention of finished mirrored reports;
 	// 0 = DefaultRetentionDays.
 	Retention time.Duration
 }
 
-// Service ist der Abfrage-Dienst für externe Statusseiten.
+// Service is the polling service for external status pages.
 type Service struct {
 	db         *gorm.DB
 	providers  map[string]Provider
@@ -91,27 +91,27 @@ type Service struct {
 	retention    time.Duration
 	lastPrune    time.Time
 
-	// fetchMu serialisiert die Abrufe im Prozess (Hintergrund-Takt und
-	// "Jetzt abrufen"): Die Ereignis-Erkennung vergleicht effektive Status
-	// vor und nach einem Abruf und verträgt keine überlappenden Abrufe
-	// derselben Seite.
+	// fetchMu serializes the fetches within the process (background tick and
+	// "Fetch now"): the event detection compares effective statuses
+	// before and after a fetch and cannot cope with overlapping fetches
+	// of the same page.
 	fetchMu sync.Mutex
-	// mu schützt state und inflight (nur kurze Abschnitte, nie während des
-	// Netzwerkabrufs).
+	// mu protects state and inflight (only short sections, never during the
+	// network fetch).
 	mu       sync.Mutex
 	state    map[uint]*sourceState
 	inflight map[uint]bool
 }
 
-// sourceState: nächster geplanter Abruf und aktuelle Backoff-Pause einer
-// Quelle. Bewusst nur im Speicher: Nach einem Neustart richtet sich der
-// erste Abruf nach LastFetchAt, ein laufender Backoff beginnt neu.
+// sourceState: next scheduled fetch and current backoff pause of a
+// source. Deliberately in memory only: after a restart the first fetch
+// is based on LastFetchAt, a running backoff starts over.
 type sourceState struct {
 	next    time.Time
 	backoff time.Duration
 }
 
-// FetchResult ist das Ergebnis eines Abrufs (auch Antwort von "Jetzt abrufen").
+// FetchResult is the result of a fetch (also the response to "Fetch now").
 type FetchResult struct {
 	OK          bool      `json:"ok"`
 	NotModified bool      `json:"not_modified"`
@@ -120,7 +120,7 @@ type FetchResult struct {
 	UpsertResult
 }
 
-// NewService baut den Dienst; Start startet die Hintergrund-Schleife.
+// NewService builds the service; Start starts the background loop.
 func NewService(db *gorm.DB, opts Options) *Service {
 	s := &Service{
 		db:         db,
@@ -169,8 +169,8 @@ func NewService(db *gorm.DB, opts Options) *Service {
 	return s
 }
 
-// Listener liefert den Empfänger für StatusChange-Ereignisse (auch für die
-// Admin-Handler beim Koppeln/Entkoppeln).
+// Listener returns the recipient for StatusChange events (also for the
+// admin handlers when linking/unlinking).
 func (s *Service) Listener() ChangeListener { return s.listener }
 
 func randomJitter(max time.Duration) time.Duration {
@@ -180,20 +180,20 @@ func randomJitter(max time.Duration) time.Duration {
 	return time.Duration(rand.Int64N(int64(max)))
 }
 
-// PollInterval liefert das Intervall einer Quelle, mindestens MinPollIntervalSeconds.
+// PollInterval returns a source's interval, at least MinPollIntervalSeconds.
 func PollInterval(src models.ExternalSource) time.Duration {
 	return time.Duration(max(src.PollIntervalSeconds, MinPollIntervalSeconds)) * time.Second
 }
 
-// nextBackoff (Muster): Nach einem Fehler verdoppelt sich die
-// Pause, beginnend beim doppelten Intervall, gedeckelt bei maxBackoff (aber
-// nie kürzer als das normale Intervall). Ein Erfolg setzt sie zurück (poll).
+// nextBackoff (pattern): after an error the pause doubles,
+// starting at twice the interval, capped at maxBackoff (but
+// never shorter than the normal interval). A success resets it (poll).
 func nextBackoff(cur, interval, maxBackoff time.Duration) time.Duration {
 	cur = max(cur, interval)
 	return min(cur*2, max(maxBackoff, interval))
 }
 
-// PollingEnabled liest PollingEnabledEnv; alles außer false/0/no/off = an.
+// PollingEnabled reads PollingEnabledEnv; anything except false/0/no/off = on.
 func PollingEnabled(getenv func(string) string) bool {
 	switch strings.ToLower(strings.TrimSpace(getenv(PollingEnabledEnv))) {
 	case "false", "0", "no", "off":
@@ -202,9 +202,9 @@ func PollingEnabled(getenv func(string) string) bool {
 	return true
 }
 
-// StartFromEnv startet die Hintergrund-Schleife, sofern nicht per
-// PollingEnabledEnv abgeschaltet, und liefert die Stopp-Funktion (wartet,
-// bis die Schleife beendet ist). Aufruf in main.go: defer StartFromEnv(...)().
+// StartFromEnv starts the background loop unless turned off via
+// PollingEnabledEnv, and returns the stop function (waits
+// until the loop has ended). Call in main.go: defer StartFromEnv(...)().
 func StartFromEnv(ctx context.Context, s *Service, getenv func(string) string) (stop func()) {
 	if !PollingEnabled(getenv) {
 		slog.Info("Abruf externer Statusseiten deaktiviert", "env", PollingEnabledEnv)
@@ -214,9 +214,9 @@ func StartFromEnv(ctx context.Context, s *Service, getenv func(string) string) (
 	return s.Start(ctx)
 }
 
-// Start startet die Hintergrund-Schleife: sofort ein Takt, danach alle
-// TickInterval. Die zurückgegebene Funktion beendet sie, wartet darauf und
-// gibt die DB-Sperre frei.
+// Start starts the background loop: one tick immediately, then every
+// TickInterval. The returned function stops it, waits for it and
+// releases the DB lock.
 func (s *Service) Start(ctx context.Context) (stop func()) {
 	ctx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
@@ -240,8 +240,8 @@ func (s *Service) Start(ctx context.Context) (stop func()) {
 	}
 }
 
-// RunOnce ist ein Takt: Sperre holen, fällige aktive Quellen abrufen.
-// Quellen gelöschter Statusseiten bleiben außen vor.
+// RunOnce is one tick: acquire the lock, fetch due active sources.
+// Sources of deleted status pages are left out.
 func (s *Service) RunOnce(ctx context.Context) {
 	locked, err := s.locker.TryLock(ctx)
 	if err != nil || !locked {
@@ -262,7 +262,7 @@ func (s *Service) RunOnce(ctx context.Context) {
 			return
 		}
 		if s.isDue(src, s.now()) {
-			s.poll(ctx, src) // wertet den Ausfall nach dem Abruf aus
+			s.poll(ctx, src) // evaluates the outage after the fetch
 		} else {
 			s.evaluateOutage(ctx, src.ID)
 		}
@@ -270,7 +270,7 @@ func (s *Service) RunOnce(ctx context.Context) {
 	s.maybePrune(ctx)
 }
 
-// pruneState entfernt den Zustand gelöschter oder deaktivierter Quellen.
+// pruneState removes the state of deleted or deactivated sources.
 func (s *Service) pruneState(active []models.ExternalSource) {
 	keep := make(map[uint]bool, len(active))
 	for _, src := range active {
@@ -285,8 +285,8 @@ func (s *Service) pruneState(active []models.ExternalSource) {
 	}
 }
 
-// isDue: Ohne Zustand (erster Takt nach dem Start) zählt LastFetchAt, damit
-// ein Neustart die Anbieter nicht sofort erneut abfragt.
+// isDue: without state (first tick after startup) LastFetchAt counts, so
+// a restart does not immediately query the vendors again.
 func (s *Service) isDue(src models.ExternalSource, now time.Time) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -296,25 +296,25 @@ func (s *Service) isDue(src models.ExternalSource, now time.Time) bool {
 	return src.LastFetchAt == nil || !now.Before(src.LastFetchAt.Add(PollInterval(src)))
 }
 
-// FetchNow ruft eine Quelle sofort ab ("Jetzt abrufen" im Admin), auch wenn
-// sie inaktiv ist, und plant den nächsten Abruf neu.
+// FetchNow fetches a source immediately ("Fetch now" in the admin), even if
+// it is inactive, and reschedules the next fetch.
 func (s *Service) FetchNow(ctx context.Context, src models.ExternalSource) FetchResult {
 	return s.poll(ctx, src)
 }
 
-// errUnknownProvider: Quelle mit einem Provider, für den es keinen Adapter gibt.
+// errUnknownProvider: source with a provider for which there is no adapter.
 var errUnknownProvider = errors.New("unbekannter Provider")
 
-// poll ruft eine Quelle ab, übernimmt das Ergebnis und plant den nächsten Abruf.
+// poll fetches a source, applies the result and schedules the next fetch.
 //
-// Pro Quelle läuft höchstens ein Abruf. Im Prozess verhindert das
-// inflight, über Instanzen hinweg die Advisory-Sperre der Quelle (dieselbe
-// Mechanik wie die Leader-Sperre des Hintergrund-Abrufs, nur mit eigenem
-// Schlüssel je Quelle). Läuft schon ein Abruf, kommt sofort ErrFetchInProgress
-// zurück, statt zu warten: Ein zweiter Abruf direkt danach brächte nichts
-// Neues (die Fremdseite cached ohnehin), und die Anfrage bliebe nicht bis zu
-// 10 s hängen. Der Hintergrund-Takt überspringt die Quelle und versucht es
-// beim nächsten Takt erneut.
+// At most one fetch runs per source. Within the process, inflight prevents
+// this; across instances, the source's advisory lock does (same mechanism
+// as the leader lock of the background fetch, just with its own key per
+// source). If a fetch is already running, ErrFetchInProgress is returned
+// immediately instead of waiting: a second fetch right after would bring
+// nothing new (the third-party site caches anyway), and the request would not
+// hang for up to 10 s. The background tick skips the source and tries again
+// on the next tick.
 func (s *Service) poll(ctx context.Context, src models.ExternalSource) FetchResult {
 	if !s.beginFetch(src.ID) {
 		return s.busyResult()
@@ -352,7 +352,7 @@ func (s *Service) poll(ctx context.Context, src models.ExternalSource) FetchResu
 	res.OK = true
 	res.NotModified = sum.NotModified
 	s.recordFetch(src.ID, now, true, "")
-	// Vorfälle und Wartungen; ein Fehler dort lässt den Abruf gelingen.
+	// Incidents and maintenances; an error there lets the fetch succeed.
 	s.syncIncidents(ctx, src.ID, now)
 	s.evaluateOutage(ctx, src.ID)
 	return res
@@ -362,7 +362,7 @@ func (s *Service) busyResult() FetchResult {
 	return FetchResult{FetchedAt: s.now(), Error: ErrFetchInProgress}
 }
 
-// beginFetch markiert die Quelle als in Arbeit; false, wenn sie es schon ist.
+// beginFetch marks the source as in progress; false if it already is.
 func (s *Service) beginFetch(id uint) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -379,8 +379,8 @@ func (s *Service) endFetch(id uint) {
 	delete(s.inflight, id)
 }
 
-// schedule plant den nächsten Abruf: nach einem Fehler mit wachsender Pause
-// (Backoff), sonst im normalen Intervall. Liefert die Backoff-Pause.
+// schedule plans the next fetch: after an error with a growing pause
+// (backoff), otherwise at the normal interval. Returns the backoff pause.
 func (s *Service) schedule(id uint, now time.Time, interval time.Duration, failed bool) time.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -407,8 +407,8 @@ func (s *Service) fetch(ctx context.Context, src models.ExternalSource) (*Summar
 	return p.FetchSummary(ctx, FetchRequest{BaseURL: src.BaseURL, ETag: src.ETag, LastModified: src.LastModified})
 }
 
-// apply übernimmt einen 200-Abruf: Upsert und Validatoren in einer
-// Transaktion, danach Ereignisse für geänderte effektive Status.
+// apply applies a 200 fetch: upsert and validators in one
+// transaction, then events for changed effective statuses.
 func (s *Service) apply(ctx context.Context, src models.ExternalSource, sum *Summary, now time.Time) (UpsertResult, error) {
 	before, err := EffectiveStatuses(s.db, src.StatusPageID)
 	if err != nil {
@@ -435,8 +435,8 @@ func (s *Service) apply(ctx context.Context, src models.ExternalSource, sum *Sum
 	return res, nil
 }
 
-// recordFetch speichert das Ergebnis am Source-Datensatz. Ein Fehler beim
-// Speichern wird nur geloggt: Der nächste Takt versucht es ohnehin erneut.
+// recordFetch stores the result on the Source record. An error while
+// saving is only logged: the next tick tries again anyway.
 func (s *Service) recordFetch(id uint, now time.Time, ok bool, errText string) {
 	updates := map[string]any{"last_fetch_at": now, "last_fetch_ok": ok, "last_error": errText}
 	if ok {
@@ -447,8 +447,8 @@ func (s *Service) recordFetch(id uint, now time.Time, ok bool, errText string) {
 	}
 }
 
-// truncate kürzt auf höchstens n Bytes, ohne ein UTF-8-Zeichen zu zerteilen
-// (Postgres lehnt ungültiges UTF-8 ab).
+// truncate shortens to at most n bytes without splitting a UTF-8 character
+// (Postgres rejects invalid UTF-8).
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s

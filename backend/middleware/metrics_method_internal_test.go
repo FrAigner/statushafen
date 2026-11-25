@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Die Liste der Methoden, die ein eigenes Label bekommen, ist abgeschlossen:
-// Ein zusätzlicher Eintrag ließe eine angreifer-wählbare Methode als eigene
-// Zeitreihe zu (Speicherwachstum). Neue Methoden bewusst hier eintragen.
+// The list of methods that get their own label is closed:
+// an additional entry would let an attacker-chosen method become its own
+// time series (memory growth). Add new methods here deliberately.
 func TestKnownMethods_AreExactlyTheStandardOnes(t *testing.T) {
 	want := []string{
 		http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,

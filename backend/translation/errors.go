@@ -2,18 +2,18 @@ package translation
 
 import "errors"
 
-// Fehler der Übersetzungsdienste. Die Texte nennen bewusst weder
-// Adresse noch Schlüssel: Sie landen in Logs und werden vom Handler auf
-// Fehlercodes abgebildet. Netzwerkfehler des http.Clients tragen die URL und
-// werden deshalb nie weitergereicht, sondern auf ErrUnavailable abgebildet.
+// Errors of the translation services. The texts deliberately name neither
+// address nor key: they end up in logs and are mapped by the handler to
+// error codes. Network errors of the http.Client carry the URL and
+// are therefore never passed on, but mapped to ErrUnavailable.
 var (
-	// ErrUnavailable: Dienst nicht erreichbar, Zeitüberschreitung, Serverfehler
-	// oder unlesbare Antwort.
+	// ErrUnavailable: service unreachable, timeout, server error
+	// or unreadable response.
 	ErrUnavailable = errors.New("übersetzungsdienst nicht erreichbar")
-	// ErrAuth: der Dienst lehnt den Schlüssel ab (401/403).
+	// ErrAuth: the service rejects the key (401/403).
 	ErrAuth = errors.New("übersetzungsdienst lehnt den Zugang ab")
-	// ErrQuota: Kontingent oder Aufruf-Limit des Dienstes erreicht (429/456).
+	// ErrQuota: quota or call limit of the service reached (429/456).
 	ErrQuota = errors.New("kontingent des übersetzungsdienstes erreicht")
-	// ErrUnsupportedLanguage: Sprachpaar wird vom Dienst nicht angeboten.
+	// ErrUnsupportedLanguage: language pair is not offered by the service.
 	ErrUnsupportedLanguage = errors.New("sprachpaar nicht unterstützt")
 )

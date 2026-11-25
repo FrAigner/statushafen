@@ -25,8 +25,8 @@ func parseTestClaims(t *testing.T, token string) *middleware.Claims {
 	return claims
 }
 
-// Ein Seiten-SSO-Token trägt die Seite des IdP, nie Global-Admin-
-// Rechte, und sonst dieselben Claims wie GenerateTokenFull.
+// A page SSO token carries the IdP's page, never global admin
+// rights, and otherwise the same claims as GenerateTokenFull.
 func TestGeneratePageSSOToken_SetsPageClaim(t *testing.T) {
 	testutils.SetupTestDB()
 	user := models.User{Email: "v@example.com", IsGlobalAdmin: true, PreferredLanguage: "de",
@@ -49,9 +49,9 @@ func TestGeneratePageSSOToken_SetsPageClaim(t *testing.T) {
 	}
 }
 
-// SSO-Logins übernehmen den User direkt aus dem Token. Die
-// Tooltip-Einstellung muss deshalb im Claim stehen, sonst wären die
-// Tooltips nach jedem SSO-Login wieder an.
+// SSO logins take the user directly from the token. The
+// tooltip setting must therefore be in the claim, otherwise the
+// tooltips would be on again after every SSO login.
 func TestGenerateTokenFull_HideHelpTooltips(t *testing.T) {
 	testutils.SetupTestDB()
 	off, _ := middleware.GenerateTokenFull(models.User{Email: "h@example.com", HideHelpTooltips: true}, "", "", "google")
@@ -64,11 +64,11 @@ func TestGenerateTokenFull_HideHelpTooltips(t *testing.T) {
 	}
 }
 
-// AuthMiddleware und OptionalAuthMiddleware übernehmen den Claim
-// in den Kontext, andere Logins bleiben ohne Seitenbezug.
+// AuthMiddleware and OptionalAuthMiddleware take the claim
+// into the context, other logins stay without page scope.
 func TestAuthMiddlewares_SetSSOPageID(t *testing.T) {
 	db := testutils.SetupTestDB()
-	// Das Konto muss existieren: AuthMiddleware gleicht das Token mit der DB ab.
+	// The account must exist: AuthMiddleware checks the token against the DB.
 	owner := models.User{Email: "v@example.com"}
 	if err := db.Create(&owner).Error; err != nil {
 		t.Fatal(err)
@@ -113,9 +113,9 @@ func TestSSOScopeHelpers(t *testing.T) {
 	}
 }
 
-// RequirePermission/RequirePageRole und RequireGlobalAdmin mit
-// einem echten Seiten-SSO-Token. V hat Rollen auf beiden Seiten und ist
-// inzwischen Global Admin - das Token gilt trotzdem nur für Seite A.
+// RequirePermission/RequirePageRole and RequireGlobalAdmin with
+// a real page SSO token. V has roles on both pages and is
+// now Global Admin - the token still applies only to page A.
 func TestSSOPageScope_PermissionChecks(t *testing.T) {
 	db := testutils.SetupTestDB()
 	role := models.Role{Name: "Page Admin", Permissions: "incidents:write"}
@@ -151,7 +151,7 @@ func TestSSOPageScope_PermissionChecks(t *testing.T) {
 		{"fremde Seite trotz Rolle", scopedA, "/w/" + id(pageB), http.StatusForbidden},
 		{"fremde Seite, RequirePageRole", scopedA, "/r/" + id(pageB), http.StatusForbidden},
 		{"globale Route trotz Global Admin", scopedA, "/global", http.StatusForbidden},
-		// Ohne Rolle auf der SSO-Seite hilft Global Admin nicht weiter.
+		// Without a role on the SSO page, Global Admin does not help.
 		{"SSO-Seite ohne Rolle", scopedC, "/w/" + id(pageC), http.StatusForbidden},
 		{"normales Token: fremde Seite", plain, "/w/" + id(pageB), http.StatusOK},
 		{"normales Token: globale Route", plain, "/global", http.StatusOK},

@@ -8,15 +8,15 @@ import (
 	"github.com/fraigner/statushafen/logging"
 )
 
-// minJWTSecretLength: HS256 braucht einen Schlüssel von der Länge des
-// Hash-Ausgangs (32 Byte); kürzere Werte sind erratbar oder durchprobierbar,
-// und wer den Schlüssel kennt, kann Tokens für jedes Konto fälschen.
+// minJWTSecretLength: HS256 needs a key of the length of the
+// hash output (32 bytes); shorter values are guessable or brute-forceable,
+// and whoever knows the key can forge tokens for any account.
 const minJWTSecretLength = 32
 
-// knownJWTSecretPlaceholders sind Werte aus Beispielkonfigurationen, früheren
-// Rückfallwerten und Testaufbauten. Der Vergleich ist ein Teilstring-Treffer in
-// Kleinschreibung, damit auch aufgefüllte Varianten ("<Platzhalter>-xyz") und
-// Schreibweisen mit Leerraum oder Anführungszeichen auffallen.
+// knownJWTSecretPlaceholders are values from example configurations, former
+// fallback values and test setups. The comparison is a lowercase substring
+// match, so that padded variants ("<placeholder>-xyz") and
+// spellings with whitespace or quotes are also caught.
 var knownJWTSecretPlaceholders = []string{
 	"your-super-secret-jwt-key",
 	"local_super_secret_jwt_key",
@@ -28,9 +28,9 @@ var knownJWTSecretPlaceholders = []string{
 	"secret-key-here",
 }
 
-// ValidateJWTSecret prüft den Signaturschlüssel auf Mindestlänge, bekannte
-// Platzhalter und offensichtlich triviale Muster. Die Fehlermeldung nennt den
-// Wert nie.
+// ValidateJWTSecret checks the signing key for minimum length, known
+// placeholders and obviously trivial patterns. The error message never names
+// the value.
 func ValidateJWTSecret(secret string) error {
 	if secret == "" {
 		return errors.New("JWT_SECRET ist nicht gesetzt")
@@ -50,9 +50,9 @@ func ValidateJWTSecret(secret string) error {
 	return nil
 }
 
-// RequireStrongJWTSecret beendet den Prozess beim Start, wenn JWT_SECRET
-// schwach ist. Es gibt keine Ausnahme für Entwicklungsumgebungen: start.sh
-// erzeugt dort selbst ein zufälliges Geheimnis.
+// RequireStrongJWTSecret terminates the process at startup if JWT_SECRET
+// is weak. There is no exception for development environments: start.sh
+// generates a random secret there itself.
 func RequireStrongJWTSecret() {
 	if err := ValidateJWTSecret(os.Getenv("JWT_SECRET")); err != nil {
 		logging.Fatal("Ungültiges JWT_SECRET", "reason", err.Error(), "hint", "z. B. mit `openssl rand -base64 48` erzeugen")

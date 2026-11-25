@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Neue Subscriber-Tokens laufen ab: Der Link in einer Mail ist 400 Tage gültig
-// (jede neue Benachrichtigung bringt einen frischen Link). Ein geleaktes oder
-// weitergeleitetes Exemplar bleibt so nicht für immer verwendbar.
+// New subscriber tokens expire: the link in an email is valid for 400 days
+// (every new notification brings a fresh link). A leaked or
+// forwarded copy thus does not remain usable forever.
 func TestGenerateSubscriberToken_TraegtAblaufNachVierhundertTagen(t *testing.T) {
 	testutils.SetupTestDB()
 	tok, err := middleware.GenerateSubscriberToken(7, 9)
@@ -29,9 +29,9 @@ func TestGenerateSubscriberToken_TraegtAblaufNachVierhundertTagen(t *testing.T) 
 	assert.WithinDuration(t, time.Now(), claims.IssuedAt.Time, time.Minute)
 }
 
-// Ein Subscriber-Token braucht immer ein Ablaufdatum und die Subscriber-
-// Audience. Eine Übergangsregel für Tokens ohne exp oder ohne aud gibt es
-// nicht: Sie würden einen geleakten Link dauerhaft brauchbar halten.
+// A subscriber token always needs an expiry date and the subscriber
+// audience. There is no transition rule for tokens without exp or without aud:
+// they would keep a leaked link usable permanently.
 func TestParseSubscriberToken_AblaufIstPflicht(t *testing.T) {
 	testutils.SetupTestDB()
 	at := func(y int, m time.Month, d int) func() time.Time {

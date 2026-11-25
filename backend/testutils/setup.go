@@ -18,8 +18,8 @@ func SetupTestDB() *gorm.DB {
 		_ = os.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	}
 
-	// Benannte Shared-Cache-In-Memory-DB: keine Datei in /tmp, die nach dem
-	// Testlauf liegen bleibt (SetupTestDB hat kein *testing.T für TempDir).
+	// Named shared-cache in-memory DB: no file in /tmp that remains after the
+	// test run (SetupTestDB has no *testing.T for TempDir).
 	dbName := "file:statuspage_test_" + uuid.New().String() + "?mode=memory&cache=shared"
 	db, err := gorm.Open(sqlite.Open(dbName), &gorm.Config{})
 	if err != nil {
@@ -59,17 +59,17 @@ func SetupTestDB() *gorm.DB {
 		&models.UiTranslationOverride{},
 		&models.OIDCLoginState{},
 		&models.UserSSOIdentity{},
-		// globale Systemeinstellungen (Key/Value).
+		// global system settings (key/value).
 		&models.SystemSetting{},
-		// externe Statusseiten.
+		// external status pages.
 		&models.ExternalSource{},
 		&models.ExternalComponent{},
 		&models.ExternalComponentLink{},
-		// gespiegelte Vorfälle und Wartungen.
+		// mirrored incidents and maintenance.
 		&models.ExternalIncident{},
 		&models.ExternalIncidentUpdate{},
 		&models.ExternalIncidentComponent{},
-		// Admin-Nachrichtencenter.
+		// admin message center.
 		&models.AdminNotification{},
 		&models.NotificationRead{},
 		&models.ComponentStatusChange{},
@@ -79,8 +79,8 @@ func SetupTestDB() *gorm.DB {
 		panic("Migration failed in test setup")
 	}
 
-	// dieselben partiellen Unique-Indizes wie in der Produktion
-	// (die gorm-Tags dafür gibt es nicht mehr).
+	// the same partial unique indexes as in production
+	// (the gorm tags for them no longer exist).
 	database.CreateSoftDeleteUniqueIndexes(db)
 	database.CreateAdminNotificationIndexes(db)
 	database.CreateUserStatusPageRoleUniqueIndex(db)
@@ -114,8 +114,8 @@ func SetupRouter() *gin.Engine {
 	return r
 }
 
-// MustHash liefert den bcrypt-Hash eines Testpassworts und bricht bei einem
-// Fehler ab (Testpasswörter sind kurz, ein Fehler wäre ein Testfehler).
+// MustHash returns the bcrypt hash of a test password and aborts on an
+// error (test passwords are short, an error would be a test failure).
 func MustHash(password string) string {
 	hash, err := database.HashPassword(password)
 	if err != nil {

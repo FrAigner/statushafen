@@ -1,15 +1,15 @@
 package database
 
-// Migrationen in der CI auf einer echten, leeren Postgres-Datenbank
-// prüfen. Die übrigen Tests laufen auf SQLite; partielle Unique-Indizes,
-// Raw-SQL-Helfer und Backfills verhalten sich dort anders. Deshalb startet
-// dieser Test per embedded-postgres ein eigenes Postgres (kein Docker nötig,
-// läuft so auch auf GitHub-gehosteten Runnern) und ruft InitDB()
-// zweimal auf: Der zweite Lauf darf nichts mehr ändern (Idempotenz, siehe
-// Backfill-Muster in CONTRIBUTING.md).
+// Verify migrations in CI on a real, empty Postgres database.
+// The other tests run on SQLite; partial unique indexes,
+// raw SQL helpers and backfills behave differently there. Therefore
+// this test starts its own Postgres via embedded-postgres (no Docker needed,
+// so it also runs on GitHub-hosted runners) and calls InitDB()
+// twice: the second run must not change anything (idempotency, see
+// backfill pattern in CONTRIBUTING.md).
 //
-// Nur mit MIGRATION_PG_TEST=1, weil er die Postgres-Binaries herunterlädt
-// (Maven Central) und Postgres nicht als root startet.
+// Only with MIGRATION_PG_TEST=1, because it downloads the Postgres binaries
+// (Maven Central) and does not start Postgres as root.
 
 import (
 	"fmt"
@@ -26,9 +26,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// migrationSnapshot hält fest, was ein zweiter InitDB()-Lauf nicht verändern darf.
-// Hashes deckt auch überschriebene Zeilen bei gleicher Anzahl ab (z. B. ein
-// Backfill, der Admin-Änderungen zurücksetzt oder updated_at anfasst).
+// migrationSnapshot records what a second InitDB() run must not change.
+// Hashes also cover overwritten rows with the same count (e.g. a
+// backfill that resets admin changes or touches updated_at).
 type migrationSnapshot struct {
 	Tables  []string
 	Indexes []string
@@ -47,7 +47,7 @@ func takeMigrationSnapshot(t *testing.T) migrationSnapshot {
 		var n int64
 		require.NoError(t, DB.Table(table).Count(&n).Error, table)
 		s.Rows[table] = n
-		// Tabellennamen stammen aus pg_tables, werden aber trotzdem gequotet.
+		// Table names come from pg_tables, but are quoted anyway.
 		quoted := `"` + strings.ReplaceAll(table, `"`, `""`) + `"`
 		var hash string
 		require.NoError(t, DB.Raw(`SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t::text), '')) FROM `+quoted+` t`).Scan(&hash).Error, table)
@@ -56,7 +56,7 @@ func takeMigrationSnapshot(t *testing.T) migrationSnapshot {
 	return s
 }
 
-// freePort sucht einen freien TCP-Port, damit parallele Läufe nicht kollidieren.
+// freePort finds a free TCP port so parallel runs do not collide.
 func freePort(t *testing.T) uint32 {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -76,9 +76,9 @@ func TestInitDB_PostgresLeereDatenbankZweimal(t *testing.T) {
 		Version(embeddedpostgres.V16).
 		Port(port).
 		Database("statushafen").
-		// Wie in Produktion UTF-8. Ohne Vorgabe übernimmt initdb die Locale des
-		// Prozesses; in einem Container ohne Locale ist das POSIX → SQL_ASCII, und pgx lehnt
-		// dann jede Abfrage ab („client_encoding=UTF8“). Locale C passt zu jedem Encoding.
+		// UTF-8 as in production. Without a setting initdb takes the locale of the
+		// process; in a container without locale that is POSIX → SQL_ASCII, and pgx then rejects
+		// every query ("client_encoding=UTF8"). Locale C fits every encoding.
 		Encoding("UTF8").
 		Locale("C").
 		RuntimePath(t.TempDir()).
@@ -103,15 +103,15 @@ func TestInitDB_PostgresLeereDatenbankZweimal(t *testing.T) {
 	InitDB()
 	require.Equal(t, erster, takeMigrationSnapshot(t), "zweiter InitDB()-Lauf hat Schema oder Daten verändert")
 
-	// Gegenprobe: Der Snapshot muss auch eine geänderte Zeile bei gleicher
-	// Zeilenzahl erkennen – sonst fiele ein Backfill, der Admin-Änderungen bei
-	// jedem Start überschreibt, nicht auf (Review-Befund 1).
+	// Control check: the snapshot must also detect a changed row with the same
+	// row count – otherwise a backfill that overwrites admin changes on
+	// every start would go unnoticed (review finding 1).
 	require.NoError(t, DB.Exec(`UPDATE status_page_languages SET is_default = NOT is_default`).Error)
 	require.NotEqual(t, erster, takeMigrationSnapshot(t), "Snapshot erkennt geänderte Zeileninhalte nicht")
 
 	pruefeSoftDeleteUniqueIndexes(t)
 	pruefeDatenintegritaet(t)
-	// Advisory Lock und Indizes der externen Statusseiten.
+	// Advisory lock and indexes of the external status pages.
 	pruefeAdvisoryLock(t)
 	pruefeExternalStatusIndexes(t)
 	pruefeHelpTooltipsSpalte(t)
@@ -125,9 +125,9 @@ func TestInitDB_PostgresLeereDatenbankZweimal(t *testing.T) {
 	pruefeTokenHashes(t)
 }
 
-// pruefeTokenHashes: Bestandsdatenbank mit Klartext-Token (Webhook, Bestellung).
-// Der Start ersetzt sie durch den Hash, lässt leere Werte und schon gehashte
-// Werte unberührt, und ein weiterer Start ändert nichts mehr.
+// pruefeTokenHashes: existing database with plain-text tokens (webhook, order).
+// The start replaces them with the hash, leaves empty values and already hashed
+// values untouched, and another start changes nothing anymore.
 func pruefeTokenHashes(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`INSERT INTO status_pages (name, slug, webhook_token, created_at, updated_at) VALUES ('Tok A', 'tok-hash-a', 'pg-klartext-webhook', now(), now()), ('Tok B', 'tok-hash-b', '', now(), now()), ('Tok C', 'tok-hash-c', ?, now(), now())`, models.HashToken("pg-schon-gehasht")).Error)
@@ -146,11 +146,11 @@ func pruefeTokenHashes(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "zweiter Lauf hat Schema oder Daten verändert")
 }
 
-// pruefeEinladungenEindeutig (Review F3): Bestandsdatenbank mit
-// doppelten Einladungen je (Seite, Adresse) und ohne Index. Der Start behält die
-// jüngste Zeile (höchste ID, auch wenn sie ein Grabstein ist), legt den
-// Unique-Index an, der danach auch gleichzeitige Inserts auf genau einen
-// reduziert; ein weiterer Start ändert nichts.
+// pruefeEinladungenEindeutig (review F3): existing database with
+// duplicate invitations per (page, address) and without index. The start keeps the
+// most recent row (highest ID, even if it is a tombstone), creates the
+// unique index, which afterwards also reduces simultaneous inserts to exactly
+// one; another start changes nothing.
 func pruefeEinladungenEindeutig(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`DROP INDEX IF EXISTS idx_page_invitation_page_email`).Error)
@@ -164,7 +164,7 @@ func pruefeEinladungenEindeutig(t *testing.T) {
 	require.NoError(t, DB.Raw(`SELECT token_hash FROM page_invitations WHERE status_page_id = 7799 ORDER BY id`).Scan(&hashes).Error)
 	require.Equal(t, []string{"pg-h2", "pg-h3"}, hashes, "behalten wird die jüngste Zeile je (Seite, Adresse)")
 
-	// Acht gleichzeitige Inserts derselben Adresse: genau einer gewinnt.
+	// Eight simultaneous inserts of the same address: exactly one wins.
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	gewonnen := 0
@@ -188,11 +188,11 @@ func pruefeEinladungenEindeutig(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "zweiter Lauf hat Schema oder Daten verändert")
 }
 
-// pruefeKomponentenKennung: Bestandsdatenbank vor der Kennung. Die
-// Spalte fehlt, Komponenten haben also keine. Der Start legt die Spalte an
-// (leer), vergibt Kennungen deterministisch nach ID (Kollisionen -2, -3, gelöschte
-// Zeilen bleiben leer, vorhandene Kennungen bleiben) und legt danach den
-// partiellen Unique-Index an; ein weiterer Start ändert nichts.
+// pruefeKomponentenKennung: existing database before the identifier. The
+// column is missing, so components have none. The start creates the column
+// (empty), assigns identifiers deterministically by ID (collisions -2, -3, deleted
+// rows stay empty, existing identifiers stay) and then creates the
+// partial unique index; another start changes nothing.
 func pruefeKomponentenKennung(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`ALTER TABLE components DROP COLUMN slug`).Error)
@@ -215,13 +215,13 @@ func pruefeKomponentenKennung(t *testing.T) {
 	require.Contains(t, def, "CREATE UNIQUE INDEX")
 	require.Contains(t, def, "deleted_at IS NULL")
 	require.Error(t, DB.Exec(`INSERT INTO components (created_at, updated_at, status_page_id, name, slug, status, visible) VALUES (now(), now(), ?, 'X', 'mail-server', 'operational', true)`, pageID).Error, "aktive Kennung muss je Seite eindeutig sein")
-	// Der erste Start trug die Statushistorie der vier aktiven
-	// Bestandskomponenten nach (die gelöschte bekommt keine).
+	// The first start backfilled the status history of the four active
+	// existing components (the deleted one gets none).
 	var hist int64
 	require.NoError(t, DB.Raw(`SELECT count(*) FROM component_status_changes h JOIN components c ON c.id = h.component_id WHERE c.status_page_id = ? AND h.source = 'backfill' AND h.old_status = '' AND h.new_status = 'operational'`, pageID).Scan(&hist).Error)
 	require.EqualValues(t, 4, hist)
 	require.NoError(t, DB.Create(&models.Component{StatusPageID: pageID, Name: "Mail Server"}).Error)
-	backfillStatusHistory(DB) // direkt angelegt, nicht über einen Handler: Nachtrag wie beim nächsten Start
+	backfillStatusHistory(DB) // created directly, not via a handler: backfill as on the next start
 	var neu string
 	require.NoError(t, DB.Raw(`SELECT slug FROM components WHERE status_page_id = ? ORDER BY id DESC LIMIT 1`, pageID).Scan(&neu).Error)
 	require.Equal(t, "mail-server-4", neu)
@@ -231,10 +231,10 @@ func pruefeKomponentenKennung(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "InitDB() nach dem Kennungs-Backfill ist nicht idempotent")
 }
 
-// pruefeRechteCrud: Bestandsdatenbank mit Rollen im Altformat
-// (read/write, benutzerdefiniert, soft-gelöscht, Global Admin). Der Start
-// ersetzt write durch Create/Read/Update/Delete, koppelt die Tabs 1:1, lässt
-// updated_at unberührt und legt ein Backup ab; ein weiterer Start ändert nichts.
+// pruefeRechteCrud: existing database with roles in the legacy format
+// (read/write, custom, soft-deleted, Global Admin). The start
+// replaces write with create/read/update/delete, couples the tabs 1:1, leaves
+// updated_at untouched and stores a backup; another start changes nothing.
 func pruefeRechteCrud(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`DELETE FROM system_settings WHERE key LIKE 'permissions.crud%'`).Error)
@@ -277,10 +277,10 @@ func pruefeRechteCrud(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "InitDB() nach der Rechte-Umstellung ist nicht idempotent")
 }
 
-// pruefeCompletedStatus: Bestandsdatenbank mit dem Altwert
-// "completed" bei Vorfall, Wartung und Timeline-Update. Der Start stellt ihn
-// auf "resolved" um, füllt ResolvedAt nur falls leer, lässt updated_at und
-// alle anderen Zeilen unberührt; ein weiterer Start ändert nichts.
+// pruefeCompletedStatus: existing database with the legacy value
+// "completed" on incident, maintenance and timeline update. The start switches it
+// to "resolved", fills ResolvedAt only if empty, leaves updated_at and
+// all other rows untouched; another start changes nothing.
 func pruefeCompletedStatus(t *testing.T) {
 	t.Helper()
 	var pageID uint
@@ -327,9 +327,9 @@ func pruefeCompletedStatus(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "InitDB() nach der completed-Migration ist nicht idempotent")
 }
 
-// pruefeHelpTooltipsSpalte: Eine Bestandsdatenbank ohne die
-// Spalte hide_help_tooltips bekommt sie beim Start, bestehende Nutzer haben
-// danach die Hilfe-Tooltips an (false), und ein weiterer Start ändert nichts.
+// pruefeHelpTooltipsSpalte: an existing database without the
+// column hide_help_tooltips gets it on start, existing users
+// then have the help tooltips on (false), and another start changes nothing.
 func pruefeHelpTooltipsSpalte(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`ALTER TABLE users DROP COLUMN IF EXISTS hide_help_tooltips`).Error)
@@ -346,13 +346,13 @@ func pruefeHelpTooltipsSpalte(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "zweiter Start nach dem Hinzufügen von hide_help_tooltips hat etwas verändert")
 }
 
-// pruefeSoftDeleteUniqueIndexes prüft auf echtem Postgres: Eine
-// Bestandsdatenbank mit den alten, nicht-partiellen Indizes wird beim Start
-// umgestellt, gelöschte Tag-Namen und Slugs sind danach wieder frei, und eine
-// soft-gelöschte Systemseite bricht den Start nicht mehr ab.
+// pruefeSoftDeleteUniqueIndexes checks on real Postgres: an
+// existing database with the old, non-partial indexes is switched
+// over on start, deleted tag names and slugs are free again afterwards, and a
+// soft-deleted system page no longer aborts the start.
 func pruefeSoftDeleteUniqueIndexes(t *testing.T) {
 	t.Helper()
-	// Stand vor der Umstellung nachbilden (so hat ihn AutoMigrate bzw. der alte Helfer angelegt).
+	// Recreate the state before the changeover (as AutoMigrate or the old helper created it).
 	for _, sql := range []string{
 		`DROP INDEX IF EXISTS idx_status_pages_slug_active`,
 		`DROP INDEX IF EXISTS idx_tags_global_name_active`,
@@ -388,8 +388,8 @@ func pruefeSoftDeleteUniqueIndexes(t *testing.T) {
 		require.NoError(t, DB.Create(&models.Tag{Name: "UI-Test", StatusPageID: scope}).Error, "gelöschter Tag-Name muss wieder frei sein")
 	}
 
-	// Gelöschte Systemseite: Start läuft durch (früher logging.Fatal), die Seite
-	// bleibt gelöscht, und ein weiterer Start ändert nichts.
+	// Deleted system page: start runs through (formerly logging.Fatal), the page
+	// stays deleted, and another start changes nothing.
 	require.NoError(t, DB.Where("slug = ?", SystemStatusPageSlug).Delete(&models.StatusPage{}).Error)
 	InitDB()
 	vorher := takeMigrationSnapshot(t)
@@ -400,13 +400,13 @@ func pruefeSoftDeleteUniqueIndexes(t *testing.T) {
 	require.Zero(t, aktiv, "gelöschte Systemseite darf nicht neu entstehen")
 }
 
-// pruefeDatenintegritaet und die Systemseiten-Kennzeichnung auf echtem
-// Postgres ab: Bestandsdatenbank mit den alten Unique-Indizes, verwaisten
-// Seitenrollen und einer Systemseite ohne Kennzeichen wird beim Start
-// umgestellt, bereinigt und gekennzeichnet; ein weiterer Start ändert nichts.
+// pruefeDatenintegritaet and the system page marker on real
+// Postgres: an existing database with the old unique indexes, orphaned
+// page roles and a system page without marker is switched over,
+// cleaned up and marked on start; another start changes nothing.
 func pruefeDatenintegritaet(t *testing.T) {
 	t.Helper()
-	// Stand vor den Fixes nachbilden (alte Indizes wie von AutoMigrate angelegt).
+	// Recreate the state before the fixes (old indexes as created by AutoMigrate).
 	for _, sql := range []string{
 		`DROP INDEX IF EXISTS idx_roles_name_active`,
 		`DROP INDEX IF EXISTS idx_users_email_active`,
@@ -421,12 +421,12 @@ func pruefeDatenintegritaet(t *testing.T) {
 		`CREATE UNIQUE INDEX idx_incident_translation ON incident_translations (incident_id, language_code)`,
 		`CREATE UNIQUE INDEX idx_component_translation ON component_translations (component_id, language_code)`,
 		`CREATE UNIQUE INDEX idx_notice_translation ON general_notice_translations (general_notice_id, language_code)`,
-		// Systemseite ohne Kennzeichen, aktiv, mit dem reservierten Slug.
+		// System page without marker, active, with the reserved slug.
 		`UPDATE status_pages SET is_system = false, deleted_at = NULL, slug = 'system' WHERE slug = 'system' OR is_system`,
 	} {
 		require.NoError(t, DB.Exec(sql).Error, sql)
 	}
-	// verwaiste Zuordnungen (Benutzer und Rolle soft-gelöscht) und eine intakte.
+	// orphaned assignments (user and role soft-deleted) and an intact one.
 	var pageID uint
 	require.NoError(t, DB.Raw(`SELECT id FROM status_pages WHERE slug = 'system'`).Scan(&pageID).Error)
 	rolle := models.Role{Name: "Bestand513", Permissions: "x"}
@@ -449,20 +449,20 @@ func pruefeDatenintegritaet(t *testing.T) {
 		require.Contains(t, def, "deleted_at IS NULL", def)
 	}
 
-	// Namen/E-Mails gelöschter Zeilen sind wieder frei, aktive bleiben eindeutig.
+	// Names/emails of deleted rows are free again, active ones stay unique.
 	require.Error(t, DB.Create(&models.Role{Name: "Bestand513", Permissions: "y"}).Error)
 	require.NoError(t, DB.Delete(&rolle).Error)
 	require.NoError(t, DB.Create(&models.Role{Name: "Bestand513", Permissions: "y"}).Error, "gelöschter Rollenname muss frei sein")
 	require.Error(t, DB.Create(&models.User{Email: "bestand513@example.com"}).Error)
 	require.NoError(t, DB.Create(&models.User{Email: "geloescht514@example.com"}).Error, "gelöschte E-Mail muss frei sein")
 
-	// verwaiste Zeilen sind bereinigt (Nutzer und Rolle teils gelöscht).
+	// orphaned rows are cleaned up (user and role partly deleted).
 	var verwaist int64
 	require.NoError(t, DB.Raw(`SELECT count(*) FROM user_status_page_roles WHERE user_id = ?`, geloescht.ID).Scan(&verwaist).Error)
 	require.Zero(t, verwaist, "verwaiste user_status_page_roles müssen entfernt sein")
 
-	// Bestands-Systemseite gekennzeichnet, nichts verdoppelt, Slug-Änderung
-	// erzeugt beim nächsten Start keine zweite Seite.
+	// Existing system page marked, nothing duplicated, a slug change
+	// does not create a second page on the next start.
 	var systemSeiten int64
 	require.NoError(t, DB.Raw(`SELECT count(*) FROM status_pages WHERE is_system`).Scan(&systemSeiten).Error)
 	require.EqualValues(t, 1, systemSeiten)
@@ -480,10 +480,10 @@ func pruefeDatenintegritaet(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "InitDB() nach der Datenintegritäts-Migration ist nicht idempotent")
 }
 
-// pruefeSeitenRolleEindeutig: Bestandsdatenbank mit doppelten
-// Seitenrollen. Der Start behält je (Konto, Seite) nur die bisher wirksame Zeile
-// (kleinste ID; die andere ist soft-gelöscht), legt den partiellen Unique-Index an und
-// ein weiterer Start ändert nichts mehr.
+// pruefeSeitenRolleEindeutig: existing database with duplicate
+// page roles. The start keeps per (account, page) only the previously effective row
+// (smallest ID; the other is soft-deleted), creates the partial unique index and
+// another start changes nothing anymore.
 func pruefeSeitenRolleEindeutig(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`DROP INDEX IF EXISTS idx_user_status_page_role_active`).Error)
@@ -514,10 +514,10 @@ func pruefeSeitenRolleEindeutig(t *testing.T) {
 	require.Equal(t, vorher, takeMigrationSnapshot(t), "zweiter Lauf hat Schema oder Daten verändert")
 }
 
-// pruefeVerwaisteSSOIdentitaeten: Bestandsdatenbank mit einer
-// Seiten-SSO-Verknüpfung, deren Mitgliedschaft danach weich entfernt wurde
-// (Altfall vor der Umstellung), und einer bewussten Verknüpfung ohne Rolle. Der Start
-// löscht nur die verwaiste, ein weiterer Start ändert nichts mehr.
+// pruefeVerwaisteSSOIdentitaeten: existing database with a
+// page SSO link whose membership was softly removed afterwards
+// (legacy case before the changeover), and a deliberate link without a role. The start
+// deletes only the orphaned one, another start changes nothing anymore.
 func pruefeVerwaisteSSOIdentitaeten(t *testing.T) {
 	t.Helper()
 	require.NoError(t, DB.Exec(`INSERT INTO users (email, created_at, updated_at) VALUES ('waise821@example.com', now(), now()), ('ohnerolle821@example.com', now(), now())`).Error)

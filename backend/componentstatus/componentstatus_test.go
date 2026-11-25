@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Rangfolge vollständig, inkl. der Einordnung von Wartung und unknown.
+// Ranking is complete, incl. the placement of maintenance and unknown.
 func TestSeverityOrder(t *testing.T) {
 	order := []string{Unknown, Operational, UnderMaintenance, DegradedPerformance, PartialOutage, MajorOutage}
 	for i := 1; i < len(order); i++ {
@@ -31,7 +31,7 @@ func TestWorst(t *testing.T) {
 	assert.Equal(t, UnderMaintenance, Worst(Operational, UnderMaintenance))
 	assert.Equal(t, DegradedPerformance, Worst(UnderMaintenance, DegradedPerformance))
 	assert.Equal(t, MajorOutage, Worst(MajorOutage, PartialOutage, Operational))
-	// Gleichstand: der erste gewinnt (stabil).
+	// Tie: the first one wins (stable).
 	assert.Equal(t, PartialOutage, Worst(PartialOutage, PartialOutage))
 }
 
@@ -73,7 +73,7 @@ func TestOpenIncidentComponentIDs(t *testing.T) {
 
 	assert.Equal(t, map[uint]string{a.ID: PartialOutage}, OpenIncidentComponentIDs(db, page.ID))
 
-	// Mehrere offene Vorfälle: der schlimmste Schweregrad gewinnt.
+	// Multiple open incidents: the worst severity wins.
 	worse := models.Incident{StatusPageID: page.ID, Title: "t", Message: "m", Status: "monitoring", Severity: MajorOutage}
 	milder := models.Incident{StatusPageID: page.ID, Title: "t", Message: "m", Status: "identified", Severity: DegradedPerformance}
 	require.NoError(t, db.Create(&worse).Error)

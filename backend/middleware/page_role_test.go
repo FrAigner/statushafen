@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TestRequirePageRole: Lesezugriff auf
-// seiten-interne Konfiguration verlangt irgendeine Rolle auf genau dieser
-// Seite (oder Global Admin) - die konkrete Permission ist egal, weil jede
-// Rolle den Admin-Bereich der Seite öffnet, der diese Daten anzeigt.
+// TestRequirePageRole: read access to
+// page-internal configuration requires any role on exactly this
+// page (or Global Admin) - the concrete permission does not matter, because every
+// role opens the page's admin area that displays this data.
 func TestRequirePageRole(t *testing.T) {
 	db := testutils.SetupTestDB()
 	role := models.Role{Name: "Any", Permissions: "incidents:read"}

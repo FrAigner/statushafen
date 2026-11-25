@@ -8,7 +8,7 @@ import (
 )
 
 // prometheusExporter mirrors every Registry.Observe call into standard
-// Prometheus collectors (Schritt 2/4), so the /metrics endpoint
+// Prometheus collectors (Step 2/4), so the /metrics endpoint
 // exposes the exact same data as the in-memory Snapshot() used by tests and
 // the future in-app dashboard — just in Prometheus exposition format
 // for an external Grafana Agent/Alloy scraper.
@@ -65,7 +65,7 @@ func (p *prometheusExporter) observe(method, route string, statusCode int, laten
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Saturation export (Golden Signals Schritt 4/4)
+// Saturation export (Golden Signals Step 4/4)
 //
 // The collection logic itself (goroutine count, memory stats, DB
 // connection-pool stats) lives in saturation.go / Registry.SaturationSnapshot

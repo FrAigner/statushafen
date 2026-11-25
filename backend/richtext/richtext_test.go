@@ -10,13 +10,13 @@ import (
 	"golang.org/x/net/html"
 )
 
-// XSS-Matrix und Formatierung des Mail-Renderers.
+// XSS matrix and formatting of the mail renderer.
 
 var allowedMailTags = map[string]bool{"p": true, "br": true, "strong": true, "em": true, "ul": true, "ol": true, "li": true, "a": true, "code": true, "blockquote": true}
 
-// checkSafeMailHTML prüft ein Renderergebnis mit dem HTML-Tokenizer (nicht mit
-// dem Renderer selbst): einzeilig, nur erlaubte Tags, nur style (und beim Link
-// href/target/rel), href nur https, rel vollständig, style ohne url()/expression.
+// checkSafeMailHTML checks a renderer result with the HTML tokenizer (not with
+// the renderer itself): single line, only allowed tags, only style (and for the link
+// href/target/rel), href only https, rel complete, style without url()/expression.
 func checkSafeMailHTML(out string) []string {
 	var problems []string
 	if strings.ContainsAny(out, "\r\n") {
@@ -45,7 +45,7 @@ func checkSafeMailHTML(out string) []string {
 	return problems
 }
 
-// <ol start="N"> nur mit reiner Zahl (höchstens 9 Ziffern).
+// <ol start="N"> only with a plain number (at most 9 digits).
 var startAttrPattern = regexp.MustCompile(`^[0-9]{1,9}$`)
 
 func checkAttr(tag, key, val string) []string {
@@ -125,9 +125,9 @@ func TestToMailHTML_XSSMatrix(t *testing.T) {
 	}
 }
 
-// Gegenprobe: Der Prüfer schlägt bei ungefiltertem Durchreichen (alter Stand
-// bzw. Renderer ohne Whitelist) an. Ohne diesen Test könnte die Matrix leer
-// laufen.
+// Control sample: the checker trips on unfiltered pass-through (old state
+// or a renderer without a whitelist). Without this test the matrix could run
+// empty.
 func TestCheckSafeMailHTML_ErkenntUngefiltertesHTML(t *testing.T) {
 	unsafe := []string{
 		`<script>alert(1)</script>`,
@@ -190,11 +190,11 @@ func TestToMailHTML_Zaunblock(t *testing.T) {
 	out := ToMailHTML("```\nzeile1\nzeile2\n```\nDanach")
 	assert.Contains(t, out, ">zeile1<br>zeile2</code>")
 	assert.Contains(t, out, "Danach")
-	// Nicht geschlossener Zaun läuft bis zum Textende.
+	// Unclosed fence runs to the end of the text.
 	assert.Contains(t, ToMailHTML("```\nrest"), ">rest</code>")
 }
 
-// Altdaten: Klartext bleibt lesbar, einfache Zeilenumbrüche bleiben erhalten.
+// Legacy data: plain text stays readable, simple line breaks are preserved.
 func TestToMailHTML_Altdaten(t *testing.T) {
 	cases := map[string][]string{
 		"Wir untersuchen das Problem.\nBitte um Geduld.": {"Wir untersuchen das Problem.<br>Bitte um Geduld."},
@@ -236,12 +236,12 @@ func TestToMailHTML_LeerUndWhitespace(t *testing.T) {
 }
 
 func TestToMailHTML_UeberlangeAltdatenOhneFormatierung(t *testing.T) {
-	in := strings.Repeat("**x** ", MaxRenderLen) // weit über dem Renderlimit
+	in := strings.Repeat("**x** ", MaxRenderLen) // far above the render limit
 	out := ToMailHTML(in)
 	assert.NotContains(t, out, "<strong>")
 	assert.Contains(t, out, "**x**")
 	assert.Empty(t, checkSafeMailHTML(out))
-	// Absätze bleiben auch dann getrennt.
+	// Paragraphs stay separate even then.
 	assert.Equal(t, 2, strings.Count(ToMailHTML(strings.Repeat("a", MaxRenderLen)+"\n\nb"), "<p "))
 }
 

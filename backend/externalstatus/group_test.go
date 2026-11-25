@@ -13,10 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Kopplung einer ganzen externen Gruppe.
+// Linking a whole external group.
 
-// groupFixture: Gruppe "Database" (g-db) der eigenen Quelle mit drei Bausteinen,
-// eine zweite Gruppe daneben und eine gleichnamige Gruppe in der fremden Quelle.
+// groupFixture: group "Database" (g-db) of the own source with three components,
+// a second group next to it and a same-named group in the foreign source.
 type groupFixture struct {
 	*storeFixture
 	grp, otherGrp, foreignGrp         models.ExternalComponent
@@ -37,7 +37,7 @@ func (f *storeFixture) extComp(t *testing.T, srcID uint, extID, name, status, gr
 func newGroupFixture(t *testing.T) *groupFixture {
 	t.Helper()
 	f := &groupFixture{storeFixture: newStoreFixture(t)}
-	// Die Gruppe selbst meldet einen eigenen Status; er darf nie zählen.
+	// The group itself reports its own status; it must never count.
 	f.grp = f.extComp(t, f.src.ID, "g-db", "Database", componentstatus.MajorOutage, "", true)
 	f.otherGrp = f.extComp(t, f.src.ID, "g-net", "Service 18", componentstatus.Operational, "", true)
 	f.mariadb = f.extComp(t, f.src.ID, "mariadb", "Service 04", componentstatus.Operational, "g-db", false)
@@ -78,11 +78,11 @@ func TestGroupLink_GemischteStatusSchlimmsterGewinnt(t *testing.T) {
 	assert.Equal(t, &models.ExternalWorst{Name: "PostgreSQL", Status: componentstatus.DegradedPerformance}, r.Worst)
 	assert.Equal(t, componentstatus.DegradedPerformance, f.effective(t))
 
-	// Eigener Status ist schlimmer: er gewinnt weiter.
+	// Own status is worse: it keeps winning.
 	require.NoError(t, f.db.Model(&models.Component{}).Where("id = ?", f.comp.ID).Update("status", componentstatus.PartialOutage).Error)
 	assert.Equal(t, componentstatus.PartialOutage, f.effective(t))
 
-	// Ein Mitglied wird schlimmer.
+	// A member gets worse.
 	f.setExtStatus(t, f.mariadb, componentstatus.MajorOutage)
 	r = f.ref(t)
 	assert.Equal(t, componentstatus.MajorOutage, r.Status)
@@ -116,7 +116,7 @@ func TestGroupLink_VerschwundenesMitgliedZaehltNicht(t *testing.T) {
 	assert.Equal(t, "Service 12", r.Worst.Name)
 	assert.Equal(t, componentstatus.UnderMaintenance, f.effective(t))
 
-	// Gelöschte Mitglieder ebenso, und die Gruppe selbst verschwunden zählt gar nicht.
+	// Deleted members likewise, and the group itself vanishing does not count at all.
 	require.NoError(t, f.db.Delete(&f.redis).Error)
 	assert.Equal(t, componentstatus.Operational, f.ref(t).Status)
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", f.mariadb.ID).Update("status", componentstatus.MajorOutage).Error)
@@ -136,7 +136,7 @@ func TestGroupLink_LeereGruppeZaehltNichts(t *testing.T) {
 	assert.Nil(t, r.Worst)
 	assert.Equal(t, componentstatus.Operational, f.effective(t), "leere Gruppe löst keinen Fehlalarm aus")
 
-	// Mitglieder mit unbekanntem Status verschlechtern ebenfalls nichts.
+	// Members with unknown status likewise worsen nothing.
 	f.setExtStatus(t, f.outside, componentstatus.Unknown)
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", f.outside.ID).Update("vanished", false).Error)
 	r = f.ref(t)
@@ -147,26 +147,26 @@ func TestGroupLink_LeereGruppeZaehltNichts(t *testing.T) {
 
 func TestGroupLink_Mandantentrennung(t *testing.T) {
 	f := newGroupFixture(t)
-	// Gleiche externe Gruppen-ID in der Quelle einer anderen Statusseite: deren
-	// Mitglieder zählen nie mit.
+	// Same external group ID in the source of another status page: its
+	// members never count.
 	f.link(t, f.page.ID, f.comp.ID, f.grp.ID)
 	assert.Equal(t, componentstatus.DegradedPerformance, f.effective(t))
 
-	// Manipulierte Kopplung auf die Fremd-Gruppe: zählt nicht.
+	// Tampered link to the foreign group: does not count.
 	f.link(t, f.page.ID, f.comp.ID, f.foreignGrp.ID)
 	refs, err := LinkedRefs(f.db, f.page.ID)
 	require.NoError(t, err)
 	assert.Len(t, refs[f.comp.ID], 1)
 	assert.Equal(t, componentstatus.DegradedPerformance, f.effective(t))
 
-	// Die andere Seite sieht nur ihre eigenen Mitglieder.
+	// The other page sees only its own members.
 	f.link(t, f.otherPage.ID, f.otherComp.ID, f.foreignGrp.ID)
 	other, err := LinkedRefs(f.db, f.otherPage.ID)
 	require.NoError(t, err)
 	require.Len(t, other[f.otherComp.ID], 1)
 	assert.Equal(t, "Fremd-DB", other[f.otherComp.ID][0].Worst.Name)
 
-	// Inaktive Quelle zählt nicht.
+	// Inactive source does not count.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("active", false).Error)
 	assert.Equal(t, componentstatus.Operational, f.effective(t))
 }
@@ -178,7 +178,7 @@ func TestGroupLink_Idempotenz(t *testing.T) {
 	for range 3 {
 		assert.Equal(t, first, f.ref(t))
 	}
-	// Derselbe Abruf zweimal verändert Gruppenstatus und Ergebnis nicht.
+	// The same fetch twice changes neither group status nor result.
 	sum := summaryOf(
 		Component{ExternalID: "g-db", Name: "Database", IsGroup: true, Status: componentstatus.Operational},
 		Component{ExternalID: "mariadb", Name: "Service 04", GroupExternalID: "g-db", GroupName: "Database", Status: componentstatus.PartialOutage},
@@ -192,7 +192,7 @@ func TestGroupLink_Idempotenz(t *testing.T) {
 		assert.Equal(t, componentstatus.PartialOutage, r.Status)
 		assert.Equal(t, "Service 04", r.Worst.Name)
 	}
-	// PostgreSQL und Redis kamen im Abruf nicht mehr vor und zählen nicht mehr.
+	// PostgreSQL and Redis no longer appeared in the fetch and no longer count.
 	assert.True(t, extRows(t, f.db, f.src.ID)["pg"].Vanished)
 }
 
@@ -261,8 +261,8 @@ func TestGroupStatus_UnbewertbareMitgliederUndRangfolge(t *testing.T) {
 	assert.Equal(t, "a", worst.Name)
 }
 
-// Ein Abruf, der ein Mitglied verschlechtert, löst ein Ereignis an der
-// gekoppelten eigenen Komponente aus.
+// A fetch that worsens a member triggers an event on the
+// linked own component.
 func TestGroupLink_AbrufMeldetEreignis(t *testing.T) {
 	f := newGroupFixture(t)
 	f.link(t, f.page.ID, f.comp.ID, f.grp.ID)

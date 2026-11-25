@@ -6,23 +6,23 @@ import (
 	"strings"
 )
 
-// LibreTranslate spricht die API einer LibreTranslate-Instanz an:
-// Standarddienst, selbst betreibbar, die Texte verlassen den eigenen Betrieb
-// nicht. Der API-Schlüssel ist optional (nur bei Instanzen mit Schlüsselpflicht).
+// LibreTranslate talks to the API of a LibreTranslate instance:
+// the default service, self-hostable, the texts do not leave the own
+// operation. The API key is optional (only for instances that require a key).
 type LibreTranslate struct {
 	baseURL string
 	apiKey  string
 	client  *http.Client
 }
 
-// NewLibreTranslate baut den Client. baseURL ohne abschließenden Schrägstrich
-// oder mit - beides geht. Die Prüfung der Adresse (SSRF) liegt beim Aufrufer,
-// der auch den passenden http.Client mitgibt.
+// NewLibreTranslate builds the client. baseURL with or without a trailing
+// slash - both work. Checking the address (SSRF) is up to the caller,
+// who also supplies the matching http.Client.
 func NewLibreTranslate(baseURL, apiKey string, client *http.Client) *LibreTranslate {
 	return &LibreTranslate{baseURL: strings.TrimRight(baseURL, "/"), apiKey: apiKey, client: client}
 }
 
-// Translate übersetzt text von sourceLang nach targetLang.
+// Translate translates text from sourceLang to targetLang.
 func (p *LibreTranslate) Translate(text, sourceLang, targetLang string) (string, error) {
 	body := map[string]string{"q": text, "source": strings.ToLower(sourceLang), "target": strings.ToLower(targetLang), "format": "text"}
 	if p.apiKey != "" {
@@ -44,7 +44,7 @@ func (p *LibreTranslate) Translate(text, sourceLang, targetLang string) (string,
 	return resp.TranslatedText, nil
 }
 
-// TranslateMany übersetzt mehrere Texte in einer Anfrage (LibreTranslate nimmt "q" als Liste).
+// TranslateMany translates several texts in one request (LibreTranslate takes "q" as a list).
 func (p *LibreTranslate) TranslateMany(texts []string, sourceLang, targetLang string) ([]string, error) {
 	body := map[string]any{"q": texts, "source": strings.ToLower(sourceLang), "target": strings.ToLower(targetLang), "format": "text"}
 	if p.apiKey != "" {

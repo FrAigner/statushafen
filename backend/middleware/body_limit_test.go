@@ -57,7 +57,7 @@ func TestBodyLimit_AllowsBodiesUpToLimit(t *testing.T) {
 	assert.Equal(t, 100, probe.read)
 	assert.NoError(t, probe.readErr)
 
-	// Anfragen ohne Body (GET) laufen unberührt durch.
+	// Requests without a body (GET) pass through untouched.
 	probe = &bodyProbe{}
 	r = bodyLimitRouter(probe, 100, nil)
 	w = httptest.NewRecorder()
@@ -66,8 +66,8 @@ func TestBodyLimit_AllowsBodiesUpToLimit(t *testing.T) {
 	assert.True(t, probe.reached)
 }
 
-// Ohne Content-Length (chunked) greift die Lesegrenze: Der Handler bekommt
-// höchstens limit Byte und einen MaxBytesError, nie den ganzen Body.
+// Without Content-Length (chunked) the read limit applies: the handler gets
+// at most limit bytes and a MaxBytesError, never the whole body.
 func TestBodyLimit_CapsBodiesWithUnknownLength(t *testing.T) {
 	probe := &bodyProbe{}
 	r := bodyLimitRouter(probe, 100, nil)

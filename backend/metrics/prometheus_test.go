@@ -86,7 +86,7 @@ func TestPrometheusRegistry_HistogramObservesLatencyInSeconds(t *testing.T) {
 	}
 }
 
-// TestPrometheusRegistry_ExposesSaturationMetrics verifies the Schritt 4/4
+// TestPrometheusRegistry_ExposesSaturationMetrics verifies the Step 4/4
 // integration: the Prometheus export includes goroutine/memory/DB-pool
 // gauges sourced from Registry.SaturationSnapshot, with plausible values.
 func TestPrometheusRegistry_ExposesSaturationMetrics(t *testing.T) {

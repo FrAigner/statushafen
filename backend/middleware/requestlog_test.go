@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// captureJSONLog setzt für den Test einen JSON-Default-Logger (Level debug)
-// auf einen Puffer und liefert die geparsten Zeilen.
+// captureJSONLog sets a JSON default logger (level debug) for the test
+// on a buffer and returns the parsed lines.
 func captureJSONLog(t *testing.T) func() []map[string]any {
 	t.Helper()
 	var buf bytes.Buffer
@@ -129,7 +129,7 @@ func TestRequestLogger_RejectsImplausibleIncomingID(t *testing.T) {
 		assert.NotEqual(t, bad, got)
 		assert.Len(t, got, 26, "für %q muss eine neue ID erzeugt werden", bad)
 	}
-	// Genau 64 Zeichen sind noch erlaubt.
+	// Exactly 64 characters are still allowed.
 	ok := strings.Repeat("b", 64)
 	assert.Equal(t, ok, serve(newLoggedRouter(), "/items/1", ok).Header().Get(middleware.RequestIDHeader))
 }
@@ -194,8 +194,8 @@ func TestRequestIDFrom(t *testing.T) {
 	assert.Equal(t, "", middleware.RequestIDFrom(c))
 }
 
-// Query-Strings (?token=, ?key=), Authorization-Header und URLs in
-// gin-Fehlern dürfen nie im Access-Log stehen.
+// Query strings (?token=, ?key=), Authorization headers and URLs in
+// gin errors must never appear in the access log.
 func TestRequestLogger_KeineGeheimnisseImLog(t *testing.T) {
 	logs := captureJSONLog(t)
 	gin.SetMode(gin.TestMode)

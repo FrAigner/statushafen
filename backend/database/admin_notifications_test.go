@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Indizes des Nachrichtencenters (SQLite; Postgres siehe pruefeAdminNotifications).
+// Indexes of the message center (SQLite; for Postgres see pruefeAdminNotifications).
 
 func TestCreateAdminNotificationIndexes_EineOffeneMeldungJeSchluessel(t *testing.T) {
 	db := newLoggingTestDB(t)
@@ -27,12 +27,12 @@ func TestCreateAdminNotificationIndexes_EineOffeneMeldungJeSchluessel(t *testing
 	dup := mk("p1:k")
 	assert.Error(t, db.Create(&dup).Error, "zweite offene Meldung mit gleichem Schlüssel")
 
-	// Leerer Schlüssel (erledigt, abgelöst, ohne Zusammenfassung): beliebig oft.
+	// Empty key (done, superseded, without aggregation): any number of times.
 	for i := 0; i < 3; i++ {
 		e := mk("")
 		require.NoError(t, db.Create(&e).Error)
 	}
-	// Nach dem Ablösen ist der Schlüssel wieder frei.
+	// After superseding, the key is free again.
 	require.NoError(t, db.Model(&a).Update("dedup_key", "").Error)
 	again := mk("p1:k")
 	require.NoError(t, db.Create(&again).Error)

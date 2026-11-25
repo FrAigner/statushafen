@@ -2,39 +2,39 @@ package models
 
 import "gorm.io/gorm"
 
-// Language ist der globale Sprachkatalog (Stage 1 von 5 des
-// Mehrsprachigkeits-Features). Anders als die bisherige NotificationTemplate-
-// Konvention (Language dort war hartcodiert auf zwei Werte, die
-// eigentlich eine Zielgruppe statt einer echten Sprache codierten) ist dieser
-// Katalog offen erweiterbar - jede Statusseite aktiviert sich über
-// StatusPageLanguage eine Teilmenge davon.
+// Language is the global language catalog (stage 1 of 5 of the
+// multilingual feature). Unlike the previous NotificationTemplate
+// convention (Language there was hard-coded to two values that
+// actually encoded an audience instead of a real language), this
+// catalog is openly extensible - each status page activates a subset
+// of it via StatusPageLanguage.
 type Language struct {
 	gorm.Model
-	// Code: ISO-639-1-Kürzel, z.B. "en", "de", "fr". Kleingeschrieben und
-	// eindeutig - der fachliche Schlüssel, über den StatusPageLanguage und
-	// (später) lokalisierter Content referenzieren.
+	// Code: ISO 639-1 abbreviation, e.g. "en", "de", "fr". Lowercase and
+	// unique - the business key by which StatusPageLanguage and
+	// (later) localized content reference.
 	Code string `gorm:"uniqueIndex;not null"`
-	Name string `gorm:"not null"` // Anzeigename, z.B. "Deutsch"
-	// IsActive erlaubt es, eine Sprache aus dem Katalog zu deaktivieren, ohne
-	// bereits bestehende StatusPageLanguage-Zuordnungen oder lokalisierten
-	// Content zu löschen - neue Zuordnungen/Auswahlen sollen sie dann aber
-	// nicht mehr anbieten.
+	Name string `gorm:"not null"` // display name, e.g. "Deutsch"
+	// IsActive allows deactivating a language in the catalog without deleting
+	// existing StatusPageLanguage assignments or localized
+	// content - new assignments/selections should then no longer
+	// offer it, though.
 	IsActive bool `gorm:"not null;default:true"`
 }
 
-// StatusPageLanguage: pro Statusseite aktivierte Sprachen + genau eine
-// Default-Sprache. Join-Tabelle nach demselben Muster wie
-// UserStatusPageRole/ComponentTag - bewusst kein GORM many2many-Tag, damit
-// IsDefault als zusätzliches Feld mitgeführt werden kann.
+// StatusPageLanguage: languages activated per status page + exactly one
+// default language. Join table following the same pattern as
+// UserStatusPageRole/ComponentTag - deliberately no GORM many2many tag, so that
+// IsDefault can be carried as an additional field.
 //
-// Bewusst KEIN gorm "uniqueIndex"-Tag auf (StatusPageID, LanguageCode): ein
-// regulärer Unique-Index ignoriert Soft-Deletes (deleted_at) und würde ein
-// "Replace" (Deaktivieren + erneutes Aktivieren derselben Sprache) mit dem
-// soft-gelöschten Altdatensatz kollidieren lassen (siehe Kommentar bei
-// createJoinTableUniqueIndexes in database/db.go, dasselbe Problem wie bei
-// ComponentTag/IncidentTag/UserTag). Der partielle Unique-Index (nur
-// deleted_at IS NULL) wird stattdessen dort per Raw-SQL angelegt, ebenso wie
-// der zusätzliche "genau ein Default pro Seite"-Index
+// Deliberately NO gorm "uniqueIndex" tag on (StatusPageID, LanguageCode): a
+// regular unique index ignores soft deletes (deleted_at) and would make a
+// "replace" (deactivating + re-activating the same language) collide with the
+// soft-deleted old record (see the comment at
+// createJoinTableUniqueIndexes in database/db.go, same problem as with
+// ComponentTag/IncidentTag/UserTag). The partial unique index (only
+// deleted_at IS NULL) is created there via raw SQL instead, as is
+// the additional "exactly one default per page" index
 // (createLanguageUniqueIndexes).
 type StatusPageLanguage struct {
 	gorm.Model

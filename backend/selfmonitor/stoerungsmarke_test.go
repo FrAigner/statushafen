@@ -15,10 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Re-Review 1: recover sperrt die Störungs-Marke zuerst (FOR UPDATE),
-// wie openIncident; nur so liest eine zweite Replika (Postgres, READ COMMITTED)
-// die Vorfall-Marke erst nach dem Commit der ersten. Die Sperrwirkung selbst ist
-// nur auf Postgres prüfbar; hier wird die Klausel an der Abfrage geprüft.
+// Re-review 1: recover locks the outage marker first (FOR UPDATE),
+// like openIncident; only then does a second replica (Postgres, READ COMMITTED) read
+// the incident marker only after the first one's commit. The lock effect itself is
+// only testable on Postgres; here the clause is checked on the query.
 func TestMonitor_RecoverSperrtStoerungsMarkeZuerst(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -43,12 +43,12 @@ func TestMonitor_RecoverSperrtStoerungsMarkeZuerst(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Re-Review (1): Scheitert das gesperrte Lesen der Störungs-Marke, wird nichts erholt.
+// Re-review (1): if the locked read of the outage marker fails, nothing is recovered.
 func TestMonitor_RecoverSperrLesefehlerRollback(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
 	offeneStoerung(t, f)
-	lesefehlerAb(t, f.db, 2) // 1.: Besitzprüfung, 2.: gesperrtes Lesen in der Transaktion
+	lesefehlerAb(t, f.db, 2) // 1st: ownership check, 2nd: locked read in the transaction
 	comp := f.comp
 	comp.Status = f.m.Checks[0].FailedStatus
 	f.m.recover(f.m.Checks[0], comp, recoveredReason)
@@ -59,8 +59,8 @@ func TestMonitor_RecoverSperrLesefehlerRollback(t *testing.T) {
 	assert.EqualValues(t, 2, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Re-Review (2): Eine soft-gelöschte Störungs-Marke gilt (wie in readValue) als
-// vorhanden; es entsteht trotzdem ein Vorfall.
+// Re-review (2): a soft-deleted outage marker counts (as in readValue) as
+// present; an incident is still created.
 func TestMonitor_SoftGeloeschteStoerungsMarkeBlockiertVorfallNicht(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -71,7 +71,7 @@ func TestMonitor_SoftGeloeschteStoerungsMarkeBlockiertVorfallNicht(t *testing.T)
 	assert.EqualValues(t, 1, f.count(t, &models.Incident{}, "1 = 1"))
 }
 
-// Re-Review (2): Der Upsert setzt eine soft-gelöschte Marke zurück.
+// Re-review (2): the upsert resets a soft-deleted marker.
 func TestSetValue_HebtSoftDeleteAuf(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, setValue(f.db, "selfmonitor.x", "1"))
@@ -80,8 +80,8 @@ func TestSetValue_HebtSoftDeleteAuf(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.SystemSetting{}, "key = ? AND value = ?", "selfmonitor.x", "2"))
 }
 
-// Re-Review (3): Das ECHTE openMetrics öffnet einen FIFO ohne Schreiber sofort
-// (O_NONBLOCK); ein blockierendes Open käme nicht zurück.
+// Re-review (3): the REAL openMetrics opens a FIFO without a writer immediately
+// (O_NONBLOCK); a blocking open would not return.
 func TestOpenMetrics_FifoOhneSchreiberKehrtSofortZurueck(t *testing.T) {
 	fifo := filepath.Join(t.TempDir(), "fifo")
 	require.NoError(t, syscall.Mkfifo(fifo, 0o600))
@@ -98,8 +98,8 @@ func TestOpenMetrics_FifoOhneSchreiberKehrtSofortZurueck(t *testing.T) {
 		require.NotNil(t, f)
 		_ = f.Close()
 	case <-time.After(3 * time.Second):
-		t.Cleanup(func() { // hängenden Open (Fehlerfall) freigeben
-			if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil { //nolint:gosec // Testpfad
+		t.Cleanup(func() { // release the hanging open (error case)
+			if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil { //nolint:gosec // Test path
 				_ = w.Close()
 			}
 		})
@@ -107,7 +107,7 @@ func TestOpenMetrics_FifoOhneSchreiberKehrtSofortZurueck(t *testing.T) {
 	}
 }
 
-// Re-Review (4): Bei mehreren soft-gelöschten Komponenten mit gleichem Slug zählt die jüngste.
+// Re-review (4): with several soft-deleted components with the same slug, the most recent counts.
 func TestMonitor_AufraeumenAuditNimmtJuengsteGeloeschteKomponente(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Delete(&f.comp).Error)

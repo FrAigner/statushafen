@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// LibreTranslate- und DeepL-Anbindung gegen httptest-Server.
+// LibreTranslate and DeepL integration against httptest servers.
 
 func TestLibreTranslate_Erfolg(t *testing.T) {
 	var got map[string]string
@@ -88,7 +88,7 @@ func TestProvider_Fehlerabbildung(t *testing.T) {
 func TestProvider_NetzwerkfehlerOhneAdresseImText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	url := srv.URL
-	srv.Close() // Verbindung scheitert
+	srv.Close() // connection fails
 	for _, p := range []Provider{NewLibreTranslate(url, "TOPSECRET", http.DefaultClient), NewDeepL("TOPSECRET", url, http.DefaultClient)} {
 		_, err := p.Translate("a", "de", "en")
 		if !errors.Is(err, ErrUnavailable) {
@@ -169,7 +169,7 @@ func TestDeeplTarget(t *testing.T) {
 	}
 }
 
-// Stapel: mehrere Texte in einer Anfrage (Titel + Nachricht, Betreiber-Wunsch 31.10.2026).
+// Batch: several texts in one request (title + message, operator request 31.10.2026).
 func TestLibreTranslate_TranslateManyEineAnfrage(t *testing.T) {
 	var got map[string]any
 	var calls int
@@ -251,7 +251,7 @@ func TestTranslateMany_FehlerfaelleBeiderAnbieter(t *testing.T) {
 func TestTranslateMany_NetzfehlerGehtDurch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	url := srv.URL
-	srv.Close() // nicht erreichbar
+	srv.Close() // not reachable
 	if _, err := NewLibreTranslate(url, "", srv.Client()).TranslateMany([]string{"a"}, "de", "en"); err == nil {
 		t.Error("LibreTranslate: Netzfehler erwartet")
 	}

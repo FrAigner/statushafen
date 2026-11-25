@@ -13,16 +13,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bestandsdaten halten Webhook-, Bestätigungs- und Passwort-Token im Klartext.
-// Die Migration ersetzt sie durch den Hash; der Klartext aus Mails und Admin-
-// Oberfläche bleibt danach einlösbar. Ein zweiter Lauf ändert nichts mehr
-// (kein Doppel-Hashen), und leere Werte bleiben leer.
+// Existing data holds webhook, confirmation and password tokens in plain text.
+// The migration replaces them with the hash; the plain text from mails and the admin
+// UI remains redeemable afterwards. A second run changes nothing anymore
+// (no double hashing), and empty values stay empty.
 func TestHashLegacyTokens_HashtKlartextEinmalig(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tokens.db")), &gorm.Config{})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&models.StatusPage{}, &models.PageOrder{}))
 
-	// Ältere Zeilen mit Klartext direkt per SQL, ohne die Modell-Felder.
+	// Older rows with plain text directly via SQL, without the model fields.
 	exp := time.Now().Add(time.Hour)
 	require.NoError(t, db.Exec(`INSERT INTO status_pages (name, slug, webhook_token, created_at, updated_at) VALUES ('A', 'a', 'klartext-webhook', ?, ?)`, exp, exp).Error)
 	require.NoError(t, db.Exec(`INSERT INTO status_pages (name, slug, webhook_token, created_at, updated_at) VALUES ('B', 'b', '', ?, ?)`, exp, exp).Error)
@@ -61,8 +61,8 @@ func TestHashLegacyTokens_HashtKlartextEinmalig(t *testing.T) {
 	assert.True(t, updatedBefore.Equal(updatedAfter), "die Migration fasst updated_at nicht an")
 }
 
-// Auch ein gelöschtes (Soft Delete) Datenbankobjekt wird umgestellt, und ein
-// Fehler (fehlende Tabelle) kommt als Fehler zurück statt still zu verschwinden.
+// A deleted (soft delete) database object is also switched over, and an
+// error (missing table) is returned as an error instead of silently disappearing.
 func TestHashLegacyTokens_FehlerUndSoftDelete(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tokens2.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -76,8 +76,8 @@ func TestHashLegacyTokens_FehlerUndSoftDelete(t *testing.T) {
 	assert.Equal(t, models.HashToken("klartext-weg"), v, "Soft-Delete-Zeilen werden ungefiltert mitgenommen")
 }
 
-// Scheitert die Umstellung, loggt der Start nur und läuft weiter; der nächste
-// Start versucht es erneut.
+// If the changeover fails, the start only logs and continues; the next
+// start tries again.
 func TestMigrateLegacyTokens_FehlerIstNichtFatal(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tokens3.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -86,8 +86,8 @@ func TestMigrateLegacyTokens_FehlerIstNichtFatal(t *testing.T) {
 	assert.Contains(t, out.String(), "Failed to hash legacy tokens")
 }
 
-// Scheitert das Schreiben eines Hashes, kommt der Fehler zurück und die
-// Zeile bleibt unverändert (der nächste Start versucht es erneut).
+// If writing a hash fails, the error is returned and the
+// row stays unchanged (the next start tries again).
 func TestHashLegacyTokens_SchreibfehlerKommtZurueck(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tokens4.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -106,10 +106,10 @@ func TestHashLegacyTokens_SchreibfehlerKommtZurueck(t *testing.T) {
 	assert.Equal(t, "klartext", v, "die Zeile bleibt unverändert")
 }
 
-// Die Umstellung schreibt jede Zeile nur, wenn sie noch den gelesenen
-// Klartext trägt. Hat zwischen Lesen und Schreiben ein anderer Prozess (oder
-// ein Admin, der den Token erneuert) den Wert geändert, darf der Hash des
-// alten Klartexts den neuen Token nicht überschreiben.
+// The changeover writes each row only if it still carries the plain
+// text that was read. If another process (or
+// an admin renewing the token) changed the value between reading and writing, the hash of the
+// old plain text must not overwrite the new token.
 func TestHashLegacyTokens_UeberschreibtKeinenZwischenzeitlichGeaendertenWert(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "tokens5.db")), &gorm.Config{})
 	require.NoError(t, err)

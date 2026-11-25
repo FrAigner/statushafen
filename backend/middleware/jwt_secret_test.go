@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Fehlendes JWT_SECRET beendet den Prozess über logging.Fatal
-// (strukturiert geloggt) statt log.Fatalf.
+// A missing JWT_SECRET terminates the process via logging.Fatal
+// (logged in structured form) instead of log.Fatalf.
 func TestGenerateToken_MissingJWTSecretIsFatal(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	got := loggingtest.ExpectFatal(t, func() {
@@ -24,12 +24,12 @@ func TestGenerateToken_MissingJWTSecretIsFatal(t *testing.T) {
 	assert.Equal(t, "JWT_SECRET environment variable is required but not set", got.Message)
 }
 
-// strongTestSecret ist ein erfundener, gültiger Wert (40 Zeichen, bewusst ohne hohe Entropie,
-// damit Geheimnis-Scanner ihn nicht als echten Schlüssel melden).
+// strongTestSecret is an invented, valid value (40 characters, deliberately without high entropy,
+// so that secret scanners do not report it as a real key).
 var strongTestSecret = strings.Repeat("Ab1$xY", 7)
 
-// Schwache Signaturschlüssel erlauben gefälschte Login-Tokens für jedes Konto.
-// Der Start bricht deshalb bei zu kurzen Werten und bekannten Platzhaltern ab.
+// Weak signing keys allow forged login tokens for any account.
+// Startup therefore aborts on values that are too short and on known placeholders.
 func TestValidateJWTSecret(t *testing.T) {
 	strong := strongTestSecret
 	cases := []struct {
@@ -84,8 +84,8 @@ func TestRequireStrongJWTSecret_StrongSecretPasses(t *testing.T) {
 	assert.NotPanics(t, middleware.RequireStrongJWTSecret)
 }
 
-// Die Beispielkonfiguration darf keinen übernehmbaren Wert enthalten: Ein
-// kopierter Platzhalter wäre sonst ein gültiger Produktionsschlüssel.
+// The example configuration must not contain a usable value: a
+// copied placeholder would otherwise be a valid production key.
 func TestEnvExample_HatKeinenGueltigenJWTSecretWert(t *testing.T) {
 	raw, err := os.ReadFile("../.env.example")
 	require.NoError(t, err)

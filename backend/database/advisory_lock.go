@@ -7,47 +7,47 @@ import (
 	"gorm.io/gorm"
 )
 
-// AdvisoryLock sorgt dafür, dass ein Hintergrunddienst (der
-// Abruf externer Statusseiten) auch bei mehreren Instanzen nur auf einer
-// läuft. Postgres: Session-Advisory-Lock auf einer eigens gehaltenen
-// Verbindung aus dem Pool. Bewusst kein pg_try_advisory_xact_lock: Der
-// Dienst würde dafür während der HTTP-Abrufe (bis 10 s je Quelle) eine
-// Transaktion offen halten. Die Instanz mit der Sperre bleibt Leader, bis die
-// Verbindung abreißt (Postgres gibt die Sperre dann selbst frei) oder Unlock
-// aufgerufen wird; die anderen versuchen es bei jedem Takt erneut.
+// AdvisoryLock ensures that a background service (the
+// polling of external status pages) runs on only one instance even with several
+// instances. Postgres: session advisory lock on a dedicated
+// connection from the pool. Deliberately not pg_try_advisory_xact_lock: the
+// service would have to keep a transaction open during the HTTP fetches
+// (up to 10 s per source). The instance holding the lock stays leader until the
+// connection drops (Postgres then releases the lock itself) or Unlock
+// is called; the others try again on every tick.
 //
-// SQLite (Tests, lokale Entwicklung) kennt keine Advisory Locks und läuft
-// ohnehin nur in einem Prozess: TryLock liefert dort immer true.
+// SQLite (tests, local development) has no advisory locks and runs
+// in only one process anyway: TryLock always returns true there.
 //
-// Nicht nebenläufig sicher: genau eine Goroutine (die Abfrage-Schleife) besitzt
-// die Sperre.
+// Not safe for concurrent use: exactly one goroutine (the polling loop) owns
+// the lock.
 type AdvisoryLock struct {
 	db   *gorm.DB
 	key  int64
 	conn *sql.Conn
 }
 
-// NewAdvisoryLock legt eine Sperre mit dem anwendungsweit eindeutigen key an.
+// NewAdvisoryLock creates a lock with the application-wide unique key.
 func NewAdvisoryLock(db *gorm.DB, key int64) *AdvisoryLock {
 	return &AdvisoryLock{db: db, key: key}
 }
 
-// TryLock versucht, die Sperre zu bekommen bzw. zu behalten. true = diese
-// Instanz darf arbeiten.
+// TryLock tries to obtain or keep the lock. true = this
+// instance may work.
 func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 	if l.db.Name() != "postgres" {
 		return true, nil
 	}
 	if l.conn != nil {
-		// Sperre schon gehalten: nur prüfen, ob die Verbindung noch lebt.
+		// Lock already held: only check whether the connection is still alive.
 		if err := l.conn.PingContext(ctx); err == nil {
 			return true, nil
 		}
 		_ = l.conn.Close()
 		l.conn = nil
 	}
-	// db.DB() scheitert praktisch nie (auch eine gorm-Transaktion liefert
-	// ihr *sql.DB); ein Fehler läuft trotzdem in denselben Ausgang.
+	// db.DB() practically never fails (even a gorm transaction returns
+	// its *sql.DB); an error runs into the same exit anyway.
 	var conn *sql.Conn
 	sqlDB, err := l.db.DB()
 	if err == nil {
@@ -59,7 +59,7 @@ func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 	var got bool
 	err = conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, l.key).Scan(&got)
 	if err != nil || !got {
-		// Fehler oder Sperre bei einer anderen Instanz: Verbindung zurückgeben.
+		// Error or lock held by another instance: return the connection.
 		_ = conn.Close()
 		return false, err
 	}
@@ -67,7 +67,7 @@ func (l *AdvisoryLock) TryLock(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// Unlock gibt eine gehaltene Sperre frei (z. B. beim Herunterfahren).
+// Unlock releases a held lock (e.g. on shutdown).
 func (l *AdvisoryLock) Unlock() {
 	if l.conn == nil {
 		return

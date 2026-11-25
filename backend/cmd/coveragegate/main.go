@@ -1,9 +1,9 @@
-// Command coveragegate ist der CI-Gate. Er prüft, ob alle in
-// einem PR geänderten Zeilen von Tests abgedeckt sind, ob die Gesamtquoten
-// nicht unter die Baseline fallen, und liefert die Zeilenbereiche für die
-// Frontend-Mutationstests (StrykerJS --mutate).
+// Command coveragegate is the CI gate. It checks whether all lines changed in
+// a PR are covered by tests, whether the overall rates
+// do not fall below the baseline, and supplies the line ranges for the
+// frontend mutation tests (StrykerJS --mutate).
 //
-// Aufruf (siehe CONTRIBUTING.md, Abschnitt Coverage- und Mutations-Gate):
+// Usage (see CONTRIBUTING.md, section Coverage and mutation gate):
 //
 //	coveragegate check -diff pr.diff -go-profile coverage.out -lcov lcov.info -baseline coverage-baseline.json
 //	coveragegate baseline-check -go-profile coverage.out -lcov lcov.info -baseline coverage-baseline.json -frontend-tolerance 1.5
@@ -11,7 +11,7 @@
 //	coveragegate mutate-ranges -diff pr.diff
 //	coveragegate mutation-report -gremlins gremlins.json
 //
-// Exit-Codes: 0 = ok, 1 = Gate rot, 2 = Aufruf- oder Lesefehler.
+// Exit codes: 0 = ok, 1 = gate red, 2 = usage or read error.
 package main
 
 import (
@@ -20,7 +20,7 @@ import (
 	"github.com/fraigner/statushafen/coveragegate"
 )
 
-// exit ist austauschbar, damit main() im Test durchlaufen kann.
+// exit is replaceable, so that main() can run through in the test.
 var exit = os.Exit
 
 func main() {
