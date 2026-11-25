@@ -121,5 +121,7 @@ sind immer globale Tags.
 Unter **Profil** (Benutzermenü oben rechts) stellt jeder Nutzer seine Oberflächensprache ein,
 verknüpft sein Konto mit dem SSO einer Statusseite und kann sein Konto löschen. Ist man der
 einzige Admin einer Seite, wird diese nach eigener Bestätigung mitgelöscht. Der letzte Global
-Admin kann sich nicht löschen. Seine Daten lädt man mit „Meine Daten herunterladen“
+Admin kann sich nicht löschen. Wer ohne Passwort über das SSO einer Statusseite angemeldet ist,
+kann sein Konto nur löschen, wenn es ausschließlich über diese Seite besteht; sonst meldet man sich
+dafür unter der Hauptadresse an. Seine Daten lädt man mit „Meine Daten herunterladen“
 als JSON-Datei herunter (technisch `GET /api/me/export`, Anmeldung nötig).

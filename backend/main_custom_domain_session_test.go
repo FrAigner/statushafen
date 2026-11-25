@@ -20,7 +20,8 @@ import (
 // domain's DNS (the tenant). It must never reach the account itself: delete
 // it, export its data from all pages, unlink a sign-in or link a new one.
 // A page SSO session on the main domain keeps these routes (GDPR rights of
-// accounts that only sign in through a page SSO).
+// accounts that only sign in through a page SSO); deleting the account there
+// is limited further, see TestDeleteMeHandler_PageSSOSession.
 var customDomainBlockedRoutes = []struct{ method, path, body string }{
 	{http.MethodDelete, "/api/me", `{"confirm_email":"v@example.org"}`},
 	{http.MethodGet, "/api/me/export", ""},

@@ -141,6 +141,8 @@ describe('AccountDeletion', () => {
   it.each([
     [403, { error: 'x', code: 'confirmation_invalid' }, 'accountDeletion.confirmationInvalid'],
     [409, { error: 'x', code: 'last_global_admin' }, 'accountDeletion.lastGlobalAdmin'],
+    [403, { error: 'x', code: 'page_sso_session' }, 'api.errors.page_sso_session'],
+    [403, { error: 'x', code: 'custom_domain_session' }, 'api.errors.custom_domain_session'],
     [500, { error: 'x' }, 'accountDeletion.error'],
   ])('zeigt bei Status %i die passende Fehlermeldung und bleibt angemeldet', async (status, body, key) => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse(body, status))

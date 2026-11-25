@@ -147,6 +147,11 @@ Anmeldungen verknüpfen oder lösen (`POST /api/auth/oidc/link`, `POST /api/auth
 `FRONTEND_URL` an. Für eine private Seite braucht man eine Rolle auf dieser Seite; Global Admins
 verwalten unter `FRONTEND_URL`.
 
+Auch eine Seiten-SSO-Sitzung unter `FRONTEND_URL` stellt der IdP des Mandanten aus. Ohne Passwort
+löscht sie das Konto deshalb nur, wenn es ausschließlich über diese Seite besteht (keine andere
+Anmeldung, keine Rolle auf einer anderen Seite); sonst antwortet `DELETE /api/me` mit
+`403 page_sso_session`. Konten mit Passwort bestätigen die Löschung wie immer mit dem Passwort.
+
 Vertrag mit dem Reverse-Proxy: Er reicht für eigene Domains den `Host`-Header durch und liefert `/api`
 auf demselben Origin aus (Standard-Image, `VITE_API_URL` leer). Ob eine Anfrage von einer eigenen
 Domain kommt, entscheidet das Backend am `Origin`-Header des Browsers oder am `Host`, beide ohne

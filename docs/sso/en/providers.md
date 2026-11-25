@@ -149,6 +149,11 @@ linking or unlinking sign-ins (`POST /api/auth/oidc/link`, `POST /api/auth/provi
 `FRONTEND_URL`. A private page needs a role on that page; global admins administer under
 `FRONTEND_URL`.
 
+A page SSO session under `FRONTEND_URL` is issued by the tenant's IdP as well. Without a password
+it therefore deletes the account only if the account exists solely through that page (no other
+sign-in, no role on another page); otherwise `DELETE /api/me` answers `403 page_sso_session`.
+Accounts with a password confirm the deletion with the password as always.
+
 Contract with the reverse proxy: for custom domains it passes the `Host` header on and serves `/api`
 on the same origin (default image, `VITE_API_URL` empty). Whether a request comes from a custom domain
 is decided by the backend from the browser's `Origin` header or from `Host`, both regardless of case,

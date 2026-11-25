@@ -1959,6 +1959,11 @@ paths:
         `last_global_admin`).
         Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
         `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
+        Eine Seiten-SSO-Sitzung (Claim `sso_page_id`) eines Kontos ohne
+        Passwort darf nur löschen, wenn das Konto ausschließlich über diese
+        Seite besteht (keine andere Anmeldung, keine Rolle auf einer anderen
+        Seite); sonst `403` mit Code `page_sso_session`. Konten mit Passwort
+        bestätigen wie immer mit dem Passwort.
       x-required-permission: authenticated
       requestBody:
         required: true

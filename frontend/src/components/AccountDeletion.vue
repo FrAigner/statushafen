@@ -57,7 +57,12 @@ const closeDialog = () => {
   dialogOpen.value = false
 }
 
+// Sessions that may not act on the account (custom domain, page SSO) get the
+// server's translated reason instead of "confirmation invalid".
+const SESSION_CODES = ['custom_domain_session', 'page_sso_session']
+
 const errorMessageFor = (err) => {
+  if (SESSION_CODES.includes(err.data?.code)) return t(`api.errors.${err.data.code}`)
   if (isForbidden(err)) return t('accountDeletion.confirmationInvalid')
   if (err.data?.code === 'last_global_admin') return t('accountDeletion.lastGlobalAdmin')
   return t('accountDeletion.error')
