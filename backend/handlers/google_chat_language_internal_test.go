@@ -43,6 +43,7 @@ func captureWebhookServer(t *testing.T) (*httptest.Server, func() string) {
 func chatLangSetup(t *testing.T) (*Handler, notificationDispatchContext) {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := NewHandler(db)
 	page := models.StatusPage{Name: "P", Slug: "chat-lang"}
 	require.NoError(t, db.Create(&page).Error)
@@ -96,6 +97,7 @@ func TestGoogleChat_GlobalerWebhookBleibtEnglisch(t *testing.T) {
 func TestGoogleChat_SpracheDesAbonnentenUnabhaengigVonDerVorlage(t *testing.T) {
 	newWebhookEnv(t)
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := NewHandler(db)
 	page := models.StatusPage{Name: "P", Slug: "chat-tpl"}
 	require.NoError(t, db.Create(&page).Error)

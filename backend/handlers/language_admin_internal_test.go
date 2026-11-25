@@ -51,6 +51,7 @@ func TestLanguageHandlers_ErrorPaths(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testutils.SetupTestDB()
+			require.NoError(t, testutils.EnableTranslation(db))
 			h := NewHandler(db)
 			page := models.StatusPage{Name: "P", Slug: "p-lang-err"}
 			require.NoError(t, db.Create(&page).Error)
@@ -113,4 +114,42 @@ func TestLanguageHandlers_CreateWithActiveFlagAndBlankCodes(t *testing.T) {
 	require.NoError(t, db.Where("status_page_id = ?", page.ID).Find(&stored).Error)
 	require.Len(t, stored, 1)
 	assert.Equal(t, "de", stored[0].LanguageCode)
+}
+
+// With the switch off, changing the default language only moves the default flag;
+// a failing step rolls back and answers 500 without touching the assignments.
+func TestPutPageLanguages_SwitchOffErrorPaths(t *testing.T) {
+	cases := []struct {
+		name, op string
+		skip     int
+	}{
+		{"clearing the old default fails", "update", 0},
+		{"looking up the new default fails", "query", 0},
+		{"setting the new default fails", "update", 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := testutils.SetupTestDB()
+			h := NewHandler(db)
+			page := models.StatusPage{Name: "P", Slug: "p-lang-off"}
+			require.NoError(t, db.Create(&page).Error)
+			for _, l := range []models.Language{{Code: "de", Name: "Deutsch", IsActive: true}, {Code: "en", Name: "English", IsActive: true}} {
+				require.NoError(t, db.Create(&l).Error)
+			}
+			require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "de", IsDefault: true}).Error)
+			require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "en"}).Error)
+
+			c, w := pageTestContext(http.MethodPut, `{"codes":["en"],"default":"en"}`, uint(1))
+			c.Params = gin.Params{{Key: "page_id", Value: strconv.Itoa(int(page.ID))}}
+			remove := injectDBError(t, db, tc.op, "status_page_languages", tc.skip)
+			h.PutPageLanguagesHandler(c)
+			remove()
+
+			assert.Equal(t, http.StatusInternalServerError, w.Code, w.Body.String())
+			assert.Contains(t, w.Body.String(), `"code":"server_error"`)
+			var def models.StatusPageLanguage
+			require.NoError(t, db.Where("status_page_id = ? AND is_default = ?", page.ID, true).First(&def).Error)
+			assert.Equal(t, "de", def.LanguageCode, "rolled back")
+		})
+	}
 }

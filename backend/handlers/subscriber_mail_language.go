@@ -75,6 +75,11 @@ func (h *Handler) memoSubscriberTemplate(pageID uint, kind string) func(preferre
 // nur eine bei der Seite aktive Sprache wird übernommen, alles andere (leer,
 // unbekannt, nicht aktiviert) ergibt "" = Seitenstandardsprache.
 func (h *Handler) validSubscriberLanguage(pageID uint, code string) string {
+	// With the switch off every mail goes out in the page default; the stored
+	// preference is kept and applies again once the switch is on.
+	if !h.translationEnabled() {
+		return ""
+	}
 	lang, err := h.resolveSubscriberLanguage(pageID, code)
 	if err != nil {
 		// Lesefehler ist nicht "ungültig". Der Versand fällt auf die

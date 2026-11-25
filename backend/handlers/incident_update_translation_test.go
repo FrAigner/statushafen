@@ -33,6 +33,7 @@ type iutEnv struct {
 func newIUTEnv(t *testing.T) *iutEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	r.Use(func(c *gin.Context) {

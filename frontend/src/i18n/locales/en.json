@@ -1694,6 +1694,7 @@
       "translation_not_found": "The translation was not found.",
       "language_not_available": "This language is not enabled as an additional language for the page.",
       "language_not_supported": "Content is available in German and English only; other languages cannot be added or switched on.",
+      "translation_disabled": "Automatic translation is switched off. Content then exists only in the page's default language; a global admin can switch it on under System settings.",
       "translation_exists": "A translation for this language already exists.",
       "translation_not_configured": "Automatic translation is not set up. An administrator can configure it under System settings.",
       "translation_unavailable": "The translation service is not reachable. Try again later or translate manually.",

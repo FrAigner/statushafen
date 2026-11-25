@@ -99,6 +99,7 @@ func TestLanguageCatalogHandlers(t *testing.T) {
 
 func TestPageLanguagesHandlers(t *testing.T) {
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	r.POST("/api/languages", h.CreateLanguageHandler)

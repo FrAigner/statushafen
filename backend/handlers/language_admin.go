@@ -320,6 +320,12 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "default muss Teil von codes sein", "code": "language_default_not_in_codes"})
 		return
 	}
+	// Switch off: a page has its default language only; choosing a second one is refused.
+	enabled := h.translationEnabled()
+	if !enabled && len(codes) != 1 {
+		abortTranslationDisabled(c)
+		return
+	}
 
 	var validCount int64
 	if err := h.DB.Model(&models.Language{}).Where("code IN ? AND is_active = ?", codes, true).Count(&validCount).Error; err != nil {
@@ -332,6 +338,9 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 	}
 
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if !enabled {
+			return setPageDefaultLanguage(tx, uint(pageID), defaultCode)
+		}
 		if err := tx.Where("status_page_id = ?", pageID).Delete(&models.StatusPageLanguage{}).Error; err != nil {
 			return err
 		}
@@ -348,8 +357,8 @@ func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 		return
 	}
 
-	var pageLanguages []models.StatusPageLanguage
-	if err := h.DB.Where("status_page_id = ?", pageID).Order("language_code asc").Find(&pageLanguages).Error; err != nil {
+	pageLanguages, err := h.pageContentLanguages(uint(pageID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch page languages", "code": "server_error"})
 		return
 	}

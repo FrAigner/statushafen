@@ -89,6 +89,7 @@ func languageCodes(t *testing.T, raw []byte, key string) []string {
 // The catalog API only creates or activates de and en.
 func TestContentLanguages_CatalogOnlyGermanAndEnglish(t *testing.T) {
 	f := newContentLangFixture(t)
+	enableTranslation(t, f.db)
 
 	w, body := f.do(t, http.MethodPost, "/api/languages", map[string]any{"code": "it", "name": "Italiano"})
 	assert.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
@@ -118,6 +119,7 @@ func TestContentLanguages_CatalogOnlyGermanAndEnglish(t *testing.T) {
 // neither offered nor delivered.
 func TestContentLanguages_OtherLanguagesNotDelivered(t *testing.T) {
 	f := newContentLangFixture(t)
+	enableTranslation(t, f.db)
 
 	w, _ := f.do(t, http.MethodGet, "/api/pages/"+f.pid()+"/languages", nil)
 	require.Equal(t, http.StatusOK, w.Code)
@@ -154,4 +156,116 @@ func TestContentLanguages_OtherLanguagesNotDelivered(t *testing.T) {
 	var stored int64
 	require.NoError(t, f.db.Model(&models.IncidentTranslation{}).Where("language_code = ?", "fr").Count(&stored).Error)
 	assert.EqualValues(t, 1, stored, "the fr translation stays stored")
+}
+
+// With the switch off (the default) content only has the page's default
+// language: nothing else is offered, delivered or accepted, and stored
+// translations reappear once the switch is on again.
+func TestContentLanguages_SwitchOffOnlyDefaultLanguage(t *testing.T) {
+	f := newContentLangFixture(t)
+	pid, iid := f.pid(), strconv.Itoa(int(f.incident.ID))
+	tmpl := models.IncidentTemplate{StatusPageID: f.page.ID, Name: "T", Title: "T", Message: "M"}
+	require.NoError(t, f.db.Create(&tmpl).Error)
+	upd := models.IncidentUpdate{IncidentID: f.incident.ID, Message: "U", Status: "investigating"}
+	require.NoError(t, f.db.Create(&upd).Error)
+	var enTr models.IncidentTranslation
+	require.NoError(t, f.db.Where("language_code = ?", "en").First(&enTr).Error)
+	trID := strconv.Itoa(int(enTr.ID))
+	require.NoError(t, f.db.Create(&models.NotificationTemplate{StatusPageID: f.page.ID, Kind: "incident_created", Audience: "subscriber", Language: "en", Subject: "S", BodyHTML: "B"}).Error)
+	require.NoError(t, f.db.Create(&models.NotificationTemplate{StatusPageID: f.page.ID, Kind: "incident_created", Audience: "subscriber", Language: "de", Subject: "S", BodyHTML: "B"}).Error)
+
+	w, _ := f.do(t, http.MethodGet, "/api/pages/"+pid+"/languages", nil)
+	assert.Equal(t, []string{"de"}, languageCodes(t, w.Body.Bytes(), "LanguageCode"))
+	w, _ = f.do(t, http.MethodGet, "/api/public/pages/"+f.page.Slug+"/dashboard", nil)
+	var dash struct {
+		Languages json.RawMessage `json:"languages"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &dash))
+	assert.Equal(t, []string{"de"}, languageCodes(t, dash.Languages, "code"))
+
+	// Reads: only the default language, a requested other language is ignored.
+	w, body := f.do(t, http.MethodGet, "/api/public/pages/"+f.page.Slug+"/translations?lang=en", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "de", body["language"])
+	assert.Empty(t, body["incidents"])
+	w, body = f.do(t, http.MethodGet, "/api/public/pages/"+f.page.Slug+"/incidents/"+iid+"/update-translations?lang=en", nil)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "de", body["language"])
+	for _, path := range []string{"/api/incidents/" + iid + "/translations", "/api/incidents/" + iid + "/translations/all",
+		"/api/pages/" + pid + "/incident-templates/" + strconv.Itoa(int(tmpl.ID)) + "/translations",
+		"/api/pages/" + pid + "/incidents/" + iid + "/updates/" + strconv.Itoa(int(upd.ID)) + "/translations"} {
+		w, _ = f.do(t, http.MethodGet, path, nil)
+		require.Equal(t, http.StatusOK, w.Code, path)
+		assert.JSONEq(t, `[]`, w.Body.String(), path)
+	}
+	w, _ = f.do(t, http.MethodGet, "/api/pages/"+pid+"/notification-templates", nil)
+	assert.Equal(t, []string{"de"}, languageCodes(t, w.Body.Bytes(), "Language"))
+
+	// Writes: refused with translation_disabled, nothing changes.
+	writes := []struct {
+		method, path string
+		body         any
+	}{
+		{http.MethodPost, "/api/incidents/" + iid + "/translations", map[string]any{"language_code": "en", "title": "T", "message": "M", "source": "manual"}},
+		{http.MethodPut, "/api/incidents/" + iid + "/translations/en", map[string]any{"title": "T", "message": "M", "status": "draft"}},
+		{http.MethodPatch, "/api/incident-translations/" + trID + "/confirm", nil},
+		{http.MethodDelete, "/api/incident-translations/" + trID, nil},
+		{http.MethodPost, "/api/pages/" + pid + "/translate", map[string]any{"target_language": "en", "title": "T"}},
+		{http.MethodPut, "/api/pages/" + pid + "/incident-templates/" + strconv.Itoa(int(tmpl.ID)) + "/translations/en", map[string]any{"title": "T", "message": "M", "status": "draft"}},
+		{http.MethodPut, "/api/pages/" + pid + "/incidents/" + iid + "/updates/" + strconv.Itoa(int(upd.ID)) + "/translations/en", map[string]any{"message": "M", "status": "draft"}},
+		{http.MethodPut, "/api/pages/" + pid + "/notification-templates/incident_created/subscriber/en", map[string]any{"Subject": "S", "BodyHTML": "B"}},
+		{http.MethodDelete, "/api/pages/" + pid + "/notification-templates/incident_created/subscriber/en", nil},
+		{http.MethodPut, "/api/pages/" + pid + "/languages", map[string]any{"codes": []string{"de", "en"}, "default": "de"}},
+	}
+	for _, wr := range writes {
+		w, body = f.do(t, wr.method, wr.path, wr.body)
+		assert.Equal(t, http.StatusConflict, w.Code, "%s %s: %s", wr.method, wr.path, w.Body.String())
+		assert.Equal(t, "translation_disabled", body["code"], wr.path)
+	}
+	var count int64
+	f.db.Model(&models.IncidentTranslation{}).Count(&count)
+	assert.EqualValues(t, 2, count, "stored translations are kept")
+	f.db.Model(&models.NotificationTemplate{}).Where("language = ?", "en").Count(&count)
+	assert.EqualValues(t, 1, count, "the en template is kept")
+
+	// The default-language template stays editable.
+	w, _ = f.do(t, http.MethodPut, "/api/pages/"+pid+"/notification-templates/incident_created/subscriber/de", map[string]any{"Subject": "S2", "BodyHTML": "B2"})
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The default language can still be changed; other assignments are kept.
+	w, _ = f.do(t, http.MethodPut, "/api/pages/"+pid+"/languages", map[string]any{"codes": []string{"en"}, "default": "en"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, []string{"en"}, languageCodes(t, w.Body.Bytes(), "LanguageCode"))
+	var rows []models.StatusPageLanguage
+	require.NoError(t, f.db.Where("status_page_id = ?", f.page.ID).Order("language_code").Find(&rows).Error)
+	require.Len(t, rows, 3)
+	assert.Equal(t, []bool{false, true, false}, []bool{rows[0].IsDefault, rows[1].IsDefault, rows[2].IsDefault}, "de, en (default), fr")
+	w, body = f.do(t, http.MethodPut, "/api/pages/"+pid+"/languages", map[string]any{"codes": []string{"fr"}, "default": "fr"})
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, "language_codes_unknown", body["code"])
+
+	// Switching on brings the second language and the stored translations back.
+	enableTranslation(t, f.db)
+	w, _ = f.do(t, http.MethodGet, "/api/pages/"+pid+"/languages", nil)
+	assert.Equal(t, []string{"de", "en"}, languageCodes(t, w.Body.Bytes(), "LanguageCode"))
+	w, _ = f.do(t, http.MethodGet, "/api/incidents/"+iid+"/translations/all", nil)
+	assert.Equal(t, []string{"en"}, languageCodes(t, w.Body.Bytes(), "LanguageCode"))
+}
+
+// A page with the switch off can switch its default to a language it had no
+// row for yet.
+func TestContentLanguages_SwitchOffNewDefaultLanguage(t *testing.T) {
+	f := newContentLangFixture(t)
+	require.NoError(t, f.db.Unscoped().Where("status_page_id = ? AND language_code = ?", f.page.ID, "en").Delete(&models.StatusPageLanguage{}).Error)
+	w, _ := f.do(t, http.MethodPut, "/api/pages/"+f.pid()+"/languages", map[string]any{"codes": []string{"en"}, "default": "en"})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, []string{"en"}, languageCodes(t, w.Body.Bytes(), "LanguageCode"))
+	var n int64
+	f.db.Model(&models.StatusPageLanguage{}).Where("status_page_id = ?", f.page.ID).Count(&n)
+	assert.EqualValues(t, 3, n, "de and fr are kept, en is added")
+}
+
+func enableTranslation(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	require.NoError(t, testutils.EnableTranslation(db))
 }

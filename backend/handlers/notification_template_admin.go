@@ -137,7 +137,12 @@ func (h *Handler) GetNotificationTemplatesHandler(c *gin.Context) {
 		return
 	}
 	var templates []models.NotificationTemplate
-	if err := h.DB.Where("status_page_id = ?", tenantID).Order("kind asc, audience asc, language asc").Find(&templates).Error; err != nil {
+	q := h.DB.Where("status_page_id = ?", tenantID)
+	// Switch off: only templates in the page default language are shown.
+	if !h.translationEnabled() {
+		q = q.Where("language = ?", h.pageDefaultLanguageCode(uint(tenantID)))
+	}
+	if err := q.Order("kind asc, audience asc, language asc").Find(&templates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notification templates", "code": "server_error"})
 		return
 	}
@@ -149,7 +154,7 @@ func (h *Handler) GetNotificationTemplatesHandler(c *gin.Context) {
 // aktualisiert. Das UI muss dadurch keinen ID-Zustand tracken.
 func (h *Handler) PutNotificationTemplateHandler(c *gin.Context) {
 	pageID, kind, audience, language, ok := parseNotificationTemplateKey(c, h.DB)
-	if !ok {
+	if !ok || !h.requireTemplateLanguageEnabled(c, pageID, language) {
 		return
 	}
 	var req notificationTemplateUpsertReq
@@ -193,7 +198,7 @@ func (h *Handler) PutNotificationTemplateHandler(c *gin.Context) {
 // unfreundlich, aber informativer als stiller 200).
 func (h *Handler) DeleteNotificationTemplateHandler(c *gin.Context) {
 	pageID, kind, audience, language, ok := parseNotificationTemplateKey(c, h.DB)
-	if !ok {
+	if !ok || !h.requireTemplateLanguageEnabled(c, pageID, language) {
 		return
 	}
 	var tmpl models.NotificationTemplate

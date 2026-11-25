@@ -90,6 +90,7 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 	for _, tc := range tagTranslationCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			db := testutils.SetupTestDB()
+			require.NoError(t, testutils.EnableTranslation(db))
 			r := newRouter(handlers.NewHandler(db))
 
 			page := models.StatusPage{Name: "Seite", Slug: "tag-tr-" + tc.name}

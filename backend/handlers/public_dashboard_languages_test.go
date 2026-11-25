@@ -20,6 +20,7 @@ import (
 // Statusseite alle anbietet und nicht nur die Oberflächensprachen de/en.
 func TestPublicDashboard_ListetSeitenSprachen(t *testing.T) {
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	r.GET("/api/public/pages/:slug/dashboard", middleware.OptionalAuthMiddleware(), h.GetPublicDashboardHandler)

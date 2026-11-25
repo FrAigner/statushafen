@@ -37,6 +37,7 @@ type ptEnv struct {
 func newPTEnv(t *testing.T) *ptEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	require.NoError(t, testutils.EnableTranslation(db))
 	h := handlers.NewHandler(db)
 	e := &ptEnv{t: t, db: db, now: time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)}
 	h.Now = func() time.Time { return e.now }

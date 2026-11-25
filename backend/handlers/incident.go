@@ -971,8 +971,13 @@ func (h *Handler) buildNotificationDispatchContext(inc models.Incident, action, 
 
 	defaultSubject := fmt.Sprintf("[ALERT] %s: %s (%s)", compNames, inc.Title, inc.Status)
 	staffCache := map[string][2]string{}
+	fixedLang := h.fixedStaffMailLang(inc.StatusPageID)
 	staffMail := func(preferred string) (string, string) {
 		lang := staffMailLang(preferred)
+		// Switch off: everyone gets the page default language.
+		if fixedLang != "" {
+			lang = fixedLang
+		}
 		if r, ok := staffCache[lang]; ok {
 			return r[0], r[1]
 		}

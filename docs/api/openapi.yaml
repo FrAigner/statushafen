@@ -1795,12 +1795,23 @@ paths:
         Systemeinstellungen an ist. Nur dann haben Inhalte neben der
         Standardsprache der Seite eine zweite Sprache (Deutsch/Englisch);
         die Admin-Oberfläche blendet Sprachumschalter und Übersetzungen sonst
-        aus. Default (kein gespeicherter Wert): aus.
+        aus. Default (kein gespeicherter Wert): aus. Bei ausgeschaltetem Schalter
+        antworten alle schreibenden Übersetzungs-Endpunkte (Übersetzungen von
+        Vorfällen, Updates, Komponenten, Ankündigungen und Vorlagen sowie
+        `POST /api/pages/{page_id}/translate`) und Mail-Vorlagen in einer anderen
+        als der Standardsprache mit 409 `translation_disabled`; lesende Endpunkte
+        liefern nur die Standardsprache (Übersetzungslisten leer, `lang` wird
+        ignoriert). Gespeicherte Übersetzungen bleiben erhalten.
         EN: Reports without auth whether the "Automatic translation" switch of
         the system settings is on. Only then does content have a second
         language (German/English) next to the page's default language; the
         admin interface hides language switchers and translations otherwise.
-        Default (no stored value): off.
+        Default (no stored value): off. With the switch off, every writing
+        translation endpoint (translations of incidents, updates, components,
+        notices and templates, and `POST /api/pages/{page_id}/translate`) and mail
+        templates in a language other than the default answer 409
+        `translation_disabled`; reading endpoints deliver the default language only
+        (translation lists empty, `lang` ignored). Stored translations are kept.
       security: []
       x-rate-limit: 60/min pro IP
       responses:
@@ -3994,8 +4005,13 @@ paths:
                   items: { type: string }
                 default: { type: string, description: Muss in `codes` enthalten sein. }
       description: >
-        Erlaubt sind nur `de` und `en` (sonst 400 `language_codes_unknown`).
+        Erlaubt sind nur `de` und `en` (sonst 400 `language_codes_unknown`). Ist die
+        automatische Übersetzung ausgeschaltet, genau ein Code (die neue
+        Standardsprache, sonst 409 `translation_disabled`); die übrigen Zuordnungen
+        bleiben dann gespeichert.
         EN: Only `de` and `en` are allowed (otherwise 400 `language_codes_unknown`).
+        With automatic translation switched off exactly one code (the new default,
+        otherwise 409 `translation_disabled`); the other assignments are kept.
       responses:
         "200":
           description: Neue Sprachliste.

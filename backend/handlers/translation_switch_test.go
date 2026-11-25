@@ -11,10 +11,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// removeTranslationSwitch deletes the row the shared fixture stores, so the test
+// sees a fresh installation.
+func removeTranslationSwitch(t *testing.T, f translationFixture) {
+	t.Helper()
+	require.NoError(t, f.db.Unscoped().Where("key = ?", "translation.enabled").Delete(&models.SystemSetting{}).Error)
+}
+
 // The switch for automatic translation and additional content languages is a
 // system setting (translation.enabled). A missing row means "off".
 func TestTranslationSwitch_DefaultOffAndToggle(t *testing.T) {
 	f := newTranslationFixture(t)
+	removeTranslationSwitch(t, f)
 	f.r.GET("/api/public/translation/enabled", f.h.GetPublicTranslationEnabledHandler)
 	public := func() any {
 		w := doStatusPageRequest(f.r, "GET", "/api/public/translation/enabled", nil)
@@ -54,6 +62,7 @@ func TestTranslationSwitch_DefaultOffAndToggle(t *testing.T) {
 // A failing write of the switch is reported as 500 and not audited.
 func TestTranslationSwitch_SaveError(t *testing.T) {
 	f := newTranslationFixture(t)
+	removeTranslationSwitch(t, f)
 	require.NoError(t, f.db.Exec("CREATE TRIGGER no_setting BEFORE INSERT ON system_settings BEGIN SELECT RAISE(ABORT, 'locked'); END").Error)
 	w := doStatusPageRequest(f.r, "PUT", "/api/settings/translation", map[string]any{"enabled": true})
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

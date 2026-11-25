@@ -1694,6 +1694,7 @@
       "translation_not_found": "Die Übersetzung wurde nicht gefunden.",
       "language_not_available": "Diese Sprache ist für die Seite nicht als weitere Sprache aktiviert.",
       "language_not_supported": "Inhalte gibt es nur auf Deutsch und Englisch; andere Sprachen lassen sich nicht anlegen oder einschalten.",
+      "translation_disabled": "Die automatische Übersetzung ist ausgeschaltet. Inhalte gibt es dann nur in der Standardsprache der Seite; ein Global Admin kann sie unter Systemeinstellungen einschalten.",
       "translation_exists": "Für diese Sprache gibt es bereits eine Übersetzung.",
       "translation_not_configured": "Die automatische Übersetzung ist nicht eingerichtet. Ein Administrator kann sie unter Systemeinstellungen konfigurieren.",
       "translation_unavailable": "Der Übersetzungsdienst ist nicht erreichbar. Bitte später erneut versuchen oder manuell übersetzen.",

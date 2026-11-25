@@ -95,6 +95,14 @@ func SetupTestDB() *gorm.DB {
 	return db
 }
 
+// EnableTranslation switches on automatic translation and the second content
+// language (system setting translation.enabled, default off). Tests of
+// translations and additional languages call it explicitly.
+// Idempotent, so helpers that add a second language can call it repeatedly.
+func EnableTranslation(db *gorm.DB) error {
+	return db.Where("key = ?", "translation.enabled").Assign(models.SystemSetting{Key: "translation.enabled", Value: "true"}).FirstOrCreate(&models.SystemSetting{}).Error
+}
+
 // SetupRouter creates a new gin Engine for testing
 func SetupRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)

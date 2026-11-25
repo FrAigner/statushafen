@@ -149,7 +149,9 @@ func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) 
 		}
 	}
 	lang = strings.ToLower(c.Query("lang"))
-	if lang == "" {
+	// With the switch off there is only the default language: a requested other
+	// language is ignored instead of answered with 400 (no second round trip).
+	if lang == "" || !h.translationEnabled() {
 		lang = def
 	} else if !langCodePattern.MatchString(lang) || !allowed[lang] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Language not enabled for this page", "code": "invalid_request"})

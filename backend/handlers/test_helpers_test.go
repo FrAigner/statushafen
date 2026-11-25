@@ -15,8 +15,12 @@ import (
 )
 
 // Test setup helpers
+// The translation tests using it need the switch for translations on (default off).
 func newTestSetup() (*gorm.DB, *gin.Engine, *handlers.Handler) {
 	db := testutils.SetupTestDB()
+	if err := testutils.EnableTranslation(db); err != nil {
+		panic(err)
+	}
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 	return db, r, h

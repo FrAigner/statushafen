@@ -36,6 +36,9 @@ type notifAdminHarness struct {
 func newNotifAdminHarness(t *testing.T) *notifAdminHarness {
 	t.Helper()
 	db := testutils.SetupTestDB()
+	if err := testutils.EnableTranslation(db); err != nil {
+		t.Fatal(err)
+	}
 	h := handlers.NewHandler(db)
 
 	globalAdminRole := models.Role{Name: "Global Admin (Test)", Permissions: "pages:write"}

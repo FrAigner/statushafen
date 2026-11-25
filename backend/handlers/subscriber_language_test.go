@@ -22,8 +22,10 @@ import (
 // hinaus (leer = Standardsprache der Seite).
 
 // addPageLanguage aktiviert eine weitere (Nicht-Standard-)Sprache an der Seite.
+// A second language needs the switch for translations on.
 func addPageLanguage(t *testing.T, db *gorm.DB, pageID uint, code string) {
 	t.Helper()
+	require.NoError(t, testutils.EnableTranslation(db))
 	require.NoError(t, db.Where("code = ?", code).FirstOrCreate(&models.Language{Code: code, Name: code, IsActive: true}).Error)
 	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: pageID, LanguageCode: code}).Error)
 }
