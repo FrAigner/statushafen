@@ -354,6 +354,9 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// öffentlicher Flag-Endpunkt (ohne Auth), ob die Self-Service-
 	// Bestellung aktiv ist - Landing-CTA und /order-Seite richten sich danach.
 	r.GET("/api/public/orders/enabled", middleware.NewRateLimiter(60, time.Minute), h.GetPublicOrdersEnabledHandler)
+	// Public flag (no auth): whether automatic translation and the second content
+	// language are switched on. Admin views of page admins hide translation UI by it.
+	r.GET("/api/public/translation/enabled", middleware.NewRateLimiter(60, time.Minute), h.GetPublicTranslationEnabledHandler)
 	r.POST("/api/public/orders", middleware.NewRateLimiter(5, time.Minute), h.CreateOrderHandler)
 	r.POST("/api/public/orders/confirm", middleware.NewRateLimiter(20, time.Minute), h.ConfirmOrderHandler)
 	r.POST("/api/public/orders/set-password", middleware.NewRateLimiter(10, time.Minute), h.SetOrderPasswordHandler)

@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/fraigner/statushafen/database"
 	"github.com/fraigner/statushafen/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Content languages: only German and English (database.ContentLanguageCodes).
@@ -13,6 +17,28 @@ import (
 
 // codeLanguageNotSupported: content languages are only de and en.
 const codeLanguageNotSupported = "language_not_supported"
+
+const (
+	// settingTranslationEnabled switches automatic translation and the second
+	// content language on. A missing row means off (translationEnabledDefault): only
+	// an explicit "true" switches it on, so upgraded installations start with it off.
+	settingTranslationEnabled = "translation.enabled"
+	translationEnabledDefault = false
+)
+
+// translationEnabled reports whether additional content languages and automatic
+// translation are switched on.
+func (h *Handler) translationEnabled() bool {
+	return h.getSystemSettingBool(settingTranslationEnabled, translationEnabledDefault)
+}
+
+// GetPublicTranslationEnabledHandler reports without authentication whether the
+// switch is on (GET /api/public/translation/enabled). Admin views of page admins
+// need it, and GET /settings/translation is reserved for global admins. Modelled on
+// GetPublicOrdersEnabledHandler.
+func (h *Handler) GetPublicTranslationEnabledHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"enabled": h.translationEnabled()})
+}
 
 // pageContentLanguages returns the languages of a status page that are content
 // languages, ordered by code, with the catalog entry preloaded.

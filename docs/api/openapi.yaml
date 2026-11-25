@@ -1785,6 +1785,34 @@ paths:
                 required: [enabled]
                 properties:
                   enabled: { type: boolean }
+  /api/public/translation/enabled:
+    get:
+      tags: [Admin – Platform]
+      operationId: getPublicTranslationEnabled
+      summary: Ist die automatische Übersetzung eingeschaltet?
+      description: |
+        Meldet ohne Auth, ob der Schalter „Automatische Übersetzung“ der
+        Systemeinstellungen an ist. Nur dann haben Inhalte neben der
+        Standardsprache der Seite eine zweite Sprache (Deutsch/Englisch);
+        die Admin-Oberfläche blendet Sprachumschalter und Übersetzungen sonst
+        aus. Default (kein gespeicherter Wert): aus.
+        EN: Reports without auth whether the "Automatic translation" switch of
+        the system settings is on. Only then does content have a second
+        language (German/English) next to the page's default language; the
+        admin interface hides language switchers and translations otherwise.
+        Default (no stored value): off.
+      security: []
+      x-rate-limit: 60/min pro IP
+      responses:
+        "200":
+          description: Flag, ob die automatische Übersetzung an ist.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enabled]
+                properties:
+                  enabled: { type: boolean }
   /api/public/orders:
     post:
       tags: [Orders]
@@ -4338,6 +4366,7 @@ paths:
             schema:
               type: object
               properties:
+                enabled: { type: boolean, description: "Schalter für automatische Übersetzung und zweite Inhaltssprache (Default aus). EN: switch for automatic translation and the second content language (default off)." }
                 provider: { type: string, enum: ["", libretranslate, deepl] }
                 url: { type: string }
                 api_key: { type: string, description: Schreibend; wird nie zurückgegeben. }
@@ -5813,6 +5842,7 @@ components:
         Einstellungen der automatischen Übersetzung. Der Schlüssel
         ist nie enthalten.
       properties:
+        enabled: { type: boolean, description: "Automatische Übersetzung und zweite Inhaltssprache an (Default aus, auch nach dem Update). EN: automatic translation and second content language on (default off, also after upgrading)." }
         provider: { type: string, description: 'Leer = Standard (LibreTranslate aus der Umgebung), sonst libretranslate oder deepl.' }
         url: { type: string, description: LibreTranslate-Adresse (nur https). }
         api_key_set: { type: boolean }
