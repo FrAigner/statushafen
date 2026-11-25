@@ -33,3 +33,12 @@ func TestBackfillMembershipOrigin_MarksOnlyRowsFromBefore(t *testing.T) {
 	require.NoError(t, db.Unscoped().Model(&models.UserStatusPageRole{}).Order("user_id").Pluck("joined_via", &got).Error)
 	assert.Equal(t, []string{models.JoinedViaLegacy, models.JoinedViaLegacy, models.JoinedViaAssigned, models.JoinedViaAutoJoin}, got)
 }
+
+// Without the table the backfill logs the failure instead of stopping the start.
+func TestBackfillMembershipOrigin_LogsAFailure(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "empty.db")), &gorm.Config{})
+	require.NoError(t, err)
+	out := captureLog(t)
+	backfillMembershipOrigin(db)
+	assert.Contains(t, out.String(), "Failed to backfill membership origin")
+}
