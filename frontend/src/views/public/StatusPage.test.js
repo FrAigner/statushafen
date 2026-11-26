@@ -1456,6 +1456,21 @@ describe('StatusPage', () => {
     })
   })
 
+  // The header menu offers "Manage subscription" only while the subscription section is shown.
+  it('reports whether its subscription section is shown, for the header menu', async () => {
+    const { subscriptionsAvailable } = useCurrentPageSlug()
+    const { wrapper } = await mountStatusPage()
+    expect(subscriptionsAvailable.value).toBe(true)
+    wrapper.unmount()
+    activeWrapper = null
+    expect(subscriptionsAvailable.value).toBe(false)
+  })
+
+  it('does not report a subscription section for a private page without access', async () => {
+    await mountStatusPage({ fetchImpl: vi.fn().mockResolvedValue(jsonResponse({}, 401)) })
+    expect(useCurrentPageSlug().subscriptionsAvailable.value).toBe(false)
+  })
+
   it('öffnet den Abo-Editor über das statushafen:open-subscription-manager-Event', async () => {
     useAuth().setAuth('jwt-1', { email: 'a@x.de' })
     await mountStatusPage()

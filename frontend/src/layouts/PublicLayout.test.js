@@ -551,8 +551,24 @@ describe('PublicLayout', () => {
     expect(router.currentRoute.value.path).toBe('/admin')
   })
 
+  // "Manage subscription" jumps to the subscription section of the status page; anywhere else
+  // (landing page, docs, login, order, private page without access) it would do nothing.
+  it('offers "Manage subscription" only while a status page shows its subscription section', async () => {
+    useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+    const { subscriptionsAvailable } = useCurrentPageSlug()
+    subscriptionsAvailable.value = false
+    const { wrapper } = await mountLayout()
+    const hasItem = () => wrapper.findAll('.user-menu-item').some(el => el.text().includes('Abonnement verwalten'))
+    expect(hasItem()).toBe(false)
+    subscriptionsAvailable.value = true
+    await flushPromises()
+    expect(hasItem()).toBe(true)
+    subscriptionsAvailable.value = false
+  })
+
   it('dispatcht ein statushafen:open-subscription-manager-Event beim Klick auf Abonnement verwalten', async () => {
     useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+    useCurrentPageSlug().subscriptionsAvailable.value = true
     const { wrapper } = await mountLayout()
     const listener = vi.fn()
     window.addEventListener('statushafen:open-subscription-manager', listener)
@@ -563,6 +579,7 @@ describe('PublicLayout', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     window.removeEventListener('statushafen:open-subscription-manager', listener)
+    useCurrentPageSlug().subscriptionsAvailable.value = false
   })
 
   it('meldet den User beim Klick auf Abmelden ab und navigiert auf /', async () => {

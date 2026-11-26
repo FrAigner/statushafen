@@ -26,7 +26,7 @@ const { currentUser, logout, hasPerm } = useAuth()
 const { apiFetch } = useApi()
 const { myPages, setMyPages, setActiveTenant } = useTenant()
 const { theme, toggleTheme } = useTheme()
-const { currentPageSlug } = useCurrentPageSlug()
+const { currentPageSlug, subscriptionsAvailable } = useCurrentPageSlug()
 // On the landing page the header shows the Direction A variant (logo with
 // marker, navigation, login, order button); LandingPage registers itself there.
 const { isLanding, ordersEnabled } = useLandingChrome()
@@ -191,7 +191,7 @@ const goToDashboard = () => {
                   <strong>{{ currentUser.email }}</strong>
                   <small v-if="currentUser.role">({{ currentUser.role }})</small>
                 </li>
-                <li>
+                <li v-if="subscriptionsAvailable">
                   <button class="user-menu-item" @click="openSubscriptionSettings">
                     <AppIcon name="settings" :size="14" /> {{ t('layout.public.subscriptionSettings') }}
                   </button>
