@@ -24,7 +24,7 @@ describe('useApi', () => {
     expect(isForbidden(err)).toBe(true)
   })
 
-  // Der Body der 403 (Fehlercode) darf nicht verworfen werden.
+  // The body of the 403 (error code) must not be discarded.
   it('hängt den JSON-Body einer 403 als data an und behält die feste Meldung', async () => {
     const body = { error: 'Bestätigung fehlgeschlagen', code: 'confirmation_invalid' }
     global.fetch = vi.fn().mockResolvedValue(res(403, body))
@@ -41,7 +41,7 @@ describe('useApi', () => {
     expect(err.forbidden).toBe(true)
   })
 
-  // erwartete Statuscodes sind kein Konsolenfehler, der Fehler wird trotzdem geworfen.
+  // expected status codes are no console error, the error is still thrown.
   it('loggt einen erwarteten Status nicht, andere Status aber schon', async () => {
     global.fetch = vi.fn().mockResolvedValue(res(404, { error: 'nix' }))
     const err = await useApi().apiFetch('/api/x', { expectedStatuses: [404] }).catch(e => e)
@@ -60,8 +60,8 @@ describe('useApi', () => {
     expect(global.fetch.mock.calls[0][1]).not.toHaveProperty('expectedStatuses')
   })
 
-  // Fehlercodes des Backends werden übersetzt statt den englischen
-  // oder technischen Servertext zu zeigen.
+  // The backend's error codes are translated instead of showing the English
+  // or technical server text.
   it.each([
     ['de', 'invalid_request', 'Die Eingabe ist unvollständig oder ungültig. Bitte prüfe die Felder.'],
     ['en', 'invalid_request', 'The input is incomplete or invalid. Please check the fields.'],
@@ -75,8 +75,8 @@ describe('useApi', () => {
     expect(err.data.code).toBe(code)
   })
 
-  // Webhook-Ziel drosselt/lehnt ab/ist nicht erreichbar - verständliche
-  // Meldung statt rohem Servertext, retry_after landet als {seconds} in der Meldung.
+  // Webhook target throttles/rejects/is unreachable: an understandable
+  // message instead of raw server text, retry_after ends up as {seconds} in the message.
   it.each([
     ['de', 429, 'webhook_rate_limited', { retry_after: 12 }, 'Google drosselt gerade – bitte in 12 Sekunden erneut versuchen.'],
     ['en', 429, 'webhook_rate_limited', { retry_after: 3 }, 'Google is rate limiting right now – please try again in 3 seconds.'],
@@ -89,7 +89,7 @@ describe('useApi', () => {
     expect(err.message).toBe(text)
   })
 
-  // Löschen einer Sprache scheitert mit count/pages, beide landen in der Meldung.
+  // Deleting a language fails with count/pages, both end up in the message.
   it.each([
     ['de', 'language_is_default', { count: 2, pages: ['Acme', 'Beta'] }, 'Die Sprache ist Standardsprache von 2 Statusseite(n) (Acme, Beta). Stelle dort zuerst eine andere Standardsprache ein.'],
     ['en', 'language_is_default', { count: 1, pages: ['Acme'] }, 'The language is the default language of 1 status page(s) (Acme). Set a different default language there first.'],
@@ -120,8 +120,8 @@ describe('useApi', () => {
     expect(isForbidden(err)).toBe(false)
   })
 
-  // Aufrufer brauchen den Fehler-Body, z. B. die Liste der
-  // betroffenen Seiten aus der 409-Antwort von DELETE /api/me.
+  // Callers need the error body, e.g. the list of affected pages
+  // from the 409 response of DELETE /api/me.
   it('hängt den JSON-Body des Fehlers als data an', async () => {
     const body = { error: 'konflikt', code: 'sole_admin_pages', pages: [{ id: 1 }] }
     global.fetch = vi.fn().mockResolvedValue(res(409, body))
@@ -141,8 +141,8 @@ describe('useApi', () => {
     expect(useAuth().token.value).toBeFalsy()
   })
 
-  // Ein falsches Passwort (401 von /api/login, ohne Token) ist kein
-  // Sitzungsende. Bisher wurde jede 401 zu „Sitzung abgelaufen“.
+  // A wrong password (401 from /api/login, without token) is no end of
+  // session. Previously every 401 became "session expired".
   it('401 ohne gesendetes Token ist kein Sitzungsende und trägt die Server-Meldung', async () => {
     global.fetch = vi.fn().mockResolvedValue(res(401, { error: 'Invalid email or password' }))
     const err = await useApi().apiFetch('/api/login', { method: 'POST', auth: false }).catch(e => e)
@@ -151,8 +151,8 @@ describe('useApi', () => {
     expect(isSessionExpired(err)).toBe(false)
   })
 
-  // Der Login schickt ein evtl. noch gespeichertes, veraltetes
-  // Token nicht mit, damit sein 401 nie als Sitzungsende gilt.
+  // The login does not send a possibly still stored, stale token,
+  // so its 401 never counts as the end of a session.
   it('sendet bei auth: false kein Token und meldet bei 401 nicht ab', async () => {
     useAuth().setAuth('jwt-alt', { email: 'a@x.de' })
     global.fetch = vi.fn().mockResolvedValue(res(401, { error: 'Invalid email or password' }))
@@ -163,8 +163,8 @@ describe('useApi', () => {
     expect(useAuth().token.value).toBe('jwt-alt')
   })
 
-  // Eine 401 von Caddys Basic Auth (WWW-Authenticate: Basic)
-  // betrifft den vorgeschalteten Zugang, nicht die App-Sitzung.
+  // A 401 from Caddy's Basic Auth (WWW-Authenticate: Basic)
+  // concerns the upstream access, not the app session.
   it.each(['Basic realm="restricted"', 'basic'])('401 mit WWW-Authenticate %s meldet nicht ab', async (challenge) => {
     useAuth().setAuth('jwt-1', { email: 'a@x.de' })
     global.fetch = vi.fn().mockResolvedValue({ ...res(401), headers: new Headers({ 'WWW-Authenticate': challenge }) })
@@ -184,7 +184,7 @@ describe('useApi', () => {
     expect(isSessionExpired(err)).toBe(true)
   })
 
-  // Die Meldungen kamen bisher fest auf Deutsch, auch in der englischen Oberfläche.
+  // The messages used to be hard-coded in German, even in the English UI.
   it('übersetzt die eigenen Fehlermeldungen in die aktive Sprache', async () => {
     i18n.global.locale.value = 'en'
     try {
@@ -206,8 +206,8 @@ describe('useApi', () => {
     expect(isSessionExpired(undefined)).toBe(false)
   })
 
-  // Das Login-Token geht über X-Auth-Token; Authorization bleibt
-  // frei, damit der Browser Caddys Basic-Auth-Zugangsdaten selbst mitschickt.
+  // The login token goes via X-Auth-Token; Authorization stays free,
+  // so the browser sends Caddy's Basic Auth credentials itself.
   it.each([
     ['eingeloggt', 'jwt-1', 'jwt-1'],
     ['ausgeloggt', '', undefined],
@@ -232,6 +232,15 @@ describe('useApi', () => {
     expect(err.status).toBe(502)
   })
 
+  it('ruft absolute URLs unverändert auf, ohne die API-Basis voranzustellen', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.example.test')
+    global.fetch = vi.fn().mockResolvedValue(res(200, {}))
+    await useApi().apiFetch('https://extern.example.test/x')
+    await useApi().apiFetch('/api/x')
+    vi.unstubAllEnvs()
+    expect(global.fetch.mock.calls.map(([u]) => u)).toEqual(['https://extern.example.test/x', 'https://api.example.test/api/x'])
+  })
+
   it('liefert JSON bei Erfolg und null bei 204', async () => {
     global.fetch = vi.fn().mockResolvedValueOnce(res(200, { a: 1 })).mockResolvedValueOnce(res(204))
     expect(await useApi().apiFetch('/api/x')).toEqual({ a: 1 })
@@ -244,7 +253,7 @@ describe('useApi', () => {
     expect(err.status).toBeUndefined()
   })
 
-  // Der Browser-TypeError ist englisch und je Browser verschieden.
+  // The browser's TypeError is English and differs per browser.
   it.each(['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource.'])(
     'zeigt bei Netzwerkfehler (%s) eine übersetzte Meldung statt des Browsertexts', async (browserText) => {
       global.fetch = vi.fn().mockRejectedValue(new TypeError(browserText))
@@ -254,7 +263,7 @@ describe('useApi', () => {
       expect(err.network).toBe(true)
     })
 
-  // 200 mit HTML-Body (Proxy) zeigte "Unexpected token '<' ...".
+  // 200 with an HTML body (proxy) used to show "Unexpected token '<' ...".
   it('zeigt bei unlesbarem Erfolgs-Body keinen rohen Parserfehler', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true, status: 200, headers: new Headers(), json: async () => { throw new SyntaxError("Unexpected token '<'") },

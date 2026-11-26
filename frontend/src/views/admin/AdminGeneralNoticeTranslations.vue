@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGeneralNoticeTranslations } from '../../composables/useGeneralNoticeTranslations'
@@ -6,8 +6,8 @@ import { useAdminTranslationsPanel } from '../../composables/useAdminTranslation
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import TranslationsView from '../../components/TranslationsView.vue'
 
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({ noticeId: String })
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, so instrumented code must not reference local variables there
+const props = defineProps<{ noticeId: string }>()
 
 const { t } = useI18n()
 
@@ -25,7 +25,7 @@ const {
   overviewPath: '/admin/notices',
 })
 
-// Richtung C: Brotkrumen „Seite › Ankündigungen › Übersetzungen“.
+// Direction C: breadcrumbs "Page › Notices › Translations".
 const breadcrumbs = usePageCrumbs(computed(() => t('noticeTranslations.heading')), {
   extra: [{ label: t('notices.title'), to: '/admin/notices' }],
 })

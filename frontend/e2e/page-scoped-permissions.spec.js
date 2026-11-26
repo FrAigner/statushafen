@@ -1,16 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Regressionstest: hasPerm() im Frontend prüfte bisher nur die globale Rolle des
-// Nutzers (aus dem Login-Response) und ignorierte seitenbezogene
-// UserStatusPageRole-Zuweisungen komplett. Ein Nutzer, dem ein Admin explizit
-// "Page Admin" (o.ä.) auf einer bestimmten Statusseite zugewiesen hatte, sah dort
-// trotzdem keine Schreib-Buttons. Der seed-User "Editor" hat laut SeedData() genau
-// eine UserStatusPageRole: Editor-Rolle ("components:read,incidents:read,
-// incidents:create/update/delete", das alte Sammelrecht „write“ gibt es nicht mehr) auf "Acme Corp Status" — das reproduziert den Bug ohne eigens
-// eine Custom-Rolle anlegen zu müssen.
+// Regression test: hasPerm() in the frontend used to check only the user's
+// global role (from the login response) and completely ignored page-scoped
+// UserStatusPageRole assignments. A user whom an admin had explicitly assigned
+// "Page Admin" (or similar) on a specific status page still saw no write
+// buttons there. According to SeedData() the seed user "Editor" has exactly
+// one UserStatusPageRole: the Editor role ("components:read,incidents:read,
+// incidents:create/update/delete"; the old catch-all permission "write" no longer exists) on "Acme Corp Status" — this reproduces the bug without
+// having to create a custom role.
 test.describe('Page-scoped permissions', () => {
   test('Editor sieht Schreibrechte nur für die Berechtigung, die seine Seiten-Rolle tatsächlich gewährt', async ({ page }) => {
     await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
@@ -19,11 +19,11 @@ test.describe('Page-scoped permissions', () => {
     await page.locator('button.btn-login').click();
     await expect(page).toHaveURL(/\/admin\/components/);
 
-    // Editor hat "incidents:create" auf "Acme Corp Status" -> Button muss erscheinen.
+    // Editor has "incidents:create" on "Acme Corp Status" -> the button must appear.
     await page.goto(`http://localhost:${PORT}/admin/incidents`);
     await expect(page.locator('button, a', { hasText: '+ Neuer Vorfall' })).toBeVisible();
 
-    // Editor hat kein "components:create" -> Button darf nicht erscheinen.
+    // Editor has no "components:create" -> the button must not appear.
     await page.goto(`http://localhost:${PORT}/admin/components`);
     await expect(page.locator('button, a', { hasText: '+ Neue Komponente' })).toHaveCount(0);
   });
@@ -42,15 +42,15 @@ test.describe('Page-scoped permissions', () => {
     await expect(page.locator('button, a', { hasText: '+ Neuer Vorfall' })).toBeVisible();
   });
 
-  // Regressionstest: Das Badge zeigte immer currentUser.role, also die
-  // globale Rolle aus dem Login-JWT — unabhängig davon, welche Rolle der Nutzer
-  // tatsächlich per UserStatusPageRole auf der aktiven Statusseite hat. Der
-  // seed-User "viewer" ist laut SeedData() global nur "Viewer", aber auf
-  // "Acme Corp Status" explizit als "Page Admin" eingetragen. Nutzer sahen dadurch
-  // "Viewer" im Badge, obwohl sie auf der Seite tatsächlich volle Schreibrechte
-  // hatten (und Admin-UIs, die sich auf das Badge verließen, waren irreführend).
-  // Das Badge selbst sitzt seit der Umstellung in der Sidebar (unten links) statt in
-  // der Topbar.
+  // Regression test: the badge always showed currentUser.role, i.e. the
+  // global role from the login JWT — regardless of which role the user actually
+  // has on the active status page via UserStatusPageRole. According to
+  // SeedData() the seed user "viewer" is only "Viewer" globally, but explicitly
+  // registered as "Page Admin" on "Acme Corp Status". Users therefore saw
+  // "Viewer" in the badge although they actually had full write rights on the
+  // page (and admin UIs relying on the badge were misleading).
+  // Since the redesign the badge itself sits in the sidebar (bottom left) instead
+  // of the top bar.
   test('Badge zeigt die seitenbezogene Rolle, nicht die abweichende globale Rolle', async ({ page }) => {
     await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('viewer@statushafen.local');
@@ -61,8 +61,8 @@ test.describe('Page-scoped permissions', () => {
     await page.getByRole('button', { name: /Benutzermenü/ }).click();
     await expect(page.locator('.user-menu-info small')).toHaveText('Page Admin');
 
-    // Und weil die Rolle tatsächlich "Page Admin" ist, muss auch der
-    // components:create-Button erscheinen (Viewer allein hätte den nicht).
+    // And because the role really is "Page Admin", the components:create
+    // button must appear too (Viewer alone would not have it).
     await expect(page.locator('button, a', { hasText: '+ Neue Komponente' })).toBeVisible();
   });
 });

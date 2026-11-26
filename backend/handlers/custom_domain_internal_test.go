@@ -15,8 +15,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Scheitert die Abfrage, ob eine andere Seite die Domain schon verifiziert
-// trägt, wird nichts gespeichert (fail closed): 500 statt Verifizierung.
+// If the query whether another page has already verified the domain
+// fails, nothing is saved (fail closed): 500 instead of verification.
 func TestVerifyCustomDomain_LiveCheckDBErrorFailsClosed(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupCustomDomainRouter(NewHandler(db))
@@ -27,7 +27,7 @@ func TestVerifyCustomDomain_LiveCheckDBErrorFailsClosed(t *testing.T) {
 		return []string{"statushafen-verify=tok-live-err"}, nil
 	})
 
-	// Die erste Abfrage auf status_pages lädt die Seite, die zweite ist der Live-Check.
+	// The first query on status_pages loads the page, the second is the live check.
 	removeFail := injectDBError(t, db, "query", "status_pages", 1)
 	w := doJSONRequest(r, "POST", "/api/admin/pages/"+strconv.Itoa(int(page.ID))+"/custom-domain/verify", nil)
 
@@ -70,9 +70,9 @@ func TestWarnIfCustomDomainCheckUnprotected(t *testing.T) {
 	})
 }
 
-// Fehlerpfade der Domain-Endpunkte: ungültige Seiten-ID, keine Domain
-// eingetragen, fehlender Host bzw. fehlende Domain bei den öffentlichen und
-// internen Abfragen. Alle antworten ohne Seiteneffekt.
+// Error paths of the domain endpoints: invalid page ID, no domain
+// registered, missing host or domain in the public and
+// internal queries. All respond without side effects.
 func TestCustomDomainEndpoints_InputErrors(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("CADDY_INTERNAL_TOKEN", "")

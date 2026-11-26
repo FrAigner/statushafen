@@ -6,21 +6,21 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// subscriberCreatorDTO: was die Abonnentenliste vom anlegenden
-// Konto zeigt. Früher ging das ganze models.User-Objekt hinaus (E-Mail,
-// SSOProvider, SSOSubject, IsGlobalAdmin, Rolle samt Permissions,
-// PreferredLanguage) – auch von Konten fremder Mandanten, die die Seite nur
-// abonniert haben. Jetzt nur die E-Mail, und die nur, wenn das Konto selbst
-// zum Personal dieser Seite gehört oder der Anfragende selbst ist. Sonst bleibt Email leer; das Objekt selbst
-// bedeutet weiterhin "mit einem Konto verknüpft" (Frontend: Hinweis "kann das
-// Abo selbst verwalten").
+// subscriberCreatorDTO: what the subscriber list shows of the creating
+// account. Previously the whole models.User object went out (email,
+// SSOProvider, SSOSubject, IsGlobalAdmin, role including permissions,
+// PreferredLanguage) – also from accounts of other tenants that merely
+// subscribed to the page. Now only the email, and only if the account itself
+// belongs to the staff of this page or is the requester. Otherwise Email stays empty; the object itself
+// still means "linked to an account" (frontend: hint "can manage the
+// subscription itself").
 type subscriberCreatorDTO struct {
 	Email string
 }
 
-// subscriberDTO ist die Ausgabeform eines Abonnenten für Admin-Antworten.
-// Die JSON-Schlüssel entsprechen den bisherigen (Go-Feldnamen), ohne
-// StatusPage, DeletedAt und CreatedByUserID.
+// subscriberDTO is the output form of a subscriber for admin responses.
+// The JSON keys correspond to the previous ones (Go field names), without
+// StatusPage, DeletedAt and CreatedByUserID.
 type subscriberDTO struct {
 	ID                     uint
 	CreatedAt              time.Time
@@ -35,8 +35,8 @@ type subscriberDTO struct {
 	CreatedBy              *subscriberCreatorDTO
 }
 
-// subscriberDTOs wandelt Abonnenten einer Seite in DTOs um. Die Abfrage der
-// Seitenrollen läuft einmal für alle Ersteller.
+// subscriberDTOs converts subscribers of a page into DTOs. The query of the
+// page roles runs once for all creators.
 func (h *Handler) subscriberDTOs(subs []models.Subscriber, pageID, viewerID uint) []subscriberDTO {
 	ids := make([]uint, 0, len(subs))
 	for _, s := range subs {
@@ -75,8 +75,8 @@ func (h *Handler) subscriberDTOs(subs []models.Subscriber, pageID, viewerID uint
 		}
 		if s.CreatedByUserID != nil {
 			d.CreatedBy = &subscriberCreatorDTO{Email: emails[*s.CreatedByUserID]}
-			// Eigene Daten: der Anfragende sieht seine Adresse immer, auch als
-			// Global Admin ohne Seitenrolle.
+			// Own data: the requester always sees their address, even as
+			// Global Admin without a page role.
 			if viewerID != 0 && *s.CreatedByUserID == viewerID {
 				d.CreatedBy.Email = viewerEmail
 			}

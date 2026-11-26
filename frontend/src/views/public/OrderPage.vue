@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../../composables/useApi'
@@ -9,14 +9,14 @@ import '../../assets/entry.css'
 const { t } = useI18n()
 const { apiFetch } = useApi()
 
-// Ist die Self-Service-Bestellung deaktiviert, zeigt die Seite statt
-// des Formulars einen Hinweis. Default true (optimistisch) - das Backend lehnt
-// einen Absenden-Versuch im Zweifel ohnehin mit 403 ab.
+// When self-service ordering is disabled, the page shows a notice instead
+// of the form. Default true (optimistic) - the backend rejects
+// a submit attempt with 403 anyway if in doubt.
 const ordersEnabled = ref(true)
 
 onMounted(async () => {
   try {
-    const flag = await apiFetch('/api/public/orders/enabled')
+    const flag = await apiFetch<{ enabled: boolean }>('/api/public/orders/enabled')
     ordersEnabled.value = flag.enabled
   } catch (err) {
     console.error('Failed to load orders flag', err)
@@ -26,16 +26,16 @@ onMounted(async () => {
 const companyName = ref('')
 const email = ref('')
 const slug = ref('')
-// Beispieladresse im Hinweis: <Wunsch>.<Basisdomain>, ohne Basisdomain der Pfad /status/<Wunsch>.
+// Example address in the hint: <wish>.<base domain>, without a base domain the path /status/<wish>.
 const slugHint = computed(() => {
   const base = primaryBaseDomain()
   const example = t('order.slugExample')
   return t('order.slugHint', { address: base ? `${example}.${base}` : `/status/${example}` })
 })
-// Honeypot: echte Nutzer sehen/befüllen dieses Feld nie (per CSS
-// versteckt + tabindex="-1"). Ein befüllter Wert lässt das Backend die
-// Bestellung stillschweigend verwerfen, ohne dem Bot ein Erkennungssignal zu
-// geben - die Erfolgsmeldung bleibt identisch.
+// Honeypot: real users never see/fill this field (hidden via CSS
+// + tabindex="-1"). A filled value makes the backend silently discard the
+// order without giving the bot a detection signal
+// - the success message stays identical.
 const website = ref('')
 
 const submitting = ref(false)
@@ -57,7 +57,7 @@ async function submitOrder() {
     })
     submitted.value = true
   } catch (err) {
-    errorMessage.value = serverInputErrorText(err, t) || err.message
+    errorMessage.value = serverInputErrorText(err, t) || (err as Error).message
   } finally {
     submitting.value = false
   }
@@ -113,7 +113,7 @@ async function submitOrder() {
             <p class="field-hint entry-hint">{{ slugHint }}</p>
           </div>
 
-          <!-- Honeypot: für echte Nutzer per CSS unsichtbar, aber im DOM vorhanden -->
+          <!-- Honeypot: invisible to real users via CSS, but present in the DOM -->
           <div class="honeypot-field entry-honeypot" aria-hidden="true">
             <label for="order-website">{{ t('order.honeypotLabel') }}</label>
             <input id="order-website" v-model="website" type="text" tabindex="-1" autocomplete="off" />

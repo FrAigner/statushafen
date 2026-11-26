@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Wer eine Seite verlassen hat (Rolle entzogen), darf die von ihm für Dritte
-// angelegten Abonnenten weder über /api/me/subscription ändern oder löschen
-// noch im Export /api/me/export sehen: created_by_user_id ist nur so lange ein
-// Besitzrecht, wie der Ersteller noch eine Rolle auf der Seite hat. Das
-// Selbst-Abo über die eigene E-Mail-Adresse bleibt davon unberührt.
+// Whoever has left a page (role revoked) may neither change or delete the subscribers
+// they created for third parties via /api/me/subscription
+// nor see them in the export /api/me/export: created_by_user_id is only an
+// ownership right as long as the creator still has a role on the page. The
+// self-subscription via the own email address remains unaffected.
 func TestMeSubscription_EntzogenerAdminBehaeltKeinenZugriff(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -91,7 +91,7 @@ func TestMeSubscription_EntzogenerAdminBehaeltKeinenZugriff(t *testing.T) {
 		sub := models.Subscriber{StatusPageID: page.ID, Channel: "email", Email: "kunde-a@example.org", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive, CreatedByUserID: &admin.ID}
 		require.NoError(t, db.Create(&sub).Error)
 
-		// Gegenprobe: solange die Rolle besteht, gilt das Besitzrecht.
+		// Control case: as long as the role exists, the ownership right applies.
 		require.Equal(t, http.StatusOK, call(http.MethodGet, admin, page.Slug, "").Code)
 		assert.Contains(t, export(admin), "kunde-a@example.org")
 

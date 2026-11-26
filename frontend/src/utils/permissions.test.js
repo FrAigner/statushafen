@@ -28,7 +28,7 @@ describe('grants', () => {
     expect(grants(['components:create'], 'components:read')).toBe(true)
   })
 
-  // Kompatibilität: der Altwert :write gilt als alle vier Aktionen.
+  // Compatibility: the legacy value :write counts as all four actions.
   it('zählt den Altwert :write als create, read, update und delete derselben Ressource', () => {
     for (const act of ACTIONS) expect(grants('components:write', perm('components', act))).toBe(true)
     expect(grants('components:write', 'incidents:read')).toBe(false)
@@ -60,7 +60,7 @@ describe('Ressourcenliste', () => {
     expect(isGlobalResource('unbekannt')).toBe(false)
   })
 
-  // Drift-Test: backend/permissions/permissions.go ist die Quelle.
+  // Drift test: backend/permissions/permissions.go is the source.
   it('entspricht der Ressourcenliste des Backends', () => {
     const go = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../backend/permissions/permissions.go'), 'utf8')
     const groups = { GroupOperations: 'operations', GroupContent: 'content', GroupManagement: 'management', GroupSystem: 'system' }

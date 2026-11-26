@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Eine Antwort, die sich nicht als JSON kodieren lässt (NaN), darf
-// nicht in den 60-s-Cache. Altes Fehlbild: gin setzt in c.JSON den Status 200
-// vor dem Kodieren, bei NaN bekam der Client 200 mit leerem Body (der Fehler
-// lag nur in c.Errors) und die kaputte Antwort blieb 60 s im Cache.
+// A response that cannot be encoded as JSON (NaN) must
+// not go into the 60 s cache. Old failure mode: gin sets status 200 in c.JSON
+// before encoding, with NaN the client got 200 with an empty body (the error
+// was only in c.Errors) and the broken response stayed in the cache for 60 s.
 func TestRespondAvailability_KaputteAntwortWirdNichtGecacht(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &Handler{}

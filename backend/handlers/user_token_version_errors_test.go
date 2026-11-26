@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Scheitert beim Ändern oder Löschen eines Kontos ein Schritt, rollt die
-// Transaktion alles zurück: kein neues Passwort, keine halbe Rollenänderung,
-// und die Token-Version bleibt unverändert (bestehende Sitzungen gelten weiter,
-// weil nichts geändert wurde).
+// If a step fails when changing or deleting an account, the
+// transaction rolls everything back: no new password, no half role change,
+// and the token version stays unchanged (existing sessions remain valid
+// because nothing was changed).
 func TestUserUpdateDelete_FailureRollsBackIncludingTokenVersion(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -62,7 +62,7 @@ func TestUserUpdateDelete_FailureRollsBackIncludingTokenVersion(t *testing.T) {
 
 	t.Run("Token-Version erhöhen scheitert beim Ändern", func(t *testing.T) {
 		u, path := newTarget("bump-fehler@example.com")
-		failDB(t, db, "update", "users", 1) // erstes Update (Felder) gelingt, das zweite (Version) scheitert
+		failDB(t, db, "update", "users", 1) // first update (fields) succeeds, the second (version) fails
 		code := call(http.MethodPut, path, map[string]any{"email": u.Email, "password": "neues-Passwort-1"})
 		assert.Equal(t, http.StatusInternalServerError, code)
 		got := reload(u)

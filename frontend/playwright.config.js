@@ -1,8 +1,8 @@
 // @ts-check
 import { defineConfig, devices } from '@playwright/test';
 
-// E2E_PORT erlaubt einen zweiten Vite-Dev-Server (z. B. aus einem Worktree), ohne den auf
-// 5173 zu stören. Alle Specs lesen den Port aus derselben Variable.
+// E2E_PORT allows a second Vite dev server (e.g. from a worktree) without disturbing the one on
+// 5173. All specs read the port from the same variable.
 const PORT = process.env.E2E_PORT || '5173';
 
 export default defineConfig({
@@ -14,8 +14,8 @@ export default defineConfig({
   reporter: 'html',
   use: {
     baseURL: `http://localhost:${PORT}`,
-    // Die Specs prüfen deutsche Texte; ohne feste Sprache und Zeitzone hängt das Ergebnis
-    // vom Rechner ab (Playwright-Standard ist en-US), seit die UI die Browsersprache übernimmt.
+    // The specs check German texts; without a fixed locale and time zone the result depends on the
+    // machine (Playwright defaults to en-US), since the UI follows the browser language.
     locale: 'de-DE',
     timezoneId: 'Europe/Berlin',
     trace: 'on-first-retry',

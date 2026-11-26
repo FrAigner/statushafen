@@ -5,17 +5,17 @@ import { fileURLToPath } from 'url'
 
 const raw = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'style.css'), 'utf8')
 
-// Kommentare enthalten Klammern und Semikolons und würden die Regelsuche stören.
+// Comments contain braces and semicolons and would disturb the rule search.
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, '')
 
-// Komponentenseite nach Richtung C: happy-dom rechnet kein CSS aus
-// Dateien. Diese Tests prüfen deshalb den Quelltext von style.css auf die
-// Deklarationen, deren Fehlen drei sichtbare Fehler verursacht hat:
-//  1. Das Seitenformular saß ~150 px unter der Oberkante der Liste.
-//  2. Der Sprachwähler im Admin-Kopf zeigte den Browser-Pfeil.
-//  3. .action-btn als Link (<a>) war anders groß als als <button>.
+// Components page in direction C: happy-dom does not compute CSS from
+// files. These tests therefore check the style.css source for the
+// declarations whose absence caused three visible bugs:
+//  1. The side form sat ~150 px below the top of the list.
+//  2. The language switcher in the admin header showed the browser arrow.
+//  3. .action-btn as a link (<a>) had a different size than as a <button>.
 
-// Alle Regelblöcke, deren Selektorliste `selector` als eigenen Selektor enthält.
+// All rule blocks whose selector list contains `selector` as a selector of its own.
 function blocks(selector) {
   const found = []
   for (const m of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
@@ -30,8 +30,8 @@ describe('style.css: Seitenformular (.form-panel)', () => {
   it('klebt 16 px unter dem Scrollbereich, ohne die Topbar-Höhe noch einmal abzuziehen', () => {
     const rule = declared('.form-panel')
     expect(rule).toMatch(/position:\s*sticky/)
-    // Der Scrollbereich (main.admin-content) beginnt unter der Topbar; 122 px
-    // obendrauf schoben das Formular unter die Listen-Oberkante.
+    // The scroll area (main.admin-content) starts below the top bar; an extra
+    // 122 px pushed the form below the top of the list.
     expect(rule).toMatch(/inset-block-start:\s*var\(--sp-4\)\s*;/)
     expect(rule).not.toMatch(/122px/)
   })
@@ -103,7 +103,7 @@ describe('style.css: Felder und Tabelle der Komponentenseite', () => {
   })
 })
 
-// Betreiber-Wunsch 31.10.: Verhältnis Liste : Formular etwa 2 : 1 (vorher Formular höchstens 400 px).
+// Operator request 31.10.: list : form ratio roughly 2 : 1 (previously the form was at most 400 px).
 describe('style.css: Verhältnis Liste zu Seitenformular (.split--open)', () => {
   it('Liste zwei Teile, Formular ein Teil mit Mindestbreite 360 px', () => {
     expect(declared('.split--open')).toMatch(/grid-template-columns:\s*minmax\(0,\s*2fr\)\s*minmax\(360px,\s*1fr\)/)

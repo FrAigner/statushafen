@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useSaveAction, useDeleteAction } from './useAdminCrudActions'
 import { stubConfirm } from '../test-support/confirm'
 
-// onSuccess bekommt die Antwort (neue ID) und wird abgewartet, bevor neu geladen wird.
+// onSuccess receives the response (new ID) and is awaited before reloading.
 describe('useSaveAction', () => {
   it('reicht die Antwort an onSuccess und wartet darauf, bevor die Liste neu geladen wird', async () => {
     const order = []
@@ -31,7 +31,7 @@ describe('useSaveAction', () => {
   })
 })
 
-// onStart räumt die Meldung des vorigen Schritts ab, onDeleted meldet das Löschen.
+// onStart clears the message of the previous step, onDeleted reports the deletion.
 describe('onStart / onDeleted', () => {
   it('ruft onStart beim Speichern vor der Anfrage auf', async () => {
     const order = []

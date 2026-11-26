@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// silentSMTPServer nimmt Verbindungen an und antwortet nie (hängender
-// SMTP-Server).
+// silentSMTPServer accepts connections and never replies (hanging
+// SMTP server).
 func silentSMTPServer(t *testing.T) (host, port string) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -60,7 +60,7 @@ func TestDeliverMail_HangingSMTPServerTimesOut(t *testing.T) {
 }
 
 func TestDeliverMail_UnreachableServerFailsWithoutBlocking(t *testing.T) {
-	// Gegenprobe zum Verbindungsfehler: nichts lauscht auf dem Port.
+	// Counter-check to the connection error: nothing is listening on the port.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	host, port, _ := net.SplitHostPort(ln.Addr().String())

@@ -7,7 +7,7 @@ import { useApi } from './useApi'
 import { useFormTranslations } from './useFormTranslations'
 import FormLanguageSwitch from '../components/FormLanguageSwitch.vue'
 
-// „Übersetzen“-Knopf im Sprachumschalter (Composable + Komponente).
+// "Translate" button in the language switcher (composable + component).
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }]
@@ -124,7 +124,7 @@ describe('Übersetzen-Knopf', () => {
     expect(wrapper.find('[data-test="lang-translate-error"]').text()).toContain(text)
     expect(trans.draftOf('fr').title).toBe('Vorhandener Titel')
     expect(trans.translating.value).toBe(false)
-    // Sprachwechsel löscht die Meldung
+    // switching the language clears the message
     trans.active.value = 'en'
     await flushPromises()
     expect(wrapper.find('[data-test="lang-translate-error"]').exists()).toBe(false)

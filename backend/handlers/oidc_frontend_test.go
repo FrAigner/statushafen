@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Frontend-Einstieg für das Seiten-SSO (Login-Knopf, Verknüpfen im
-// Profil, Testanmeldung aus der SSO-Seite) und Auswertung der Claim-Felder.
+// Frontend entry for page SSO (login button, linking in the
+// profile, test login from the SSO page) and evaluation of the claim fields.
 
 func serveWithParams(handler gin.HandlerFunc, method, target string, params gin.Params, userID uint) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
@@ -36,7 +36,7 @@ func (f *oidcFixture) updateSSO(t *testing.T, column string, value interface{}) 
 		Update(column, value).Error)
 }
 
-// --- Öffentliche Abfrage: ist OIDC für die Seite aktiv? ---
+// --- Public query: is OIDC active for the page? ---
 
 func TestPublicOIDC_ReportsOnlyWhetherActive(t *testing.T) {
 	f := newOIDCFixture(t)
@@ -68,7 +68,7 @@ func TestPublicOIDC_UnknownPage(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-// --- Claims aus der Konfiguration ---
+// --- Claims from the configuration ---
 
 func TestOIDCCallback_UsesConfiguredNameClaim(t *testing.T) {
 	f := newOIDCFixture(t)
@@ -92,7 +92,7 @@ func TestOIDCLink_StoresConfiguredEmailClaim(t *testing.T) {
 	var ident models.UserSSOIdentity
 	require.NoError(t, f.db.First(&ident).Error)
 	assert.Equal(t, "erika@idp.example.org", ident.Email)
-	// Die E-Mail des Kontos selbst bleibt unberührt (keine Zuordnung über die E-Mail).
+	// The account's own email remains untouched (no matching via email).
 	var user models.User
 	require.NoError(t, f.db.First(&user, f.user.ID).Error)
 	assert.Equal(t, "erika@example.org", user.Email)
@@ -119,7 +119,7 @@ func TestClaimString(t *testing.T) {
 	assert.Empty(t, claimString(claims, ""))
 }
 
-// --- Fehler im Callback als Redirect ---
+// --- Errors in the callback as redirect ---
 
 func TestOIDCCallback_ProviderErrorRedirectsWithCode(t *testing.T) {
 	f := newOIDCFixture(t)
@@ -129,7 +129,7 @@ func TestOIDCCallback_ProviderErrorRedirectsWithCode(t *testing.T) {
 
 	w := serveOIDC(f.h.OIDCCallbackHandler, http.MethodGet, "/api/auth/oidc/callback?"+q.Encode(), ck, 0)
 
-	// Nur der feste Code landet in der URL, nichts aus der Antwort des Anbieters.
+	// Only the fixed code ends up in the URL, nothing from the provider's response.
 	assertOIDCError(t, w, "/login", "provider_denied")
 }
 
@@ -148,7 +148,7 @@ func TestSSOErrorURL_TargetsByFlow(t *testing.T) {
 	assert.Equal(t, "https://status.example.org/admin/sso?oidc_test=not_linked", ssoErrorURL(true, 0, errOIDCNotLinked))
 }
 
-// --- Testanmeldung (test_login_enabled) ---
+// --- Test login (test_login_enabled) ---
 
 func (f *oidcFixture) startTest(t *testing.T, pageParam string) (*httptest.ResponseRecorder, string, *http.Cookie) {
 	t.Helper()
@@ -274,7 +274,7 @@ func TestSSOTest_IncompleteConfigCases(t *testing.T) {
 	}
 }
 
-// --- Verknüpfungen im Profil ---
+// --- Links in the profile ---
 
 func (f *oidcFixture) mySSO(t *testing.T, userID uint) (int, mySSOResponse) {
 	t.Helper()
@@ -292,8 +292,8 @@ func (f *oidcFixture) ssoPage(t *testing.T, name, slug string, enabled bool, mut
 	if mutate != nil {
 		mutate(&page)
 	}
-	// Create überschreibt Nullwerte mit dem DB-Default (is_public_indexed=true),
-	// deshalb die gewünschten Werte vorher merken und danach setzen.
+	// Create overwrites zero values with the DB default (is_public_indexed=true),
+	// so remember the desired values beforehand and set them afterwards.
 	flags := map[string]interface{}{"is_private": page.IsPrivate, "is_public_indexed": page.IsPublicIndexed}
 	require.NoError(t, f.db.Create(&page).Error)
 	require.NoError(t, f.db.Model(&page).Updates(flags).Error)
@@ -332,7 +332,7 @@ func TestMySSO_ListsIdentitiesAndLinkablePublicPages(t *testing.T) {
 	assert.Equal(t, "OIDC-Seite", body.Identities[0].PageName)
 	assert.Equal(t, "erika@idp.example.org", body.Identities[0].Email)
 	assert.NotZero(t, body.Identities[0].ID)
-	// Die schon verknüpfte Seite erscheint nicht noch einmal als verknüpfbar.
+	// The already linked page does not appear again as linkable.
 	assert.Equal(t, []uint{public.ID}, linkablePageIDs(body))
 	assert.Equal(t, "Öffentlich", body.Linkable[0].PageName)
 }
@@ -414,7 +414,7 @@ func TestDeleteMySSO_UnknownUser(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-// --- Private Seiten: Seiten-ID und SSO-Art nur für Berechtigte ---
+// --- Private pages: page ID and SSO kind only for authorized users ---
 
 func TestPublicOIDC_PrivatePageAnswersLikeMissingPageWithoutPermission(t *testing.T) {
 	f := newOIDCFixture(t)

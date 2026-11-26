@@ -2,7 +2,7 @@ package models
 
 // the single place in the backend that defines which incident and
 // maintenance statuses exist and which count as "resolved". The frontend
-// mirrors the rule in frontend/src/utils/incidentStatus.js
+// mirrors the rule in frontend/src/utils/incidentStatus.ts
 // (RESOLVED_INCIDENT_STATUSES) and has a test that compares both.
 const (
 	IncidentStatusInvestigating = "investigating"

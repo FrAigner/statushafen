@@ -25,7 +25,7 @@ func loginAttempt(r *gin.Engine, email, password string) *httptest.ResponseRecor
 	return loginAttemptFrom(r, "192.0.2.1:1234", email, password)
 }
 
-// loginAttemptFrom schickt den Versuch von der angegebenen Absenderadresse (ip:port).
+// loginAttemptFrom sends the attempt from the given sender address (ip:port).
 func loginAttemptFrom(r *gin.Engine, remoteAddr, email, password string) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
 	req := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewReader(body))
@@ -36,10 +36,10 @@ func loginAttemptFrom(r *gin.Engine, remoteAddr, email, password string) *httpte
 	return w
 }
 
-// Die Sperre gilt je Paar aus Konto und Quelle. Nach zehn Fehlversuchen ist die
-// Quelle gesperrt, und die Sperre sieht für bekannte und unbekannte Adressen
-// gleich aus. Ein Angreifer, der nur die Adresse kennt, sperrt damit aber nicht
-// den echten Nutzer, der von einer anderen Quelle kommt.
+// The lockout applies per pair of account and source. After ten failed attempts the
+// source is locked, and the lockout looks the same for known and unknown addresses.
+// An attacker who only knows the address thus does not lock out
+// the real user coming from a different source.
 func TestLogin_ThrottleBlocksSourceButNotOwnerElsewhere(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -64,7 +64,7 @@ func TestLogin_ThrottleBlocksSourceButNotOwnerElsewhere(t *testing.T) {
 		assert.NotEmpty(t, w.Header().Get("Retry-After"))
 	}
 	assert.Equal(t, known.Body.String(), unknown.Body.String(), "Antwort verrät nicht, ob das Konto existiert")
-	// Die Restzeit unterscheidet sich nur um die verstrichene Zeit (mit -race dauert bcrypt rund eine Sekunde).
+	// The remaining time differs only by the elapsed time (with -race bcrypt takes about a second).
 	for _, w := range []*httptest.ResponseRecorder{known, unknown} {
 		secs, err := strconv.Atoi(w.Header().Get("Retry-After"))
 		require.NoError(t, err)
@@ -72,18 +72,18 @@ func TestLogin_ThrottleBlocksSourceButNotOwnerElsewhere(t *testing.T) {
 		assert.Positive(t, secs)
 	}
 
-	// Der echte Nutzer von einer anderen Quelle kann sich anmelden.
+	// The real user from a different source can sign in.
 	assert.Equal(t, http.StatusOK, loginAttemptFrom(r, "203.0.113.20:5000", "ziel@example.com", "RichtigesPasswort1").Code)
 
-	// Gegenprobe: ein anderes Konto ist unberührt, und dasselbe Konto ist von
-	// der gesperrten Quelle nach Normalisierung der Schreibweise ebenfalls gesperrt.
+	// Control check: a different account is untouched, and the same account is also
+	// locked from the locked source after normalizing the spelling.
 	require.NoError(t, db.Create(&models.User{Email: "anderes@example.com", PasswordHash: testutils.MustHash("RichtigesPasswort2")}).Error)
 	assert.Equal(t, http.StatusOK, loginAttemptFrom(r, attacker, "anderes@example.com", "RichtigesPasswort2").Code)
 	assert.Equal(t, http.StatusTooManyRequests, loginAttemptFrom(r, attacker, " ZIEL@example.com ", "RichtigesPasswort1").Code)
 }
 
-// 100 gleichzeitige Fehlversuche derselben Quelle gegen dasselbe Konto: nur die
-// Schwelle kommt durch (Prüfen und Zählen sind ein Schritt).
+// 100 concurrent failed attempts from the same source against the same account: only the
+// threshold gets through (checking and counting are one step).
 func TestLogin_ParallelWrongPasswordsStopAtThreshold(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -131,9 +131,9 @@ func TestLogin_SuccessResetsPairCounter(t *testing.T) {
 	}
 }
 
-// Bei unbekanntem Konto läuft derselbe bcrypt-Vergleich wie bei bekanntem, die
-// Laufzeit verrät also nicht, ob die Adresse ein Konto hat. Die Schwelle ist
-// großzügig: ohne Vergleich liegt der Faktor bei über 100.
+// For an unknown account the same bcrypt comparison runs as for a known one, so the
+// runtime does not reveal whether the address has an account. The threshold is
+// generous: without the comparison the factor is above 100.
 func TestLogin_TimingDoesNotRevealAccountExistence(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Zeitmessung")
@@ -143,7 +143,7 @@ func TestLogin_TimingDoesNotRevealAccountExistence(t *testing.T) {
 	r := testutils.SetupRouter()
 	r.POST("/api/login", h.LoginHandler)
 	require.NoError(t, db.Create(&models.User{Email: "bekannt@example.com", PasswordHash: testutils.MustHash("RichtigesPasswort1")}).Error)
-	// SSO-Konto ohne Passwort-Hash.
+	// SSO account without a password hash.
 	require.NoError(t, db.Create(&models.User{Email: "sso-ohne-pw@example.com"}).Error)
 
 	median := func(email string) time.Duration {

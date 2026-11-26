@@ -15,10 +15,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Der Admin-Pfad (CreateSubscriberAdminHandler /
-// UpdateSubscriberHandler) übernahm Webhook-URLs ungeprüft, während der
-// öffentliche SubscribeHandler validateWebhookURL aufruft. Ein
-// Seiten-Admin konnte so interne Ziele (Loopback, private Netze) als
+// The admin path (CreateSubscriberAdminHandler /
+// UpdateSubscriberHandler) took webhook URLs unchecked, while the
+// public SubscribeHandler calls validateWebhookURL. A
+// page admin could thus store internal targets (loopback, private networks) as
 // Google-Chat-Webhook hinterlegen.
 
 func stubWebhookLookup(t *testing.T) {
@@ -85,9 +85,9 @@ func TestUpdateSubscriberHandler_ValidatesWebhookURL(t *testing.T) {
 
 	page := models.StatusPage{Name: "Admin SSRF Update", Slug: "admin-ssrf-update"}
 	db.Create(&page)
-	// Bestandsabo, dessen gespeicherte URL inzwischen intern auflöst: eine
-	// reine Komponenten-Änderung soll weiter möglich sein (Bestandsdaten
-	// nicht aussperren); beim Versand schützt safeDialContext.
+	// Existing subscription whose stored URL now resolves internally: a
+	// pure component change should remain possible (do not lock out
+	// existing data); safeDialContext protects at send time.
 	legacy := models.Subscriber{StatusPageID: page.ID, Channel: "google_chat", WebhookURL: "https://internal.example.test/legacy", SubscribedComponentIDs: "all"}
 	email := models.Subscriber{StatusPageID: page.ID, Channel: "email", Email: "sub@example.com", SubscribedComponentIDs: "all"}
 	db.Create(&legacy)

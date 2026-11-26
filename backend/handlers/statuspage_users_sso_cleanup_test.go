@@ -14,8 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Seitenbenutzer-Verwaltung (SSO-Verknüpfung beim Entfernen,
-// Eindeutigkeit der Seitenrolle, letzter Owner).
+// Page user management (SSO link on removal,
+// uniqueness of the page role, last owner).
 type pageUsers struct {
 	db       *gorm.DB
 	h        *handlers.Handler
@@ -39,7 +39,7 @@ func setupPageUsers(t *testing.T) *pageUsers {
 	r.PUT("/api/users/:id", h.UpdateUserHandler)
 	r.POST("/api/users", h.CreateUserHandler)
 
-	// Einladungsmails laufen im Hintergrund; vor dem Schließen der DB abwarten.
+	// Invitation mails run in the background; wait for them before closing the DB.
 	t.Cleanup(h.WaitMails)
 	p := &pageUsers{db: db, h: h, r: r,
 		pageA:    models.StatusPage{Name: "A", Slug: "a"},
@@ -86,8 +86,8 @@ func (p *pageUsers) activeRoles(u models.User, page models.StatusPage) int64 {
 }
 
 func TestRemoveStatusPageUser_DeletesSSOIdentity(t *testing.T) {
-	// "anhängbar" heißt jetzt: Einladung mit Mail. Der Versand
-	// scheitert hier absichtlich (Port 1) und wird auditiert; das zählt der Test.
+	// "attachable" now means: invitation with mail. Sending
+	// fails here on purpose (port 1) and is audited; the test counts that.
 	t.Setenv("SMTP_HOST", "127.0.0.1")
 	t.Setenv("SMTP_PORT", "1")
 	p := setupPageUsers(t)
@@ -100,9 +100,9 @@ func TestRemoveStatusPageUser_DeletesSSOIdentity(t *testing.T) {
 	victim, _ := p.user("victim@x.example", false)
 	p.member(victim, p.pageB, p.viewer)
 	p.identity(victim, p.pageB, "sub-b")
-	p.identity(victim, p.pageA, "sub-a") // andere Seite: bleibt
+	p.identity(victim, p.pageA, "sub-a") // other page: stays
 
-	// Vorher: Seite C kann das Konto nicht anhängen (Rolle/Identität auf B).
+	// Before: page C cannot attach the account (role/identity on B).
 	idorRequest(t, p.r, "POST", p.base(pageC), tokC, map[string]any{"email": victim.Email, "role_id": p.viewer.ID})
 	if p.activeRoles(victim, pageC) != 0 || auditCountFor(p.db, "statuspage.invitation_email_failed") != 0 {
 		t.Fatal("Vorbedingung: Konto darf nicht angehängt (und nicht angeschrieben) werden")
@@ -118,13 +118,13 @@ func TestRemoveStatusPageUser_DeletesSSOIdentity(t *testing.T) {
 	if p.identities(victim, p.pageA) != 1 {
 		t.Error("Verknüpfung auf anderer Seite darf nicht angefasst werden")
 	}
-	// A bleibt als Fremdidentität bestehen; für den Anhänge-Test A entfernen,
-	// damit nur die Wirkung von B geprüft wird.
+	// A remains as a foreign identity; for the attach test remove A,
+	// so only the effect of B is checked.
 	p.db.Where("status_page_id = ?", p.pageA.ID).Delete(&models.UserSSOIdentity{})
-	// Die erste (stille) Einladung ist älter als 30 Minuten, sonst bliebe sie unverändert.
+	// The first (silent) invitation is older than 30 minutes, otherwise it would stay unchanged.
 	p.db.Model(&models.PageInvitation{}).Where("1 = 1").Update("created_at", time.Now().Add(-time.Hour))
 	idorRequest(t, p.r, "POST", p.base(pageC), tokC, map[string]any{"email": victim.Email, "role_id": p.viewer.ID})
-	p.h.WaitMails() // der fehlgeschlagene Versand läuft im Hintergrund
+	p.h.WaitMails() // the failed send runs in the background
 	if p.activeRoles(victim, pageC) != 0 || auditCountFor(p.db, "statuspage.invitation_email_failed") != 1 {
 		t.Error("nach dem Entfernen muss das Konto an Seite C einladbar sein (Mailversuch)")
 	}
@@ -138,7 +138,7 @@ func TestDeleteRoleAndReplaceRoles_DeleteSSOIdentity(t *testing.T) {
 	p.identity(a, p.pageA, "a-A")
 	p.identity(a, p.pageB, "a-B")
 
-	// Rolle ownerRol löschen -> Mitgliedschaft B endet, Identität B weg, A bleibt.
+	// Delete role ownerRol -> membership B ends, identity B gone, A stays.
 	w := idorRequest(t, p.r, "DELETE", "/api/roles/"+strconv.Itoa(int(p.ownerRol.ID)), "", nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("Rolle löschen: %d %s", w.Code, w.Body.String())
@@ -147,7 +147,7 @@ func TestDeleteRoleAndReplaceRoles_DeleteSSOIdentity(t *testing.T) {
 		t.Errorf("Rolle löschen: Identität B=%d (soll 0), A=%d (soll 1)", p.identities(a, p.pageB), p.identities(a, p.pageA))
 	}
 
-	// Konto bearbeiten: Seite A aus den Rollen entfernen -> Identität A weg.
+	// Edit account: remove page A from the roles -> identity A gone.
 	b, _ := p.user("b@x.example", false)
 	p.member(b, p.pageA, p.viewer)
 	p.member(b, p.pageB, p.viewer)
@@ -157,7 +157,7 @@ func TestDeleteRoleAndReplaceRoles_DeleteSSOIdentity(t *testing.T) {
 		"email": b.Email,
 		"page_roles": []map[string]any{
 			{"status_page_id": p.pageB.ID, "role_id": p.viewer.ID},
-			{"status_page_id": p.pageB.ID, "role_id": p.viewer.ID}, // Doppelter Eintrag: kein 500
+			{"status_page_id": p.pageB.ID, "role_id": p.viewer.ID}, // Duplicate entry: no 500
 		},
 	})
 	if w.Code != http.StatusOK {
@@ -170,7 +170,7 @@ func TestDeleteRoleAndReplaceRoles_DeleteSSOIdentity(t *testing.T) {
 		t.Error("doppelter page_roles-Eintrag muss zu genau einer Zeile werden")
 	}
 
-	// Anlegen mit doppelten Seiten: ebenfalls kein 500.
+	// Creating with duplicate pages: also no 500.
 	w = idorRequest(t, p.r, "POST", "/api/users", "", map[string]any{
 		"email": "neu@x.example", "password": "secret123-pass",
 		"page_roles": []map[string]any{
@@ -183,8 +183,8 @@ func TestDeleteRoleAndReplaceRoles_DeleteSSOIdentity(t *testing.T) {
 	}
 }
 
-// Gleichzeitiges Hinzufügen -> Unique-Index schlägt zu, Antwort 200
-// mit aktualisierter Rolle statt 500.
+// Concurrent add -> the unique index rejects one of them, response 200
+// with the updated role instead of 500.
 func TestAddStatusPageUser_ConcurrentInsertBecomesUpdate(t *testing.T) {
 	p := setupPageUsers(t)
 	ga, gaTok := p.user("ga@x.example", true)
@@ -198,7 +198,7 @@ func TestAddStatusPageUser_ConcurrentInsertBecomesUpdate(t *testing.T) {
 			return
 		}
 		armed = false
-		// Der "andere" Aufruf war schneller: Zeile mit Viewer-Rolle existiert.
+		// The "other" call was faster: row with Viewer role exists.
 		p.db.Session(&gorm.Session{NewDB: true, SkipDefaultTransaction: true}).Exec(
 			"INSERT INTO user_status_page_roles (created_at, updated_at, user_id, status_page_id, role_id) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?)",
 			target.ID, p.pageA.ID, p.viewer.ID)
@@ -217,7 +217,7 @@ func TestAddStatusPageUser_ConcurrentInsertBecomesUpdate(t *testing.T) {
 	}
 }
 
-// Ein zweiter Insert derselben (Konto, Seite) muss am Index scheitern.
+// A second insert of the same (account, page) must fail on the index.
 func TestUserStatusPageRole_UniqueIndexOnTestDB(t *testing.T) {
 	p := setupPageUsers(t)
 	u, _ := p.user("u@x.example", false)
@@ -233,7 +233,7 @@ func TestPageUsers_LastOwnerCannotLockOutSelf(t *testing.T) {
 	p.member(owner, p.pageA, p.ownerRol)
 	self := strconv.Itoa(int(owner.ID))
 
-	// Entfernen als letzter Owner: 409.
+	// Removal as last owner: 409.
 	w := idorRequest(t, p.r, "DELETE", p.base(p.pageA)+"/"+self, tok, nil)
 	if w.Code != http.StatusConflict || !contains(w.Body.String(), "last_page_owner") {
 		t.Fatalf("Entfernen: erwartet 409 last_page_owner, war %d %s", w.Code, w.Body.String())
@@ -246,7 +246,7 @@ func TestPageUsers_LastOwnerCannotLockOutSelf(t *testing.T) {
 	if p.activeRoles(owner, p.pageA) != 1 {
 		t.Fatal("Rolle darf nicht verändert worden sein")
 	}
-	// Rolle mit gleichem Recht zu ändern bleibt erlaubt.
+	// Changing to a role with the same permission remains allowed.
 	other := models.Role{Name: "Owner2", Permissions: p.ownerRol.Permissions}
 	p.db.Create(&other)
 	w = idorRequest(t, p.r, "POST", p.base(p.pageA), tok, map[string]any{"user_id": owner.ID, "role_id": other.ID})
@@ -254,7 +254,7 @@ func TestPageUsers_LastOwnerCannotLockOutSelf(t *testing.T) {
 		t.Fatalf("Wechsel auf gleichwertige Rolle: %d %s", w.Code, w.Body.String())
 	}
 
-	// Mit zweitem Owner ist Selbst-Entfernen erlaubt.
+	// With a second owner, self-removal is allowed.
 	second, _ := p.user("second@x.example", false)
 	p.member(second, p.pageA, p.ownerRol)
 	w = idorRequest(t, p.r, "DELETE", p.base(p.pageA)+"/"+self, tok, nil)
@@ -283,7 +283,7 @@ func contains(s, sub string) bool {
 	return false
 }
 
-// failTable lässt jede Operation `op` (create|query|delete|update) auf `table` scheitern.
+// failTable makes every operation `op` (create|query|delete|update) on `table` fail.
 func failTable(t *testing.T, db *gorm.DB, op, table string) {
 	t.Helper()
 	name := "test:fail807:" + op + table
@@ -365,7 +365,7 @@ func TestAddStatusPageUser_RaceVariants(t *testing.T) {
 				target.ID, p.pageA.ID, roleID)
 		})
 		t.Cleanup(func() { _ = p.db.Callback().Create().Remove("test:race800b") })
-		// Einladungsmails laufen im Hintergrund und nutzen die Callbacks; zuerst abwarten.
+		// Invitation mails run in the background and use the callbacks; wait for them first.
 		t.Cleanup(p.h.WaitMails)
 	}
 
@@ -381,7 +381,7 @@ func TestAddStatusPageUser_RaceVariants(t *testing.T) {
 			}
 		})
 		t.Cleanup(func() { _ = p.db.Callback().Create().Remove("test:count799") })
-		t.Cleanup(p.h.WaitMails) // vor dem Entfernen des Callbacks (LIFO)
+		t.Cleanup(p.h.WaitMails) // before removing the callback (LIFO)
 		t.Setenv("SMTP_PORT", "1")
 		w := idorRequest(t, p.r, "POST", p.base(p.pageA), tok, map[string]any{"email": target.Email, "role_id": p.viewer.ID})
 		if w.Code != http.StatusOK || creates != 0 || p.activeRoles(target, p.pageA) != 0 {
@@ -426,7 +426,7 @@ func TestPageUsers_OwnerLookupError(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
 	p.member(owner, p.pageA, p.ownerRol)
-	// Vierte Abfrage auf user_status_page_roles (nach Rechteprüfung, Mitglied und eigenen Rechten) = Owner-Suche.
+	// Fourth query on user_status_page_roles (after permission check, member and own permissions) = owner lookup.
 	n := 0
 	_ = p.db.Callback().Query().Before("gorm:query").Register("test:ownerlookup", func(tx *gorm.DB) {
 		if tx.Statement.Table != "user_status_page_roles" {
@@ -447,7 +447,7 @@ func TestPageUsers_OwnerLookupError(t *testing.T) {
 	}
 }
 
-// Wer pages:update nie hatte, verliert durch Selbst-Entfernen keinen Owner.
+// Whoever never had pages:update does not remove an owner by removing themselves.
 func TestPageUsers_NonOwnerMaySelfRemove(t *testing.T) {
 	p := setupPageUsers(t)
 	role := models.Role{Name: "Nur Benutzer", Permissions: "pages:create,pages:read,pages:delete"}
@@ -460,7 +460,7 @@ func TestPageUsers_NonOwnerMaySelfRemove(t *testing.T) {
 	}
 }
 
-// Ein soft-gelöschtes Konto zählt nicht als weiterer Owner (wie soleAdminPages).
+// A soft-deleted account does not count as another owner (like soleAdminPages).
 func TestPageUsers_DeletedAccountIsNoOtherOwner(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
@@ -474,8 +474,8 @@ func TestPageUsers_DeletedAccountIsNoOtherOwner(t *testing.T) {
 	}
 }
 
-// Auto-Join: parallele SPA-Anfragen -> eine verliert gegen den Unique-Index und
-// muss trotzdem Erfolg melden (Mitgliedschaft existiert).
+// Auto-join: parallel SPA requests -> one loses against the unique index and
+// must still report success (membership exists).
 func TestAutoJoin_ConcurrentInsertIsSuccess(t *testing.T) {
 	p := setupPageUsers(t)
 	h := handlers.NewHandler(p.db)

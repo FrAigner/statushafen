@@ -1,17 +1,18 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C: Gemeinsame Oberfläche der Admin-Übersetzungsseiten
-  für Komponenten und Ankündigungen (beide waren bis auf Inhaltsfeld und Texte
-  identisch). Seitenkopf mit Brotkrumen, Listenkarte mit Zeilenmenü
-  (Bestätigen, Löschen) und Formular als Seitenkarte. Die Logik (Laden, Speichern,
-  Bestätigen, Löschen) bleibt in useAdminTranslationsPanel; diese Komponente
-  zeigt nur an und meldet per Ereignis zurück.
+  Direction C: shared UI of the admin translation pages for components and
+  notices (both were identical apart from the content field and texts). Page
+  header with breadcrumbs, list card with row menu (confirm, delete) and the
+  form as a side card. The logic (loading, saving, confirming, deleting) stays
+  in useAdminTranslationsPanel; this component only renders and reports back
+  via events.
 
-  - contentKey: Feld der Übersetzung in der Liste ('Description' / 'Message').
-  - contentFormKey: Feld im Formular ('description' / 'message').
-  - form ist das Formularobjekt des Panels (language_code, title, Inhalt).
+  - contentKey: field of the translation in the list ('Description' / 'Message').
+  - contentFormKey: field in the form ('description' / 'message').
+  - form is the panel's form object (language_code, title, content).
 */
 import { computed, nextTick, ref } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
@@ -24,36 +25,60 @@ import ResponsiveTable from './ResponsiveTable.vue'
 import RichTextEditor from './RichTextEditor.vue'
 import RowMenu from './RowMenu.vue'
 import StatusBadge from './StatusBadge.vue'
+import type { EntityTranslation, Language } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  title: { type: String, required: true },
-  subtitle: { type: String, default: null },
-  breadcrumbs: { type: Array, default: () => [] },
-  alertMsg: { type: String, default: '' },
-  alertType: { type: String, default: 'info' },
-  canCreate: { type: Boolean, default: false },
-  canUpdate: { type: Boolean, default: false },
-  canDelete: { type: Boolean, default: false },
-  isEditing: { type: Boolean, default: false },
-  isSaving: { type: Boolean, default: false },
-  translations: { type: Array, default: () => [] },
-  languages: { type: Array, default: () => [] },
-  confirmingId: { type: [Number, String], default: null },
-  deletingId: { type: [Number, String], default: null },
-  contentKey: { type: String, required: true },
-  contentFormKey: { type: String, required: true },
-  contentColumnLabel: { type: String, required: true },
-  contentFieldLabel: { type: String, required: true },
-  contentPlaceholder: { type: String, default: '' },
-  // Inhalt ist formatierter Text (Markdown) und bekommt den Editor.
-  richText: { type: Boolean, default: false },
-  // Formularobjekt des Panels (language_code, title, Inhalt); die Felder schreiben direkt hinein.
-  form: { type: Object, default: () => ({}) },
+type TranslationId = number | string
+type FieldErrors = Partial<Record<'language' | 'title' | 'content', string>>
+
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  title: string
+  subtitle?: string | null
+  breadcrumbs?: { label: string, to?: RouteLocationRaw }[]
+  alertMsg?: string
+  alertType?: string
+  canCreate?: boolean
+  canUpdate?: boolean
+  canDelete?: boolean
+  isEditing?: boolean
+  isSaving?: boolean
+  translations?: EntityTranslation[]
+  languages?: Language[]
+  confirmingId?: TranslationId | null
+  deletingId?: TranslationId | null
+  contentKey: string
+  contentFormKey: string
+  contentColumnLabel: string
+  contentFieldLabel: string
+  contentPlaceholder?: string
+  // The content is formatted text (Markdown) and gets the editor.
+  richText?: boolean
+  // The panel's form object (language_code, title, content); the fields write straight into it.
+  form?: Record<string, string>
+}>(), {
+  subtitle: null,
+  breadcrumbs: () => [],
+  alertMsg: '',
+  alertType: 'info',
+  canCreate: false,
+  canUpdate: false,
+  canDelete: false,
+  isEditing: false,
+  isSaving: false,
+  translations: () => [],
+  languages: () => [],
+  confirmingId: null,
+  deletingId: null,
+  contentPlaceholder: '',
+  richText: false,
+  form: () => ({}),
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['new', 'cancel', 'save', 'confirm', 'delete', 'dismiss'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{
+  (e: 'new' | 'cancel' | 'save' | 'dismiss'): void
+  (e: 'confirm' | 'delete', id: TranslationId): void
+}>()
 
 const { t } = useI18n()
 
@@ -64,18 +89,19 @@ const columns = computed(() => [
   { key: 'Status', label: t('translations.tableStatus') },
 ])
 
-const menuItems = (trans) => [
+const menuItems = (trans: EntityTranslation) => [
   ...(trans.Status === 'draft' && props.canUpdate
     ? [{ key: 'confirm', label: props.confirmingId === trans.ID ? t('translations.confirming') : t('translations.confirm'), icon: 'check', disabled: props.confirmingId === trans.ID }]
     : []),
   ...(props.canDelete ? [{ key: 'delete', label: props.deletingId === trans.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: props.deletingId === trans.ID }] : []),
 ]
-const onMenuSelect = (trans, key) => emit(key, trans.ID)
+// The menu keys are exactly the two events (see menuItems).
+const onMenuSelect = (trans: EntityTranslation, key: string) => emit(key as 'confirm' | 'delete', trans.ID)
 
-// Pflichtfelder: Fehler am Feld, Fokus auf das erste fehlerhafte Feld.
-const errors = ref({})
-const formEl = ref(null)
-const fieldErrors = () => ({
+// Required fields: error at the field, focus on the first invalid field.
+const errors = ref<FieldErrors>({})
+const formEl = ref<HTMLFormElement | null>(null)
+const fieldErrors = (): FieldErrors => ({
   language: props.form.language_code ? '' : t('translations.errorLanguage'),
   title: (props.form.title || '').trim() ? '' : t('translations.errorTitle'),
   content: (props.form[props.contentFormKey] || '').trim() ? '' : t('translations.errorContent'),
@@ -84,7 +110,7 @@ const onSubmit = async () => {
   errors.value = fieldErrors()
   if (Object.values(errors.value).some(Boolean)) {
     await nextTick()
-    formEl.value?.querySelector('[aria-invalid="true"]')?.focus()
+    formEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
     return
   }
   emit('save')
@@ -100,7 +126,7 @@ const onNew = async () => {
   formEl.value?.closest('aside')?.scrollIntoView?.({ block: 'nearest' })
   formEl.value?.querySelector('select')?.focus({ preventScroll: true })
 }
-// Das Formularobjekt gehört der Seite und wird hier absichtlich bearbeitet (v-model).
+// The form object belongs to the page and is edited here on purpose (v-model).
 const formModel = computed(() => props.form)
 </script>
 

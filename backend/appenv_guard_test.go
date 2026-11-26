@@ -12,15 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter gegen das Fail-open-Muster bei Entwicklungsausnahmen:
-// Vergleiche wie APP_ENV != "production" öffnen die Ausnahme bei jedem
-// anderen Wert ("prod", leer, Tippfehler). Entwicklungsausnahmen fragen
-// deshalb ausschließlich database.IsDevelopmentAppEnv (Allowlist) ab.
-// APP_ENV lesen darf sonst nur die Wahl des Log-Formats (kein
+// Structural guard against the fail-open pattern for development exceptions:
+// comparisons such as APP_ENV != "production" open the exception for every
+// other value ("prod", empty, typo). Development exceptions are queried
+// therefore exclusively via database.IsDevelopmentAppEnv (allowlist).
+// Otherwise only the choice of log format may read APP_ENV (no
 // Sicherheitsmerkmal).
 var appEnvReaders = map[string]bool{
 	"database/db.go":     true, // IsDevelopmentAppEnv
-	"logging/logging.go": true, // Log-Format
+	"logging/logging.go": true, // log format
 }
 
 var productionCompare = regexp.MustCompile(`(?:!=|==)\s*"production"|"production"\s*(?:!=|==)`)
@@ -63,7 +63,7 @@ func TestAppEnv_OnlyReadInAllowedPlaces(t *testing.T) {
 func TestAppEnv_NoComparisonWithProduction(t *testing.T) {
 	for path, src := range nonTestGoFiles(t) {
 		if path == "logging/logging.go" {
-			continue // Log-Format: JSON in Produktion, kein Sicherheitsmerkmal
+			continue // Log format: JSON in production, not a security feature
 		}
 		if loc := productionCompare.FindStringIndex(src); loc != nil {
 			t.Errorf("%s vergleicht mit \"production\" (%q): fail-open bei jedem anderen Wert, stattdessen Allowlist der Entwicklungsumgebungen", path, src[loc[0]:loc[1]])
@@ -71,7 +71,7 @@ func TestAppEnv_NoComparisonWithProduction(t *testing.T) {
 	}
 }
 
-// Gegenprobe: Das Suchmuster erkennt beide Schreibweisen des Musters.
+// Control check: the search pattern recognizes both spellings of the pattern.
 func TestAppEnv_ProductionCompareMatchesBothForms(t *testing.T) {
 	for _, code := range []string{`os.Getenv("APP_ENV") != "production"`, `os.Getenv("APP_ENV") == "production"`, `"production" == env`} {
 		assert.True(t, productionCompare.MatchString(code), code)

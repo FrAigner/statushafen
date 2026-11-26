@@ -15,18 +15,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Fehlerpfade, die über die echte Routenkette schwer zu erreichen
-// sind (fehlende Pfadparameter, ungültige IDs, Datenbankfehler), werden mit
-// direkt registrierten Handlern geprüft. Jede Antwort trägt `code` und den
-// Rückfalltext `error`, aber nie den rohen Fehlertext.
+// Error paths that are hard to reach via the real route chain
+// (missing path parameters, invalid IDs, database errors) are checked with
+// directly registered handlers. Every response carries `code` and the
+// fallback text `error`, but never the raw error text.
 
 type abdeckungCase struct {
 	name, method, url string
 	body              any
 	status            int
 	code              string
-	failOp, failTable string // optional: DB-Operation, die vorher scheitert
-	token             string // optional: Anmeldung statt Global Admin
+	failOp, failTable string // optional: DB operation that fails beforehand
+	token             string // optional: login instead of global admin
 	prepare           func()
 }
 
@@ -36,7 +36,7 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 	r := testutils.SetupRouter()
 	g := r.Group("/t", middleware.AuthMiddleware())
 
-	// Pfadparameter fehlen (Route ohne :param) -> parameter_missing.
+	// Path parameters missing (route without :param) -> parameter_missing.
 	g.GET("/np/comptrans", h.GetComponentTranslationsHandler)
 	g.GET("/np/noticetrans", h.GetGeneralNoticeTranslationsHandler)
 	g.GET("/np/inctrans", h.GetIncidentTranslationsHandler)
@@ -46,7 +46,7 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 	g.POST("/np/subs", h.CreateSubscriberAdminHandler)
 	g.PUT("/np/subs/:id", h.UpdateSubscriberHandler)
 	g.DELETE("/np/subs/:id", h.DeleteSubscriberHandler)
-	// Seiten-ID keine Zahl.
+	// Page ID is not a number.
 	g.PUT("/pg/:page_id/subs/:id", h.UpdateSubscriberHandler)
 	g.DELETE("/pg/:page_id/subs/:id", h.DeleteSubscriberHandler)
 	g.GET("/pg/:page_id/notices", h.GetActiveNoticesHandler)
@@ -66,7 +66,7 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 	g.POST("/pg/:page_id/users", h.AddStatusPageUserHandler)
 	g.POST("/pg", h.CreateStatusPageHandler)
 	g.POST("/pg/:page_id/webhook-token", h.GenerateWebhookTokenHandler)
-	// Übersetzungen (Komponente, Ankündigung, Vorfall).
+	// Translations (component, announcement, incident).
 	for _, p := range []struct {
 		name, param string
 		get, create gin.HandlerFunc
@@ -129,17 +129,17 @@ func TestFehlercodes_Abdeckung(t *testing.T) {
 	gaUser := models.User{Email: "ga-abd@example.com", IsGlobalAdmin: true}
 	require.NoError(t, db.Create(&gaUser).Error)
 	tok, _ := middleware.GenerateToken(gaUser.ID, gaUser.Email, "", "", true)
-	// Token eines Nutzers, der danach gelöscht wird -> GetMyPages: "User not found".
+	// Token of a user who is deleted afterwards -> GetMyPages: "User not found".
 	ghost := models.User{Email: "ghost-abd@example.com"}
 	require.NoError(t, db.Create(&ghost).Error)
 	ghostTok, _ := middleware.GenerateToken(ghost.ID, ghost.Email, "", "", false)
 	require.NoError(t, db.Unscoped().Delete(&ghost).Error)
-	// Bestellung, deren Wunsch-Slug inzwischen von einer Seite belegt ist.
+	// Order whose desired slug is meanwhile taken by a page.
 	future := time.Now().Add(time.Hour)
 	require.NoError(t, db.Create(&models.Role{Name: "Page Admin", Permissions: "pages:write"}).Error)
 	require.NoError(t, db.Create(&models.PageOrder{CompanyName: "Z", Email: "z-abd@example.com", Slug: "abd-p", Status: "pending_confirmation", ConfirmTokenHash: models.HashToken("abd-tok"), ConfirmTokenExpiry: &future}).Error)
 
-	// Nutzer mit Tag-Einschränkung sieht Vorfälle fremder Tags nicht (403).
+	// User with tag restriction does not see incidents of other tags (403).
 	tagA, tagB := models.Tag{Name: "abd-a"}, models.Tag{Name: "abd-b"}
 	require.NoError(t, db.Create(&tagA).Error)
 	require.NoError(t, db.Create(&tagB).Error)

@@ -13,34 +13,34 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Audit-Log (Review-Befund A4)
+// Audit log (review finding A4)
 //
-// Routen (in main.go, innerhalb der authGroup):
+// Routes (in main.go, inside the authGroup):
 //   auditAdmin := authGroup.Group("/admin/audit")
 //   auditAdmin.Use(middleware.RequireGlobalAdmin())
 //   auditAdmin.GET("", h.GetAuditLogsHandler)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// RecordAudit schreibt einen Audit-Eintrag. Aus mutierenden Handlern aufrufen,
-// z.B. am Ende von UpdateIncidentHandler:
+// RecordAudit writes an audit entry. Call it from mutating handlers,
+// e.g. at the end of UpdateIncidentHandler:
 //
 //	h.RecordAudit(c, "incident.status_changed", "incident", "Incident",
 //	    strconv.FormatUint(uint64(incident.ID), 10), incident.Title, "")
 //
-// Fehler werden bewusst nur geloggt, nicht an den Aufrufer zurückgegeben –
-// eine Audit-Panne darf die eigentliche Aktion nicht scheitern lassen.
+// Errors are deliberately only logged, not returned to the caller -
+// an audit failure must not make the actual action fail.
 func (h *Handler) RecordAudit(c *gin.Context, action, category, targetType, targetID, targetName, details string) {
 	entry := newAuditEntry(c, action, category, targetType, targetID, targetName, details)
 	if err := h.DB.Create(&entry).Error; err != nil {
-		// Nur loggen – Aktion nicht blockieren.
+		// Only log - do not block the action.
 		c.Error(err) //nolint:errcheck
 	}
 	logAuditLine(c, entry)
 }
 
-// newAuditEntry baut den Audit-Eintrag aus dem Request (Review F3:
-// getrennt von RecordAudit, damit ein Handler ihn in seiner Transaktion
-// schreiben kann).
+// newAuditEntry builds the audit entry from the request (Review F3:
+// separate from RecordAudit so that a handler can write it in its
+// transaction).
 func newAuditEntry(c *gin.Context, action, category, targetType, targetID, targetName, details string) models.AuditLog {
 	entry := models.AuditLog{
 		Action:     action,
@@ -65,13 +65,13 @@ func newAuditEntry(c *gin.Context, action, category, targetType, targetID, targe
 	return entry
 }
 
-// logAuditLine schreibt die Access-Log-Zeile zum Audit-Eintrag.
+// logAuditLine writes the access log line for the audit entry.
 func logAuditLine(c *gin.Context, entry models.AuditLog) {
 	action, category, targetType, targetID := entry.Action, entry.Category, entry.TargetType, entry.TargetID
-	// AuditLog hat (bewusst ohne Schemaänderung) kein
-	// Request-ID-Feld - die Logzeile über den Request-Logger trägt sie und
-	// verknüpft den Eintrag mit dem Access-Log. TargetName/Details bleiben
-	// draußen (enthalten oft E-Mail-Adressen).
+	// AuditLog deliberately (without a schema change) has no
+	// request ID field - the log line via the request logger carries it and
+	// links the entry to the access log. TargetName/Details are left
+	// out (they often contain email addresses).
 	attrs := []any{"action", action, "category", category, "target_type", targetType, "target_id", targetID}
 	if entry.ActorID != nil {
 		attrs = append(attrs, "actor_id", *entry.ActorID)
@@ -79,15 +79,15 @@ func logAuditLine(c *gin.Context, entry models.AuditLog) {
 	logging.FromContext(c.Request.Context()).Info("audit", attrs...)
 }
 
-// RecordSystemAudit schreibt einen Audit-Eintrag für Vorgänge, die nicht im
-// Rahmen eines HTTP-Requests laufen (kein *gin.Context verfügbar), z.B. den
-// asynchronen E-Mail-Versand in DispatchNotifications (auch aus dem
-// Maintenance-Scheduler heraus aufgerufen) oder künftige
-// Hintergrund-Jobs. ActorID/ActorEmail bleiben leer bzw. "system" – siehe
+// RecordSystemAudit writes an audit entry for operations that do not run
+// within an HTTP request (no *gin.Context available), e.g. the
+// asynchronous email dispatch in DispatchNotifications (also called from the
+// maintenance scheduler) or future
+// background jobs. ActorID/ActorEmail stay empty or "system" – see
 // models.AuditLog ("ActorID *uint ... nil = System/Automation").
 //
-// Macht sichtbar, wenn z.B. der Benachrichtigungsversand fehlschlägt, statt
-// dass der Fehler nur im Server-Log (slog.Error) landet.
+// Makes it visible when e.g. notification dispatch fails, instead of
+// the error only ending up in the server log (slog.Error).
 func (h *Handler) RecordSystemAudit(action, category, targetType, targetID, targetName, details string) {
 	entry := models.AuditLog{
 		Action:     action,
@@ -99,12 +99,12 @@ func (h *Handler) RecordSystemAudit(action, category, targetType, targetID, targ
 		ActorEmail: "system",
 	}
 	if err := h.DB.Create(&entry).Error; err != nil {
-		// Nur loggen – ein Audit-Fehler darf den Aufrufer nicht blockieren.
+		// Only log - an audit error must not block the caller.
 		slog.Error("Failed to write system audit log entry", "action", action, "error", err)
 	}
 }
 
-// GetAuditLogsHandler liefert paginierte, filterbare Audit-Einträge.
+// GetAuditLogsHandler returns paginated, filterable audit entries.
 // Query-Parameter: ?page=1&limit=25&category=incident (auth|incident|config|user|subscriber|notice|maintenance|system)&q=INC-2041
 func (h *Handler) GetAuditLogsHandler(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -119,8 +119,8 @@ func (h *Handler) GetAuditLogsHandler(c *gin.Context) {
 
 	q := h.DB.Model(&models.AuditLog{})
 	if cat := c.Query("category"); cat != "" {
-		// Ein unbekannter Wert lieferte still eine leere Liste;
-		// jetzt ein klarer Fehler (Tippfehler im Aufrufer fallen auf).
+		// An unknown value used to silently return an empty list;
+		// now a clear error (typos in the caller stand out).
 		if !models.IsAuditCategory(cat) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown audit category", "code": "invalid_category"})
 			return

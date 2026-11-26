@@ -14,24 +14,24 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Das Frontend blendet Navigation und Schreibknöpfe nach den
-// Rechten der Rolle aus, maßgeblich ist aber das Backend. Dieser Test geht
-// über ALLE registrierten Schreib-Routen (r.Routes()) und prüft, dass ein
-// Viewer (Seed-Rolle, nur :read) auf seiner eigenen Seite überall 403 bekommt
-// und ein Editor nur bei Vorfällen, Wartungsfenstern, Vorfall-Vorlagen und
-// Ankündigungen durchkommt. Eine neue Schreib-Route ohne Rechteprüfung lässt
-// den Test rot werden, statt erst im UI aufzufallen.
+// The frontend hides navigation and write buttons according to the
+// role's permissions, but the backend is authoritative. This test goes
+// over ALL registered write routes (r.Routes()) and checks that a
+// viewer (seed role, :read only) gets 403 everywhere on its own page
+// and an editor gets through only for incidents, maintenance windows, incident templates and
+// notices. A new write route without a permission check turns
+// the test red instead of only being noticed in the UI.
 
-// Rechte wie in database.SeedData (Viewer/Editor); seit der Umstellung aus den
-// früheren read/write-Listen abgeleitet (gleiche Wirkung, jetzt als CRUD).
+// Permissions as in database.SeedData (viewer/editor); since the changeover derived from the
+// former read/write lists (same effect, now as CRUD).
 var (
 	seedViewerPerms = permissions.MigrateLegacy("components:read,incidents:read,notices:read")
 	seedEditorPerms = permissions.MigrateLegacy("components:read,incidents:write,notices:write")
 )
 
-// selfServiceWriteRoutes sind Schreib-Routen ohne Seiten-Recht: öffentlich
-// (Login, Abo, Bestellung, IdP-Rückkanal), per eigenem Token geschützt
-// (Komponenten-Webhook) oder Selbstverwaltung des eigenen Kontos (/me).
+// selfServiceWriteRoutes are write routes without a page permission: public
+// (login, subscription, order, IdP back channel), protected by their own token
+// (component webhook) or self-management of the own account (/me).
 var selfServiceWriteRoutes = map[string]bool{
 	"POST /api/auth/sso-exchange":                        true,
 	"POST /api/login":                                    true,
@@ -51,17 +51,17 @@ var selfServiceWriteRoutes = map[string]bool{
 	"DELETE /api/me/sso/:id":                             true,
 	"PUT /api/me/subscription":                           true,
 	"DELETE /api/me/subscription":                        true,
-	// eigene Einladung (nur das eingeladene Konto).
+	// own invitation (only the invited account).
 	"POST /api/invitations/preview": true,
 	"POST /api/invitations/accept":  true,
 	"POST /api/invitations/decline": true,
 }
 
-// editorWritePrefixes: Routen, für die incidents:write bzw. notices:write genügt.
+// editorWritePrefixes: routes for which incidents:write or notices:write suffices.
 var editorWritePrefixes = []string{
 	"/api/pages/:page_id/incidents",
 	"/api/pages/:page_id/incident-templates",
-	"/api/pages/:page_id/translate", // Übersetzungsvorschlag
+	"/api/pages/:page_id/translate", // translation suggestion
 	"/api/incidents/",
 	"/api/incident-translations",
 	"/api/pages/:page_id/notices",
@@ -83,7 +83,7 @@ type roleAccessFixture struct {
 	pageID      string
 	viewerToken string
 	editorToken string
-	writeRoutes []string // "METHOD /pfad/mit/:params"
+	writeRoutes []string // "METHOD /path/with/:params"
 }
 
 func setupRoleAccessFixture(t *testing.T) roleAccessFixture {
@@ -93,9 +93,9 @@ func setupRoleAccessFixture(t *testing.T) roleAccessFixture {
 
 	page := models.StatusPage{Name: "Rechte", Slug: "rechte-503"}
 	db.Create(&page)
-	// Vorfall, Komponente, Ankündigung und je eine Übersetzung (alle ID 1), damit die Seiten-Scope-Middleware
-	// der Übersetzungs-Routen (IncidentPageScope usw.) die Seite auflöst und
-	// tatsächlich die Rechteprüfung entscheidet, nicht ein 404.
+	// incident, component, notice and one translation each (all ID 1), so that the page-scope middleware
+	// of the translation routes (IncidentPageScope etc.) resolves the page and
+	// the permission check actually decides, not a 404.
 	db.Create(&models.Incident{Title: "V", StatusPageID: page.ID})
 	db.Create(&models.Component{Name: "K", StatusPageID: page.ID})
 	db.Create(&models.GeneralNotice{Title: "A", StatusPageID: page.ID})
@@ -130,8 +130,8 @@ func setupRoleAccessFixture(t *testing.T) roleAccessFixture {
 	return roleAccessFixture{r: r, pageID: strconv.FormatUint(uint64(page.ID), 10), viewerToken: viewerToken, editorToken: editorToken, writeRoutes: routes}
 }
 
-// call ersetzt :page_id durch die Seite der Rolle und alle übrigen
-// Parameter durch "1" (die IDs der Fixture-Objekte).
+// call replaces :page_id with the role's page and all other
+// parameters with "1" (the IDs of the fixture objects).
 func (f roleAccessFixture) call(method, path, token string) int {
 	concrete := strings.ReplaceAll(path, ":page_id", f.pageID)
 	parts := strings.Split(concrete, "/")
@@ -176,10 +176,10 @@ func TestRouter_EditorWritesOnlyIncidentsAndNotices(t *testing.T) {
 	}
 }
 
-// Lese-Endpunkte, an denen das Frontend die Sichtbarkeit der Navigation
-// festmacht (AdminLayout.vue): Vorfall-Vorlagen brauchen schon zum Lesen
-// incident_templates:read, Mail-Vorlagen notification_templates:read,
-// Ankündigungen notices:read.
+// Read endpoints on which the frontend bases the visibility of the navigation
+// (AdminLayout.vue): incident templates already need a permission to read,
+// incident_templates:read, mail templates notification_templates:read,
+// notices need notices:read.
 func TestRouter_NavRelevantReadsFollowRolePermissions(t *testing.T) {
 	f := setupRoleAccessFixture(t)
 	cases := []struct {

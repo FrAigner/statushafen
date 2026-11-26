@@ -97,4 +97,14 @@ describe('useIncidentTranslations', () => {
     const { loadTranslations } = useIncidentTranslations()
     await expect(loadTranslations(apiFetchMock, 999)).rejects.toThrow()
   })
+
+  it('falls back to an empty list when the API returns no body', async () => {
+    apiFetchMock.mockResolvedValueOnce(null)
+
+    const { translations, loadTranslations } = useIncidentTranslations()
+    translations.value = [{ ID: 1 }]
+    await loadTranslations(apiFetchMock, 1)
+
+    expect(translations.value).toEqual([])
+  })
 })

@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Start-Guards in main.go laufen über logging.Fatal und sind
-// damit testbar, ohne den Testprozess zu beenden.
+// The startup guards in main.go run via logging.Fatal and are
+// thus testable without terminating the test process.
 func TestCORSMiddleware_WildcardIsFatal(t *testing.T) {
 	t.Setenv("CORS_ORIGINS", "https://a.example, *")
 	got := loggingtest.ExpectFatal(t, func() { CORSMiddleware() })
@@ -25,8 +25,8 @@ func TestCORSMiddleware_WildcardIsFatal(t *testing.T) {
 	assert.Contains(t, got.Message, "CORS_ORIGINS darf kein '*' enthalten")
 }
 
-// initLogging muss .env VOR dem Logger-Aufbau laden, damit LOG_FORMAT/
-// LOG_LEVEL aus einer lokalen .env greifen; lokal ohne Vorgabe: Text.
+// initLogging must load .env BEFORE building the logger so that LOG_FORMAT/
+// LOG_LEVEL from a local .env take effect; locally without a setting: text.
 func TestInitLogging_UsesLogFormatFromDotEnv(t *testing.T) {
 	prevLogger := slog.Default()
 	t.Cleanup(func() { slog.SetDefault(prevLogger) })
@@ -55,8 +55,8 @@ func TestNewRouter_InvalidTrustedProxiesIsFatal(t *testing.T) {
 	assert.NotNil(t, got.Attrs["error"])
 }
 
-// newRouter nutzt RequestLogger statt des gin-Default-Loggers -
-// jede Antwort trägt eine X-Request-ID.
+// newRouter uses RequestLogger instead of the gin default logger -
+// every response carries an X-Request-ID.
 func TestNewRouter_SetsRequestID(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	t.Setenv("TRUSTED_PROXIES", "")

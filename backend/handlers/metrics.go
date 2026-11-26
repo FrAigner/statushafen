@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Env vars for /metrics Basic-Auth (Schritt 2/4). A Grafana
+// Env vars for /metrics Basic-Auth (step 2/4). A Grafana
 // Agent/Alloy scraper (or any other Prometheus-compatible client) sends them
 // as a normal HTTP Basic-Auth header.
 const (

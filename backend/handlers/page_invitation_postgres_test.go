@@ -1,9 +1,9 @@
 package handlers_test
 
-// Security-Review Fund F3: Gleichzeitige Einladungen auf
-// einem ECHTEN Postgres (READ COMMITTED). SQLite serialisiert Schreiber und
-// zeigt das Problem nicht. Wie database/migration_postgres_test.go nur mit
-// MIGRATION_PG_TEST=1 (lädt die Binaries, startet nicht als root).
+// Security review finding F3: Concurrent invitations on
+// a REAL Postgres (READ COMMITTED). SQLite serializes writers and
+// does not show the problem. Like database/migration_postgres_test.go only with
+// MIGRATION_PG_TEST=1 (downloads the binaries, does not start as root).
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ func startInvitationPostgres(t *testing.T) *gorm.DB {
 		t.Skip("nur mit MIGRATION_PG_TEST=1 (echtes Postgres)")
 	}
 	if os.Getenv("JWT_SECRET") == "" {
-		t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production") // wie testutils.SetupTestDB
+		t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production") // like testutils.SetupTestDB
 	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -63,10 +63,10 @@ func startInvitationPostgres(t *testing.T) *gorm.DB {
 	return db
 }
 
-// warmUpPool öffnet n Verbindungen im Voraus und hält sie offen. Der Aufbau
-// einer Postgres-Verbindung dauert Millisekunden; ohne vorgewärmten Pool laufen
-// die "gleichzeitigen" Aufrufe in Wirklichkeit nacheinander und der Test
-// erkennt das fehlende Sperren nicht (Gegenprobe ohne Sperre bleibt sonst grün).
+// warmUpPool opens n connections in advance and keeps them open. Setting up
+// a Postgres connection takes milliseconds; without a warmed-up pool the
+// "concurrent" calls actually run one after another and the test
+// does not detect the missing locking (the control check without lock would otherwise stay green).
 func warmUpPool(t *testing.T, db *gorm.DB, n int) {
 	t.Helper()
 	sqlDB, err := db.DB()
@@ -85,8 +85,8 @@ func warmUpPool(t *testing.T, db *gorm.DB, n int) {
 	wg.Wait()
 }
 
-// postParallel schickt n Einladungen gleichzeitig (Start per Barriere) und
-// liefert die Statuscodes.
+// postParallel sends n invitations concurrently (start via barrier) and
+// returns the status codes.
 func postParallel(t *testing.T, f invFixture, emails []string) []int {
 	t.Helper()
 	codes := make([]int, len(emails))
@@ -110,8 +110,8 @@ func postParallel(t *testing.T, f invFixture, emails []string) []int {
 	return codes
 }
 
-// Gleiche Adresse, viele gleichzeitige Aufrufe: genau eine Zeile, genau eine
-// Mail, genau ein Audit-Eintrag, alle antworten neutral 200.
+// Same address, many concurrent calls: exactly one row, exactly one
+// mail, exactly one audit entry, all respond with a neutral 200.
 func TestPageInvitationPostgres_ParallelSameAddressOneMail(t *testing.T) {
 	db := startInvitationPostgres(t)
 	srv := startFakeSMTPServerWithEnv(t)
@@ -140,9 +140,9 @@ func TestPageInvitationPostgres_ParallelSameAddressOneMail(t *testing.T) {
 	}
 }
 
-// Tagesgrenze unter Last: Stehen schon 199 Einladungen im Audit, darf von
-// mehreren gleichzeitigen Aufrufen für verschiedene Adressen nur einer
-// durchkommen (Seitenzeile gesperrt, Audit in derselben Transaktion).
+// Daily limit under load: If 199 invitations are already in the audit, of
+// several concurrent calls for different addresses only one may
+// get through (page row locked, audit in the same transaction).
 func TestPageInvitationPostgres_ParallelDailyLimit(t *testing.T) {
 	db := startInvitationPostgres(t)
 	f := newInvFixtureOn(t, db)
@@ -153,7 +153,7 @@ func TestPageInvitationPostgres_ParallelDailyLimit(t *testing.T) {
 	if err := db.CreateInBatches(&rows, 100).Error; err != nil {
 		t.Fatal(err)
 	}
-	// Die Zeitstempel (Unix-Sekunden) liegen im 24-Stunden-Fenster.
+	// The timestamps (Unix seconds) lie within the 24-hour window.
 	db.Model(&models.AuditLog{}).Where("action = ?", "statuspage.invitation_created").Update("created_at", time.Now().Unix())
 
 	emails := make([]string, 24)
@@ -179,12 +179,12 @@ func TestPageInvitationPostgres_ParallelDailyLimit(t *testing.T) {
 	}
 }
 
-// Re-Review W1: Annehmen gegen gleichzeitiges Neu-Einladen derselben Adresse.
-// Das Annehmen hält die Sperre auf der Einladungszeile und braucht beim INSERT
-// in user_status_page_roles FOR KEY SHARE auf die Seitenzeile (Fremdschlüssel).
-// Sperrt das Einladen die Seite mit FOR UPDATE und wartet dann auf die
-// Einladungszeile, entsteht ein Deadlock (40P01). FOR NO KEY UPDATE kollidiert
-// nicht mit KEY SHARE; das Einladen wartet, bis das Annehmen fertig ist.
+// Re-review W1: Accepting versus a concurrent re-invite of the same address.
+// Accepting holds the lock on the invitation row and, on the INSERT
+// into user_status_page_roles, needs FOR KEY SHARE on the page row (foreign key).
+// If inviting locks the page with FOR UPDATE and then waits for the
+// invitation row, a deadlock (40P01) arises. FOR NO KEY UPDATE does not collide
+// with KEY SHARE; inviting waits until accepting is done.
 func TestPageInvitationPostgres_AcceptVsReinviteNoDeadlock(t *testing.T) {
 	db := startInvitationPostgres(t)
 	srv := startFakeSMTPServerWithEnv(t)
@@ -198,19 +198,19 @@ func TestPageInvitationPostgres_AcceptVsReinviteNoDeadlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// (1) Annehmen: löscht die Einladungszeile und hält deren Sperre.
+	// (1) Accept: deletes the invitation row and holds its lock.
 	accept := db.Begin()
 	if err := accept.Unscoped().Where("id = ? AND deleted_at IS NULL", inv.ID).Delete(&models.PageInvitation{}).Error; err != nil {
 		t.Fatal(err)
 	}
-	// (2) Einladen: sperrt die Seite, will die Zeilen der Adresse löschen und wartet auf (1).
+	// (2) Invite: locks the page, wants to delete the rows of the address and waits for (1).
 	done := make(chan int, 1)
 	go func() {
 		w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": u.Email, "role_id": f.viewer.ID})
 		done <- w.Code
 	}()
 	time.Sleep(700 * time.Millisecond)
-	// (3) Annehmen legt die Mitgliedschaft an (KEY SHARE auf die Seitenzeile).
+	// (3) Accept creates the membership (KEY SHARE on the page row).
 	if insErr := accept.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: f.page.ID, RoleID: f.viewer.ID}).Error; insErr != nil {
 		_ = accept.Rollback()
 		t.Errorf("Annehmen: %v", insErr)
@@ -219,7 +219,7 @@ func TestPageInvitationPostgres_AcceptVsReinviteNoDeadlock(t *testing.T) {
 	}
 	select {
 	case code := <-done:
-		// Nach dem Annehmen ist die Adresse Mitglied: neutrale 200 (Rolle bleibt).
+		// After accepting, the address is a member: neutral 200 (role stays).
 		if code != http.StatusOK {
 			t.Errorf("Einladen: Status %d", code)
 		}
@@ -228,10 +228,10 @@ func TestPageInvitationPostgres_AcceptVsReinviteNoDeadlock(t *testing.T) {
 	}
 }
 
-// Review-Fund 1: Zwei Einladungen (Seite A und B) an dasselbe Konto,
-// gleichzeitig angenommen. Ohne die Benutzersperre VOR der Ein-Seiten-Prüfung
-// sehen beide Transaktionen "keine Rolle" (FOR UPDATE auf Rollenzeilen eines
-// Kontos ohne Rolle sperrt nichts) und das Konto wird Mitglied beider Seiten.
+// Review finding 1: Two invitations (page A and B) to the same account,
+// accepted concurrently. Without the user lock BEFORE the one-page check
+// both transactions see "no role" (FOR UPDATE on the role rows of an
+// account without a role locks nothing) and the account becomes a member of both pages.
 func TestPageInvitationPostgres_ParallelAcceptTwoPages(t *testing.T) {
 	db := startInvitationPostgres(t)
 	f := newInvFixtureOn(t, db)
@@ -275,9 +275,9 @@ func TestPageInvitationPostgres_ParallelAcceptTwoPages(t *testing.T) {
 	}
 }
 
-// Review-Fund 2: Lock-Reihenfolge des Annehmens (Einladung löschen,
-// Rollen und Benutzer FOR UPDATE in BEIDEN Reihenfolgen) gegen gleichzeitiges
-// Konto-Löschen (Ablauf von DeleteUserHandler) und Neu-Einladen: kein Deadlock.
+// Review finding 2: Lock order of accepting (delete invitation,
+// roles and user FOR UPDATE in BOTH orders) against concurrent
+// account deletion (flow of DeleteUserHandler) and re-inviting: no deadlock.
 func TestPageInvitationPostgres_AcceptLockOrderVsDeleteAndReinvite(t *testing.T) {
 	for _, userFirst := range []bool{false, true} {
 		t.Run(fmt.Sprintf("userFirst=%v", userFirst), func(t *testing.T) {
@@ -318,8 +318,8 @@ func TestPageInvitationPostgres_AcceptLockOrderVsDeleteAndReinvite(t *testing.T)
 			delDone := make(chan error, 1)
 			go func() {
 				tx := db.Begin()
-				// Reihenfolge wie lockAccountForDeletion (Einladungen,
-				// Benutzer FOR UPDATE), danach erst die Rollen.
+				// Order like lockAccountForDeletion (invitations,
+				// user FOR UPDATE), only then the roles.
 				err := tx.Unscoped().Where("email = ? OR invited_user_id = ? OR invited_by_id = ?", u.Email, u.ID, u.ID).Delete(&models.PageInvitation{}).Error
 				if err == nil {
 					var x models.User

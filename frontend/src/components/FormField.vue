@@ -1,42 +1,48 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Formularfeld-Muster. Label über dem Feld,
-  „*“ für Pflicht bzw. „optional“, Hilfe am Feld, darunter eine
-  Hinweis- ODER Fehlerzeile mit Symbol. ersetzt .form-group label und die
-  gemischten Onyx-Labels bei nativen Feldern.
+  Redesign stage 3: form field pattern. Label above the field,
+  "*" for required or "optional", help on the field, below it a
+  hint OR error line with an icon. Replaces .form-group label and the
+  mixed Onyx labels on native fields.
 
-  Das Feld selbst kommt über den Standard-Slot und bekommt per Slot-Props alles
-  Nötige, damit das Muster nicht am Markup hängt:
+  The field itself comes via the default slot and receives everything it
+  needs as slot props, so the pattern does not depend on the markup:
 
     <FormField v-slot="f" label="Name" required :error="errors.name" help="components.name">
       <input :id="f.id" v-model="name" :required="f.required"
              :aria-describedby="f.describedby" :aria-invalid="f.invalid">
     </FormField>
 
-  - Der Stern kommt nur aus der Darstellung, nie aus dem Label-Text
-    (Regel, i18n/requiredMarker.test.js); er ist für
-    Screenreader versteckt, `required` am Feld sagt es an.
-  - Fehler ersetzt den Hinweis, steht in einer role="alert"-Zeile und setzt
-    aria-invalid; beide Zeilen sind per aria-describedby mit dem Feld verbunden.
-  - `help` ist ein Hilfeschlüssel für v-help ("bereich.feld"); die Hilfe hängt
-    am Feldbereich (Hover/Fokus, Escape schließt), ohne zusätzliches Symbol.
-  - Der Aufrufer sorgt beim Absenden dafür, dass der Fokus auf das erste
-    fehlerhafte Feld springt (umsetzung.md, Barrierefreiheit).
+  - The asterisk only comes from the presentation, never from the label text
+    (rule, i18n/requiredMarker.test.js); it is hidden from
+    screen readers, `required` on the field announces it.
+  - An error replaces the hint, sits in a role="alert" line and sets
+    aria-invalid; both lines are linked to the field via aria-describedby.
+  - `help` is a help key for v-help ("area.field"); the help is attached
+    to the field area (hover/focus, Escape closes), without an extra icon.
+  - On submit the caller makes sure focus jumps to the first
+    invalid field (umsetzung.md, accessibility).
 */
 import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 import vHelp from '../directives/vHelp'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  label: { type: String, required: true },
-  required: { type: Boolean, default: false },
-  hint: { type: String, default: null },
-  error: { type: String, default: null },
-  help: { type: String, default: null },
-  // Eigene Feld-ID, falls das Feld sie schon vorgibt (label for).
-  fieldId: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  label: string
+  required?: boolean
+  hint?: string | null
+  error?: string | null
+  help?: string | null
+  // Own field ID, if the field already dictates it (label for).
+  fieldId?: string | null
+}>(), {
+  required: false,
+  hint: null,
+  error: null,
+  help: null,
+  fieldId: null,
 })
 // Stryker restore all
 
@@ -47,7 +53,7 @@ const hintId = computed(() => `${id.value}-hint`)
 const errorId = computed(() => `${id.value}-error`)
 const invalid = computed(() => !!props.error)
 
-// Fehler ersetzt den Hinweis; ohne beides kein aria-describedby.
+// An error replaces the hint; without either there is no aria-describedby.
 const describedby = computed(() => {
   if (props.error) return errorId.value
   if (props.hint) return hintId.value

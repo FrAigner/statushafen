@@ -9,9 +9,9 @@ import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { componentTreeFixture } from '../../test-support/componentTree'
 import AdminMaintenance from './AdminMaintenance.vue'
 import AdminNotices from './AdminNotices.vue'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 
-// Sprachumschalter in Wartung und Ankündigungen (Vorfälle: AdminIncidentsLanguages.test.js).
+// Language switcher in maintenance and notices (incidents: AdminIncidentsLanguages.test.js).
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }]

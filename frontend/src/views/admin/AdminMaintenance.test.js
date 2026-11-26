@@ -7,10 +7,10 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { withArchivedComponent, componentTreeFixture, expectedTreeOptionLabels, multiSelectOptionLabels } from '../../test-support/componentTree'
 import AdminMaintenance from './AdminMaintenance.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
+import { clickMenuItem } from '../../test-support/rowMenu'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
 import { stubConfirm } from '../../test-support/confirm'
 
 function maintenanceFixture() {
@@ -46,7 +46,7 @@ function makeFetchRouter({ incidentsOk = true, items = maintenanceFixture(), tem
       return writeOk ? jsonResponse({ ID: 99 }) : jsonResponse({ error: 'Speichern kaputt' }, 500)
     }
     if (method === 'PUT' && /\/incidents\/\d+$/.test(url)) return jsonResponse({ ID: 1 })
-    // Baum mit Unterkomponente statt nur oberster Ebene.
+    // Tree with a subcomponent instead of only the top level.
     if (method === 'GET' && /\/components$/.test(url)) return jsonResponse(componentTreeFixture())
     if (method === 'GET' && /\/api\/tags/.test(url)) return jsonResponse([])
     throw new Error(`Unerwarteter Fetch-Aufruf: ${method} ${url}`)
@@ -67,7 +67,7 @@ async function mountAdminMaintenance({ fetchImpl, tenantId = '1' } = {}) {
   return { wrapper }
 }
 
-// Rechte je Tab statt incidents:write.
+// Permissions per tab instead of incidents:write.
 const MAINTENANCE_PERMS = 'maintenance:create,maintenance:update,maintenance:delete,incident_templates:read'
 
 describe('AdminMaintenance', () => {
@@ -77,9 +77,9 @@ describe('AdminMaintenance', () => {
     useTenant().setMyPages([])
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -156,7 +156,7 @@ describe('AdminMaintenance', () => {
     expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
-  // vorher bot die Auswahl nur die oberste Ebene an.
+  // previously the selection only offered the top level.
   it('bietet in der Komponenten-Auswahl auch Unterkomponenten eingerückt an', async () => {
     setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
     const { wrapper } = await mountAdminMaintenance()
@@ -165,7 +165,7 @@ describe('AdminMaintenance', () => {
     expect(multiSelectOptionLabels(wrapper)).toEqual(expectedTreeOptionLabels)
   })
 
-  // eine inzwischen archivierte Komponente einer bestehenden Wartung bleibt in der Auswahl sichtbar.
+  // a meanwhile archived component of an existing maintenance stays visible in the selection.
   it('zeigt beim Bearbeiten eine archivierte, gewählte Komponente weiter in der Auswahl', async () => {
     setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
     const items = [{ ...maintenanceFixture()[0], Components: [{ ID: 13, Name: 'Altsystem' }] }]
@@ -176,7 +176,7 @@ describe('AdminMaintenance', () => {
     expect(multiSelectOptionLabels(wrapper)).not.toContain('Altsystem')
   })
 
-  // Nachrichtenfeld ist der Editor.
+  // The message field is the editor.
   it('Nachrichtenfeld ist der RichTextEditor', async () => {
     setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
     const { wrapper } = await mountAdminMaintenance()
@@ -254,9 +254,9 @@ describe('AdminMaintenance', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // /api/tags ist global-admin-only. Ein Editor sah „Keine Tags
-  // vorhanden. Unter ‚Tags‘ anlegen.“, obwohl Tags existieren und er die
-  // Tag-Verwaltung nicht öffnen darf. Jetzt fehlt das Feld ganz.
+  // /api/tags is global-admin-only. An editor saw "No tags
+  // available. Create them under 'Tags'.", although tags exist and they may not
+  // open the tag management. Now the field is missing entirely.
   it('blendet das Tag-Feld für Editoren aus und zeigt es Global Admins', async () => {
     setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
     const editorFetch = makeFetchRouter()
@@ -322,7 +322,7 @@ describe('AdminMaintenance', () => {
 
   it('blendet Neu-Knopf, Bearbeiten und Löschen ohne maintenance:create/update/delete aus', async () => {
     const { wrapper } = await mountAdminMaintenance()
-    // Ohne Recht nur „Ansehen“, kein Neu-Knopf, kein Bearbeiten/Löschen.
+    // Without permission only "View", no new button, no edit/delete.
     expect([...new Set(wrapper.findAll('[role="menuitem"]').map(i => i.text()))]).toEqual(['Ansehen'])
     expect(wrapper.find('.page-head button').exists()).toBe(false)
   })
@@ -424,7 +424,7 @@ describe('AdminMaintenance', () => {
     expect(item.text()).toContain('Löschen…')
     expect(item.attributes('aria-disabled')).toBe('true')
   })
-  // Richtung C: Seitenkopf, Kartenkopf mit Suche und Filter, Formular als Seitenkarte.
+  // Direction C: page header, card header with search and filter, form as a side card.
   describe('Richtung C', () => {
     const windows = () => [
       { ID: 1, Title: 'DB-Upgrade', Message: 'Kurz offline', Status: 'scheduled', Components: [{ ID: 10, Name: 'API' }], Tags: [], ScheduledStartAt: '2026-08-01T10:00:00Z', ScheduledEndAt: '2026-08-01T12:00:00Z' },
@@ -472,7 +472,7 @@ describe('AdminMaintenance', () => {
       expect(fieldByLabel(wrapper, 'Start').attributes('aria-invalid')).toBeUndefined()
     })
 
-    // Regression: Komponenten-Pflichtfeld wurde nur vom Server geprüft.
+    // Regression: the required components field was only checked by the server.
     it('Komponenten-Pflichtfeld: Fehler am Feld ohne Request, verschwindet bei Auswahl', async () => {
       setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
       const fetchMock = makeFetchRouter()
@@ -505,7 +505,7 @@ describe('AdminMaintenance', () => {
     })
   })
 
-  // Ohne Recht zum Ändern öffnet „Ansehen“ das Formular gesperrt, ohne Speichern.
+  // Without update permission "View" opens the form locked, without saving.
   it('öffnet das Formular ohne Änderungsrecht gesperrt und ohne Speichern-Knopf', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'maintenance:read' })
     const { wrapper } = await mountAdminMaintenance()
@@ -515,7 +515,7 @@ describe('AdminMaintenance', () => {
     expect(wrapper.find('.form-lock-hint').text()).toContain('Nur Lesezugriff')
     expect(wrapper.findAll('button[type="submit"]')).toHaveLength(0)
   })
-  // Nach dem Löschen blieb „Wartungsfenster erstellt.“ stehen, eine Löschmeldung fehlte.
+  // After deleting, "Maintenance window created." stayed; a delete message was missing.
   it('ersetzt beim Löschen die alte Meldung durch „Gelöscht.“ als Erfolgsmeldung', async () => {
     setAuthAsPageRole('jwt-1', { permissions: MAINTENANCE_PERMS })
     stubConfirm(true)

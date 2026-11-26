@@ -27,44 +27,44 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// OIDC-Anmeldung je Statusseite (ersetzt das frühere Gerüst mit
-// festem State und Mock-Token). Ablauf:
+// OIDC login per status page (replaces the earlier scaffolding with
+// fixed state and mock token). Flow:
 //
-//  1. GET /api/auth/oidc/login?page=N: State, Nonce und PKCE-Verifier in der
-//     DB ablegen, State zusätzlich als HttpOnly-Cookie an den Browser binden
-//     (gegen Login-CSRF), dann zum Anbieter umleiten.
-//  2. GET /api/auth/oidc/callback?page=N&state=…&code=…: State genau einmal
-//     einlösen, Code mit PKCE tauschen, ID-Token per go-oidc prüfen
-//     (Signatur über das JWKS, iss, aud, exp) und die Nonce vergleichen.
-//  3. Das Konto wird nur über (Seite, Issuer, Subject) gefunden, nie über die
-// E-Mail (bewusste Entscheidung gegen Konto-Übernahme). Neue Konten entstehen hier
-//     nicht. Die Verknüpfung legt ein angemeldeter Nutzer selbst an
-//     (POST /api/auth/oidc/link?page=N), danach läuft derselbe Callback.
-//  4. Sitzung: Einmal-Code, den das Frontend über
-//     /api/auth/sso-exchange gegen das JWT tauscht.
+//  1. GET /api/auth/oidc/login?page=N: store state, nonce and PKCE verifier in the
+//     DB, additionally bind the state to the browser as an HttpOnly cookie
+//     (against login CSRF), then redirect to the provider.
+//  2. GET /api/auth/oidc/callback?page=N&state=…&code=…: redeem the state exactly
+//     once, exchange the code with PKCE, verify the ID token via go-oidc
+//     (signature via the JWKS, iss, aud, exp) and compare the nonce.
+//  3. The account is found only via (page, issuer, subject), never via the
+//     email (deliberate decision against account takeover). New accounts are not
+//     created here. A logged-in user creates the link themselves
+//     (POST /api/auth/oidc/link?page=N), after which the same callback runs.
+//  4. Session: one-time code that the frontend exchanges for the JWT via
+//     /api/auth/sso-exchange.
 //
-// Fehler im Browser-Ablauf (Login-Start und Callback) leiten mit
-// einem festen Code ins Frontend um statt rohes JSON zu zeigen, siehe
-// ssoErrorURL. Dazu kommt die Testanmeldung eines Seiten-Admins
+// Errors in the browser flow (login start and callback) redirect with
+// a fixed code into the frontend instead of showing raw JSON, see
+// ssoErrorURL. In addition there is the test login of a page admin
 // (OIDCLoginState.TestLogin, StartSSOTestHandler).
 
 const (
 	oidcStateCookie     = "oidc_state"
 	oidcStateCookiePath = "/api/auth/oidc"
-	// oidcProviderTTL: So lange gilt ein Discovery-Ergebnis samt JWKS-Cache
-	// (go-oidc lädt das JWKS selbst nach, wenn eine unbekannte kid auftaucht).
+	// oidcProviderTTL: how long a discovery result including the JWKS cache is valid
+	// (go-oidc reloads the JWKS itself when an unknown kid appears).
 	oidcProviderTTL = time.Hour
-	// oidcFailureTTL: So lange gilt ein fehlgeschlagener Discovery-Versuch als
-	// Antwort, damit ein toter Anbieter nicht bei jedem Aufruf bis zu 10 s
-	// Netzwerkzeit kostet.
+	// oidcFailureTTL: how long a failed discovery attempt counts as the
+	// answer, so a dead provider does not block every call for up to 10 s
+	// network time.
 	oidcFailureTTL = time.Minute
 )
 
-// oidcError beschreibt einen Fehler im OIDC-Ablauf. status und
-// msg gehen an JSON-Aufrufer (Verknüpfen und Testanmeldung starten), code ist
-// der feste Fehlercode für den Redirect ins Frontend (dort übersetzt unter
-// auth.oidcErrors.<code>). In die URL kommt bewusst nur dieser Code: keine
-// Meldung des Anbieters, keine Details aus dem Log.
+// oidcError describes an error in the OIDC flow. status and
+// msg go to JSON callers (starting a link and the test login), code is
+// the fixed error code for the redirect into the frontend (translated there under
+// auth.oidcErrors.<code>). Deliberately only this code goes into the URL: no
+// message from the provider, no details from the log.
 type oidcError struct {
 	status int
 	code   string
@@ -109,11 +109,11 @@ var errOIDCInsecureIssuer = errors.New("OIDC-Issuer muss https verwenden")
 
 var errOIDCInsecureEndpoint = errors.New("OIDC-Endpunkt muss eine https-Adresse sein")
 
-// oidcEndpointAllowed prüft eine Adresse aus dem Discovery-Dokument. Sie
-// stammt vom Anbieter, den der Seiten-Admin einträgt: Der Browser wird auf
-// authorization_endpoint weitergeleitet, der Server ruft token_endpoint auf.
-// Erlaubt ist nur https mit Host; http nur für den ausdrücklich benannten
-// Entwicklungs-Issuer. javascript:, data: und Ähnliches fallen so heraus.
+// oidcEndpointAllowed checks an address from the discovery document. It
+// comes from the provider that the page admin enters: the browser is redirected to
+// authorization_endpoint, the server calls token_endpoint.
+// Only https with a host is allowed; http only for the explicitly named
+// development issuer. javascript:, data: and the like are thereby excluded.
 func oidcEndpointAllowed(issuer, raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {
@@ -128,10 +128,10 @@ func oidcEndpointAllowed(issuer, raw string) bool {
 	return false
 }
 
-// defaultOIDCHTTPClient spricht Discovery, JWKS und Token-Endpunkt an. Den
-// Discovery-URL pflegt der Seiten-Admin, deshalb derselbe SSRF-Schutz wie bei
-// Webhooks (safeDialContext): interne Adressen sind gesperrt, auch
-// nach Redirects und DNS-Rebinding.
+// defaultOIDCHTTPClient talks to discovery, JWKS and token endpoint. The
+// discovery URL is maintained by the page admin, hence the same SSRF protection as for
+// webhooks (safeDialContext): internal addresses are blocked, even
+// after redirects and DNS rebinding.
 func defaultOIDCHTTPClient() *http.Client {
 	return &http.Client{
 		Timeout:   10 * time.Second,
@@ -139,20 +139,20 @@ func defaultOIDCHTTPClient() *http.Client {
 	}
 }
 
-// oidcDevHTTPClient spricht nur die Issuer aus
-// OIDC_DEV_INSECURE_ISSUERS an, also den lokalen Mock-OIDC-Dienst aus
-// docker-compose.yml. Der läuft auf localhost, den safeDialContext sperrt.
+// oidcDevHTTPClient talks only to the issuers from
+// OIDC_DEV_INSECURE_ISSUERS, i.e. the local mock OIDC service from
+// docker-compose.yml. It runs on localhost, which safeDialContext blocks.
 func oidcDevHTTPClient() *http.Client {
 	return &http.Client{Timeout: 10 * time.Second}
 }
 
-// oidcDevIssuerAllowed: Für die lokale Entwicklung darf ein
-// Issuer ohne TLS und auf einer internen Adresse laufen, wenn er exakt in der
-// kommagetrennten Liste OIDC_DEV_INSECURE_ISSUERS steht. Bewusst exakter
-// Vergleich statt Präfix und nur in einer ausdrücklichen Entwicklungsumgebung
-// (wie beim Seeding in database/db.go): Sonst reichte eine vergessene Variable
-// oder ein abweichender APP_ENV-Wert auf dem Server, damit ein Seiten-Admin per
-// Discovery-URL interne Dienste erreicht.
+// oidcDevIssuerAllowed: for local development an
+// issuer may run without TLS and on an internal address if it is listed exactly in the
+// comma-separated list OIDC_DEV_INSECURE_ISSUERS. Deliberately exact
+// comparison rather than prefix and only in an explicit development environment
+// (as with seeding in database/db.go): otherwise a forgotten variable
+// or a differing APP_ENV value on the server would suffice for a page admin to
+// reach internal services via the discovery URL.
 func oidcDevIssuerAllowed(issuer string) bool {
 	if issuer == "" || !database.IsDevelopmentAppEnv() {
 		return false
@@ -174,15 +174,15 @@ var (
 	oidcTrustedHTTPClient = &http.Client{Timeout: 10 * time.Second}
 	oidcNow               = time.Now
 
-	// oidcProviderMu schützt nur die Map-Zugriffe, nie einen Netzwerkaufruf.
+	// oidcProviderMu protects only the map accesses, never a network call.
 	oidcProviderMu sync.Mutex
 	oidcProviders  = map[string]oidcProviderEntry{}
-	// oidcDiscoveries bündelt gleichzeitige Discoveries je Issuer.
+	// oidcDiscoveries bundles concurrent discoveries per issuer.
 	oidcDiscoveries singleflight.Group
 )
 
-// oidcProviderEntry hält entweder einen Provider oder den Fehler eines
-// fehlgeschlagenen Versuchs (negativer Cache), jeweils bis expires.
+// oidcProviderEntry holds either a provider or the error of a
+// failed attempt (negative cache), each until expires.
 type oidcProviderEntry struct {
 	provider *oidc.Provider
 	err      error
@@ -227,10 +227,10 @@ func oidcCacheKey(issuer string, trusted bool) string {
 	return issuer
 }
 
-// oidcIssuer leitet den Issuer aus dem gespeicherten Discovery-URL ab. Das
-// Admin-UI nimmt beides an: den Issuer selbst oder den vollen
-// .well-known-URL. Ein abschließender Schrägstrich bleibt stehen, weil er
-// bei manchen Anbietern Teil des Issuers ist.
+// oidcIssuer derives the issuer from the stored discovery URL. The
+// admin UI accepts both: the issuer itself or the full
+// .well-known URL. A trailing slash is kept because it
+// is part of the issuer for some providers.
 func oidcIssuer(discoveryURL string) string {
 	return strings.TrimSuffix(strings.TrimSpace(discoveryURL), "/.well-known/openid-configuration")
 }
@@ -356,8 +356,8 @@ func (h *Handler) activeOIDCConfig(pageID uint64) (models.StatusPageSSOConfig, b
 	return cfg, err == nil
 }
 
-// beginOIDC legt den Login-State an und liefert die Authorize-URL des
-// Anbieters. linkUserID != 0 startet eine Verknüpfung für dieses Konto.
+// beginOIDC creates the login state and returns the provider's
+// authorize URL. linkUserID != 0 starts a link for this account.
 func (h *Handler) beginOIDC(c *gin.Context, linkUserID uint) (string, *oidcError) {
 	pageID, err := strconv.ParseUint(c.Query("page"), 10, 32)
 	if err != nil {
@@ -399,14 +399,14 @@ func (h *Handler) startOIDCFlow(c *gin.Context, cl oidcClient, st models.OIDCLog
 	return cl.oauthConfig(p).AuthCodeURL(st.State, oidc.Nonce(st.Nonce), oauth2.S256ChallengeOption(st.CodeVerifier)), nil
 }
 
-// oidcStateLifetime: So lange gilt ein Login-State. Als Funktion, weil gremlins
-// Mutanten in Paketkonstanten keinem Coverage-Block zuordnet (NOT COVERED).
+// oidcStateLifetime: how long a login state is valid. A function because gremlins
+// mutants in package constants are not assigned to any coverage block (NOT COVERED).
 func oidcStateLifetime() time.Duration { return 10 * time.Minute }
 
-// OIDCLoginHandler startet den Login über das SSO einer Statusseite.
-// GET /api/auth/oidc/login?page=N (öffentlich, rate-limitiert). Der Browser
-// navigiert hierher (Knopf „Mit SSO anmelden“), Fehler gehen deshalb wie im
-// Callback als Code auf die Login-Seite.
+// OIDCLoginHandler starts the login via a status page's SSO.
+// GET /api/auth/oidc/login?page=N (public, rate-limited). The browser
+// navigates here ("Sign in with SSO" button), so errors go to the login page as a code,
+// as in the callback.
 func (h *Handler) OIDCLoginHandler(c *gin.Context) {
 	if h.moveLoginToBaseHost(c) {
 		return
@@ -418,14 +418,14 @@ func (h *Handler) OIDCLoginHandler(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, target)
 }
 
-// OIDCLinkHandler startet die Verknüpfung des angemeldeten Kontos mit dem
-// SSO einer Statusseite. Liefert die Authorize-URL als JSON, weil ein
-// Browser-Redirect den Authorization-Header nicht mitschickt.
-// POST /api/auth/oidc/link?page=N (angemeldet)
+// OIDCLinkHandler starts linking the logged-in account with the
+// SSO of a status page. Returns the authorize URL as JSON because a
+// browser redirect does not send the Authorization header.
+// POST /api/auth/oidc/link?page=N (logged in)
 //
-// Global Admins sind ausgenommen: Den IdP einer Seite kontrolliert deren
-// Admin, eine Verknüpfung gäbe ihm sonst einen Weg zu globalen Rechten. Das
-// gilt auch für Konten mit Rolle auf einer anderen Seite (Rechte dort).
+// Global admins are excluded: a page's IdP is controlled by its
+// admin, and a link would otherwise give them a path to global permissions. This
+// also applies to accounts with a role on another page (permissions there).
 func (h *Handler) OIDCLinkHandler(c *gin.Context) {
 	user, e := h.ssoLinkUser(c)
 	if e != nil {
@@ -494,8 +494,8 @@ type oidcClaims struct {
 	emailVerified *bool
 }
 
-// claimString liest einen String-Claim; fehlt er oder ist er kein String,
-// ist das Ergebnis leer.
+// claimString reads a string claim; if it is missing or not a string,
+// the result is empty.
 func claimString(claims map[string]interface{}, key string) string {
 	v, _ := claims[key].(string)
 	return v
@@ -548,8 +548,8 @@ func claimBool(claims map[string]interface{}, key string) *bool {
 	return &v
 }
 
-// linkSSOIdentity legt die Verknüpfung für linkUserID an. Gehört die
-// Identität schon einem anderen Konto, bleibt es bei diesem (409).
+// linkSSOIdentity creates the link for linkUserID. If the
+// identity already belongs to another account, it stays with that one (409).
 func (h *Handler) linkSSOIdentity(linkUserID uint, ident models.UserSSOIdentity, found bool) (uint, *oidcError) {
 	if found {
 		if ident.UserID != linkUserID {
@@ -569,7 +569,7 @@ func (h *Handler) linkSSOIdentity(linkUserID uint, ident models.UserSSOIdentity,
 // on the link (shown in the profile); the lookup uses key alone.
 func (h *Handler) resolveSSOUser(linkUserID uint, key models.UserSSOIdentity, email string) (models.User, *oidcError) {
 	var user models.User
-	// Ein Schlüsselteil, der leer ist, wäre "beliebig": nie suchen, nie anlegen.
+	// A key part that is empty would mean "anything": never search, never create.
 	if key.StatusPageID == 0 || key.Protocol == "" || key.Issuer == "" || key.Subject == "" {
 		return user, errOIDCIDTokenInvalid
 	}
@@ -595,24 +595,24 @@ func (h *Handler) resolveSSOUser(linkUserID uint, key models.UserSSOIdentity, em
 	return user, nil
 }
 
-// ssoIdentityScope wählt genau die Identität mit allen fünf Schlüsselspalten.
-// GORMs Struktur-Where (Where(&key)) ließe Nullwerte weg und träfe dann
-// beliebige Zeilen; hier steht jede Spalte ausdrücklich in der Bedingung
-// (auch ein leeres Subject-Format).
+// ssoIdentityScope selects exactly the identity with all five key columns.
+// GORM's struct Where (Where(&key)) would drop zero values and then match
+// arbitrary rows; here every column is explicitly in the condition
+// (even an empty subject format).
 func ssoIdentityScope(db *gorm.DB, key models.UserSSOIdentity) *gorm.DB {
 	return db.Where("status_page_id = ? AND protocol = ? AND issuer = ? AND subject = ? AND subject_format = ?",
 		key.StatusPageID, key.Protocol, key.Issuer, key.Subject, key.SubjectFormat)
 }
 
-// hasRoleOnOtherPage: Wer auf einer anderen Seite eine Rolle hat, darf nicht
-// über dieses SSO hinein (Rechteausweitung durch den Admin des fremden IdP).
-// Seit der Umstellung ist die Sitzung zusätzlich per sso_page_id auf die Seite
-// beschränkt; das deckt Rollen ab, die der Nutzer erst nach der Anmeldung
-// erhält. Die Prüfung hier bleibt als frühe, verständliche Ablehnung.
+// hasRoleOnOtherPage: anyone with a role on another page must not get in
+// via this SSO (privilege escalation by the admin of the foreign IdP).
+// Since the changeover the session is additionally restricted to the page via sso_page_id;
+// that covers roles the user only receives after logging in.
+// The check here remains as an early, understandable rejection.
 func (h *Handler) hasRoleOnOtherPage(userID, pageID uint) bool {
 	var n int64
-	// Fail closed: Bei einem DB-Fehler gilt die Sperre (Anmeldung abgelehnt,
-	// Konto nicht anhängbar), nie "keine Rolle gefunden".
+	// Fail closed: on a DB error the block applies (login rejected,
+	// account cannot be attached), never "no role found".
 	if err := h.DB.Model(&models.UserStatusPageRole{}).Where("user_id = ? AND status_page_id <> ?", userID, pageID).Count(&n).Error; err != nil {
 		return true
 	}
@@ -655,9 +655,9 @@ func (h *Handler) OIDCCallbackHandler(c *gin.Context) {
 	}
 }
 
-// oidcConfigForState: Login und Verknüpfung brauchen ein aktives Seiten-SSO,
-// die Testanmeldung nur eine vollständige Konfiguration mit
-// test_login_enabled (sie soll vor dem Einschalten prüfbar sein).
+// oidcConfigForState: login and linking need an active page SSO,
+// the test login only a complete configuration with
+// test_login_enabled (it should be checkable before enabling).
 func (h *Handler) oidcConfigForState(st models.OIDCLoginState) (models.StatusPageSSOConfig, *oidcError) {
 	if st.TestLogin {
 		return h.testOIDCConfig(uint64(st.StatusPageID))
@@ -696,9 +696,9 @@ func (h *Handler) completeOIDC(c *gin.Context, st models.OIDCLoginState) *oidcEr
 	return nil
 }
 
-// oidcTestResultURL meldet den Erfolg der Testanmeldung an die SSO-Seite,
-// dazu welche der konfigurierten Claims im ID-Token fehlten (nur die festen
-// Namen email/name, nie Werte).
+// oidcTestResultURL reports the success of the test login to the SSO page,
+// including which of the configured claims were missing in the ID token (only the fixed
+// names email/name, never values).
 func oidcTestResultURL(claims oidcClaims) string {
 	var missing []string
 	if claims.email == "" {
@@ -730,9 +730,9 @@ func (h *Handler) finishSSOLogin(c *gin.Context, user models.User, name string, 
 	h.RecordAudit(c, action, "auth", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email,
 		"provider="+protocol+" page="+strconv.FormatUint(uint64(pageID), 10))
 
-	// HS256 mit gesetztem JWT_SECRET kann nicht fehlschlagen; ohne Secret
-	// beendet getJWTSecret den Prozess schon vorher. Das Token
-	// gilt nur für pageID (sso_page_id-Claim).
+	// HS256 with JWT_SECRET set cannot fail; without a secret
+	// getJWTSecret ends the process beforehand. The token
+	// is valid only for pageID (sso_page_id claim).
 	origin, returnTo := h.loginDelivery(st, user)
 	token, _ := middleware.GeneratePageSSOToken(user, name, protocol, pageID, middleware.WithCustomDomain(origin.host))
 	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host, codeBinding(st, origin))+next)

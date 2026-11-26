@@ -1,20 +1,20 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C, Betriebsseiten: Segment-Umschalter für Listenfilter
-  (z. B. Alle / Offen / Behoben). Gruppe aus Knöpfen mit aria-pressed, damit
-  er ohne Pfeiltasten-Sonderlogik per Tab und Enter/Leertaste bedienbar ist.
-  Optionen: [{ value, label }]; der gewählte Wert ist auch ohne Farbe am
-  Rahmen und an der Füllung erkennbar (aria-pressed gibt ihn weiter).
+  Direction C, operations pages: segment switch for list filters
+  (e.g. All / Open / Resolved). A group of buttons with aria-pressed, so it
+  can be operated via Tab and Enter/Space without special arrow-key logic.
+  Options: [{ value, label }]; the selected value is recognizable without
+  colour too, by border and fill (aria-pressed conveys it).
 */
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  modelValue: { type: String, required: true },
-  options: { type: Array, required: true },
-  label: { type: String, required: true },
-})
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+defineProps<{
+  modelValue: string
+  options: { value: string, label: string }[]
+  label: string
+}>()
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>

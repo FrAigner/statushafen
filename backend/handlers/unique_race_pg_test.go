@@ -16,11 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Gleichzeitiges Anlegen desselben Slugs/Tags/Namens gegen ein
-// echtes Postgres. Jede Anfrage muss mit 201 oder 409 enden, genau eine mit
-// 201 (vorher gelegentlich 500 durch die Unique-Verletzung zwischen
-// Vorabprüfung und Insert). Nur mit MIGRATION_PG_TEST=1 (lädt Postgres, startet
-// nicht als root).
+// Concurrent creation of the same slug/tag/name against a
+// real Postgres. Every request must end with 201 or 409, exactly one with
+// 201 (previously occasionally 500 from the unique violation between
+// pre-check and insert). Only with MIGRATION_PG_TEST=1 (loads Postgres, does
+// not run as root).
 func TestUniqueRace_ParallelPostgres(t *testing.T) {
 	if os.Getenv("MIGRATION_PG_TEST") != "1" {
 		t.Skip("nur mit MIGRATION_PG_TEST=1")

@@ -17,8 +17,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Hilfe-Tooltips sind pro Benutzer serverseitig abschaltbar
-// (User.HideHelpTooltips, PATCH /api/me {"help_tooltips": bool}), Default an.
+// Help tooltips can be switched off per user on the server side
+// (User.HideHelpTooltips, PATCH /api/me {"help_tooltips": bool}), default on.
 
 func meJSON(t *testing.T, h *handlers.Handler, userID uint) map[string]any {
 	t.Helper()
@@ -67,7 +67,7 @@ func TestHelpTooltips_DefaultAnInLoginUndMe(t *testing.T) {
 		t.Errorf("Login help_tooltips = %v, erwartet true", got)
 	}
 
-	// Ausgeschaltet: Login liefert false.
+	// Switched off: login returns false.
 	db.Model(&models.User{}).Where("id = ?", u.ID).Update("hide_help_tooltips", true)
 	if got := loginJSON(t, h, login)["help_tooltips"]; got != false {
 		t.Errorf("Login help_tooltips = %v, erwartet false", got)
@@ -98,7 +98,7 @@ func TestHelpTooltips_PatchSpeichertNurDieseSpalte(t *testing.T) {
 	if got := meJSON(t, h, u.ID)["help_tooltips"]; got != false {
 		t.Errorf("GET /api/me help_tooltips = %v, erwartet false", got)
 	}
-	// Nur hide_help_tooltips darf sich ändern (Sprache bleibt).
+	// Only hide_help_tooltips may change (language stays).
 	after.HideHelpTooltips, after.UpdatedAt = before.HideHelpTooltips, before.UpdatedAt
 	if !reflect.DeepEqual(after, before) {
 		t.Errorf("andere Felder verändert: vorher %+v, nachher %+v", before, after)
@@ -124,7 +124,7 @@ func TestHelpTooltips_PatchBeideFelder(t *testing.T) {
 		t.Errorf("User nach PATCH = %+v", after)
 	}
 
-	// Ungültige Sprache: nichts wird geschrieben, auch nicht die Tooltips.
+	// Invalid language: nothing is written, not even the tooltips.
 	requireStatusCode(t, patchMeLanguage(t, h, u.ID, `{"help_tooltips":true,"preferred_language":"fr"}`), http.StatusBadRequest)
 	db.First(&after, u.ID)
 	if !after.HideHelpTooltips {

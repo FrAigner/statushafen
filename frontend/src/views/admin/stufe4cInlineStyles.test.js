@@ -3,9 +3,9 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// Stufe 4c: Die Views zur Statusseitenverwaltung haben keine
-// Inline-Styles mehr (Einrückung, Abstände, Farben kommen aus Klassen und
-// Tokens). Geprüft wird der Template-Quelltext, weil happy-dom kein CSS rechnet.
+// Stage 4c: the views of the status page management no longer have
+// inline styles (indentation, spacing, colours come from classes and
+// tokens). The template source is checked because happy-dom computes no CSS.
 const dir = dirname(fileURLToPath(import.meta.url))
 const VIEWS = [
   'AdminComponents', 'AdminComponentTranslations', 'AdminSubscribers',

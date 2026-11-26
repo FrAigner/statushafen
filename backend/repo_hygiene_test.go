@@ -12,38 +12,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Das Repository soll ohne Betriebs- und Personenbezug veröffentlichbar
-// bleiben: keine Deploy-Workflows, Zugangs- oder Schlüsseldateien und keine
-// privaten Postfach-Adressen in versionierten Dateien. Geprüft wird der Index
-// (git ls-files), nicht das Dateisystem. Drittsoftware-Lizenztexte enthalten
-// Autorenadressen und sind ausgenommen.
+// The repository should remain publishable without operational or personal
+// references: no deploy workflows, credential or key files, and no
+// private mailbox addresses in versioned files. The index is checked
+// (git ls-files), not the file system. Third-party license texts contain
+// author addresses and are exempt.
 var (
-	// forbiddenTrackedPath trifft Deploy-Workflows und -Konfigurationen sowie
-	// Dateien, die Geheimnisse tragen (.env ohne .example, Schlüssel, Zertifikate).
+	// forbiddenTrackedPath matches deploy workflows and configurations as well as
+	// files that carry secrets (.env without .example, keys, certificates).
 	forbiddenTrackedPath = regexp.MustCompile(`(?i)(^|/)(\.github/workflows/[^/]*deploy[^/]*|docker-compose\.[^/]*(prod|production|staging)[^/]*|\.env|\.env\.(?:prod|production|local)[^/]*|id_(?:rsa|ed25519|ecdsa)|[^/]+\.(?:pem|key|p12|pfx|kdbx))$`)
-	// freeMailAddress trifft Adressen bei privaten Postfachanbietern.
+	// freeMailAddress matches addresses at private mailbox providers.
 	freeMailAddress = regexp.MustCompile(`(?i)[a-z0-9._%+\-]+@(?:gmail|googlemail|hotmail|outlook|live|gmx|web|yahoo|icloud|proton|protonmail)\.(?:com|de|net|me)\b`)
-	// ticketReference trifft Verweise auf Tickets, Issues und Pull Requests
-	// ("#123", "PR 2") in Kommentaren und Dokumentation. Ohne das Ticketsystem
-	// sind sie tote Verweise; der Kommentar soll das Warum selbst erklären.
+	// ticketReference matches references to tickets, issues and pull requests
+	// ("#123", "PR 2") in comments and documentation. Without the ticket system
+	// they are dead references; the comment should explain the why itself.
 	ticketReference = regexp.MustCompile(`(?:^|[\s(])#[0-9]{1,5}\b|\bPR [0-9]+\b`)
-	// inlineReference trifft Verweise auch außerhalb von Kommentaren, etwa in
-	// Testnamen und Meldungen: "(#660)", "(#383/#387)" und "seit #543".
+	// inlineReference matches references also outside comments, such as in
+	// test names and messages: "(#660)", "(#383/#387)" and "since #543".
 	inlineReference = regexp.MustCompile(`(?:^|\s)\(#[0-9]{1,5}[/,)]|\b(?:vor|seit|aus|vgl\.?|siehe|Regeln?|Fehlerbild|Sichtprüfung|Zusammenführung|for)\s+#[0-9]{1,5}\b`)
-	// commentMarker trennt in Quelltext den Kommentar vom Code (Farbwerte wie
-	// "#666" in Code und CSS-Werten sind keine Verweise).
+	// commentMarker separates the comment from the code in source text (color values such as
+	// "#666" in code and CSS values are not references).
 	commentMarker = regexp.MustCompile(`//|/\*|<!--|^\s*\*|^\s*#\s`)
-	// referenceFixtures sind Dateien, deren Tests Verweisnummern bewusst als
-	// Testdaten enthalten (z. B. 3-stellige Hexfarben in Kommentaren).
+	// referenceFixtures are files whose tests deliberately use reference numbers as
+	// test data (e.g. 3-digit hex colors in comments).
 	referenceFixtures = map[string]bool{
 		"frontend/src/hexColors.test.js":              true,
 		"frontend/src/patternsCss.test.js":            true,
 		"frontend/src/publicDesign4a.test.js":         true,
-		"frontend/src/test-support/noInlineStyles.js": true,
+		"frontend/src/test-support/noInlineStyles.ts": true,
 		"backend/sql_concat_guard_test.go":            true,
 		"backend/repo_hygiene_test.go":                true,
 	}
-	// thirdPartyFiles dürfen fremde Autorenadressen enthalten.
+	// thirdPartyFiles may contain foreign author addresses.
 	thirdPartyFiles = map[string]bool{"THIRD_PARTY_NOTICES.md": true, "LICENSE": true, "frontend/package-lock.json": true}
 )
 
@@ -82,7 +82,7 @@ func TestRepo_NoPrivateMailboxAddressesTracked(t *testing.T) {
 		}
 		raw, err := os.ReadFile(filepath.Join(root, f))
 		if err != nil || len(raw) > 4<<20 || strings.ContainsRune(string(raw[:min(len(raw), 8000)]), 0) {
-			continue // nicht lesbar, sehr groß oder binär
+			continue // unreadable, very large or binary
 		}
 		if m := freeMailAddress.FindString(string(raw)); m != "" {
 			t.Errorf("%s enthält eine private Postfachadresse (%s): Beispieladressen unter example.com/example.org verwenden", f, m)
@@ -110,7 +110,7 @@ func TestRepo_NoTicketReferencesInCommentsOrDocs(t *testing.T) {
 	}
 }
 
-// hasTicketReference prüft eine Zeile; in Quelltext zählt nur der Teil ab dem
+// hasTicketReference checks one line; in source text only the part from the
 // Kommentarzeichen.
 func hasTicketReference(line string, isDoc bool) bool {
 	if inlineReference.MatchString(line) {
@@ -134,7 +134,7 @@ func TestTicketReferencePattern(t *testing.T) {
 	assert.False(t, hasTicketReference("Farbe #abc", true))
 }
 
-// Gegenprobe: Die Muster erkennen, wogegen sie schützen, und lassen Beispiele durch.
+// Control case: the patterns detect what they protect against and let examples through.
 func TestRepoHygienePatterns(t *testing.T) {
 	for _, p := range []string{".github/workflows/deploy-prod.yml", "docker-compose.production.yml", ".env", "backend/.env.production", "keys/server.pem", "id_rsa"} {
 		assert.True(t, forbiddenTrackedPath.MatchString(p), p)
@@ -142,8 +142,8 @@ func TestRepoHygienePatterns(t *testing.T) {
 	for _, p := range []string{".github/workflows/ci.yml", "docker-compose.yml", "backend/.env.example", "frontend/.env.example", "README.md"} {
 		assert.False(t, forbiddenTrackedPath.MatchString(p), p)
 	}
-	// Die Beispiele werden zusammengesetzt, damit diese Datei die Prüfung nicht
-	// selbst auslöst.
+	// The examples are assembled so that this file does not trigger the check
+	// itself.
 	for _, a := range []string{"jemand@" + "gmail.com", "Name.Nachname@" + "hotmail.de", "x@" + "GMX.net", "a+b@" + "outlook.com"} {
 		assert.True(t, freeMailAddress.MatchString(a), a)
 	}

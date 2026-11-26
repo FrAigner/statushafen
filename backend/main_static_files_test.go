@@ -12,11 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Regression 2026-10-29: /logo.png und /fonts/*.woff2 lieferten auf Prod
-// index.html (text/html) statt der Dateien, weil der Router nur /assets,
-// /favicon.svg und /icons.svg kannte. Der Vite-Devserver liefert public/ selbst
-// aus, deshalb fiel es lokal nicht auf. Diese Tests laufen gegen den echten
-// Handler mit einem Build-Ordner im Temp-Verzeichnis.
+// Regression 2026-10-29: /logo.png and /fonts/*.woff2 served index.html
+// (text/html) on prod instead of the files, because the router only knew /assets,
+// /favicon.svg and /icons.svg. The Vite dev server serves public/ itself,
+// so it went unnoticed locally. These tests run against the real
+// handler with a build folder in the temp directory.
 
 const spaMarker = "<html>SPA-INDEX</html>"
 
@@ -93,7 +93,7 @@ func TestStatic_GibtKeineGeheimnisseOderVerzeichnisseHeraus(t *testing.T) {
 		".versteckt":    []byte("GEHEIM"),
 		"fonts/.env":    []byte("GEHEIM"),
 	})
-	// Datei neben dem Build-Ordner, per ../ nicht erreichbar.
+	// File next to the build folder, not reachable via ../.
 	if err := os.WriteFile(filepath.Join(filepath.Dir(root), "geheim.txt"), []byte("GEHEIM"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestStaticFileFor(t *testing.T) {
 	}{
 		{"/a.txt", true}, {"a.txt", true}, {"/dir", false}, {"/nein.txt", false},
 		{"/", false}, {"/index.html", false}, {"/.a", false}, {"/dir/../a.txt", true},
-		{"/../a.txt", true}, // Clean löst das auf /a.txt auf, bleibt also im Ordner
+		{"/../a.txt", true}, // Clean resolves this to /a.txt, so it stays within the folder
 	}
 	for _, tt := range tests {
 		if _, ok := staticFileFor(root, tt.url); ok != tt.ok {
@@ -134,9 +134,9 @@ func TestStaticFileFor(t *testing.T) {
 	}
 }
 
-// Wächter: Jede Datei, die in frontend/public/ liegt, muss ausgeliefert werden.
-// Legt jemand eine neue Datei dort ab (Logo, Schrift, Bild), steht sie sofort
-// im Build; dieser Test stellt sicher, dass der Server sie nicht verschluckt.
+// Guard: every file in frontend/public/ must be served.
+// If someone puts a new file there (logo, font, image), it is immediately
+// in the build; this test ensures the server does not swallow it.
 func TestStatic_JedeDateiAusFrontendPublicWirdAusgeliefert(t *testing.T) {
 	publicDir := filepath.Join("..", "frontend", "public")
 	files := map[string][]byte{}
@@ -166,8 +166,8 @@ func TestStatic_JedeDateiAusFrontendPublicWirdAusgeliefert(t *testing.T) {
 	}
 }
 
-// Ein Link im Build-Ordner, der aus dem Ordner herauszeigt, darf nichts
-// ausliefern: os.Stat folgt Links, und path.Clean sieht sie nicht.
+// A link in the build folder that points out of the folder must not
+// serve anything: os.Stat follows links, and path.Clean does not see them.
 func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "dist")
@@ -185,9 +185,9 @@ func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 		t.Fatal(err)
 	}
 	links := map[string]string{
-		"datei.txt":    secret,                          // Link auf eine Datei außerhalb
-		"fonts/aussen": outside,                         // Link auf einen Ordner außerhalb
-		"alias.txt":    filepath.Join(root, "echt.txt"), // Link innerhalb: erlaubt
+		"datei.txt":    secret,                          // Link to a file outside
+		"fonts/aussen": outside,                         // Link to a folder outside
+		"alias.txt":    filepath.Join(root, "echt.txt"), // Link inside: allowed
 	}
 	for name, target := range links {
 		if err := os.Symlink(target, filepath.Join(root, filepath.FromSlash(name))); err != nil {
@@ -200,7 +200,7 @@ func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 			t.Errorf("staticFileFor(%q) liefert %q aus dem Ordner heraus aus", url, got)
 		}
 	}
-	// Gegenprobe: normale Datei und Link innerhalb des Ordners funktionieren.
+	// Control case: a normal file and a link within the folder work.
 	for _, url := range []string{"/echt.txt", "/alias.txt"} {
 		if _, ok := staticFileFor(root, url); !ok {
 			t.Errorf("staticFileFor(%q) lehnt eine Datei im Ordner ab", url)
@@ -208,7 +208,7 @@ func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 	}
 }
 
-// Fehlerpfade: ein nicht auflösbarer Ordner oder Pfad gilt als außerhalb.
+// Error paths: an unresolvable folder or path counts as outside.
 func TestWithinRoot_NichtAufloesbareGelten_AlsAusserhalb(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "a.txt")

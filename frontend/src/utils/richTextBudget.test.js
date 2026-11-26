@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: DOMPurify braucht ein vollständiges DOM (siehe richText.test.js).
+// jsdom instead of happy-dom: DOMPurify needs a complete DOM (see richText.test.js).
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
@@ -6,17 +6,17 @@ import {
   RICH_TEXT_RENDER_BUDGET, RICH_TEXT_RENDER_REFILL_PER_SECOND,
 } from './richText'
 
-// Jeder Text bleibt einzeln auf 5.000 Zeichen (Block) bzw. 8.000 (Gesamt)
-// begrenzt, doch viele solche Texte auf einer Seite summierten sich zu Sekunden
-// Blockierzeit (marked ist bei `*a_` quadratisch). Deshalb gilt ein Budget für
-// das Formatieren neuer Texte (Zeichen plus quadratischer Anteil, es füllt sich
-// mit der Zeit wieder auf); ist es aufgebraucht, erscheint der Text unformatiert
-// als maskierter Klartext. Treffer im Zwischenspeicher kosten nichts.
+// Every text stays individually limited to 5,000 characters (block) or 8,000 (total),
+// but many such texts on one page added up to seconds of blocking time
+// (marked is quadratic for `*a_`). Hence a budget applies to
+// formatting new texts (characters plus a quadratic share; it refills
+// over time); once it is used up, the text appears unformatted
+// as escaped plain text. Cache hits cost nothing.
 
-// Beginnt mit echter Formatierung (`**fett**`), damit sich formatiertes Ergebnis und
-// Klartext-Fallback unterscheiden lassen; der lange Rest ist das quadratische Muster.
+// Starts with real formatting (`**fett**`), so that the formatted result and the
+// plain-text fallback can be told apart; the long rest is the quadratic pattern.
 const pathological = (salt) => `**fett ${salt}** ${'*a_'.repeat(1650)}`
-const literalOf = (text) => `<p>${text}</p>` // Text enthält nur * _ a, Buchstaben und Ziffern: nichts zu maskieren
+const literalOf = (text) => `<p>${text}</p>` // the text only contains * _ a, letters and digits: nothing to escape
 const isLiteral = (html, text) => html === literalOf(text)
 
 describe('Render-Budget für formatierte Texte', () => {
@@ -40,8 +40,8 @@ describe('Render-Budget für formatierte Texte', () => {
     const fallbacks = results.filter((html, i) => isLiteral(html, texts[i])).length
     const maxFormatted = Math.floor(RICH_TEXT_RENDER_BUDGET / richTextRenderCost(pathological('0')))
     expect(fallbacks).toBeGreaterThanOrEqual(40 - maxFormatted - 1)
-    expect(fallbacks).toBeLessThan(40) // die ersten werden noch formatiert
-    // Der Fallback ist der vollständige Text (nichts abgeschnitten), die formatierten tragen <strong>.
+    expect(fallbacks).toBeLessThan(40) // the first ones are still formatted
+    // The fallback is the complete text (nothing cut off); the formatted ones carry <strong>.
     for (const [i, html] of results.entries()) expect(isLiteral(html, texts[i]) || html.includes('<strong>')).toBe(true)
   })
 
@@ -51,20 +51,20 @@ describe('Render-Budget für formatierte Texte', () => {
     const last = texts[39]
     expect(isLiteral(renderRichText(last), last)).toBe(true)
 
-    vi.advanceTimersByTime(30_000) // 30 s * Auffüllrate > Budget
+    vi.advanceTimersByTime(30_000) // 30 s * refill rate > budget
     expect(isLiteral(renderRichText(last), last)).toBe(false)
   })
 
   it('füllt sich mit der festen Rate wieder auf, höchstens bis zum Budget', () => {
     const cost = richTextRenderCost(pathological('0'))
     const first = Array.from({ length: Math.ceil(RICH_TEXT_RENDER_BUDGET / cost) + 1 }, (_, i) => pathological(`a${i}`))
-    first.forEach(renderRichText) // Budget leer
+    first.forEach(renderRichText) // budget empty
     const probe = pathological('probe')
     expect(isLiteral(renderRichText(probe), probe)).toBe(true)
 
     vi.advanceTimersByTime((cost / RICH_TEXT_RENDER_REFILL_PER_SECOND) * 1000 + 50)
     const again = pathological('probe2')
-    expect(isLiteral(renderRichText(again), again)).toBe(false) // genau ein teurer Text passt wieder
+    expect(isLiteral(renderRichText(again), again)).toBe(false) // exactly one expensive text fits again
     const next = pathological('probe3')
     expect(isLiteral(renderRichText(next), next)).toBe(true)
   })
@@ -80,8 +80,8 @@ describe('Render-Budget für formatierte Texte', () => {
   it('der Klartext für Suche und Listen folgt demselben Budget', () => {
     const texts = Array.from({ length: 40 }, (_, i) => pathological(`p${i}`))
     const plain = texts.map(markdownToPlainText)
-    expect(plain[0].startsWith('fett p0')).toBe(true) // formatiert: ohne Sternchen
-    expect(plain[39].startsWith('**fett p39**')).toBe(true) // Budget leer: Rohtext
+    expect(plain[0].startsWith('fett p0')).toBe(true) // formatted: without asterisks
+    expect(plain[39].startsWith('**fett p39**')).toBe(true) // budget empty: raw text
   })
 })
 
@@ -92,8 +92,8 @@ describe('Render-Budget: feste Größen', () => {
   })
   afterEach(() => vi.useRealTimers())
 
-  // Ohne feste Zahlen würde eine versehentlich vergrößerte Konstante alle anderen
-  // Tests mitziehen (sie rechnen mit den exportierten Werten).
+  // Without fixed numbers, an accidentally enlarged constant would drag all other
+  // tests along (they compute with the exported values).
   it('die Kosten sind Zeichen plus ein Anteil je Formatierzeichen', () => {
     expect(richTextRenderCost('a'.repeat(1000))).toBe(1000)
     for (const c of ['*', '_', '`', '>', '~', '[', ']']) {
@@ -106,10 +106,10 @@ describe('Render-Budget: feste Größen', () => {
     const allowed = Math.floor(RICH_TEXT_RENDER_BUDGET / cost)
     expect(allowed).toBeGreaterThanOrEqual(2)
     expect(allowed).toBeLessThanOrEqual(6)
-    expect(RICH_TEXT_RENDER_BUDGET / RICH_TEXT_RENDER_REFILL_PER_SECOND).toBeGreaterThanOrEqual(5) // volles Budget braucht Sekunden
+    expect(RICH_TEXT_RENDER_BUDGET / RICH_TEXT_RENDER_REFILL_PER_SECOND).toBeGreaterThanOrEqual(5) // a full budget takes seconds
   })
 
-  // Leert das Budget genau: Klartext ohne Formatierzeichen kostet seine Länge.
+  // Empties the budget exactly: plain text without formatting characters costs its length.
   const drain = (amount) => {
     let left = amount
     for (let i = 0; left > 0; i++) {
@@ -148,18 +148,18 @@ describe('Render-Budget: feste Größen', () => {
 
   it('ein Text, der genau dem Rest des Budgets entspricht, passt noch hinein', () => {
     drain(RICH_TEXT_RENDER_BUDGET - 1502)
-    const exact = `*x*${'y'.repeat(1497)}` // 1500 Zeichen, 2 Formatierzeichen: Kosten 1500 + 2*1500/1500 = 1502
+    const exact = `*x*${'y'.repeat(1497)}` // 1500 characters, 2 formatting characters: cost 1500 + 2*1500/1500 = 1502
     expect(richTextRenderCost(exact)).toBe(1502)
     expect(renderRichText(exact)).toContain('<em>x</em>')
     const next = '*z*'
-    expect(renderRichText(next)).not.toContain('<em>') // Budget jetzt genau leer
+    expect(renderRichText(next)).not.toContain('<em>') // budget now exactly empty
   })
 })
 
 describe('Render-Budget: Messung', () => {
-  // Kontrolle: so viele teure Texte, wie das Budget erlaubt (ungebremst). Angriff:
-  // vierzig verschiedene. Ohne Budget wären das ca. 7-mal so viele Sekunden.
-  // Die Schwelle ist großzügig, damit langsame Rechner nicht flackern.
+  // Control: as many expensive texts as the budget allows (unthrottled). Attack:
+  // forty different ones. Without a budget that would be about 7 times as many seconds.
+  // The threshold is generous, so that slow machines do not flake.
   it('vierzig teure Texte kosten höchstens ein Mehrfaches der Kontrolle', () => {
     resetRichTextBudget()
     const allowed = Math.floor(RICH_TEXT_RENDER_BUDGET / richTextRenderCost(pathological('0')))

@@ -14,11 +14,11 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Systemeinstellungen für die automatische Übersetzung, nur
-// Global Admin (system_settings). Der Schlüssel wird nie ausgegeben: die
-// Antwort nennt nur api_key_set.
+// System settings for automatic translation, global
+// admin only (system_settings). The key is never returned: the
+// response only reports api_key_set.
 
-// translationSettingsView ist die Antwort von GET/PUT /settings/translation.
+// translationSettingsView is the response of GET/PUT /settings/translation.
 func (h *Handler) translationSettingsView() gin.H {
 	st := h.storedTranslation()
 	eff := h.effectiveTranslationConfig()
@@ -35,7 +35,7 @@ func (h *Handler) translationSettingsView() gin.H {
 	}
 }
 
-// GetTranslationSettingsHandler liefert die Einstellungen ohne Schlüssel.
+// GetTranslationSettingsHandler returns the settings without the key.
 func (h *Handler) GetTranslationSettingsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.translationSettingsView())
 }
@@ -50,9 +50,9 @@ func (h *Handler) setSystemSettingString(key, value string) error {
 	}).Create(&models.SystemSetting{Key: key, Value: value}).Error
 }
 
-// UpdateTranslationSettingsHandler speichert Dienst, Adresse und Schlüssel.
-// Jedes Feld ist optional (Pointer): fehlt api_key, bleibt der Schlüssel
-// unverändert, ein leerer String löscht ihn. Das Audit-Log nennt nie den Wert.
+// UpdateTranslationSettingsHandler stores service, address and key.
+// Every field is optional (pointer): if api_key is missing, the key stays
+// unchanged, an empty string deletes it. The audit log never names the value.
 func (h *Handler) UpdateTranslationSettingsHandler(c *gin.Context) {
 	var req struct {
 		Enabled  *bool   `json:"enabled"`
@@ -126,8 +126,8 @@ func (h *Handler) UpdateTranslationSettingsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.translationSettingsView())
 }
 
-// TestTranslationSettingsHandler übersetzt einen festen Beispieltext mit der
-// gespeicherten Konfiguration (Verbindungstest, POST /settings/translation/test).
+// TestTranslationSettingsHandler translates a fixed sample text with the
+// saved configuration (connection test, POST /settings/translation/test).
 func (h *Handler) TestTranslationSettingsHandler(c *gin.Context) {
 	provider, name, err := h.translationProvider()
 	if err != nil {

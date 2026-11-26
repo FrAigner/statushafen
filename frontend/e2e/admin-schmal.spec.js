@@ -1,15 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-// Regressionstest für schmale Breiten im Admin. happy-dom
-// rechnet kein Layout, deshalb prüft dieser Spec in echtem Chromium bei 375 und
-// 390 px, dass
-//  - die Seite nicht horizontal scrollt,
-//  - Seitenkopf und Hauptbuttons nicht über den rechten Rand ragen,
-//  - Badges in den Karten (z. B. das Domain-Badge der Statusseiten) nicht aus
-//    der Karte herausragen.
-// Die API ist vollständig gemockt (kein Backend, keine Zugangsdaten nötig):
+// Regression test for narrow widths in the admin. happy-dom computes no
+// layout, so this spec checks in real Chromium at 375 and 390 px that
+//  - the page does not scroll horizontally,
+//  - the page header and main buttons do not stick out past the right edge,
+//  - badges in the cards (e.g. the status pages' domain badge) do not stick
+//    out of the card.
+// The API is fully mocked (no backend, no credentials needed):
 //   cd frontend && E2E_PORT=5207 npx playwright test admin-schmal --reporter=list
-// Der Vite-Dev-Server muss auf diesem Port laufen (oder Playwright startet ihn).
+// The Vite dev server must run on this port (or Playwright starts it).
 const PORT = process.env.E2E_PORT || '5173';
 const BASE = `http://localhost:${PORT}`;
 
@@ -35,7 +34,7 @@ async function mockApi(page) {
     }
     if (path === '/api/pages' || path === '/api/me/pages') return json(route, [PAGE])
     if (route.request().method() !== 'GET') return json(route, {})
-    // Alles andere: leere Liste bzw. leeres Objekt
+    // Everything else: empty list or empty object
     return json(route, path.endsWith('/settings') ? {} : [])
   })
 }

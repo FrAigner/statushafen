@@ -11,13 +11,13 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// Redesign Stufe 4e „Einstieg“: Login, Bestellung, Bestätigungs- und
-// Abmeldeseiten teilen sich assets/entry.css und nutzen nur Tokens. Vorher trug
-// jede View eigene Karte/Formularfelder/Knöpfe mit Indigo-Verlauf (#6366f1,
-// #7c3aed), festen rgba-Werten und `#fff`/`#dc2626`-Rückfallwerten. Der Test
-// hält die Seiten auf dem Stand: kein Inline-Style, keine Farbliterale, kein
-// eigener <style>-Block, der das Aussehen wieder abspaltet.
-// ?raw liefert für .css unter vitest einen leeren String, deshalb von der Platte lesen.
+// Redesign stage 4e "entry": login, order, confirmation and
+// unsubscribe pages share assets/entry.css and use only tokens. Previously
+// every view carried its own card/form fields/buttons with an indigo gradient (#6366f1,
+// #7c3aed), fixed rgba values and `#fff`/`#dc2626` fallbacks. The test
+// keeps the pages in that state: no inline style, no colour literals, no
+// own <style> block that splits the look off again.
+// Under vitest ?raw yields an empty string for .css, so read it from disk.
 const entryCss = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../assets/entry.css'), 'utf-8')
 
 const VIEWS = {

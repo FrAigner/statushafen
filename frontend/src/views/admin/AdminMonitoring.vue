@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 /*
-  In-App Monitoring-Dashboard (Golden Signals Schritt 3/4), nur für
-  Global Admins. Zeigt dieselben Signale wie der Prometheus-Export aus
-  Schritt 2/4 direkt in der App an – als Fallback/Quick-View, falls
-  Grafana Cloud nicht verfügbar oder noch nicht eingerichtet ist.
+  In-app monitoring dashboard (golden signals step 3/4), global admins
+  only. Shows the same signals as the Prometheus export from step 2/4
+  directly in the app - as a fallback/quick view in case Grafana Cloud
+  is unavailable or not set up yet.
   Route: { path: 'monitoring', component: AdminMonitoring }  in router/index.js
   Backend: GET /api/admin/monitoring  (handlers/monitoring.go, RequireGlobalAdmin)
 */
@@ -18,27 +18,28 @@ import KpiCard from '../../components/KpiCard.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import SegmentControl from '../../components/SegmentControl.vue'
-import { ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds.js'
+import { ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds'
+import type { MonitoringResponse, MonitoringRoute, MonitoringSaturation, MonitoringTotals } from '../../types/admin'
 
 const { apiFetch } = useApi()
 const { t } = useI18n()
 const breadcrumbs = usePageCrumbs(computed(() => t('monitoring.title')), { global: true })
 
-const routes = ref([])
-const totals = ref({
+const routes = ref<MonitoringRoute[]>([])
+const totals = ref<MonitoringTotals>({
   request_count: 0, error_count: 0, error_rate: 0, requests_per_minute: 0,
   avg_latency_ms: 0, p50_latency_ms: 0, p95_latency_ms: 0, max_latency_ms: 0,
 })
 const uptimeSeconds = ref(0)
-// Dashboard-Link kommt aus der Backend-Konfiguration (GRAFANA_DASHBOARD_URL); leer = kein Link.
+// The dashboard link comes from the backend configuration (GRAFANA_DASHBOARD_URL); empty = no link.
 const grafanaUrl = ref('')
-const saturation = ref({
+const saturation = ref<MonitoringSaturation>({
   goroutine_count: 0, heap_alloc_bytes: 0, heap_sys_bytes: 0, sys_bytes: 0, num_gc: 0,
   db_stats_available: false, db_max_open_connections: 0, db_open_connections: 0, db_in_use: 0, db_idle: 0,
 })
-// Schlüssel je Zeile für ResponsiveTable (Methode + Route ist eindeutig).
-// Das Backend liefert alle registrierten Routen, auch ungenutzte (0 Requests).
-// Filter „Alle“ / „Nur genutzte“; ungenutzte Zeilen zeigen „–“ statt 0,0 % / 0ms.
+// Key per row for ResponsiveTable (method + route is unique).
+// The backend returns all registered routes, including unused ones (0 requests).
+// Filter "All" / "Used only"; unused rows show "–" instead of 0.0 % / 0ms.
 const usageFilter = ref('all')
 const usageOptions = computed(() => [
   { value: 'all', label: t('monitoring.filterAll') },
@@ -55,32 +56,32 @@ const loadData = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    const data = await apiFetch('/api/admin/monitoring')
+    const data: MonitoringResponse = await apiFetch('/api/admin/monitoring')
     routes.value = data.routes ?? []
     totals.value = data.totals ?? totals.value
     uptimeSeconds.value = data.uptime_seconds ?? 0
     grafanaUrl.value = data.grafana_dashboard_url ?? ''
     saturation.value = data.saturation ?? saturation.value
   } catch (err) {
-    errorMsg.value = t('monitoring.loadError') + err.message
+    errorMsg.value = t('monitoring.loadError') + (err as Error).message
   } finally {
     loading.value = false
   }
 }
 onMounted(loadData)
 
-const fmtMs = (ms) => (ms == null ? '–' : ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : Math.round(ms) + 'ms')
-const fmtPct = (ratio) => (ratio == null ? '–' : (ratio * 100).toFixed(1) + '%')
-const fmtRate = (perMin) => (perMin == null ? '–' : perMin < 10 ? perMin.toFixed(2) : Math.round(perMin))
-const fmtUptime = (s) => {
+const fmtMs = (ms: number | null | undefined) => (ms == null ? '–' : ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : Math.round(ms) + 'ms')
+const fmtPct = (ratio: number | null | undefined) => (ratio == null ? '–' : (ratio * 100).toFixed(1) + '%')
+const fmtRate = (perMin: number | null | undefined) => (perMin == null ? '–' : perMin < 10 ? perMin.toFixed(2) : Math.round(perMin))
+const fmtUptime = (s: number) => {
   if (!s) return '–'
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
   return h > 0 ? `${h}h ${m}min` : `${m}min`
 }
-// Schwellen (gelb ab 5 %, rot ab 10 %) und Stufenlogik: monitoringThresholds.js.
-// Grober Wert, kein SLO; dient nur der visuellen Orientierung im Dashboard.
-// Stufe 4d: Die Stufe (major/degraded) geht an StatusBadge (Form +
-// Farbe + Text), KpiCard färbt nur ab "major" (alert); keine Regenbogen-Kacheln.
+// Thresholds (yellow from 5 %, red from 10 %) and level logic: monitoringThresholds.ts.
+// A rough value, not an SLO; only a visual guide in the dashboard.
+// Stage 4d: the level (major/degraded) goes to StatusBadge (shape +
+// colour + text); KpiCard only colours from "major" (alert); no rainbow tiles.
 
 const kpis = computed(() => [
   { label: t('monitoring.kpiRequests'),            value: String(totals.value.request_count ?? 0) },
@@ -91,13 +92,13 @@ const kpis = computed(() => [
   { label: t('monitoring.kpiUptime'),              value: fmtUptime(uptimeSeconds.value) },
 ])
 
-// Saturation (Golden Signals Schritt 4/4): Ressourcen-Auslastung
-// des Backend-Prozesses – ergänzt die Requests-lastigen KPIs oben um
-// Goroutines/Speicher/DB-Pool.
-const fmtMb = (bytes) => (bytes == null ? '–' : (bytes / (1024 * 1024)).toFixed(1) + ' MB')
-// Ab welcher Pool-Auslastung die DB-Kachel Handlungsbedarf zeigt –
-// ebenfalls ein grober visueller Schwellwert, keine harte SLO-Grenze.
-const dbPoolAlert = (inUse, maxOpen) => maxOpen > 0 && inUse / maxOpen >= 0.8
+// Saturation (golden signals step 4/4): resource usage of the backend
+// process - complements the request-heavy KPIs above with
+// goroutines/memory/DB pool.
+const fmtMb = (bytes: number | null | undefined) => (bytes == null ? '–' : (bytes / (1024 * 1024)).toFixed(1) + ' MB')
+// The pool usage from which the DB tile signals a need for action -
+// also a rough visual threshold, not a hard SLO limit.
+const dbPoolAlert = (inUse: number, maxOpen: number) => maxOpen > 0 && inUse / maxOpen >= 0.8
 
 const saturationKpis = computed(() => {
   const s = saturation.value
@@ -139,12 +140,12 @@ const columns = computed(() => [
 
     <div v-if="errorMsg" class="alert alert-error mb-16">{{ errorMsg }}</div>
 
-    <!-- KPI-Zeile -->
+    <!-- KPI row -->
     <div class="kpi-grid">
       <KpiCard v-for="k in kpis" :key="k.label" :label="k.label" :value="k.value" :alert="k.alert" />
     </div>
 
-    <!-- KPI-Zeile: Saturation (Ressourcen-Auslastung) -->
+    <!-- KPI row: saturation (resource usage) -->
     <div class="section-subheader">
       <h3>{{ t('monitoring.saturationHeading') }}</h3>
       <span class="text-muted">{{ t('monitoring.saturationSubtitle') }}</span>
@@ -153,7 +154,7 @@ const columns = computed(() => [
       <KpiCard v-for="k in saturationKpis" :key="k.label" :label="k.label" :value="k.value" :alert="k.alert" />
     </div>
 
-    <!-- Tabelle: Golden Signals je Endpunkt -->
+    <!-- Table: golden signals per endpoint -->
     <ListCard :title="t('monitoring.cardTitle')">
       <template #tools>
         <SegmentControl v-model="usageFilter" :options="usageOptions" :label="t('monitoring.filterLabel')" />
@@ -207,18 +208,18 @@ const columns = computed(() => [
 .muted { color: var(--text-2); }
 .mb-16 { margin-bottom: var(--sp-4); }
 
-/* Smartphone (480px+): 2 spalten */
+/* Smartphone (480px+): 2 columns */
 @media (min-width: 480px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Tablet (768px+): 3 spalten */
+/* Tablet (768px+): 3 columns */
 @media (min-width: 768px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .kpi-grid-saturation { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Desktop (1200px+): 6 spalten */
+/* Desktop (1200px+): 6 columns */
 @media (min-width: 1200px) {
   .kpi-grid { grid-template-columns: repeat(6, 1fr); }
   .kpi-grid-saturation { grid-template-columns: repeat(4, 1fr); }

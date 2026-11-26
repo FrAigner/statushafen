@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -21,25 +21,31 @@ import PageHeader from '../../components/PageHeader.vue'
 import FormField from '../../components/FormField.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
+import type { Role } from '../../types/api'
+
+/** Edit form: the role fields plus the permissions as a list for the matrix. */
+interface RoleForm extends Partial<Role> {
+  permissions?: string[]
+}
 
 const { apiFetch } = useApi()
-// Rollen sind eine globale Ressource (roles:*): nur Global Admins, daher kein Rechtecheck je Aktion.
+// Roles are a global resource (roles:*): global admins only, hence no permission check per action.
 const { isGlobalAdmin } = useAuth()
 const { t, locale } = useI18n()
 
-const items = ref([])
+const items = ref<Role[]>([])
 const isEditing = ref(false)
-const currentEditItem = ref(null)
-const formData = ref({})
+const currentEditItem = ref<'new' | number | null>(null)
+const formData = ref<RoleForm>({})
 const alertMsg = ref('')
 const isSaving = ref(false)
-const deletingId = ref(null)
+const deletingId = ref<number | null>(null)
 const query = ref('')
 const editName = ref('')
 const nameError = ref('')
 const { formEl, focusForm, focusInvalid } = useFormPanel()
 
-// Richtung C: Titel mit Namen statt ID, Seitenkopf mit Zählung.
+// Direction C: title with the name instead of the ID, page header with a count.
 const formTitle = computed(() => currentEditItem.value === 'new'
   ? t('roles.createTitle')
   : t('roles.editTitle', { name: editName.value }))
@@ -50,11 +56,11 @@ const rows = computed(() => {
   const needle = query.value.trim().toLowerCase()
   return items.value.filter(r => r.Name.toLowerCase().includes(needle))
 })
-// Die Matrix leitet ihre Zeilen aus den Tabs der Navigation ab; nur
-// das Sonderrecht ohne Aktionen kommt als eigener Abschnitt „Zugriff“ dazu.
-// seitenbezogene Berechtigung fürs „Dashboard“-Menüelement im
-// öffentlichen Header (Statusseite) – bewusst getrennt von den Tab-Rechten, da
-// sie nur den Zugang zum CMS-Bereich steuert.
+// The matrix derives its rows from the navigation tabs; only the special
+// permission without actions is added as its own "Access" section:
+// the page-scoped permission for the "Dashboard" menu item in the public
+// header (status page) - deliberately separate from the tab permissions, as
+// it only controls access to the CMS area.
 const standalonePermissions = [ADMIN_DASHBOARD]
 
 const columns = computed(() => [
@@ -67,18 +73,18 @@ const loadData = async () => {
   try {
     items.value = await apiFetch('/api/roles')
   } catch (err) {
-    alertMsg.value = t('common.loadError') + err.message
+    alertMsg.value = t('common.loadError') + (err as Error).message
   }
 }
 
 onMounted(loadData)
 
-const openEdit = (item) => {
+const openEdit = (item: Role | 'new') => {
   if (item === 'new') {
     formData.value = { permissions: [] }
   } else {
     formData.value = { ...item }
-    // Alt-Rollen (`x:write`, fehlendes read) erscheinen korrekt als CRUD.
+    // Legacy roles (`x:write`, missing read) show up correctly as CRUD.
     formData.value.permissions = normalizePermissions(formData.value.Permissions)
   }
   currentEditItem.value = item === 'new' ? 'new' : item.ID
@@ -116,13 +122,13 @@ const saveItem = async () => {
   await saveAction(endpoint, isNew ? 'POST' : 'PUT', payload, cancelEdit)
 }
 
-const deleteItem = (role) => deleteAction(`/api/roles/${role.ID}`, role.ID, t('roles.confirmDelete', { name: role.Name }))
+const deleteItem = (role: Role) => deleteAction(`/api/roles/${role.ID}`, role.ID, t('roles.confirmDelete', { name: role.Name }))
 
-const menuItems = (role) => [
+const menuItems = (role: Role) => [
   { key: 'edit', label: t('common.edit'), icon: 'pencil' },
   { key: 'delete', label: deletingId.value === role.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === role.ID },
 ]
-const onMenuSelect = (role, key) => {
+const onMenuSelect = (role: Role, key: string) => {
   if (key === 'edit') openEdit(role)
   else deleteItem(role)
 }
@@ -140,7 +146,7 @@ const onMenuSelect = (role, key) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Tabellenkarte links, Formular als Seitenkarte rechts. -->
+    <!-- Direction C: table card on the left, form as a side card on the right. -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('roles.cardTitle')">
         <template #tools>
@@ -176,7 +182,7 @@ const onMenuSelect = (role, key) => {
               @input="nameError = ''"
             />
           </FormField>
-          <PermissionMatrix v-model="formData.permissions" :standalone="standalonePermissions" />
+          <PermissionMatrix v-model="formData.permissions!" :standalone="standalonePermissions" />
           <div class="form-actions">
             <OnyxButton :label="t('common.cancel')" mode="outline" @click="cancelEdit" type="button" :disabled="isSaving" />
             <OnyxButton :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />

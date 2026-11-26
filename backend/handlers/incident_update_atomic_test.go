@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Verweist ein Update auf eine Komponente einer anderen Seite, antwortet der
-// Handler mit 404 und darf am Vorfall nichts verändert haben (keine halb
-// geschriebene Änderung vor der Fehlerantwort).
+// If an update refers to a component of another page, the
+// handler responds with 404 and must not have changed anything on the incident (no half
+// written change before the error response).
 func TestUpdateIncident_ForeignComponentChangesNothing(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -51,7 +51,7 @@ func TestUpdateIncident_ForeignComponentChangesNothing(t *testing.T) {
 	require.NoError(t, db.First(&got, inc.ID).Error)
 	assert.Equal(t, "Original", got.Title, "bei fehlgeschlagener Prüfung bleibt der Vorfall unverändert")
 
-	// Gegenprobe: eigene Komponente funktioniert und ändert den Titel.
+	// Control case: own component works and changes the title.
 	assert.Equal(t, http.StatusOK, put(map[string]any{"title": "Geändert", "message": "m", "status": "investigating", "ComponentIDs": []uint{own.ID}}))
 	require.NoError(t, db.First(&got, inc.ID).Error)
 	assert.Equal(t, "Geändert", got.Title)

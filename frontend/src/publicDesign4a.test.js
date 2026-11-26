@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Redesign 4a: Schutz für die fünf öffentlichen Dateien.
-// Inline-Styles: 0 (einzige Ausnahme: die Kundenmarke auf .content-area),
-// keine alten .badge-*-Klassen, keine Hex-Farben (nur Tokens).
+// Redesign 4a: guard for the five public files.
+// Inline styles: 0 (only exception: the customer brand on .content-area),
+// no old .badge-* classes, no hex colors (tokens only).
 const FILES = [
   'views/public/StatusPage.vue',
   'components/PageLayoutList.vue',
@@ -14,7 +14,7 @@ const FILES = [
   'components/AvailabilityBars.vue',
 ]
 const read = (f) => readFileSync(resolve(__dirname, f), 'utf-8')
-// Kommentare entfernen (dort stehen Verweisnummern wie #534).
+// Strip comments (they contain reference numbers like #534).
 const code = (f) => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
 
 describe('Öffentliche Seiten (Redesign 4a)', () => {

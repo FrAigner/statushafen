@@ -113,7 +113,7 @@ Mutationstests laufen nachts (`.github/workflows/mutation-nachts.yml`): Backend 
   Eingabe, der prüft, dass es nicht im Log-Puffer steht. Das Access-Log enthält nur den Pfad, nie
   Query-String, Header oder Body.
 - **Formatierte Texte** sind eine eingeschränkte Markdown-Teilmenge (`backend/richtext`,
-  `frontend/src/utils/richText.js`); neue Speicherstellen für Nachrichten brauchen dieselbe
+  `frontend/src/utils/richText.ts`); neue Speicherstellen für Nachrichten brauchen dieselbe
   Längenprüfung (`requireMessageLength`).
 - **Workflows:** nur GitHub-gehostete Runner, jede fremde Action per Commit-SHA gepinnt, ausdrückliche
   `permissions` an jedem Job und `persist-credentials: false` an jedem Checkout

@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Fehlerpfade der Admin-Übersetzungslisten direkt am Handler
-// (ohne PageScope-Middleware, die ungültige IDs sonst schon abfängt). Den
-// Erfolgsfall samt Rechte- und Mandantenprüfung deckt
-// main_translation_admin_list_test.go über den echten Router ab.
+// Error paths of the admin translation lists directly on the handler
+// (without the PageScope middleware, which would otherwise already catch invalid IDs). The
+// success case including permission and tenant checks is covered by
+// main_translation_admin_list_test.go via the real router.
 func TestAdminTranslationListHandlers_ErrorPaths(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

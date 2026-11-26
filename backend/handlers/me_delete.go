@@ -15,46 +15,46 @@ import (
 	"gorm.io/gorm"
 )
 
-// DeletedUserMarker ersetzt beim Löschen eines Kontos
-// die E-Mail-Adresse in allen Datensätzen, die bewusst erhalten bleiben
-// (Audit-Log, Incident-Timeline, Post-Mortem-Maßnahmen, Seitenbestellungen).
-// Bewusst ein fester Text statt leer: ActorEmail "" bzw. ActorID nil steht im
-// Audit-Log sonst für System/Automation, ein gelöschter Mensch soll davon
-// unterscheidbar bleiben.
+// DeletedUserMarker replaces the email address on account deletion
+// in all records that are deliberately kept
+// (audit log, incident timeline, post-mortem actions, page orders).
+// Deliberately a fixed text rather than empty: ActorEmail "" or ActorID nil in the
+// audit log otherwise stands for system/automation, and a deleted human should
+// remain distinguishable.
 const DeletedUserMarker = "[gelöschter Nutzer]"
 
-// pagesWritePermission ist die Seitenberechtigung, die einen Nutzer zum Admin
-// einer Statusseite macht (entspricht permPagesWrite in main.go, mit der
-// RequirePermission die Seitenverwaltung schützt).
+// pagesWritePermission is the page permission that makes a user an admin
+// of a status page (corresponds to permPagesWrite in main.go, with which
+// RequirePermission protects page management).
 const pagesWritePermission = "pages:update"
 
-// meDeleteRequest: Body von DELETE /api/me. ConfirmEmail ist für alle Konten
-// Pflicht (bewusste Handlung, analog zum Eintippen des Namens bei GitHub),
-// Password zusätzlich für Konten mit Passwort (Re-Authentifizierung, damit ein
-// liegen gelassenes Token allein nicht reicht). ConfirmDeletePageIDs ist die
-// ausdrückliche Bestätigung, dass die Seiten, deren einziger Admin der Nutzer
-// ist, unwiderruflich mitgelöscht werden.
+// meDeleteRequest: body of DELETE /api/me. ConfirmEmail is required for all
+// accounts (a deliberate action, analogous to typing the name on GitHub),
+// Password additionally for accounts with a password (re-authentication, so that a
+// token left lying around is not enough on its own). ConfirmDeletePageIDs is the
+// explicit confirmation that the pages of which the user is the only admin
+// are irrevocably deleted along with the account.
 type meDeleteRequest struct {
 	Password             string `json:"password"`
 	ConfirmEmail         string `json:"confirm_email"`
 	ConfirmDeletePageIDs []uint `json:"confirm_delete_page_ids"`
 }
 
-// meDeletePage beschreibt eine Statusseite, die mit dem Konto gelöscht würde
-// bzw. wurde.
+// meDeletePage describes a status page that would be deleted with the account
+// or was deleted.
 type meDeletePage struct {
 	ID   uint   `json:"id"`
 	Name string `json:"name"`
 	Slug string `json:"slug"`
 }
 
-// DeleteMeHandler liefert DELETE /api/me: löscht das eigene Konto (DSGVO Art. 17).
-// Entscheidungen des Betreibers (vom 2026-10-28): Audit-Logs werden anonymisiert statt gelöscht; Seiten, deren
-// einziger Admin der Nutzer ist, werden mitgelöscht, aber nur nach
-// ausdrücklicher Bestätigung - sonst 409 mit der Liste dieser Seiten.
-// Zusätzlich (konservativ, nicht vom Betreiber entschieden): Der letzte Global
-// Admin kann sich nicht selbst löschen, sonst wäre die Plattform ohne
-// Verwaltung.
+// DeleteMeHandler serves DELETE /api/me: deletes the user's own account (GDPR Art. 17).
+// Operator decisions (of 2026-10-28): audit logs are anonymized instead of deleted; pages whose
+// only admin is the user are deleted along with the account, but only after
+// explicit confirmation - otherwise 409 with the list of these pages.
+// Additionally (conservative, not decided by the operator): the last Global
+// Admin cannot delete themselves, otherwise the platform would be without
+// administration.
 func (h *Handler) DeleteMeHandler(c *gin.Context) {
 	var req meDeleteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -77,8 +77,8 @@ func (h *Handler) DeleteMeHandler(c *gin.Context) {
 	}
 
 	if !accountDeletionConfirmed(user, req) {
-		// 403 statt 401: das Frontend meldet bei 401 ab, hier soll der Nutzer
-		// die Eingabe nur korrigieren können.
+		// 403 instead of 401: the frontend logs out on 401, here the user should
+		// only be able to correct the input.
 		c.JSON(http.StatusForbidden, gin.H{"error": "Bestätigung fehlgeschlagen", "code": "confirmation_invalid"})
 		return
 	}
@@ -114,11 +114,11 @@ func (h *Handler) DeleteMeHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Konto gelöscht", "deleted_pages": pages})
 }
 
-// accountDeletionConfirmed prüft die Bestätigung aus dem Request: Die E-Mail
-// muss (ohne Rücksicht auf Groß-/Kleinschreibung und Leerraum) stimmen, und
-// Konten mit Passwort müssen es korrekt angeben. SSO-Konten ohne Passwort
-// bestätigen nur per E-Mail (siehe Bericht: eine frische
-// SSO-Anmeldung lässt sich ohne iat-Claim im Token nicht prüfen).
+// accountDeletionConfirmed checks the confirmation from the request: the email
+// must match (ignoring case and whitespace), and
+// accounts with a password must provide it correctly. SSO accounts without a password
+// confirm by email only (see report: a fresh
+// SSO login cannot be verified without an iat claim in the token).
 func accountDeletionConfirmed(user models.User, req meDeleteRequest) bool {
 	if !strings.EqualFold(strings.TrimSpace(req.ConfirmEmail), user.Email) {
 		return false
@@ -151,21 +151,21 @@ func (h *Handler) pageSSOMayDeleteAccount(user models.User, pageID uint) bool {
 	return identities == 0 && memberships == 0
 }
 
-// otherGlobalAdminExists: Fail-closed - schlägt die Zählung fehl, bleibt n 0
-// und die Löschung wird abgelehnt statt die Plattform womöglich ohne Global
-// Admin zurückzulassen.
+// otherGlobalAdminExists: fail-closed - if the count fails, n stays 0
+// and the deletion is rejected rather than possibly leaving the platform without a Global
+// Admin.
 func (h *Handler) otherGlobalAdminExists(userID uint) bool {
 	var n int64
 	h.DB.Model(&models.User{}).Where("is_global_admin = ? AND id <> ?", true, userID).Count(&n)
 	return n > 0
 }
 
-// soleAdminPages liefert alle (nicht gelöschten) Statusseiten, auf denen der
-// Nutzer pages:write hat und kein anderer, nicht gelöschter Nutzer. Rollen
-// soft-gelöschter Nutzer zählen nicht: DeleteUserHandler lässt deren
-// Rollenzeilen liegen, verwalten können sie die Seite trotzdem nicht mehr.
-// Global Admins zählen bewusst nicht als Seiten-Admin (sie verwalten die
-// Plattform, nicht die Seite).
+// soleAdminPages returns all (non-deleted) status pages on which the
+// user has pages:write and no other non-deleted user does. Roles
+// of soft-deleted users do not count: DeleteUserHandler leaves their
+// role rows in place, but they can no longer manage the page anyway.
+// Global Admins deliberately do not count as page admins (they manage the
+// platform, not the page).
 func (h *Handler) soleAdminPages(userID uint) ([]meDeletePage, error) {
 	var mine []models.UserStatusPageRole
 	if err := h.DB.Preload("Role").Preload("StatusPage").Where("user_id = ?", userID).Order("status_page_id").Find(&mine).Error; err != nil {
@@ -192,16 +192,16 @@ func (h *Handler) soleAdminPages(userID uint) ([]meDeletePage, error) {
 	return pages, nil
 }
 
-// permissionListContains prüft eine kommagetrennte Permissions-Liste (gleiche
-// Logik wie permissions.Has).
+// permissionListContains checks a comma-separated permissions list (same
+// logic as permissions.Has).
 func permissionListContains(list, required string) bool {
 	return permissions.Has(list, required)
 }
 
-// allPagesConfirmed: Jede betroffene Seite muss in der Bestätigung genannt
-// sein. Zusätzlich genannte Seiten sind unschädlich (sie werden nicht
-// gelöscht), etwa wenn zwischen 409 und Bestätigung ein weiterer Admin
-// hinzukam. Kommt umgekehrt eine neue Seite hinzu, gibt es erneut 409.
+// allPagesConfirmed: every affected page must be named in the confirmation.
+// Additionally named pages are harmless (they are not
+// deleted), for example when another admin was added between the 409 and the confirmation.
+// Conversely, if a new page is added, there is another 409.
 func allPagesConfirmed(pages []meDeletePage, confirmed []uint) bool {
 	for _, p := range pages {
 		if !slices.Contains(confirmed, p.ID) {
@@ -211,20 +211,20 @@ func allPagesConfirmed(pages []meDeletePage, confirmed []uint) bool {
 	return true
 }
 
-// deleteAccount löscht bzw. anonymisiert alle Daten des Nutzers innerhalb der
-// Transaktion tx. Persönliche Daten ohne Aufbewahrungsgrund werden hart
-// gelöscht (Unscoped, kein Soft-Delete), Datensätze anderer Zwecke bleiben mit
-// DeletedUserMarker statt der E-Mail erhalten. Die Seiten werden wie in
-// DeleteStatusPageHandler gelöscht (Soft-Delete der StatusPage).
+// deleteAccount deletes or anonymizes all of the user's data within the
+// transaction tx. Personal data without a retention reason is hard
+// deleted (Unscoped, no soft delete); records kept for other purposes remain with
+// DeletedUserMarker instead of the email. The pages are deleted as in
+// DeleteStatusPageHandler (soft delete of the StatusPage).
 func deleteAccount(tx *gorm.DB, user models.User, pages []meDeletePage) error {
 	uid := strconv.FormatUint(uint64(user.ID), 10)
 	email := user.Email
 	m := DeletedUserMarker
 
 	steps := []func() error{
-		// vorher (Security-Review) am Ende der Liste:
-		// Einladungen an und von diesem Konto löschen und die Benutzerzeile sperren,
-		// BEVOR Rollen entfernt werden (gleichzeitiges Annehmen).
+		// previously (security review) at the end of the list:
+		// delete invitations to and from this account and lock the user row,
+		// BEFORE roles are removed (concurrent acceptance).
 		func() error { return lockAccountForDeletion(tx, user) },
 		func() error {
 			return tx.Model(&models.AuditLog{}).Where("actor_id = ? OR actor_email = ?", user.ID, email).
@@ -258,8 +258,8 @@ func deleteAccount(tx *gorm.DB, user models.User, pages []meDeletePage) error {
 		func() error { return tx.Where("user_id = ?", user.ID).Delete(&models.UserSSOIdentity{}).Error },
 		func() error { return tx.Where("link_user_id = ?", user.ID).Delete(&models.OIDCLoginState{}).Error },
 	}
-	// Je Seite zwei eigene Schritte statt einer inneren Schleife: so läuft
-	// jeder Fehler durch dieselbe Abbruchstelle unten.
+	// Two separate steps per page instead of an inner loop: this way
+	// every error passes through the same abort point below.
 	for _, p := range pages {
 		pageID := p.ID
 		steps = append(steps,
@@ -280,7 +280,7 @@ func deleteAccount(tx *gorm.DB, user models.User, pages []meDeletePage) error {
 				TargetID: uid, TargetName: m, ActorEmail: m,
 			}).Error
 		},
-		// eigene Lesemarken des Nachrichtencenters (auch ohne FK-Cascade).
+		// the user's own read markers of the message center (even without FK cascade).
 		func() error { return tx.Where("user_id = ?", user.ID).Delete(&models.NotificationRead{}).Error },
 		func() error { return tx.Unscoped().Delete(&models.User{}, user.ID).Error },
 	)

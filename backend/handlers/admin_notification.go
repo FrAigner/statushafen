@@ -16,17 +16,17 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Admin-Nachrichtencenter (Glocke). Dieser Dienst schreibt die
-// Nachrichten (NotifyAdmins), die Handler darunter liefern sie an die Admins
-// aus. Kein Audit-Eintrag: Nachrichten sind flüchtige Betriebsmeldungen und
-// werden nach adminNotificationRetention gelöscht.
+// Admin message center (bell). This service writes the
+// messages (NotifyAdmins); the handlers below deliver them to the admins.
+// No audit entry: messages are transient operational notices and
+// are deleted after adminNotificationRetention.
 
 const (
-	// adminNotificationWindow: Innerhalb dieser Zeit fasst NotifyAdmins gleiche
-	// Meldungen (gleicher DedupKey) zusammen.
+	// adminNotificationWindow: within this time NotifyAdmins merges identical
+	// messages (same DedupKey).
 	adminNotificationWindow = 15 * time.Minute
 
-	// Nachrichtenarten (Kind). Die Texte stehen im Frontend unter
+	// Message kinds (Kind). The texts live in the frontend under
 	// adminNotifications.<kind>.title/body.
 	AdminNotifExternalSourceOutage    = "external_source_outage"
 	AdminNotifExternalSourceRecovered = "external_source_recovered"
@@ -37,18 +37,18 @@ const (
 	adminNotifMaxLimit     = 100
 	permSubscribersWrite   = "subscribers:update"
 	adminSubscribersPath   = "/admin/subscribers"
-	// adminNotifUnreadClause: für den angemeldeten Nutzer noch nicht gelesen.
+	// adminNotifUnreadClause: not yet read by the signed-in user.
 	adminNotifUnreadClause = "NOT EXISTS (SELECT 1 FROM notification_reads r WHERE r.notification_id = admin_notifications.id AND r.user_id = ?)"
 )
 
-// adminNotifForbiddenParams: Parameter, die nie in einer Nachricht landen
-// dürfen (Webhook-URL/-Schlüssel/-Token, Adressen von Abonnenten).
+// adminNotifForbiddenParams: parameters that must never end up in a
+// message (webhook URL/key/token, subscriber addresses).
 var adminNotifForbiddenParams = []string{"url", "key", "token", "secret", "password", "email", "mail", "address", "webhook"}
 
-// sanitizeAdminNotifParams entfernt Werte, die geheim oder personenbezogen
-// sein können: Schlüssel mit den Wörtern aus adminNotifForbiddenParams sowie
-// Zeichenketten, die wie URL oder E-Mail-Adresse aussehen. Das Ergebnis ist
-// ein JSON-Objekt als Text.
+// sanitizeAdminNotifParams removes values that may be secret or personal:
+// keys containing the words from adminNotifForbiddenParams as well as
+// strings that look like a URL or email address. The result is
+// a JSON object as text.
 func sanitizeAdminNotifParams(params map[string]any) string {
 	safe := map[string]any{}
 	for k, v := range params {
@@ -74,7 +74,7 @@ func sanitizeAdminNotifParams(params map[string]any) string {
 	return string(b)
 }
 
-// sanitizeAdminNotifLink lässt nur relative Admin-Pfade zu (kein Open Redirect).
+// sanitizeAdminNotifLink only allows relative admin paths (no open redirect).
 func sanitizeAdminNotifLink(p string) string {
 	if !strings.HasPrefix(p, "/admin/") || strings.Contains(p, "//") || strings.Contains(p, "\\") || strings.Contains(p, ":") {
 		return ""
@@ -96,17 +96,17 @@ func (h *Handler) adminNotifNow() time.Time {
 	return time.Now().UTC()
 }
 
-// NotifyAdmins schreibt eine Nachricht für die Admins der Statusseite pageID
-// (nil = systemweit, nur Global Admins) oder fasst sie mit einer offenen
-// gleichen zusammen. Gleicher dedupKey (je Seite) innerhalb von 15 Minuten:
-// Count wird erhöht, LastSeenAt aktualisiert und der Lesestatus aller Benutzer
-// zurückgesetzt, die Nachricht lebt also wieder als ungelesen auf. Danach
-// entsteht eine neue Zeile (die alte verliert ihren Schlüssel). Leerer
-// dedupKey: nie zusammenfassen.
+// NotifyAdmins writes a message for the admins of the status page pageID
+// (nil = system-wide, global admins only) or merges it with an open
+// identical one. Same dedupKey (per page) within 15 minutes:
+// Count is incremented, LastSeenAt updated and the read state of all users
+// reset, so the message revives as unread. After that
+// a new row is created (the old one loses its key). An empty
+// dedupKey: never merge.
 //
-// Ein Fehler wird nur geloggt, der Aufrufer (Versand, Abruf-Takt) wird nie
-// blockiert oder abgebrochen. params darf nur unkritische Werte enthalten; die
-// Funktion filtert URL-/Schlüssel-/Token-/E-Mail-artige Werte zusätzlich.
+// An error is only logged; the caller (dispatch, polling cycle) is never
+// blocked or aborted. params may only contain non-critical values; the
+// function additionally filters URL/key/token/email-like values.
 func (h *Handler) NotifyAdmins(pageID *uint, kind, severity, titleKey, bodyKey string, params map[string]any, linkPath, dedupKey string) {
 	if severity != models.AdminNotificationInfo && severity != models.AdminNotificationWarning && severity != models.AdminNotificationError {
 		severity = models.AdminNotificationInfo
@@ -131,8 +131,8 @@ func (h *Handler) upsertAdminNotification(n models.AdminNotification, now time.T
 		return nil
 	}
 	err := h.createAdminNotification(n, now)
-	// Unique-Verletzung: Eine parallele Anfrage hat die offene Meldung
-	// inzwischen angelegt, dann zählt diese hoch statt zu scheitern.
+	// Unique violation: a concurrent request has meanwhile created the open
+	// message, so this one counts it up instead of failing.
 	if err != nil && n.DedupKey != "" && isUniqueViolation(err) && h.mergeAdminNotification(n, now) {
 		return nil
 	}
@@ -141,8 +141,8 @@ func (h *Handler) upsertAdminNotification(n models.AdminNotification, now time.T
 
 func (h *Handler) createAdminNotification(n models.AdminNotification, now time.Time) error {
 	if n.DedupKey != "" {
-		// Nur abgelaufene Zeilen ablösen: eine frische, parallel angelegte
-		// darf nicht ihren Schlüssel verlieren.
+		// Only supersede expired rows: a fresh one created
+		// concurrently must not lose its key.
 		if err := h.DB.Model(&models.AdminNotification{}).
 			Where("dedup_key = ? AND last_seen_at < ?", n.DedupKey, now.Add(-adminNotificationWindow)).
 			Update("dedup_key", "").Error; err != nil {
@@ -152,10 +152,10 @@ func (h *Handler) createAdminNotification(n models.AdminNotification, now time.T
 	return h.DB.Create(&n).Error
 }
 
-// mergeAdminNotification zählt die offene Meldung mit gleichem Schlüssel hoch
-// (nur innerhalb des Zeitfensters) und setzt den Lesestatus zurück. false =
-// nichts zusammengefasst (keine offene Meldung, parallel verändert oder
-// Datenbankfehler, der geloggt wird); der Aufrufer legt dann neu an.
+// mergeAdminNotification increments the open message with the same key
+// (only within the time window) and resets the read state. false =
+// nothing merged (no open message, concurrently changed or
+// database error, which is logged); the caller then creates a new one.
 func (h *Handler) mergeAdminNotification(n models.AdminNotification, now time.Time) bool {
 	var found []models.AdminNotification
 	if err := h.DB.Where("dedup_key = ? AND last_seen_at >= ?", n.DedupKey, now.Add(-adminNotificationWindow)).Limit(1).Find(&found).Error; err != nil {
@@ -177,7 +177,7 @@ func (h *Handler) mergeAdminNotification(n models.AdminNotification, now time.Ti
 		return false
 	}
 	if res.RowsAffected == 0 {
-		return false // parallel erledigt oder abgelöst
+		return false // resolved or superseded concurrently
 	}
 	if err := h.DB.Where("notification_id = ?", found[0].ID).Delete(&models.NotificationRead{}).Error; err != nil {
 		slog.Error("Admin-Nachricht: Lesestatus nicht zurückgesetzt", "error", err)
@@ -185,10 +185,10 @@ func (h *Handler) mergeAdminNotification(n models.AdminNotification, now time.Ti
 	return true
 }
 
-// ResolveAdminNotifications markiert alle offenen Zeilen mit diesem dedupKey
-// (auch die durch das Zeitfenster abgelösten) als erledigt (Entwarnung): Sie
-// bleibt in der Liste, zählt aber nicht mehr als ungelesen, und eine spätere gleiche Meldung fasst sich nicht mehr mit ihr
-// zusammen. Fehler werden nur geloggt.
+// ResolveAdminNotifications marks all open rows with this dedupKey
+// (including those superseded by the time window) as resolved (all clear): it
+// stays in the list but no longer counts as unread, and a later identical message no longer
+// merges with it. Errors are only logged.
 func (h *Handler) ResolveAdminNotifications(pageID *uint, dedupKey string) {
 	if dedupKey == "" {
 		return
@@ -202,9 +202,9 @@ func (h *Handler) ResolveAdminNotifications(pageID *uint, dedupKey string) {
 	}
 }
 
-// NotifyWebhookRateLimited meldet, dass ein Webhook-Kanal (z. B. google_chat)
-// mit HTTP 429 begrenzt wird. Je Seite und Kanal zusammengefasst. Für den
-// zentralen Webhook-Sender (retryAfterSeconds 0 = unbekannt).
+// NotifyWebhookRateLimited reports that a webhook channel (e.g. google_chat)
+// is rate limited with HTTP 429. Merged per page and channel. For the
+// central webhook sender (retryAfterSeconds 0 = unknown).
 func (h *Handler) NotifyWebhookRateLimited(pageID uint, channel string, retryAfterSeconds int) {
 	h.NotifyAdmins(&pageID, AdminNotifWebhookRateLimited, models.AdminNotificationWarning,
 		"adminNotifications.webhook_rate_limited.title", "adminNotifications.webhook_rate_limited.body",
@@ -212,9 +212,9 @@ func (h *Handler) NotifyWebhookRateLimited(pageID uint, channel string, retryAft
 		AdminNotifWebhookRateLimited+":"+channel)
 }
 
-// NotifyWebhookRejected meldet, dass ein Webhook dauerhaft abgelehnt wird
-// (z. B. 401/403/404/410). Je Seite, Kanal und Abonnent zusammengefasst. Die
-// Webhook-URL gehört nie in die Nachricht, nur die Abonnenten-ID.
+// NotifyWebhookRejected reports that a webhook is permanently rejected
+// (e.g. 401/403/404/410). Merged per page, channel and subscriber. The
+// webhook URL never goes into the message, only the subscriber ID.
 func (h *Handler) NotifyWebhookRejected(pageID uint, channel string, subscriberID uint) {
 	h.NotifyAdmins(&pageID, AdminNotifWebhookRejected, models.AdminNotificationError,
 		"adminNotifications.webhook_rejected.title", "adminNotifications.webhook_rejected.body",
@@ -226,11 +226,11 @@ func (h *Handler) NotifyWebhookRejected(pageID uint, channel string, subscriberI
 // Auslieferung
 // ---------------------------------------------------------------------------
 
-// adminNotifScope bestimmt Umfang und Berechtigung der Anfrage. Mit :page_id
-// gelten die Nachrichten der Seite für Global Admins sowie Rollen mit
-// external_sources:update oder subscribers:update auf genau dieser Seite; ohne
-// :page_id (systemweit) nur für Global Admins. Bei Fehler ist die Antwort
-// schon geschrieben.
+// adminNotifScope determines the scope and authorization of the request. With :page_id
+// the page's messages apply to global admins and to roles with
+// external_sources:update or subscribers:update on exactly this page; without
+// :page_id (system-wide) only to global admins. On error the response is
+// already written.
 func (h *Handler) adminNotifScope(c *gin.Context) (*uint, uint, bool) {
 	userID := getUserID(c)
 	var user models.User
@@ -269,7 +269,7 @@ func (h *Handler) adminNotifScope(c *gin.Context) (*uint, uint, bool) {
 	return &pageID, userID, true
 }
 
-// hasNotificationRole: Rolle auf der Seite mit external_sources:update oder subscribers:update.
+// hasNotificationRole: role on the page with external_sources:update or subscribers:update.
 func (h *Handler) hasNotificationRole(userID, pageID uint) bool {
 	var roles []models.UserStatusPageRole
 	if err := h.DB.Preload("Role").Where("user_id = ? AND status_page_id = ?", userID, pageID).Find(&roles).Error; err != nil {
@@ -297,8 +297,8 @@ type adminNotificationItem struct {
 	Read   bool            `json:"read"`
 }
 
-// GET /api/pages/:page_id/admin-notifications bzw. /api/admin-notifications
-// (?limit=20&unread=1): neueste zuerst, mit Lesestatus des angemeldeten Nutzers.
+// GET /api/pages/:page_id/admin-notifications or /api/admin-notifications
+// (?limit=20&unread=1): newest first, with the read state of the signed-in user.
 func (h *Handler) ListAdminNotificationsHandler(c *gin.Context) {
 	pageID, userID, ok := h.adminNotifScope(c)
 	if !ok {
@@ -343,8 +343,8 @@ func (h *Handler) ListAdminNotificationsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-// GET .../admin-notifications/unread-count: leichte Abfrage für das Polling.
-// Erledigte Nachrichten zählen nicht.
+// GET .../admin-notifications/unread-count: lightweight query for polling.
+// Resolved messages do not count.
 func (h *Handler) AdminNotificationUnreadCountHandler(c *gin.Context) {
 	pageID, userID, ok := h.adminNotifScope(c)
 	if !ok {
@@ -358,8 +358,8 @@ func (h *Handler) AdminNotificationUnreadCountHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"unread_count": n})
 }
 
-// POST .../admin-notifications/:id/read: eigene Lesemarke, idempotent. Eine
-// Nachricht außerhalb des Umfangs (andere Seite, systemweit) ist 404.
+// POST .../admin-notifications/:id/read: own read marker, idempotent. A
+// message outside the scope (other page, system-wide) is 404.
 func (h *Handler) MarkAdminNotificationReadHandler(c *gin.Context) {
 	pageID, userID, ok := h.adminNotifScope(c)
 	if !ok {
@@ -387,8 +387,8 @@ func (h *Handler) MarkAdminNotificationReadHandler(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// POST .../admin-notifications/read-all: alle Nachrichten des Umfangs als
-// gelesen markieren (nur für den angemeldeten Nutzer).
+// POST .../admin-notifications/read-all: mark all messages in scope as
+// read (only for the signed-in user).
 func (h *Handler) MarkAllAdminNotificationsReadHandler(c *gin.Context) {
 	pageID, userID, ok := h.adminNotifScope(c)
 	if !ok {

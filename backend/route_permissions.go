@@ -10,33 +10,33 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Jede geschützte Admin-Route hängt über genau einen Eintrag an
-// einer Ressource (Tab) und einer Aktion. Die Routen werden nur über
-// guarded() registriert; dabei landet die Zuordnung in routeRegistry, und
-// main_route_permissions_test.go erzwingt, dass keine Route daran vorbei
-// registriert wird und die Aktion zur HTTP-Methode passt.
+// Every protected admin route is tied via exactly one entry to
+// a resource (tab) and an action. Routes are registered only via
+// guarded(); the mapping ends up in routeRegistry, and
+// main_route_permissions_test.go enforces that no route is registered
+// bypassing it and that the action matches the HTTP method.
 
 type guardMode string
 
 const (
-	// modePage: Recht auf der Seite aus :page_id (RequirePermission).
+	// modePage: permission on the page from :page_id (RequirePermission).
 	modePage guardMode = "page"
-	// modeGlobal: Global Admin (RequireGlobalAdmin) - Ressource ohne
-	// page_id-Bezug oder Plattform-Operation (z. B. Seite anlegen).
+	// modeGlobal: Global Admin (RequireGlobalAdmin) - resource without
+	// page_id reference or platform operation (e.g. creating a page).
 	modeGlobal guardMode = "global"
-	// modePageRole: irgendeine Rolle auf der Seite genügt (RequirePageRole).
+	// modePageRole: any role on the page suffices (RequirePageRole).
 	modePageRole guardMode = "page_role"
-	// modeAny: mindestens eines der Rechte (RequireAnyPermission).
+	// modeAny: at least one of the permissions (RequireAnyPermission).
 	modeAny guardMode = "any"
 	// modeAnyAction: one of several actions on one resource (RequireAnyPermission).
 	modeAnyAction guardMode = "any_action"
-	// modeAll: alle Rechte (RequireAllPermissions).
+	// modeAll: all permissions (RequireAllPermissions).
 	modeAll guardMode = "all"
-	// modeKind: Ressource folgt der Art des Datensatzes (Vorfall/Wartung).
+	// modeKind: the resource follows the kind of the record (incident/maintenance).
 	modeKind guardMode = "kind"
 )
 
-// routeGuard beschreibt die Rechteprüfung einer Route.
+// routeGuard describes the permission check of a route.
 type routeGuard struct {
 	Mode      guardMode
 	Resources []string
@@ -47,7 +47,7 @@ type routeGuard struct {
 	pre     []gin.HandlerFunc
 }
 
-// routeInfo ist der Registry-Eintrag einer Route.
+// routeInfo is the registry entry of a route.
 type routeInfo struct {
 	Mode      guardMode
 	Resources []string
@@ -60,7 +60,7 @@ var (
 	routeRegistry   = map[string]routeInfo{}
 )
 
-// guardedRoutes liefert eine Kopie der Registry (Schlüssel "METHOD /pfad").
+// guardedRoutes returns a copy of the registry (key "METHOD /path").
 func guardedRoutes() map[string]routeInfo {
 	routeRegistryMu.Lock()
 	defer routeRegistryMu.Unlock()
@@ -71,8 +71,8 @@ func guardedRoutes() map[string]routeInfo {
 	return out
 }
 
-// need verlangt res:act. Globale Ressourcen (permissions.ScopeGlobal) prüfen
-// auf Global Admin, Seiten-Ressourcen auf die Rolle der Seite aus :page_id.
+// need requires res:act. Global resources (permissions.ScopeGlobal) check
+// for Global Admin, page resources for the role on the page from :page_id.
 func need(resource, action string) routeGuard {
 	for _, r := range permissions.Resources {
 		if r.Key == resource && r.Scope == permissions.ScopeGlobal {
@@ -83,22 +83,22 @@ func need(resource, action string) routeGuard {
 		mw: middleware.RequirePermission(permissions.Perm(resource, action))}
 }
 
-// platform: Plattform-Operation ohne page_id (Global Admin), auch für eine
-// Seiten-Ressource, z. B. das Anlegen einer Statusseite oder der Sprachkatalog.
+// platform: platform operation without page_id (Global Admin), also for a
+// page resource, e.g. creating a status page or the language catalog.
 func platform(resource, action string) routeGuard {
 	return routeGuard{Mode: modeGlobal, Resources: []string{resource}, Action: action,
 		mw: middleware.RequireGlobalAdmin()}
 }
 
-// pageRole: jede Rolle auf der Seite genügt (Lesen von Konfiguration, die jeder
-// Admin-Bereich der Seite braucht). resource nennt nur die zugehörige Ressource
-// für die Dokumentation.
+// pageRole: any role on the page suffices (reading configuration that every
+// admin area of the page needs). resource only names the associated resource
+// for documentation.
 func pageRole(resource string) routeGuard {
 	return routeGuard{Mode: modePageRole, Resources: []string{resource}, Action: permissions.Read,
 		mw: middleware.RequirePageRole()}
 }
 
-// anyOf verlangt action auf mindestens einer der Ressourcen.
+// anyOf requires action on at least one of the resources.
 func anyOf(action string, resources ...string) routeGuard {
 	perms := make([]string, len(resources))
 	for i, r := range resources {
@@ -119,7 +119,7 @@ func anyAction(resource string, actions ...string) routeGuard {
 		mw: middleware.RequireAnyPermission(perms...)}
 }
 
-// allOf verlangt action auf allen Ressourcen.
+// allOf requires action on all resources.
 func allOf(action string, resources ...string) routeGuard {
 	perms := make([]string, len(resources))
 	for i, r := range resources {
@@ -129,21 +129,21 @@ func allOf(action string, resources ...string) routeGuard {
 		mw: middleware.RequireAllPermissions(perms...)}
 }
 
-// byKind: incidents oder maintenance, je nach Art des Datensatzes.
+// byKind: incidents or maintenance, depending on the kind of the record.
 func byKind(action string, resolve func(c *gin.Context) string) routeGuard {
 	return routeGuard{Mode: modeKind, Resources: []string{"incidents", "maintenance"}, Action: action,
 		mw: middleware.RequireResolvedPermission(action, resolve)}
 }
 
-// after hängt Middlewares an, die VOR der Rechteprüfung laufen (z. B. die
-// *PageScope-Middlewares, die :page_id setzen).
+// after attaches middlewares that run BEFORE the permission check (e.g. the
+// *PageScope middlewares that set :page_id).
 func (g routeGuard) after(pre ...gin.HandlerFunc) routeGuard {
 	g.pre = pre
 	return g
 }
 
-// guarded registriert eine Route mit Rechteprüfung und trägt sie in die
-// Registry ein. handlers laufen nach der Prüfung (Rate-Limit, Handler).
+// guarded registers a route with a permission check and enters it in the
+// registry. handlers run after the check (rate limit, handler).
 func guarded(group *gin.RouterGroup, method, path string, guard routeGuard, handlers ...gin.HandlerFunc) {
 	chain := make([]gin.HandlerFunc, 0, len(guard.pre)+1+len(handlers))
 	chain = append(chain, guard.pre...)

@@ -39,8 +39,8 @@ func loginFrom(r *gin.Engine, ctx context.Context, remoteAddr, password string) 
 	return w, time.Since(start)
 }
 
-// Viele Quellen gegen dasselbe Konto verzögern den Login, sperren ihn aber nicht:
-// der Nutzer meldet sich mit dem richtigen Passwort weiterhin an.
+// Many sources against the same account delay the login but do not lock it:
+// the user still signs in with the correct password.
 func TestLogin_DistributedGuessingIsOnlyDelayed(t *testing.T) {
 	const step = 150 * time.Millisecond
 	r := delayTestRouter(t, 3, step)
@@ -58,8 +58,8 @@ func TestLogin_DistributedGuessingIsOnlyDelayed(t *testing.T) {
 	assert.GreaterOrEqual(t, d, step)
 }
 
-// Schließt der Client während der Wartezeit die Verbindung, endet der Handler,
-// ohne das Passwort zu prüfen.
+// If the client closes the connection during the wait, the handler ends
+// without checking the password.
 func TestLogin_DelayEndsWhenClientGoesAway(t *testing.T) {
 	r := delayTestRouter(t, 0, 5*time.Second)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -76,7 +76,7 @@ func TestWaitForThrottle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	assert.False(t, waitForThrottle(ctx, time.Minute))
-	// Ohne verlangte Wartezeit zählt ein bereits geschlossener Client nicht: Der Handler läuft normal weiter.
+	// Without a demanded wait, an already closed client does not count: the handler continues normally.
 	for i := 0; i < 50; i++ {
 		assert.True(t, waitForThrottle(ctx, 0))
 		assert.True(t, waitForThrottle(ctx, -time.Second))

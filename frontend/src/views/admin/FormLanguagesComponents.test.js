@@ -5,10 +5,10 @@ import { useAuth } from '../../composables/useAuth'
 import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
-import { fieldByLabel } from '../../test-support/fields.js'
+import { fieldByLabel } from '../../test-support/fields'
 import AdminComponents from './AdminComponents.vue'
 
-// Sprachumschalter im Komponenten-Formular (Name + optionale Beschreibung).
+// Language switcher in the component form (name + optional description).
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }]
@@ -142,7 +142,7 @@ describe('Sprachumschalter: Komponenten', () => {
   it('zählt Zeichen im aktiven Reiter und zeigt Längenfehler der Standardsprache nur dort', async () => {
     await mountView(router())
     await openEdit('API')
-    await fieldByLabel(wrapper, 'Name').setValue('x'.repeat(65)) // länger als erlaubt (Altbestand)
+    await fieldByLabel(wrapper, 'Name').setValue('x'.repeat(65)) // longer than allowed (legacy data)
     expect(wrapper.text()).toContain('höchstens 60 Zeichen')
     await tab('English').trigger('click')
     expect(wrapper.text()).not.toContain('höchstens 60 Zeichen')

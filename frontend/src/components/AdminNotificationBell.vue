@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Nachrichtenglocke der Admin-Kopfzeile. Knopf mit Badge (Zahl der
-  ungelesenen Nachrichten, ab 10 als „9+“; die genaue Zahl steht im aria-label)
-  und ein Panel darunter. Das Panel ist ein nicht-modaler Dialog: Der Fokus
-  springt beim Öffnen hinein, Escape schließt und gibt den Fokus an den Knopf
-  zurück, Tab aus dem Panel heraus und ein Klick daneben schließen es ebenfalls.
-  Der Zähler wird alle 60 s abgefragt, aber nur bei sichtbarem Tab; beim
-  Mandantenwechsel sofort neu (Antworten der alten Seite werden verworfen,
-  siehe useAdminNotifications).
+  Notification bell of the admin top bar. Button with a badge (number of
+  unread messages, from 10 on as "9+"; the exact number is in the aria-label)
+  and a panel below it. The panel is a non-modal dialog: focus moves into it
+  on open, Escape closes it and returns focus to the button, tabbing out of
+  the panel and a click outside close it as well.
+  The counter is polled every 60 s, but only while the tab is visible; on a
+  tenant switch it is refreshed immediately (responses for the old page are
+  discarded, see useAdminNotifications).
 */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -16,35 +16,36 @@ import EmptyState from './EmptyState.vue'
 import RelativeTime from './RelativeTime.vue'
 import { useTenant } from '../composables/useTenant'
 import { useAdminNotifications } from '../composables/useAdminNotifications'
+import type { AdminNotificationEntry } from '../composables/useAdminNotifications'
 import { useDismissable } from '../composables/useDismissable'
 
 const POLL_MS = 60_000
 const BADGE_MAX = 9
-const SEVERITY_ICON = { error: 'alert-circle', warning: 'alert-triangle', info: 'info' }
+const SEVERITY_ICON: Partial<Record<string, string>> & { info: string } = { error: 'alert-circle', warning: 'alert-triangle', info: 'info' }
 
 const { t, te } = useI18n()
 const { activeTenantId } = useTenant()
 const { items, unreadCount, loading, failed, enabled, refreshCount, load, markRead, markAllRead, reset } = useAdminNotifications()
 
 const open = ref(false)
-const rootRef = ref(null)
-const buttonRef = ref(null)
-const panelRef = ref(null)
+const rootRef = ref<HTMLElement | null>(null)
+const buttonRef = ref<HTMLButtonElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
 
 const badge = computed(() => (unreadCount.value > BADGE_MAX ? `${BADGE_MAX}+` : String(unreadCount.value)))
 const buttonLabel = computed(() => (unreadCount.value > 0
   ? t('adminNotifications.bellLabelUnread', { n: unreadCount.value })
   : t('adminNotifications.bellLabel')))
 
-const severityIcon = (item) => SEVERITY_ICON[item.severity] || SEVERITY_ICON.info
-const severityText = (item) => t(`adminNotifications.severity.${SEVERITY_ICON[item.severity] ? item.severity : 'info'}`)
-// Titel und Text kommen als i18n-Schlüssel vom Server; ein unbekannter
-// Schlüssel (neuere Server-Version) zeigt einen neutralen Text statt des Schlüssels.
-const textFor = (key, fallbackKey, params) => (te(key) ? t(key, params || {}) : t(fallbackKey))
+const severityIcon = (item: AdminNotificationEntry) => SEVERITY_ICON[item.severity] || SEVERITY_ICON.info
+const severityText = (item: AdminNotificationEntry) => t(`adminNotifications.severity.${SEVERITY_ICON[item.severity] ? item.severity : 'info'}`)
+// Title and text come from the server as i18n keys; an unknown key
+// (newer server version) shows a neutral text instead of the key.
+const textFor = (key: string, fallbackKey: string, params?: Record<string, unknown>) => (te(key) ? t(key, params || {}) : t(fallbackKey))
 
 const focusables = () => Array.from(panelRef.value?.querySelectorAll('a[href], button') || [])
 
-const close = ({ restoreFocus = false } = {}) => {
+const close = ({ restoreFocus = false }: { restoreFocus?: boolean } = {}) => {
   open.value = false
   if (restoreFocus) buttonRef.value?.focus()
 }
@@ -53,34 +54,34 @@ const openPanel = async () => {
   open.value = true
   load()
   await nextTick()
-  const first = focusables()[0] || panelRef.value
+  const first = (focusables()[0] || panelRef.value) as HTMLElement | null | undefined
   first?.focus()
 }
 
 const toggle = () => (open.value ? close() : openPanel())
 
-const onKeydown = (e) => {
+const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape' && open.value) {
     e.stopPropagation()
     close({ restoreFocus: true })
   }
 }
 
-const onFocusout = (e) => {
-  if (e.relatedTarget && !rootRef.value?.contains(e.relatedTarget)) close()
+const onFocusout = (e: FocusEvent) => {
+  if (e.relatedTarget && !rootRef.value?.contains(e.relatedTarget as Node)) close()
 }
 
 // Click/tap outside closes; Escape is handled on the root (onKeydown).
 useDismissable(open, [rootRef], () => close(), { escape: false })
 
-// Eine Nachricht öffnen: Link folgen, als gelesen markieren, Panel schließen.
-const onFollow = (item) => {
+// Opening a message: follow the link, mark it as read, close the panel.
+const onFollow = (item: AdminNotificationEntry) => {
   markRead(item)
   close()
 }
 
 // --- Polling ---------------------------------------------------------------
-let timer = null
+let timer: ReturnType<typeof setInterval> | null = null
 const stopPolling = () => {
   if (timer) clearInterval(timer)
   timer = null
@@ -108,7 +109,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibility)
 })
 
-// Mandantenwechsel: Stand der alten Seite sofort verwerfen und neu abfragen.
+// Tenant switch: discard the old page's state immediately and query again.
 watch(activeTenantId, () => {
   reset()
   refreshCount()
@@ -274,12 +275,12 @@ watch(activeTenantId, () => {
 }
 .notif-action:hover { background: var(--surface-2); text-decoration: none; }
 
-/* Schmale Bildschirme: Das Panel hängt an der Kopfzeile statt am Knopf, damit es
-   die volle Breite nutzen kann (der Knopf sitzt mitten in der Zeile). */
+/* Narrow screens: the panel hangs off the top bar instead of the button, so it
+   can use the full width (the button sits in the middle of the row). */
 @media (max-width: 768px) {
   .notif { position: static; }
   .notif-panel {
-    /* unterhalb der umbrochenen Steuerzeile (Theme, Glocke, Sprache, Benutzer) */
+    /* below the wrapped control row (theme, bell, language, user) */
     inset-block-start: calc(var(--ctl-h) * 2 + var(--sp-6));
     inset-inline: var(--sp-2);
     inline-size: auto;

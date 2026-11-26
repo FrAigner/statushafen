@@ -117,10 +117,10 @@ func TestGetMyPagesHandler(t *testing.T) {
 		})
 	}
 
-	// Regressionstest: seitenbezogene Permissions müssen aus der zugewiesenen
-	// UserStatusPageRole/Role stammen, nicht aus der globalen Rolle des Nutzers
-	// (Frontend hasPerm() konnte sonst nie erkennen, dass z.B. ein "Viewer"
-	// global auf einer bestimmten Seite als "Editor" eingesetzt wurde).
+	// Regression test: page-specific permissions must come from the assigned
+	// UserStatusPageRole/Role, not from the user's global role
+	// (otherwise frontend hasPerm() could never tell that e.g. a "Viewer"
+	// globally was assigned as "Editor" on a specific page).
 	t.Run("Seitenbezogene Permissions werden mitgeliefert", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/me/pages", nil)
 		req.Header.Set("X-Mock-User-ID", strconv.Itoa(int(normalUser.ID)))

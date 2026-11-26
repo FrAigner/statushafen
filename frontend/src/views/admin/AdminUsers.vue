@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -22,21 +22,41 @@ import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import TagCheckboxList from '../../components/TagCheckboxList.vue'
 import { pageRoleOptions, userAdminErrorText } from '../../utils/userAdmin'
 import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, isPasswordTooLong, isPasswordTooShort, serverInputErrorText } from '../../utils/inputRules'
+import type { ApiError, Role, StatusPage, Tag, User } from '../../types/api'
+
+/** A user as GET /api/users returns it: with the assigned tags. */
+interface AdminUser extends User {
+  Tags?: Tag[]
+}
+
+/** Role of the user on one status page (role_id 0 = no access). */
+interface PageRoleAssignment {
+  status_page_id: number
+  role_id: number
+}
+
+interface UserForm {
+  Email?: string
+  Password?: string
+  TagIDs?: number[]
+  IsGlobalAdmin?: boolean
+  PageRoles: PageRoleAssignment[]
+}
 
 const { apiFetch } = useApi()
 const { isGlobalAdmin, currentUser } = useAuth()
 const { t, locale } = useI18n()
 
-const items = ref([])
-const roles = ref([])
-const pages = ref([])
-const availableTags = ref([])
+const items = ref<AdminUser[]>([])
+const roles = ref<Role[]>([])
+const pages = ref<StatusPage[]>([])
+const availableTags = ref<Tag[]>([])
 const isEditing = ref(false)
-const currentEditItem = ref(null)
-const formData = ref({ PageRoles: [], TagIDs: [] })
+const currentEditItem = ref<'new' | number | null>(null)
+const formData = ref<UserForm>({ PageRoles: [], TagIDs: [] })
 const alertMsg = ref('')
 const isSaving = ref(false)
-const deletingId = ref(null)
+const deletingId = ref<number | null>(null)
 const query = ref('')
 const editName = ref('')
 const errors = ref({ email: '', password: '' })
@@ -49,7 +69,7 @@ const columns = computed(() => [
   { key: 'UpdatedAt', label: t('users.tableChanged') },
 ])
 
-// Richtung C: Titel mit Namen statt ID, Seitenkopf mit Zählung.
+// Direction C: title with the name instead of the ID, page header with a count.
 const formTitle = computed(() => currentEditItem.value === 'new'
   ? t('users.createTitle')
   : t('users.editTitle', { name: editName.value }))
@@ -69,14 +89,14 @@ const rows = computed(() => {
 
 const loadData = async () => {
   try {
-    // /api/tags ist global-admin-only - Laden hier bewusst
-    // fehlertolerant, damit ein Nicht-Global-Admin (falls diese Seite jemals
-    // ohne isGlobalAdmin-Gate aufgerufen würde) nicht am 403 scheitert, nur
-    // ohne Tag-Auswahl weiterarbeitet.
+    // /api/tags is global-admin-only - loading is deliberately fault-tolerant
+    // here, so a non-global admin (should this page ever be opened without
+    // the isGlobalAdmin gate) does not fail on the 403 but simply continues
+    // without the tag selection.
     const [usr, rls, pgs] = await Promise.all([
-      apiFetch('/api/users'),
-      apiFetch('/api/roles'),
-      apiFetch('/api/pages')
+      apiFetch<AdminUser[] | null>('/api/users'),
+      apiFetch<Role[] | null>('/api/roles'),
+      apiFetch<StatusPage[] | null>('/api/pages')
     ])
     items.value = usr || []
     roles.value = rls || []
@@ -87,23 +107,23 @@ const loadData = async () => {
       availableTags.value = []
     }
   } catch (err) {
-    alertMsg.value = t('common.loadError') + err.message
+    alertMsg.value = t('common.loadError') + (err as Error).message
   }
 }
 
 const toggleTag = useTagToggle(formData)
 
-// Benutzer-Tags sind nur global gültig (das Backend lehnt
-// seitengebundene mit 400 ab). Die seitengebundenen erschienen hier trotzdem,
-// gleichnamige mehrfach und ohne Seitennamen nicht unterscheidbar.
+// User tags are only valid globally (the backend rejects page-bound ones with
+// 400). The page-bound ones used to appear here anyway, duplicates of the
+// same name indistinguishable without the page name.
 const globalTags = computed(() => availableTags.value.filter(tag => !tag.StatusPageID))
 
-// eigenes Konto und letzter Global Admin. Das Backend lehnt
-// Löschen/Herabstufen mit 409 ab; die Oberfläche bietet es gar nicht erst an.
+// own account and last global admin. The backend rejects deleting/demoting
+// with 409; the UI does not offer it in the first place.
 const globalAdminCount = computed(() => items.value.filter(u => u.IsGlobalAdmin).length)
-const isSelf = (u) => currentUser.value?.id != null && u.ID === currentUser.value.id
-const isLastGlobalAdmin = (u) => u.IsGlobalAdmin && globalAdminCount.value === 1
-const deleteBlockedHint = (u) => {
+const isSelf = (u: AdminUser) => currentUser.value?.id != null && u.ID === currentUser.value.id
+const isLastGlobalAdmin = (u: AdminUser) => u.IsGlobalAdmin && globalAdminCount.value === 1
+const deleteBlockedHint = (u: AdminUser) => {
   if (isSelf(u)) return t('users.selfRowHint')
   if (isLastGlobalAdmin(u)) return t('users.lastAdminRowHint')
   return ''
@@ -118,12 +138,12 @@ const adminLockHint = computed(() => {
 
 onMounted(loadData)
 
-const getRoleForPage = (pageId) => {
+const getRoleForPage = (pageId: number) => {
   const pr = formData.value.PageRoles.find(p => p.status_page_id === pageId)
   return pr ? pr.role_id : 0
 }
 
-const setRoleForPage = (pageId, roleIdStr) => {
+const setRoleForPage = (pageId: number, roleIdStr: string) => {
   const roleId = Number.parseInt(roleIdStr) || 0
   const existing = formData.value.PageRoles.find(p => p.status_page_id === pageId)
   
@@ -134,13 +154,13 @@ const setRoleForPage = (pageId, roleIdStr) => {
   }
 }
 
-const openEdit = (item) => {
+const openEdit = (item: AdminUser | 'new') => {
   if (item === 'new') {
     const defaultPageRoles = pages.value
       .filter(p => p.DefaultRoleID)
       .map(p => ({
         status_page_id: p.ID,
-        role_id: p.DefaultRoleID
+        role_id: p.DefaultRoleID as number
       }))
       
     formData.value = {
@@ -176,10 +196,10 @@ const cancelEdit = () => {
   formData.value = { PageRoles: [] }
 }
 
-// zu kurzes oder zu langes Passwort (Backend: 400 password_too_short bzw.
-// password_too_long) steht am Feld.
-const onSaveError = async (err) => {
-  const text = ['password_too_short', 'password_too_long'].includes(err.data?.code) ? serverInputErrorText(err, t) : null
+// a password that is too short or too long (backend: 400 password_too_short or
+// password_too_long) is shown at the field.
+const onSaveError = async (err: ApiError) => {
+  const text = ['password_too_short', 'password_too_long'].includes(err.data?.code ?? '') ? serverInputErrorText(err, t) : null
   if (!text) {
     alertMsg.value = t('common.saveError') + userAdminErrorText(err, t)
     return
@@ -190,8 +210,8 @@ const onSaveError = async (err) => {
 const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onError: onSaveError })
 const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadData, onError: (err) => { alertMsg.value = t('common.deleteError') + userAdminErrorText(err, t) } })
 
-// Neu: Pflicht; beim Ändern leer = unverändert. Gesetzt gilt die Mindestlänge.
-const passwordError = (isNew) => {
+// New: required; when editing, empty = unchanged. When set, the minimum length applies.
+const passwordError = (isNew: boolean) => {
   const pw = formData.value.Password
   if (isNew && !pw) return t('users.passwordRequired')
   if (pw && isPasswordTooShort(pw)) return t('inputErrors.password_too_short', { min: MIN_PASSWORD_LENGTH })
@@ -200,7 +220,7 @@ const passwordError = (isNew) => {
 
 const saveItem = async () => {
   const isNew = currentEditItem.value === 'new'
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste fehlerhafte Feld.
+  // Required fields: error at the field instead of a server error, focus on the first invalid field.
   errors.value = {
     email: (formData.value.Email || '').trim() ? '' : t('users.emailRequired'),
     password: passwordError(isNew),
@@ -222,22 +242,22 @@ const saveItem = async () => {
   await saveAction(endpoint, isNew ? 'POST' : 'PUT', payload, cancelEdit)
 }
 
-// Die Löschfrage nennt die E-Mail, damit klar ist, wen sie trifft.
-const deleteItem = (user) => deleteAction(`/api/users/${user.ID}`, user.ID, t('users.confirmDelete', { email: user.Email }))
+// The delete question names the email so it is clear whom it affects.
+const deleteItem = (user: AdminUser) => deleteAction(`/api/users/${user.ID}`, user.ID, t('users.confirmDelete', { email: user.Email }))
 
-// Eigenes Konto und letzter Global Admin bieten kein Löschen an.
-const menuItems = (user) => [
+// Own account and last global admin offer no delete.
+const menuItems = (user: AdminUser) => [
   { key: 'edit', label: t('common.edit'), icon: 'pencil' },
   ...(deleteBlockedHint(user)
     ? []
     : [{ key: 'delete', label: deletingId.value === user.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === user.ID }]),
 ]
-const onMenuSelect = (user, key) => {
+const onMenuSelect = (user: AdminUser, key: string) => {
   if (key === 'edit') openEdit(user)
   else deleteItem(user)
 }
 
-const summarizeRoles = (user) => {
+const summarizeRoles = (user: AdminUser) => {
   if (user.IsGlobalAdmin) return t('users.globalAdminSummary')
   if (!user.UserStatusPageRoles || user.UserStatusPageRoles.length === 0) return t('users.noRightsSummary')
 
@@ -258,7 +278,7 @@ const summarizeRoles = (user) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Tabellenkarte links, Formular als Seitenkarte rechts. -->
+    <!-- Direction C: table card on the left, form as a side card on the right. -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('users.cardTitle')">
         <template #tools>
@@ -338,7 +358,7 @@ const summarizeRoles = (user) => {
               <div v-for="page in pages" :key="page.ID" class="page-role-row">
                 <div class="page-name">{{ page.Name }}</div>
                 <div class="page-select">
-                  <select class="form-select" :value="getRoleForPage(page.ID)" :aria-label="t('users.roleForPageAria', { name: page.Name })" @change="e => setRoleForPage(page.ID, e.target.value)">
+                  <select class="form-select" :value="getRoleForPage(page.ID)" :aria-label="t('users.roleForPageAria', { name: page.Name })" @change="e => setRoleForPage(page.ID, (e.target as HTMLSelectElement).value)">
                     <option value="0">{{ t('users.noAccessOption') }}</option>
                     <option v-for="r in pageRoleOptions(roles, getRoleForPage(page.ID))" :key="r.ID" :value="r.ID">{{ r.Name }}</option>
                   </select>
@@ -353,7 +373,7 @@ const summarizeRoles = (user) => {
               <span id="user-tags-label" class="form-field__label">{{ t('users.fieldTags') }}</span>
               <span class="form-field__optional">{{ t('patterns.optional') }}</span>
             </div>
-            <TagCheckboxList :tags="globalTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
+            <TagCheckboxList :tags="globalTags" :selected-ids="formData.TagIDs!" @toggle="toggleTag" />
           </div>
 
           <div class="form-actions">

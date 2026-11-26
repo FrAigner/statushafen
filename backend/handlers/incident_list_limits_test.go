@@ -20,8 +20,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Seite mit sehr vielen Vorfällen: Die Listen sind begrenzt, ein anonymer
-// Aufruf darf nicht alle Zeilen laden (Speicher- und Antwortgröße).
+// Page with a very large number of incidents: the lists are bounded, an anonymous
+// call must not load all rows (memory and response size).
 
 type incidentListEnv struct {
 	db   *gorm.DB
@@ -41,8 +41,8 @@ func newIncidentListEnv(t *testing.T) incidentListEnv {
 	return incidentListEnv{db: db, r: r, page: page}
 }
 
-// seed legt n Vorfälle an; Titel "v<i>", i=0 ist der älteste. Jeder zehnte ist
-// eine Wartung, die Status folgen status(i).
+// seed creates n incidents; titles "v<i>", i=0 is the oldest. Every tenth is
+// a maintenance, the statuses follow status(i).
 func (e incidentListEnv) seed(t *testing.T, n int, status func(i int) string) {
 	t.Helper()
 	base := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -111,7 +111,7 @@ func TestGetIncidentsHandler_LimitsResultSize(t *testing.T) {
 		assert.Equal(t, []string{"v598", "v597", "v596"}, first)
 		_, next, _ := e.get(t, base+"?limit=3&offset=3")
 		assert.Equal(t, []string{"v595", "v594", "v593"}, next)
-		// 540 Normalvorfälle: der älteste (v0) liegt bei offset 539
+		// 540 regular incidents: the oldest (v0) is at offset 539
 		_, last, _ := e.get(t, base+"?limit=50&offset=539")
 		assert.Equal(t, []string{"v0"}, last)
 		_, none, _ := e.get(t, base+"?limit=50&offset=540")
@@ -133,7 +133,7 @@ func TestGetIncidentsHandler_LimitsResultSize(t *testing.T) {
 
 func TestGetIncidentsHandler_StateFilterAndNewIncidents(t *testing.T) {
 	e := newIncidentListEnv(t)
-	// 300 behobene, dazu zuletzt ein offener Vorfall und eine geplante Wartung
+	// 300 resolved, plus last an open incident and a scheduled maintenance
 	e.seed(t, 300, func(i int) string {
 		if i == 295 {
 			return "investigating"
@@ -151,7 +151,7 @@ func TestGetIncidentsHandler_StateFilterAndNewIncidents(t *testing.T) {
 	assert.Len(t, resolved, 200)
 	assert.NotContains(t, resolved, "v295")
 
-	// Gegenprobe: Ein neu angelegter Vorfall ist sofort ganz vorn.
+	// Counter-check: a newly created incident is at the very front immediately.
 	started := time.Now()
 	require.NoError(t, e.db.Create(&models.Incident{StatusPageID: e.page.ID, Title: "neu", Message: "x", Status: "investigating", StartedAt: &started}).Error)
 	_, all, _ := e.get(t, base+"&limit=1")
@@ -160,7 +160,7 @@ func TestGetIncidentsHandler_StateFilterAndNewIncidents(t *testing.T) {
 
 func TestPublicDashboard_LimitsIncidents(t *testing.T) {
 	e := newIncidentListEnv(t)
-	// 600 Vorfälle: v0 bis v599; drei alte sind noch offen, der Rest behoben.
+	// 600 incidents: v0 to v599; three old ones are still open, the rest resolved.
 	open := map[int]bool{3: true, 7: true, 11: true}
 	e.seed(t, 600, func(i int) string {
 		if open[i] {
@@ -208,7 +208,7 @@ func TestPublicDashboard_LimitsIncidents(t *testing.T) {
 	})
 }
 
-// Der größte erlaubte offset ist 100000; ein Wert darüber ist ungültig.
+// The largest allowed offset is 100000; a larger value is invalid.
 func TestGetIncidentsHandler_OffsetBoundary(t *testing.T) {
 	e := newIncidentListEnv(t)
 	base := "/api/pages/" + strconv.Itoa(int(e.page.ID)) + "/incidents"
@@ -219,9 +219,9 @@ func TestGetIncidentsHandler_OffsetBoundary(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, code)
 }
 
-// Haben viele Vorfälle denselben Zeitpunkt (Massenimport), muss die Reihenfolge
-// trotzdem eindeutig sein, sonst gehen beim Blättern Zeilen doppelt oder gar
-// nicht durch.
+// If many incidents have the same timestamp (bulk import), the order must
+// still be unambiguous, otherwise rows are returned twice or not at all
+// when paginating.
 func TestGetIncidentsHandler_PagingIsStableForEqualTimestamps(t *testing.T) {
 	e := newIncidentListEnv(t)
 	started := time.Date(2025, 5, 1, 12, 0, 0, 0, time.UTC)
@@ -241,7 +241,7 @@ func TestGetIncidentsHandler_PagingIsStableForEqualTimestamps(t *testing.T) {
 	}
 	require.Len(t, all, n)
 	assert.Len(t, uniqueStrings(all), n, "keine Zeile doppelt oder ausgelassen")
-	// Bei gleichem Zeitpunkt entscheidet die ID absteigend (neueste zuerst).
+	// With the same timestamp the ID decides, descending (newest first).
 	assert.Equal(t, "gleich24", all[0])
 	assert.Equal(t, "gleich00", all[n-1])
 }
@@ -254,8 +254,8 @@ func uniqueStrings(in []string) map[string]struct{} {
 	return out
 }
 
-// Auch Seiten mit sehr vielen offenen Vorfällen liefern höchstens 200 davon;
-// die behobenen kommen zusätzlich, begrenzt durch incident_limit.
+// Even pages with a very large number of open incidents return at most 200 of them;
+// the resolved ones come in addition, bounded by incident_limit.
 func TestPublicDashboard_OpenIncidentsAreCapped(t *testing.T) {
 	e := newIncidentListEnv(t)
 	e.seed(t, 260, func(i int) string {
@@ -271,8 +271,8 @@ func TestPublicDashboard_OpenIncidentsAreCapped(t *testing.T) {
 	assert.NotContains(t, titles, "v49", "der 201. offene Vorfall fehlt")
 }
 
-// Jede Abfrage der Vorfälle im Dashboard und in der Liste trägt ein LIMIT: Die
-// Begrenzung muss in der Datenbank greifen, nicht erst nach dem Laden aller Zeilen.
+// Every query for incidents in the dashboard and in the list carries a LIMIT: the
+// limit must take effect in the database, not only after loading all rows.
 func TestIncidentReads_QueriesCarryALimit(t *testing.T) {
 	e := newIncidentListEnv(t)
 	e.seed(t, 30, allResolved)
@@ -298,8 +298,8 @@ func TestIncidentReads_QueriesCarryALimit(t *testing.T) {
 	}
 }
 
-// incidents_more ist nur wahr, wenn es tatsächlich mehr behobene gibt als geliefert
-// werden: genau incident_limit behobene Vorfälle sind noch "alles".
+// incidents_more is only true if there are actually more resolved ones than are
+// delivered: exactly incident_limit resolved incidents still count as "everything".
 func TestPublicDashboard_MoreFlagAtExactLimit(t *testing.T) {
 	e := newIncidentListEnv(t)
 	e.seed(t, 50, allResolved)

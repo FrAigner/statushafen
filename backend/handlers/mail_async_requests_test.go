@@ -17,11 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bestell- und Einladungsmails laufen über dieselbe begrenzte Warteschlange wie
-// die Bestätigungsmails beim Abonnieren: Die Antwort hängt weder vom
-// SMTP-Server ab (hängender Server) noch verrät ihre Dauer, ob für die Adresse
-// eine Mail rausgeht, und bei ausgefallenem Mailserver stauen sich keine
-// unbegrenzt vielen Goroutinen auf.
+// Order and invitation mails run through the same bounded queue as
+// the confirmation mails when subscribing: the response depends neither on the
+// SMTP server (hanging server) nor does its duration reveal whether a mail
+// is sent for the address, and when the mail server is down no
+// unbounded number of goroutines piles up.
 
 type orderMailEnv struct {
 	db *gorm.DB
@@ -56,7 +56,7 @@ func TestCreateOrder_AntwortOhneWartenAufHaengendenSMTP(t *testing.T) {
 	assert.Less(t, d, 2*time.Second, "die Antwort wartet nicht auf den SMTP-Server (Dial 5 s, Gesamtfrist 15 s)")
 }
 
-// Gegenprobe zum hängenden Server: Die Bestätigungsmail wird tatsächlich zugestellt.
+// Control case for the hanging server: the confirmation mail is actually delivered.
 func TestCreateOrder_BestaetigungsmailWirdImHintergrundZugestellt(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -126,7 +126,7 @@ func setupInvitationMailEnv(t *testing.T, release func()) *invitationMailEnv {
 	require.NoError(t, db.Create(&models.UserStatusPageRole{UserID: owner.ID, StatusPageID: page.ID, RoleID: ownerRole.ID}).Error)
 	tok, err := middleware.GenerateToken(owner.ID, owner.Email, "", "", false)
 	require.NoError(t, err)
-	// Einladungsmails gehen nur an vorhandene Konten.
+	// Invitation mails only go to existing accounts.
 	for _, addr := range []string{"a", "b", "c"} {
 		require.NoError(t, db.Create(&models.User{Email: addr + "@invitee.example"}).Error)
 	}
@@ -156,8 +156,8 @@ func TestInviteUser_EinladungsmailWirdImHintergrundZugestellt(t *testing.T) {
 	e.h.WaitMails()
 }
 
-// Die Einladungen teilen sich die begrenzte Warteschlange: Ein ausgefallener
-// Mailserver darf keine unbegrenzt vielen Versand-Goroutinen aufstauen.
+// The invitations share the bounded queue: a failed
+// mail server must not pile up an unbounded number of send goroutines.
 func TestInviteUser_VolleWarteschlangeVerwirftMailsUndLoggtOhneEingaben(t *testing.T) {
 	logBuf := captureSlog(t)
 	release := startHangingSMTP(t)

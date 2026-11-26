@@ -1,13 +1,13 @@
 package handlers_test
 
-// Rollenvergabe (PUT /api/admin/users/:id mit page_roles und
-// POST /api/admin/pages/:page_id/users durch einen Global Admin) gleichzeitig
-// mit der Kontolöschung auf einem ECHTEN Postgres (READ COMMITTED). Früher
-// wartete der Schreiber auf die Benutzersperre der Löschung, aktualisierte
-// danach 0 Zeilen, legte die Rolle aber trotzdem an und antwortete 200: eine
-// Rollenzeile am gelöschten Konto. SQLite serialisiert Schreiber und zeigt das
-// nicht. Wie page_invitation_postgres_test.go nur mit MIGRATION_PG_TEST=1 und
-// nicht als root.
+// Role assignment (PUT /api/admin/users/:id with page_roles and
+// POST /api/admin/pages/:page_id/users by a Global Admin) concurrently
+// with account deletion on a REAL Postgres (READ COMMITTED). Previously
+// the writer waited for the user lock of the deletion, then updated
+// 0 rows, but created the role anyway and answered 200: a
+// role row on the deleted account. SQLite serializes writers and does not show
+// this. Like page_invitation_postgres_test.go only with MIGRATION_PG_TEST=1 and
+// not as root.
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ type updWrite struct {
 	method string
 	path   func(f invFixture, u models.User) string
 	body   func(f invFixture, u models.User) any
-	// member: Konto ist vorher schon Mitglied der Seite (Rollenwechsel statt Anlegen).
+	// member: account is already a member of the page beforehand (role change instead of creation).
 	member bool
 }
 
@@ -103,10 +103,10 @@ func updWait(t *testing.T, name string, ch chan updResult) updResult {
 	return updResult{}
 }
 
-// Deterministisch verschränkt: Die "Löschung" (dieselben Schritte wie
-// lockAccountForDeletion + DeleteUserHandler) hält Benutzerzeile und Rollen,
-// der Schreiber läuft in sie hinein und wird erst nach dem Commit frei.
-// Erwartung: 404, keine Rollenzeile des gelöschten Kontos.
+// Deterministically interleaved: the "deletion" (same steps as
+// lockAccountForDeletion + DeleteUserHandler) holds the user row and roles,
+// the writer runs into it and is released only after the commit.
+// Expectation: 404, no role row of the deleted account.
 func TestUserWritePostgres_VsDeleteHeldLock(t *testing.T) {
 	for _, w := range updWrites() {
 		t.Run(w.name, func(t *testing.T) {
@@ -147,9 +147,9 @@ func TestUserWritePostgres_VsDeleteHeldLock(t *testing.T) {
 	}
 }
 
-// Echte Handler gegeneinander, viele Läufe mit versetztem Start: danach nie
-// eine Rollenzeile des gelöschten Kontos, nie 5xx (Deadlock 40P01) und kein
-// Hänger.
+// Real handlers against each other, many runs with staggered start: afterwards never
+// a role row of the deleted account, never 5xx (deadlock 40P01) and no
+// hang.
 func TestUserWritePostgres_VsDeleteRounds(t *testing.T) {
 	dels := []struct {
 		name string

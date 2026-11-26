@@ -17,11 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Das Abonnement speichert die gewünschte Mailsprache; Vorfälle,
-// Ankündigungen, externe Meldungen und die Bestätigung gehen in dieser Sprache
-// hinaus (leer = Standardsprache der Seite).
+// The subscription stores the desired mail language; incidents,
+// announcements, external reports and the confirmation go out in this language
+// (empty = default language of the page).
 
-// addPageLanguage aktiviert eine weitere (Nicht-Standard-)Sprache an der Seite.
+// addPageLanguage enables a further (non-default) language on the page.
 // A second language needs the switch for translations on.
 func addPageLanguage(t *testing.T, db *gorm.DB, pageID uint, code string) {
 	t.Helper()
@@ -77,7 +77,7 @@ func TestSubscriberSprache_Ankuendigung_JederBekommtSeineSprache(t *testing.T) {
 
 	h.DispatchNoticeNotifications(noticeFor(page.ID), "created")
 
-	// Reihenfolge der beiden Mails ist offen: nach Empfänger einsortieren.
+	// The order of the two mails is undefined: sort by recipient.
 	for range 2 {
 		msg := waitForEmail(t, srv)
 		if strings.Contains(msg, "To: sl668-notice-en@example.com") {
@@ -138,9 +138,9 @@ func TestSubscriberSprache_Abo_SpeichertNurAktiveSeitensprache(t *testing.T) {
 	}
 	for email, tc := range map[string][2]string{
 		"sl668-a@example.com": {" EN ", "en"},          // normalisiert
-		"sl668-b@example.com": {"fr", ""},              // bei der Seite nicht aktiv
-		"sl668-c@example.com": {"", ""},                // keine Angabe
-		"sl668-d@example.com": {"en-ZZ-unbekannt", ""}, // Müll ohne Steuerzeichen
+		"sl668-b@example.com": {"fr", ""},              // not active on the page
+		"sl668-c@example.com": {"", ""},                // no value
+		"sl668-d@example.com": {"en-ZZ-unbekannt", ""}, // garbage without control characters
 	} {
 		w := postJSON(r, "/api/subscribe", map[string]string{
 			"channel": "email", "email": email, "component_ids": "all", "slug": "doi-page", "language": tc[0],
@@ -149,8 +149,8 @@ func TestSubscriberSprache_Abo_SpeichertNurAktiveSeitensprache(t *testing.T) {
 		assert.Equal(t, tc[1], stored(email), "language=%q", tc[0])
 	}
 
-	// Steuerzeichen in der Sprache (Header-Einschleusung, NUL-Byte) werden
-	// nicht mehr stillschweigend verworfen, sondern mit 400 abgewiesen.
+	// Control characters in the language (header injection, NUL byte) are
+	// no longer silently discarded but rejected with 400.
 	w := postJSON(r, "/api/subscribe", map[string]string{
 		"channel": "email", "email": "sl668-e@example.com", "component_ids": "all", "slug": "doi-page", "language": "en\r\nX:",
 	}, nil)

@@ -14,8 +14,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Fehlerpfade der Admin-Handler zum Erzeugen/Widerrufen des
-// Webhook-Tokens (ungültige ID, unbekannte Seite, Speicherfehler).
+// Error paths of the admin handlers for generating/revoking the
+// webhook token (invalid ID, unknown page, storage error).
 
 func doWebhookTokenRequest(r http.Handler, method, pageID string) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest(method, "/api/admin/pages/"+pageID+"/webhook-token", nil)
@@ -44,7 +44,7 @@ func TestWebhookTokenAdminHandlers_ErrorPaths(t *testing.T) {
 		})
 	}
 
-	// Speicherfehler erzwingen: ein Update-Callback, der immer scheitert.
+	// Force a storage error: an update callback that always fails.
 	const cbName = "test:webhook_token_save_error"
 	if err := db.Callback().Update().Before("gorm:update").Register(cbName, func(tx *gorm.DB) {
 		_ = tx.AddError(errors.New("simulierter Speicherfehler"))

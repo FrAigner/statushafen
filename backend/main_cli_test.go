@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// cliTestPassword ist ein reines Testpasswort.
+// cliTestPassword is a plain test password.
 const cliTestPassword = "ein-langes-testpasswort"
 
 func newCLITestDB(t *testing.T) *gorm.DB {
@@ -85,7 +85,7 @@ func TestCreateAdminCLI_VorhandenesKontoGibtFehlercode(t *testing.T) {
 func TestRunCLI_LehntSeedUndUnbekannteBefehleAb(t *testing.T) {
 	var o, e bytes.Buffer
 
-	// Das Seeden würde alle Tabellen löschen: create-admin darf nie damit laufen.
+	// Seeding would drop all tables: create-admin must never run with it.
 	t.Setenv("SEED_DB", "true")
 	code := runCLI([]string{"create-admin", "--email", "a@example.com", "--password-stdin"}, strings.NewReader(cliTestPassword+"\n"), &o, &e)
 	assert.NotZero(t, code)
@@ -98,8 +98,8 @@ func TestRunCLI_LehntSeedUndUnbekannteBefehleAb(t *testing.T) {
 	assert.Contains(t, e.String(), "create-admin")
 }
 
-// Der Testlauf übergibt Flags wie -test.v an main(); nur ein Wort ohne
-// führenden Bindestrich ist ein Verwaltungsbefehl.
+// The test run passes flags like -test.v to main(); only a word without a
+// leading hyphen is an administration command.
 func TestCLIRequested(t *testing.T) {
 	assert.False(t, cliRequested(nil))
 	assert.False(t, cliRequested([]string{"-test.v"}))
@@ -117,7 +117,7 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Eine endlose Eingabe ohne Zeilenende darf nicht ungebremst gelesen werden.
+// An endless input without a line ending must not be read without limit.
 func TestCreateAdminCLI_LiestNurBegrenzteMengeVonStdin(t *testing.T) {
 	db := newCLITestDB(t)
 	src := &countingReader{}
@@ -141,8 +141,8 @@ func TestCreateAdminCLI_LesefehlVonStdinBrichtAb(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// runCLI öffnet die Datenbank erst nach den Vorprüfungen; main() reicht den
-// Exit-Code des Befehls weiter, statt den Server zu starten.
+// runCLI opens the database only after the preliminary checks; main() passes the
+// exit code of the command on, instead of starting the server.
 func TestMain_FuehrtVerwaltungsbefehlAusStattServerZuStarten(t *testing.T) {
 	db := newCLITestDB(t)
 	t.Setenv("SEED_DB", "")

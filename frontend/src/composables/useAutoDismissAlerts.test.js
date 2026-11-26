@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { useAutoDismissAlerts, ALERT_AUTO_DISMISS_MS } from './useAutoDismissAlerts'
 
-// Erfolgsmeldungen verschwinden nach einigen Sekunden, Fehler/Warnungen bleiben (Betreiber 31.10.2026).
+// Success messages disappear after a few seconds, errors/warnings stay (operator 31.10.2026).
 
 const flushObserver = () => Promise.resolve().then(() => Promise.resolve())
 
@@ -106,18 +106,35 @@ describe('useAutoDismissAlerts', () => {
     expect(closed).not.toHaveBeenCalled()
   })
 
-  // Review: Die Ansichten rendern EINEN Meldungsknoten; der Wechsel Fehler -> Erfolg patcht nur Klasse/Text.
+  // Review: the views render ONE message node; the switch error -> success only patches class/text.
   it('bewaffnet die Frist, wenn dasselbe Element von Warnung auf Erfolg wechselt', async () => {
     const w = mountHost()
     const closed = addAlert(w.element, 'warning')
     await flushObserver()
     vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS * 2)
-    expect(closed).not.toHaveBeenCalled() // Warnung bleibt
+    expect(closed).not.toHaveBeenCalled() // warning stays
 
     const el = w.element.querySelector('.alert')
     el.className = 'alert alert-success'
     await flushObserver()
     vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS + 10)
+    expect(closed).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
+  it('startet die Frist neu, wenn sich nur der Text einer Erfolgsmeldung ändert', async () => {
+    const w = mountHost()
+    const closed = addAlert(w.element, 'success')
+    const text = document.createTextNode('Gespeichert')
+    w.element.querySelector('.alert').appendChild(text)
+    await flushObserver()
+    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS - 100)
+
+    text.data = 'Erneut gespeichert' // characterData: target is the text node
+    await flushObserver()
+    vi.advanceTimersByTime(200)
+    expect(closed).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS)
     expect(closed).toHaveBeenCalledTimes(1)
     w.unmount()
   })
@@ -138,9 +155,9 @@ describe('useAutoDismissAlerts', () => {
     const closed = addAlert(w.element, 'success')
     await flushObserver()
     vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS - 1000)
-    w.element.querySelector('.alert').insertBefore(document.createTextNode('Zweite Meldung'), null) // Textwechsel
+    w.element.querySelector('.alert').insertBefore(document.createTextNode('Zweite Meldung'), null) // text change
     await flushObserver()
-    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS - 1000) // alte Frist wäre jetzt abgelaufen
+    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS - 1000) // the old delay would have expired by now
     expect(closed).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1100)
     expect(closed).toHaveBeenCalledTimes(1)

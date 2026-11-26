@@ -12,21 +12,21 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Ende-zu-Ende-Tests für alle drei smtp.SendMail-Aufrufstellen
-// (Bestell-Bestätigung, Abo-Bestätigung, Incident-/Notice-Benachrichtigung
-// über sendAlertEmail). Der Fake-SMTP-Server lehnt wie Brevo jedes MAIL FROM
-// mit Anzeigenamen per 501 ab; kommt die Mail an, war der Envelope-Absender
-// also die nackte Adresse. Zusätzlich muss der From:-Header den Anzeigenamen
-// unverändert behalten.
+// End-to-end tests for all three smtp.SendMail call sites
+// (order confirmation, subscription confirmation, incident/notice notification
+// via sendAlertEmail). Like Brevo, the fake SMTP server rejects every MAIL FROM
+// with a display name via 501; if the mail arrives, the envelope sender
+// was therefore the bare address. In addition, the From: header must keep the display name
+// unchanged.
 
-// displayNameFrom enthält Umlaute, ein Komma und ein Ampersand im
-// Anzeigenamen, damit auch die quotierte Form durch mail.ParseAddress läuft.
+// displayNameFrom contains umlauts, a comma and an ampersand in the
+// display name, so that the quoted form also goes through mail.ParseAddress.
 const (
 	displayNameFrom   = `"Statushafen Störungsdienst, Müller & Co" <no-reply@example.com>`
 	displayNameBareTo = "no-reply@example.com"
 )
 
-// awaitMailFrom liefert das vom Fake-Server akzeptierte MAIL-FROM-Argument.
+// awaitMailFrom returns the MAIL FROM argument accepted by the fake server.
 func awaitMailFrom(t *testing.T, srv *fakeSMTPServer) string {
 	t.Helper()
 	select {
@@ -38,8 +38,8 @@ func awaitMailFrom(t *testing.T, srv *fakeSMTPServer) string {
 	}
 }
 
-// assertEnvelopeAndHeader prüft Envelope-Absender (nackt) und From:-Header
-// (mit Anzeigename) einer zugestellten Mail.
+// assertEnvelopeAndHeader checks the envelope sender (bare) and From: header
+// (with display name) of a delivered mail.
 func assertEnvelopeAndHeader(t *testing.T, srv *fakeSMTPServer, msg, wantHeaderFrom, wantEnvelope string) {
 	t.Helper()
 	if got := awaitMailFrom(t, srv); got != wantEnvelope {
@@ -50,9 +50,9 @@ func assertEnvelopeAndHeader(t *testing.T, srv *fakeSMTPServer, msg, wantHeaderF
 	}
 }
 
-// assertSenderIsOperator prüft für Mails einer Statusseite: Envelope-Absender
-// und Adresse im From-Header sind die nackte Betreiberadresse, der Seitenname
-// steht als (gegebenenfalls kodierter) Anzeigename im Header.
+// assertSenderIsOperator checks for mails of a status page: the envelope sender
+// and the address in the From header are the bare operator address, the page name
+// appears as the (possibly encoded) display name in the header.
 func assertSenderIsOperator(t *testing.T, srv *fakeSMTPServer, msg, wantName, wantAddress string) {
 	t.Helper()
 	if got := awaitMailFrom(t, srv); got != wantAddress {
@@ -90,7 +90,7 @@ func TestSMTPEnvelope_SubscriptionConfirmationUsesBareAddress(t *testing.T) {
 	defer srv.close()
 	t.Setenv("SMTP_FROM", displayNameFrom)
 	db, r, page := setupDOIRouter(t)
-	// Seitenname mit Umlauten: wird als Anzeigename RFC-2047-kodiert.
+	// Page name with umlauts: is RFC 2047-encoded as the display name.
 	db.Model(&page).Update("name", "Störungs-Info Ä Ö Ü")
 
 	w := subscribeEmail(r, "envelope-sub@example.com", nil)
@@ -117,8 +117,8 @@ func TestSMTPEnvelope_IncidentNotificationUsesBareAddress(t *testing.T) {
 	assertSenderIsOperator(t, srv, msg, "Envelope Page", displayNameBareTo)
 }
 
-// TestSMTPEnvelope_BareAddressInputStaysBare: Ist SMTP_FROM schon die nackte
-// Adresse (aktueller Prod-Workaround), bleiben Envelope und Header gleich.
+// TestSMTPEnvelope_BareAddressInputStaysBare: if SMTP_FROM is already the bare
+// address (current production workaround), envelope and header stay the same.
 func TestSMTPEnvelope_BareAddressInputStaysBare(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -137,10 +137,10 @@ func TestSMTPEnvelope_BareAddressInputStaysBare(t *testing.T) {
 	assertEnvelopeAndHeader(t, srv, msg, displayNameBareTo, displayNameBareTo)
 }
 
-// TestSMTPEnvelope_InvalidFromIsRejectedAndAudited (Fehlerpfad): Ein nicht
-// parsebarer Absender fällt unverändert durch, der strikte Server lehnt ihn
-// mit 501 ab und der Fehler landet wie jeder andere Versandfehler im Audit-Log
-// statt still zu verschwinden.
+// TestSMTPEnvelope_InvalidFromIsRejectedAndAudited (error path): an
+// unparsable sender passes through unchanged, the strict server rejects it
+// with 501, and the error ends up in the audit log like any other send error
+// instead of silently disappearing.
 func TestSMTPEnvelope_InvalidFromIsRejectedAndAudited(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()

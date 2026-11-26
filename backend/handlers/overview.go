@@ -9,14 +9,14 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mandanten-Übersicht (Kern-Screen der Enterprise-App)
+// Tenant overview (core screen of the enterprise app)
 //
-// Aggregiert für JEDE Statusseite: schlechtesten Komponenten-Status,
-// Anzahl offener Incidents, Anzahl Abonnenten. Ein einziger Roundtrip statt
-// N Client-Calls (löst zugleich das N+1-Risiko aus Review-Befund A3 für dieses
+// Aggregates for EVERY status page: worst component status,
+// number of open incidents, number of subscribers. A single round trip instead of
+// N client calls (also resolves the N+1 risk from review finding A3 for this
 // Dashboard).
 //
-// Route (in main.go, innerhalb der authGroup):
+// Route (in main.go, inside the authGroup):
 //   authGroup.GET("/admin/overview", middleware.RequireGlobalAdmin(), h.GetOverviewHandler)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -51,19 +51,19 @@ func (h *Handler) GetOverviewHandler(c *gin.Context) {
 	for _, p := range pages {
 		row := overviewPage{ID: p.ID, Name: p.Name, Slug: p.Slug, Status: "operational"}
 
-		// Schlechtester Komponenten-Status (nur echte Komponenten, keine Gruppen).
+		// Worst component status (real components only, no groups).
 		var comps []models.Component
 		h.DB.Where("status_page_id = ? AND status <> 'group' AND archived_at IS NULL", p.ID).Find(&comps)
 		row.Components = int64(len(comps))
-		// offene Vorfälle überlagern den gespeicherten Status wie im
-		// Dashboard; seit der Umstellung zählen auch gekoppelte externe Komponenten.
-		// Bei einem DB-Fehler fehlen sie nur (leere Map = operational).
+		// open incidents overlay the stored status as in the
+		// dashboard; since the changeover coupled external components also count.
+		// On a DB error they are just missing (empty map = operational).
 		effective := h.effectiveSnapshot(p.ID)
 		statuses := make([]string, 0, len(effective))
 		for _, s := range effective {
 			statuses = append(statuses, s)
 		}
-		row.Status = worstStatus(statuses) // aus component.go wiederverwendet
+		row.Status = worstStatus(statuses) // reused from component.go
 
 		h.DB.Model(&models.Incident{}).
 			Where("status_page_id = ? AND status IN ?", p.ID, openStatuses).

@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// E2E-Lücken Sprachumschalter, Mobile-Menü und Tastaturbedienung.
-// Die Tests laufen gegen gemockte API-Antworten (page.route), damit sie ohne
-// Backend und Datenbank auskommen und nur das Frontend-Verhalten prüfen.
-// Browsersprache fest auf Deutsch, damit die Erkennung (navigator.language)
-// unabhängig vom Testrechner den Standard liefert.
+// E2E gaps: language switcher, mobile menu and keyboard operation.
+// The tests run against mocked API responses (page.route) so they need no
+// backend or database and only check frontend behaviour.
+// Browser language fixed to German so that detection (navigator.language)
+// yields the default regardless of the test machine.
 test.use({ locale: 'de-DE' });
 
 async function mockApi(page, { admin = false } = {}) {
@@ -21,7 +21,7 @@ async function mockApi(page, { admin = false } = {}) {
     if (url.pathname === '/api/public/auth-config') {
       return route.fulfill({ json: { password_login: true, providers: [] } });
     }
-    // Die Übersicht erwartet ein Objekt mit pages-Liste (sonst Render-Fehler, Befund 2).
+    // The overview expects an object with a pages list (otherwise a render error, finding 2).
     if (url.pathname === '/api/admin/overview') {
       return route.fulfill({
         json: { pages: [], total_pages: 0, total_open_incidents: 0, total_subscribers: 0, worst_status: 'operational' },
@@ -31,9 +31,9 @@ async function mockApi(page, { admin = false } = {}) {
   });
 }
 
-// Fokus ausschließlich per Tab-Taste herstellen (Befund 1): focus() umgeht die
-// Tab-Reihenfolge und würde z. B. tabindex="-1" nicht bemerken. Mit Obergrenze,
-// damit ein nicht erreichbares Element als Fehlschlag endet statt zu hängen.
+// Move focus only with the Tab key (finding 1): focus() bypasses the tab
+// order and would not notice e.g. tabindex="-1". With an upper bound so that
+// an unreachable element ends as a failure instead of hanging.
 async function tabTo(page, selector, maxTabs = 30) {
   for (let i = 0; i < maxTabs; i++) {
     await page.keyboard.press('Tab');
@@ -71,7 +71,7 @@ test.describe('Sprache umschalten (DE/EN)', () => {
 test.describe('Mobile-Menü (Admin)', () => {
   test.use({ viewport: { width: 375, height: 700 } });
 
-  // Gemeinsamer Start: Admin-Übersicht auf kleinem Viewport, Menü per Burger geöffnet.
+  // Common start: admin overview on a small viewport, menu opened via the burger.
   async function openMenu(page) {
     await mockApi(page, { admin: true });
     await page.addInitScript(() => localStorage.setItem('jwt_token', 'test-token'));
@@ -120,7 +120,7 @@ test.describe('Mobile-Menü (Admin)', () => {
     await expect(nav).not.toHaveClass(/is-open/);
   });
 
-  // Fokus beim Öffnen auf den ersten Eintrag, beim Schließen zurück auf den Burger.
+  // Focus on the first entry when opening, back on the burger when closing.
   test('Fokus wandert beim Öffnen ins Menü und beim Schließen zurück auf den Burger', async ({ page }) => {
     const { burger, nav } = await openMenu(page);
     await expect(nav.locator('.area-items a').first()).toBeFocused();
@@ -128,7 +128,7 @@ test.describe('Mobile-Menü (Admin)', () => {
     await expect(burger).toBeFocused();
   });
 
-  // Kopf: Die Marke „Statushafen Admin“ wurde auf „Ad“ abgeschnitten, die Seite scrollte seitlich.
+  // Header: the brand "Statushafen Admin" was cut off to "Ad", the page scrolled sideways.
   test('Kopfzeile zeigt „Statushafen Admin“ vollständig und die Seite scrollt nicht seitlich', async ({ page }) => {
     await mockApi(page, { admin: true });
     await page.addInitScript(() => localStorage.setItem('jwt_token', 'test-token'));
@@ -155,8 +155,8 @@ test.describe('Tastaturbedienung', () => {
     const select = page.locator('select.language-switcher');
     await tabTo(page, 'select.language-switcher');
     await expect(select).toBeFocused();
-    // ArrowDown öffnet unter macOS nur die (für Playwright unsichtbare) Auswahlliste und
-    // wechselt nicht; die Anfangsbuchstaben-Suche („E“ für „Englisch“) wirkt auf allen Systemen.
+    // On macOS ArrowDown only opens the selection list (invisible to Playwright) and does
+    // not switch; type-ahead by first letter ("E" for "Englisch") works on all systems.
     await page.keyboard.press('E');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('When something goes down, your customers hear it from you first.');
     expect(await page.evaluate(() => localStorage.getItem('preferred_language'))).toBe('en');

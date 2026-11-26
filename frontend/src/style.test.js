@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 describe('Phase 1: CSS System (Breakpoints, Spacing, Typography)', () => {
-  // Die Tokens stehen seit der Konsolidierung in assets/tokens.css
-  // (style.css enthält nur Komponenten-Regeln); die Variable heißt weiter styleCss.
+  // Since the consolidation the tokens live in assets/tokens.css
+  // (style.css only holds component rules); the variable is still called styleCss.
   describe('CSS Variables defined in assets/tokens.css', () => {
     let styleCss
 
@@ -33,7 +33,7 @@ describe('Phase 1: CSS System (Breakpoints, Spacing, Typography)', () => {
       expect(styleCss).toContain('--bp-xl: 1200px')
     })
 
-    // Responsive Abstände (clamp), nur die noch genutzten
+    // Responsive spacing (clamp), only those still in use
     it('should define --space-sm with clamp', () => {
       expect(styleCss).toContain('--space-sm: clamp(12px, 3vw, 16px)')
     })
@@ -47,9 +47,9 @@ describe('Phase 1: CSS System (Breakpoints, Spacing, Typography)', () => {
     })
   })
 
-  // Redesign Stufe 2: Der Mandanten-Umschalter sitzt kompakt in der
-  // dunklen Kopfzeile (früher Seitenleiste), die Bereiche stehen als
-  // Reiter statt als Seitenleiste.
+  // Redesign stage 2: the tenant switcher sits compactly in the dark
+  // header (formerly the sidebar); the sections are tabs instead of a
+  // sidebar.
   describe('Admin-Kopfzeile: Mandanten-Umschalter und Reiter', () => {
     let styleCss
 
@@ -139,8 +139,8 @@ describe('Phase 1: CSS System (Breakpoints, Spacing, Typography)', () => {
   })
 })
 
-// Der Admin-Inhalt war auf 1400 px begrenzt und linksbündig: auf großen Schirmen
-// blieb rechts ein leerer Streifen, Tabellen mit Seitenformular wurden gequetscht.
+// The admin content was capped at 1400 px and left-aligned: on large screens an
+// empty strip remained on the right, tables with a side form got squeezed.
 describe('Admin-Inhalt nutzt die volle Breite', () => {
   it('.admin-content hat kein max-width', () => {
     const css = readFileSync(`${__dirname}/style.css`, 'utf-8')
@@ -150,9 +150,9 @@ describe('Admin-Inhalt nutzt die volle Breite', () => {
   })
 })
 
-// Die Filterchips der Statusseite blieben bei Kundenfarbe indigo, weil
-// sie --color-primary (Ebenen-Wert) nutzten; die Kundenmarke setzt nur --primary
-// (Inline-Style auf .content-area), wie beim Abonnieren-Knopf.
+// The status page's filter chips stayed indigo with a customer color because
+// they used --color-primary (level value); the customer brand only sets --primary
+// (inline style on .content-area), as for the subscribe button.
 describe('Filterchips folgen der Kundenmarke', () => {
   const css = readFileSync(`${__dirname}/style.css`, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '')
   const rule = (selector) => {

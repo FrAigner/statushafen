@@ -17,9 +17,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Rest: Sprache im Admin-Formular,
-// Fallback bei deaktivierter Sprache, Mails an interne Nutzer in deren
-// UI-Sprache.
+// The rest: language in the admin form,
+// fallback when a language is disabled, emails to internal users in their
+// UI language.
 
 func TestSubscriberSprache_DeaktivierteKatalogspracheWirdNichtGespeichert(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
@@ -43,7 +43,7 @@ func TestSubscriberSprache_NachtraeglichDeaktiviert_VersandInSeitenstandard(t *t
 	setPageDefaultLanguage(t, db, page.ID, "de")
 	addPageLanguage(t, db, page.ID, "en")
 	addLangSubscriber(t, db, page.ID, "l703-deact@example.com", "en")
-	// Die Sprache wird nach dem Abo bei der Seite abgewählt.
+	// The language is deselected on the page after the subscription.
 	require.NoError(t, db.Where("status_page_id = ? AND language_code = ?", page.ID, "en").Delete(&models.StatusPageLanguage{}).Error)
 	inc := seedIncident(t, db, page.ID, "Latenz", "Wir prüfen.", "investigating")
 
@@ -53,7 +53,7 @@ func TestSubscriberSprache_NachtraeglichDeaktiviert_VersandInSeitenstandard(t *t
 	assert.Contains(t, msg, "Status-Update für", "Rückfall auf die Seitenstandardsprache")
 }
 
-// --- Admin-Formular -----------------------------------------------------------
+// --- Admin form -----------------------------------------------------------
 
 func newAdminSubRouter(db *gorm.DB) http.Handler {
 	h := handlers.NewHandler(db)
@@ -95,7 +95,7 @@ func TestAdminAbonnent_AnlegenUndAendernMitSprache(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	assert.Equal(t, "en", lang("l703-a@example.com"))
 
-	// Sprache einer anderen Seite / keine Angabe: Seitenstandard (leer).
+	// Language of another page / no value: page default (empty).
 	w = adminSubCall(r, http.MethodPost, base, `{"Channel":"email","Email":"l703-b@example.com","SubscribedComponentIDs":"all","Language":"fr"}`)
 	require.Equal(t, http.StatusCreated, w.Code)
 	assert.Equal(t, "", lang("l703-b@example.com"), "fr gehört nur zur anderen Seite")
@@ -119,7 +119,7 @@ func TestAdminAbonnent_AnlegenUndAendernMitSprache(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "de", lang("l703-a@example.com"))
 
-	// Mandantentrennung: ein Abo einer anderen Seite ist über diese Seite nicht änderbar.
+	// Tenant isolation: a subscription of another page cannot be changed via this page.
 	foreign := models.Subscriber{StatusPageID: other.ID, Email: "l703-x@example.com", Channel: "email", SubscribedComponentIDs: "all"}
 	require.NoError(t, db.Create(&foreign).Error)
 	w = adminSubCall(r, http.MethodPut, base+"/"+strconv.Itoa(int(foreign.ID)), `{"Channel":"email","Email":"l703-x@example.com","SubscribedComponentIDs":"all","Language":"en"}`)
@@ -129,8 +129,8 @@ func TestAdminAbonnent_AnlegenUndAendernMitSprache(t *testing.T) {
 	assert.Equal(t, "", f.Language)
 }
 
-// Das Admin-Formular beschriftet die Sprachen mit dem Namen aus dem Katalog;
-// die Liste der Seitensprachen liefert ihn deshalb mit.
+// The admin form labels the languages with the name from the catalog;
+// the list of page languages therefore returns it as well.
 func TestPageLanguagesList_LiefertSprachnamen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -147,7 +147,7 @@ func TestPageLanguagesList_LiefertSprachnamen(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"Name":"Deutsch"`)
 
-	// DB-Fehler -> 500 mit Code
+	// DB error -> 500 with code
 	require.NoError(t, db.Migrator().DropTable(&models.StatusPageLanguage{}))
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/pages/"+strconv.Itoa(int(page.ID))+"/languages", nil))
@@ -155,10 +155,10 @@ func TestPageLanguagesList_LiefertSprachnamen(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "server_error")
 }
 
-// --- Interne Nutzer nach PreferredLanguage ---------------------------------------
+// --- Internal users by PreferredLanguage ---------------------------------------
 
-// collectMailsByRecipient liest genau n Mails und ordnet sie dem Empfänger zu
-// (die Reihenfolge der Versandschleife ist offen).
+// collectMailsByRecipient reads exactly n mails and assigns them to the recipient
+// (the order of the send loop is undefined).
 func collectMailsByRecipient(t *testing.T, srv *fakeSMTPServer, n int, recipients ...string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
@@ -191,7 +191,7 @@ func TestInterneNutzer_VorfallMailInIhrerSprache(t *testing.T) {
 	assert.Contains(t, got["l703-de@example.com"], "Status-Update für")
 	assert.NotContains(t, got["l703-de@example.com"], "Status update for")
 	assert.Contains(t, got["l703-en@example.com"], "Status update for")
-	// Ohne gespeicherte Sprache bleibt es beim bisherigen Englisch.
+	// Without a stored language it stays with the previous English.
 	assert.Contains(t, got["l703-staff-admin@example.com"], "Status update for")
 }
 
@@ -199,14 +199,14 @@ func TestInterneNutzer_VorlageNachSpracheMitRueckfallAufEnglisch(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "l703-stafftpl", "l703-stafftpl-admin@example.com")
 	require.NoError(t, testutils.EnableTranslation(db))
 	require.NoError(t, db.Create(&models.User{Email: "l703-tpl-de@example.com", IsGlobalAdmin: true, PreferredLanguage: "de"}).Error)
-	// Nur die englische Staff-Vorlage gepflegt: gilt auch für den deutschen Nutzer (wie vor der Umstellung).
+	// Only the English staff template is maintained: it also applies to the German user (as before the changeover).
 	seedTemplate(t, db, page.ID, handlers.NotificationKindIncidentCreated, handlers.NotificationAudienceStaff, "en", "STAFF-EN {{.Language}}", "<p>X</p>")
 	inc := seedIncident(t, db, page.ID, "Latenz", "Wir prüfen.", "investigating")
 	h.DispatchNotifications(inc, []models.Component{comp}, "CREATED")
 	got := collectMailsByRecipient(t, srv, 2, "l703-tpl-de@example.com", "l703-stafftpl-admin@example.com")
 	assert.Contains(t, got["l703-tpl-de@example.com"], "Subject: STAFF-EN en")
 
-	// Jetzt eine deutsche Staff-Vorlage: der deutsche Nutzer bekommt sie, die anderen die englische.
+	// Now a German staff template: the German user gets it, the others get the English one.
 	seedTemplate(t, db, page.ID, handlers.NotificationKindIncidentCreated, handlers.NotificationAudienceStaff, "de", "STAFF-DE {{.Language}}", "<p>Y</p>")
 	h.DispatchNotifications(inc, []models.Component{comp}, "CREATED")
 	got = collectMailsByRecipient(t, srv, 2, "l703-tpl-de@example.com", "l703-stafftpl-admin@example.com")

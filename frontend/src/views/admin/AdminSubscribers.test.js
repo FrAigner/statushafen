@@ -8,8 +8,8 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { withArchivedComponent, componentTreeFixture, expectedTreeOptionLabels, multiSelectOptionLabels } from '../../test-support/componentTree'
 import AdminSubscribers from './AdminSubscribers.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel, hasLabel } from '../../test-support/fields.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel, hasLabel } from '../../test-support/fields'
 import { stubConfirm } from '../../test-support/confirm'
 
 function subscribersFixture() {
@@ -25,7 +25,7 @@ function subscribersFixture() {
   ]
 }
 function componentsFixture() {
-  // Baum mit Unterkomponente statt nur oberster Ebene.
+  // Tree with a subcomponent instead of only the top level.
   return componentTreeFixture()
 }
 
@@ -94,7 +94,7 @@ async function mountAdminSubscribers({ fetchImpl, tenantId = '1' } = {}) {
   return { wrapper, router }
 }
 
-// Zeilenaktionen stehen im Zeilenmenü (RowMenu), die Einträge sind auch geschlossen im DOM.
+// Row actions are in the row menu (RowMenu); the entries are in the DOM even when it is closed.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 
 describe('AdminSubscribers', () => {
@@ -104,9 +104,9 @@ describe('AdminSubscribers', () => {
     useTenant().setMyPages([])
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -116,7 +116,7 @@ describe('AdminSubscribers', () => {
     vi.restoreAllMocks()
   })
 
-  // vorher bot die Auswahl nur die oberste Ebene an.
+  // previously the selection only offered the top level.
   it('bietet in der Komponenten-Auswahl auch Unterkomponenten eingerückt an', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update,subscribers:delete' })
     const { wrapper } = await mountAdminSubscribers()
@@ -125,7 +125,7 @@ describe('AdminSubscribers', () => {
     expect(multiSelectOptionLabels(wrapper)).toEqual(expectedTreeOptionLabels)
   })
 
-  // eine inzwischen archivierte Komponente eines bestehenden Abonnenten bleibt in der Auswahl sichtbar.
+  // a meanwhile archived component of an existing subscriber stays visible in the selection.
   it('zeigt beim Bearbeiten eine archivierte, gewählte Komponente weiter in der Auswahl', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update,subscribers:delete' })
     const subscribersFixtureOverride = [{ ...subscribersFixture()[0], SubscribedComponentIDs: '13' }]
@@ -160,7 +160,7 @@ describe('AdminSubscribers', () => {
     expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
-  // unbestätigte Abos (Double-Opt-in) sind in der Liste markiert.
+  // unconfirmed subscriptions (double opt-in) are marked in the list.
   it('markiert unbestätigte E-Mail-Abos mit "Unbestätigt", bestätigte nicht', async () => {
     const subs = subscribersFixture()
     subs.push({ ID: 3, Channel: 'email', Email: 'offen@x.de', SubscribedComponentIDs: '', Status: 'pending', CreatedBy: null })
@@ -180,6 +180,13 @@ describe('AdminSubscribers', () => {
     const rows = wrapper.findAll('tbody tr')
     expect(rows[0].text()).toContain('API')
     expect(rows[1].text()).toContain('alle')
+  })
+
+  it('zeigt einen unbekannten Kanal unverändert als Rohwert', async () => {
+    const subs = [{ ID: 4, Channel: 'pager', Email: 'p@x.de', SubscribedComponentIDs: '', Status: 'active', CreatedBy: null }]
+    const { wrapper } = await mountAdminSubscribers({ fetchImpl: makeFetchRouter({ subscribersFixtureOverride: subs }) })
+
+    expect(wrapper.find('tbody tr td[data-label="Kanal"] .tag-pill').text()).toBe('pager')
   })
 
   it('zeigt den Google-Chat-Kanal mit Webhook-URL und Test-Button statt E-Mail', async () => {
@@ -214,7 +221,7 @@ describe('AdminSubscribers', () => {
     expect(wrapper.find('.alert-error').text()).toContain('Fehler beim Testen')
   })
 
-  // Google drosselt (429 + retry_after) - verständliche Meldung, kein roher Servertext.
+  // Google throttles (429 + retry_after) - an understandable message, no raw server text.
   it('zeigt bei einer Drosselung des Webhook-Ziels die Wartezeit', async () => {
     const response = jsonResponse({ error: 'Webhook-Ziel drosselt gerade', code: 'webhook_rate_limited', retry_after: 9 }, 429)
     const { wrapper } = await mountAdminSubscribers({ fetchImpl: makeFetchRouter({ testWebhookResponse: response }) })
@@ -230,7 +237,7 @@ describe('AdminSubscribers', () => {
   it('zeigt "+ Abonnent hinzufügen" und die Aktionen-Spalte nur mit subscribers:create/update/delete-Berechtigung', async () => {
     const { wrapper: withoutPerm } = await mountAdminSubscribers()
     expect(withoutPerm.text()).not.toContain('Abonnent hinzufügen')
-    // Ohne Recht bleibt nur „Ansehen“ im Zeilenmenü (Details schreibgeschützt).
+    // Without permission only "View" remains in the row menu (details read-only).
     expect([...new Set(withoutPerm.findAll('[role="menuitem"]').map(i => i.text()))]).toEqual(['Ansehen'])
 
     setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update,subscribers:delete' })
@@ -284,7 +291,7 @@ describe('AdminSubscribers', () => {
     await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('neu@x.de')
     const checkboxes = wrapper.findAll('.onyx-select-stub-option input[type="checkbox"]')
     await checkboxes[0].setValue(true)
-    // Index 1 ist die Unterkomponente 12, 2 ist "Web" (11).
+    // Index 1 is subcomponent 12, 2 is "Web" (11).
     await checkboxes[2].setValue(true)
 
     await wrapper.find('.edit-form').trigger('submit')
@@ -366,7 +373,7 @@ describe('AdminSubscribers', () => {
     expect(wrapper.text()).toContain('Keine Abonnenten vorhanden.')
   })
 
-  // Richtung C: Kartenkopf, Untertitel mit Zählung, Suche, Fehler am Feld.
+  // Direction C: card header, subtitle with a count, search, error at the field.
   it('zeigt Kartenkopf und Untertitel mit Zählung', async () => {
     const subs = subscribersFixture()
     subs.push({ ID: 3, Channel: 'email', Email: 'offen@x.de', SubscribedComponentIDs: '', Status: 'pending', CreatedBy: null })
@@ -395,7 +402,7 @@ describe('AdminSubscribers', () => {
     expect(row.find('.badge-pending').text()).toBe('Unbestätigt')
   })
 
-  // Regression: ein leerer Kontakt ging bisher als Serveranfrage raus.
+  // Regression: an empty contact used to go out as a server request.
   it('meldet fehlende E-Mail bzw. Webhook-URL am Feld, fokussiert es und sendet nichts', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update,subscribers:delete' })
     const fetchMock = makeFetchRouter()
@@ -476,7 +483,7 @@ describe('AdminSubscribers', () => {
     const [, options] = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST')
     expect(JSON.parse(options.body)).toMatchObject({ Channel: 'google_chat', WebhookURL: 'https://chat.googleapis.com/neu' })
   })
-  // Nach dem Löschen blieb „Abonnent hinzugefügt.“ stehen.
+  // After deleting, "Subscriber added." stayed in place.
   it('meldet das Löschen und entfernt die ältere Meldung', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update,subscribers:delete' })
     stubConfirm(true)
@@ -490,7 +497,7 @@ describe('AdminSubscribers', () => {
     expect(wrapper.text()).not.toContain('Abonnent hinzugefügt.')
     expect(wrapper.find('.alert-success').text()).toContain('Abonnent gelöscht.')
   })
-  // Mailsprache im Admin-Formular.
+  // Mail language in the admin form.
   describe('Mailsprache', () => {
     const twoLanguages = [
       { LanguageCode: 'de', IsDefault: true, Language: { Name: 'Deutsch' } },
@@ -576,7 +583,7 @@ describe('AdminSubscribers', () => {
         const { wrapper } = await mountAdminSubscribers({ fetchImpl: makeFetchRouter(opts) })
         await wrapper.find('.page-head__actions button').trigger('click')
         expect(hasLabel(wrapper, 'Sprache der Benachrichtigungen')).toBe(false)
-        // Die Liste lädt trotz fehlender Sprachliste, ohne Fehlermeldung.
+        // The list loads despite the missing language list, without an error message.
         expect(wrapper.findAll('tbody tr')).toHaveLength(2)
         expect(wrapper.find('.alert-error').exists()).toBe(false)
         activeWrapper.unmount()

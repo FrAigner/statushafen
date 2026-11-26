@@ -17,11 +17,11 @@ import (
 )
 
 // TestIncidentDetail_AuthorEmailOnlyForEditors:
-// das öffentliche GET /api/pages/:page_id/incidents/:id lieferte
-// updates[].author_email an jeden Besucher und machte so die E-Mail-Adressen
-// des Teams öffentlich. Sie bleibt nur für Nutzer mit incidents:write auf
-// genau dieser Seite (Admin-Ansicht AdminIncidentDetail.vue) sichtbar -
-// dieselbe Grenze wie für Post-Mortem-Entwürfe.
+// the public GET /api/pages/:page_id/incidents/:id returned
+// updates[].author_email to every visitor, thereby making the team's email addresses
+// public. It remains visible only to users with incidents:write on
+// exactly this page (admin view AdminIncidentDetail.vue) -
+// the same boundary as for post-mortem drafts.
 func TestIncidentDetail_AuthorEmailOnlyForEditors(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

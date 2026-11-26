@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -6,21 +6,21 @@ import { useApi } from '../../composables/useApi'
 import AppIcon from '../../components/AppIcon.vue'
 import '../../assets/entry.css'
 
-// Bestätigungsseite des Double-Opt-in für E-Mail-Abos. Der Link
-// aus der Bestätigungsmail führt hierher (/subscribe/confirm?token=...).
+// Confirmation page of the double opt-in for email subscriptions. The link
+// in the confirmation mail leads here (/subscribe/confirm?token=...).
 
 const route = useRoute()
 const { t } = useI18n()
 const { apiFetch } = useApi()
 
-// state: 'idle' (wartet auf Klick) | 'confirming' | 'success' | 'error'
-const state = ref('idle')
-// Startwerte sind äquivalent: Jeder Zustand, der sie anzeigt oder sendet, setzt sie vorher.
-// Stryker disable next-line StringLiteral: wird vor dem Fehlerzustand immer gesetzt
+// state: 'idle' (waiting for a click) | 'confirming' | 'success' | 'error'
+const state = ref<'idle' | 'confirming' | 'success' | 'error'>('idle')
+// The initial values are equivalent: every state that shows or sends them sets them first.
+// Stryker disable next-line StringLiteral: always set before the error state
 const errorMessage = ref('')
-// Stryker disable next-line StringLiteral: wird vor dem Erfolgszustand immer gesetzt
+// Stryker disable next-line StringLiteral: always set before the success state
 const slug = ref('')
-// Stryker disable next-line StringLiteral: ohne Token-Query bleibt die Seite im Fehlerzustand
+// Stryker disable next-line StringLiteral: without a token query the page stays in the error state
 const token = ref('')
 
 onMounted(() => {
@@ -30,22 +30,22 @@ onMounted(() => {
     errorMessage.value = t('subscribeConfirm.noTokenError')
     return
   }
-  token.value = queryToken
+  token.value = queryToken as string
 })
 
-// Bewusst kein Auto-Fire beim Mounten (wie OrderConfirmPage): Mail-Gateways
-// mit Link-Prefetching würden den Einmal-Token sonst vor dem Klick verbrauchen.
+// Deliberately no auto-fire on mount (like OrderConfirmPage): mail gateways
+// with link prefetching would otherwise use up the one-time token before the click.
 async function confirm() {
   state.value = 'confirming'
   try {
-    const data = await apiFetch('/api/public/subscribers/confirm', {
+    const data = await apiFetch<{ slug?: string }>('/api/public/subscribers/confirm', {
       method: 'POST',
       body: JSON.stringify({ token: token.value }),
     })
     slug.value = data.slug || ''
     state.value = 'success'
   } catch (err) {
-    errorMessage.value = err.message
+    errorMessage.value = (err as Error).message
     state.value = 'error'
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { incidentBadge, maintenanceBadge, noticeBadge, actionBadge } from './badgeStatus'
 
-// Der Übersetzer gibt den Schlüssel zurück: geprüft wird die Zuordnung.
+// The translator returns the key: what is checked is the mapping.
 const t = key => `t:${key}`
 
 describe('badgeStatus (Stufe 4b)', () => {
@@ -41,7 +41,7 @@ describe('badgeStatus (Stufe 4b)', () => {
   it('zeigt unbekannte Werte neutral mit dem Rohwert, nie mit Statusfarbe', () => {
     expect(incidentBadge('seltsam', t)).toEqual({ status: null, label: 'seltsam' })
     expect(noticeBadge(undefined, t)).toEqual({ status: null, label: '' })
-    // Prototyp-Schlüssel sind keine Status.
+    // Prototype keys are not statuses.
     expect(maintenanceBadge('constructor', t)).toEqual({ status: null, label: 'constructor' })
   })
 })

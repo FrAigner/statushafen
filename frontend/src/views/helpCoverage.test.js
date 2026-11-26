@@ -8,9 +8,9 @@ import { useAuth } from '../composables/useAuth'
 import { useTenant } from '../composables/useTenant'
 import { HELP_PARTS } from '../composables/useHelpText'
 import { onyxFormStubs } from '../test-support/onyxStubs'
-import { vueSources, lookup } from '../test-support/templateScan.js'
+import { vueSources, lookup } from '../test-support/templateScan'
 import { NAV_GROUPS } from '../utils/adminNav'
-import routerSource from '../router/index.js?raw'
+import routerSource from '../router/index.ts?raw'
 import AdminComponents from './admin/AdminComponents.vue'
 import AdminExternalSources from './admin/AdminExternalSources.vue'
 import AdminOverview from './admin/AdminOverview.vue'
@@ -21,40 +21,40 @@ import AdminNotices from './admin/AdminNotices.vue'
 import AdminIncidentTemplates from './admin/AdminIncidentTemplates.vue'
 import AdminSubscribers from './admin/AdminSubscribers.vue'
 
-// Abdeckungs-Test für Hilfetexte (Was / Auswirkung / Beispiel).
+// Coverage test for help texts (what / effect / example).
 //
-// Für jede Seite in HELP_COMPLETE_VIEWS gilt:
-//   1. Im gemounteten DOM hat JEDES Formularfeld (input, select, textarea)
-//      und JEDER Button eine Hilfe-Zuordnung: aria-describedby zeigt auf ein
-//      role="tooltip"-Element der Tooltip-Ebene (ID "help-…"). v-help setzt
-//      das, solange die Hilfe eingeschaltet ist (Default). Bei Feldgruppen
-//      (z. B. Tag-Checkboxen) darf das aria-describedby an der umgebenden
-//      Gruppe (role="group") sitzen.
-//      Ausgenommen sind Elemente mit data-help-exempt="<Begründung>" (z. B.
-//      das ✕ einer Meldung).
-//   2. Jeder im Quelltext verwendete Hilfe-Schlüssel (v-help="'…'") existiert
-//      in de UND en mit what, effect und example.
-//   3. Es gibt keine ⓘ-Hilfesymbole mehr (Rückmeldung zum ersten Pilot: zu
-//      viele Symbole auf der Seite).
-// Zusätzlich muss der ganze help-Katalog in beiden Sprachen vollständig sein.
+// For every page in HELP_COMPLETE_VIEWS:
+//   1. In the mounted DOM EVERY form field (input, select, textarea)
+//      and EVERY button has a help assignment: aria-describedby points to a
+//      role="tooltip" element of the tooltip layer (ID "help-…"). v-help sets
+//      that while help is switched on (default). For field groups
+//      (e.g. tag checkboxes) the aria-describedby may sit on the surrounding
+//      group (role="group").
+//      Exempt are elements with data-help-exempt="<reason>" (e.g.
+//      the ✕ of a message).
+//   2. Every help key used in the source (v-help="'…'") exists
+//      in de AND en with what, effect and example.
+//   3. There are no ⓘ help icons any more (feedback on the first pilot: too
+//      many icons on the page).
+// In addition the whole help catalog must be complete in both languages.
 //
-// Geprüft wird der gemountete DOM statt des Quelltexts, weil nur dort
-// sichtbar ist, was wirklich als Feld/Button ankommt (v-if-Zustände,
-// Unterkomponenten wie TagCheckboxList). Deshalb fährt jeder Eintrag seine
-// Seite durch alle Zustände (Liste, Neu, Bearbeiten …).
+// The mounted DOM is checked instead of the source, because only there
+// it is visible what really arrives as a field/button (v-if states,
+// subcomponents like TagCheckboxList). That is why every entry drives its
+// page through all states (list, new, edit …).
 //
-// Seite hinzufügen (Stufe 2):
-//   1. In der View `import { vHelp } from '../../directives/vHelp'` und an
-//      jedes Feld bzw. jeden Button v-help="'bereich.feld'" schreiben (Muster:
-//      AdminComponents.vue). Bei sit-onyx-Komponenten direkt an OnyxInput,
-//      OnyxSelect, OnyxButton …; die Direktive beschreibt das Feld darin.
-//      Feldgruppen: v-help an das Element mit role="group". Funktionen, die
-//      sich in jeder Zeile wiederholen, teilen sich einen Schlüssel.
-//   2. Texte unter help.<bereich>.<feld>.{what,effect,example} in de.json und
-//      en.json eintragen, aus dem tatsächlichen Verhalten (Handler, docs/).
-//   3. Hier einen Eintrag in HELP_COMPLETE_VIEWS ergänzen: file (Pfad ab
-//      src/) und states, eine async Funktion, die die View mountet, durch
-//      ihre Zustände klickt und für jeden Zustand `await check(label)` ruft.
+// Adding a page (stage 2):
+//   1. In the view, `import { vHelp } from '../../directives/vHelp'` and write
+//      v-help="'area.field'" on every field or button (pattern:
+//      AdminComponents.vue). For sit-onyx components directly on OnyxInput,
+//      OnyxSelect, OnyxButton …; the directive describes the field inside.
+//      Field groups: v-help on the element with role="group". Functions that
+//      repeat in every row share one key.
+//   2. Enter texts under help.<area>.<field>.{what,effect,example} in de.json and
+//      en.json, from the actual behaviour (handlers, docs/).
+//   3. Add an entry to HELP_COMPLETE_VIEWS here: file (path from
+//      src/) and states, an async function that mounts the view, clicks through
+//      its states and calls `await check(label)` for each state.
 
 const wrappers = []
 
@@ -288,7 +288,7 @@ function describedByHelp(el) {
   return ids.some(id => document.getElementById(id)?.getAttribute('role') === 'tooltip')
 }
 
-// Liefert alle Felder/Buttons im Zustand, denen ein Hilfetext fehlt.
+// Returns all fields/buttons in the state that lack a help text.
 export function missingHelp(root) {
   const missing = []
   for (const el of root.querySelectorAll('input:not([type="hidden"]), select, textarea')) {
@@ -306,7 +306,7 @@ export function helpKeysIn(src) {
   return [...new Set([...src.matchAll(/v-help="'([\w.-]+)'"/g)].map(m => m[1]))]
 }
 
-// ⓘ-Hilfesymbole des ersten Pilots (HelpTip): Trigger-Button bzw. „Hilfe: …“.
+// ⓘ help icons of the first pilot (HelpTip): trigger button or "Hilfe: …".
 export function helpIcons(root) {
   return [...root.querySelectorAll('.help-tip, .help-tip__trigger, [aria-label^="Hilfe:"], [aria-label^="Help:"]')]
 }
@@ -370,7 +370,7 @@ describe('Hilfetexte vollständig', () => {
   })
 
   it('der help-Katalog ist in de und en vollständig', () => {
-    // parts sind die Überschriften des Tooltips selbst, kein Bereich.
+    // parts are the headings of the tooltip itself, not an area.
     const fieldKeys = (help) => Object.entries(help)
       .filter(([area]) => area !== 'parts')
       .flatMap(([area, fields]) => Object.keys(fields).map(f => `${area}.${f}`))

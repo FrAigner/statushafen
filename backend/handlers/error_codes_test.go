@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Rest: Die Handler liefern bei 4xx einen Fehlercode
-// (`code`, übersetzt unter api.errors.<code>) statt roher err.Error()-Texte.
-// Mandantentrennung (404), Rechte (403) und Fehleingaben (400) je Handler.
+// Rest: on 4xx the handlers return an error code
+// (`code`, translated under api.errors.<code>) instead of raw err.Error() texts.
+// Tenant isolation (404), permissions (403) and invalid input (400) per handler.
 
 func newCodeEnvRouter(t *testing.T) (*handlers.Handler, http.Handler, string, string, models.StatusPage, models.StatusPage) {
 	t.Helper()
@@ -53,7 +53,7 @@ func newCodeEnvRouter(t *testing.T) (*handlers.Handler, http.Handler, string, st
 	users.POST("", h.CreateUserHandler)
 	users.PUT("/:id", h.UpdateUserHandler)
 
-	// Lesende und weitere Routen für die Serverfehler-Tests (error_codes_server_test.go).
+	// Reading and further routes for the server error tests (error_codes_server_test.go).
 	r.GET("/api/noparam/components", h.GetComponentsHandler)
 	pub.GET("/pages/:page_id/components", middleware.OptionalAuthMiddleware(), h.GetComponentsHandler)
 	pub.GET("/pages/:page_id/incidents", middleware.OptionalAuthMiddleware(), h.GetIncidentsHandler)
@@ -115,7 +115,7 @@ func runCodeCases(t *testing.T, r http.Handler, cases []codeCase) {
 		t.Run(tc.name, func(t *testing.T) {
 			status, out := doJSON(t, r, tc.method, tc.url, tc.token, tc.body)
 			assert.Equal(t, tc.status, status, "%v", out)
-			if tc.code != "" { // leer: Antwort der Rechte-Middleware, hat keinen Code
+			if tc.code != "" { // empty: response of the permissions middleware, has no code
 				assert.Equal(t, tc.code, out["code"], "%v", out)
 			}
 			if msg, ok := out["error"].(string); ok {

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// notifyLimitRouter hängt den Begrenzer an eine Route mit :page_id; der
-// Nutzer kommt aus dem Header X-Test-User (wie ihn die Anmeldung setzen würde).
+// notifyLimitRouter attaches the limiter to a route with :page_id; the
+// user comes from the header X-Test-User (as authentication would set it).
 func notifyLimitRouter(perPage, perUser int) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -28,7 +28,7 @@ func notifyLimitRouter(perPage, perUser int) *gin.Engine {
 	return r
 }
 
-// notifyLimitRouterWith hängt einen fertigen Begrenzer an die Route.
+// notifyLimitRouterWith attaches a finished limiter to the route.
 func notifyLimitRouterWith(limit gin.HandlerFunc) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -62,7 +62,7 @@ func fakeNotifyClock(t *testing.T) *time.Time {
 func TestNotificationRateLimiter_LimitJeSeite(t *testing.T) {
 	now := fakeNotifyClock(t)
 	r := notifyLimitRouter(3, 100)
-	// Verschiedene Nutzer, dieselbe Seite: Die Grenze gilt je Seite.
+	// Different users, same page: the limit applies per page.
 	for i := 1; i <= 3; i++ {
 		require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/7/x", i).Code, "Aufruf %d", i)
 	}
@@ -71,10 +71,10 @@ func TestNotificationRateLimiter_LimitJeSeite(t *testing.T) {
 	assert.JSONEq(t, `{"error":"Zu viele Anfragen. Bitte später erneut versuchen.","code":"rate_limited"}`, w.Body.String())
 	assert.Equal(t, "3600", w.Header().Get("Retry-After"))
 
-	// Gegenprobe: eine andere Seite ist nicht betroffen.
+	// Control check: a different page is not affected.
 	assert.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/8/x", 4).Code)
 
-	// Nach Ablauf des Fensters geht es wieder; Retry-After zählt herunter.
+	// After the window expires it works again; Retry-After counts down.
 	*now = now.Add(40 * time.Minute)
 	w = callNotifyLimit(r, "/pages/7/x", 4)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
@@ -89,7 +89,7 @@ func TestNotificationRateLimiter_LimitJeNutzerSeitenuebergreifend(t *testing.T) 
 	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 5).Code)
 	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/2/x", 5).Code)
 	assert.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/3/x", 5).Code, "dritter Aufruf desselben Nutzers auf anderer Seite")
-	// Gegenprobe: ein anderer Nutzer ist unabhängig.
+	// Control check: a different user is independent.
 	assert.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/3/x", 6).Code)
 }
 
@@ -100,7 +100,7 @@ func TestNotificationRateLimiter_AbgewieseneAufrufeZaehlenNichtWeiter(t *testing
 	for i := 0; i < 50; i++ {
 		require.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/1/x", 1).Code)
 	}
-	// Das Fenster endet eine Stunde nach dem einen gezählten Aufruf, nicht nach den abgewiesenen.
+	// The window ends one hour after the one counted call, not after the rejected ones.
 	*now = now.Add(time.Hour + time.Second)
 	assert.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 1).Code)
 }
@@ -108,10 +108,10 @@ func TestNotificationRateLimiter_AbgewieseneAufrufeZaehlenNichtWeiter(t *testing
 func TestNotificationRateLimiter_RouteOhneSeiteUndOhneNutzer(t *testing.T) {
 	fakeNotifyClock(t)
 	r := notifyLimitRouter(1, 1)
-	// ohne :page_id zählt nur der Nutzer
+	// without :page_id only the user counts
 	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/ohne-seite", 9).Code)
 	assert.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/ohne-seite", 9).Code)
-	// ohne Nutzer (Header ungültig) zählt nur die Seite
+	// without a user (invalid header) only the page counts
 	req := httptest.NewRequest(http.MethodPost, "/pages/55/x", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -135,7 +135,7 @@ func TestNotificationRateLimiter_RaeumtAbgelaufeneEintraegeAuf(t *testing.T) {
 	assert.LessOrEqual(t, len(rl.hits), 2, "abgelaufene Schlüssel werden entfernt")
 }
 
-// Nur ein Teil der Aufrufe ist aus dem Fenster gefallen: Die übrigen zählen weiter.
+// Only some of the calls have fallen out of the window: the rest still count.
 func TestNotificationRateLimiter_TeilweiseAbgelaufenesFenster(t *testing.T) {
 	now := fakeNotifyClock(t)
 	r := notifyLimitRouter(2, 100)
@@ -144,14 +144,14 @@ func TestNotificationRateLimiter_TeilweiseAbgelaufenesFenster(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 1).Code) // t0+40
 	require.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/1/x", 1).Code)
 
-	*now = now.Add(30 * time.Minute) // t0+70: der erste Aufruf ist raus, der zweite zählt noch
+	*now = now.Add(30 * time.Minute) // t0+70: the first call is out, the second still counts
 	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 1).Code)
 	w := callNotifyLimit(r, "/pages/1/x", 1)
 	assert.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.Equal(t, "1800", w.Header().Get("Retry-After"), "der Aufruf bei t0+40 verlässt das Fenster bei t0+100, jetzt ist t0+70")
 }
 
-// Die fest verdrahteten Grenzen: Anlegen 30 je Seite und Stunde, Ändern 120.
+// The hard-wired limits: create 30 per page and hour, change 120.
 func TestNotificationLimits_FesteGrenzen(t *testing.T) {
 	fakeNotifyClock(t)
 	gin.SetMode(gin.TestMode)
@@ -179,13 +179,13 @@ func TestNotificationLimits_FesteGrenzen(t *testing.T) {
 	assert.Equal(t, 120, notifyChangePerPagePerHour)
 }
 
-// Die Grenzen je Nutzer gelten seitenübergreifend: Wer auf mehreren Seiten
-// Schreibrecht hat, kann die Grenze je Seite nicht durch Verteilen umgehen.
+// The per-user limits apply across pages: someone with
+// write permission on several pages cannot get around the per-page limit by spreading calls.
 func TestNotificationLimits_FesteGrenzenJeNutzer(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for name, tc := range map[string]struct {
 		limit gin.HandlerFunc
-		max   int // Aufrufe je Nutzer und Stunde
+		max   int // calls per user and hour
 	}{
 		"Anlegen": {NotificationCreateLimit(), 60},
 		"Ändern":  {NotificationChangeLimit(), 120},
@@ -193,8 +193,8 @@ func TestNotificationLimits_FesteGrenzenJeNutzer(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			now := fakeNotifyClock(t)
 			r := notifyLimitRouterWith(tc.limit)
-			// Seiten 1..n nehmen je höchstens 30 Aufrufe (Anlegen) bzw. 60 (Ändern) auf,
-			// damit nur die Grenze je Nutzer greift.
+			// Pages 1..n each take at most 30 calls (create) or 60 (change),
+			// so that only the per-user limit applies.
 			perPage := 20
 			for i := 0; i < tc.max; i++ {
 				path := "/pages/" + strconv.Itoa(i/perPage+1) + "/x"
@@ -203,7 +203,7 @@ func TestNotificationLimits_FesteGrenzenJeNutzer(t *testing.T) {
 			assert.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/99/x", 7).Code, "Aufruf über der Grenze je Nutzer")
 			assert.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/99/x", 8).Code, "ein anderer Nutzer ist frei")
 
-			// Das Fenster ist eine Stunde: davor bleibt die Sperre, danach ist sie weg.
+			// The window is one hour: before that the block remains, afterwards it is gone.
 			*now = now.Add(time.Hour - time.Minute)
 			assert.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/99/x", 7).Code)
 			*now = now.Add(2 * time.Minute)
@@ -212,7 +212,7 @@ func TestNotificationLimits_FesteGrenzenJeNutzer(t *testing.T) {
 	}
 }
 
-// Je Seite gilt ebenfalls ein Fenster von einer Stunde (Anlegen wie Ändern).
+// A window of one hour also applies per page (create as well as change).
 func TestNotificationLimits_FensterJeSeiteEineStunde(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for name, tc := range map[string]struct {
@@ -225,7 +225,7 @@ func TestNotificationLimits_FensterJeSeiteEineStunde(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			now := fakeNotifyClock(t)
 			r := notifyLimitRouterWith(tc.limit)
-			for i := 0; i < tc.max; i++ { // jeder Aufruf von einem anderen Nutzer: nur die Seite zählt
+			for i := 0; i < tc.max; i++ { // each call from a different user: only the page counts
 				require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/5/x", 1000+i).Code)
 			}
 			require.Equal(t, http.StatusTooManyRequests, callNotifyLimit(r, "/pages/5/x", 5000).Code)
@@ -237,7 +237,7 @@ func TestNotificationLimits_FensterJeSeiteEineStunde(t *testing.T) {
 	}
 }
 
-// Gedrosselte Anfragen erreichen den Handler nicht: Er löst die Mails aus.
+// Throttled requests do not reach the handler: it triggers the mails.
 func TestNotificationRateLimiter_GedrosselterAufrufErreichtHandlerNicht(t *testing.T) {
 	fakeNotifyClock(t)
 	gin.SetMode(gin.TestMode)
@@ -254,25 +254,25 @@ func TestNotificationRateLimiter_GedrosselterAufrufErreichtHandlerNicht(t *testi
 	assert.Equal(t, 1, calls, "der Handler läuft nur für den zugelassenen Aufruf")
 }
 
-// Sind Seite und Nutzer voll, gilt die längere Wartezeit.
+// If page and user are both full, the longer wait time applies.
 func TestNotificationRateLimiter_LaengsteWartezeitGewinnt(t *testing.T) {
 	now := fakeNotifyClock(t)
 	r := notifyLimitRouter(1, 1)
-	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 1).Code) // t0: Seite 1 und Nutzer 1
+	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/1/x", 1).Code) // t0: page 1 and user 1
 	*now = now.Add(30 * time.Minute)
-	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/2/x", 2).Code) // t0+30: Seite 2 und Nutzer 2
+	require.Equal(t, http.StatusNoContent, callNotifyLimit(r, "/pages/2/x", 2).Code) // t0+30: page 2 and user 2
 	*now = now.Add(10 * time.Minute)
-	// t0+40: Nutzer 1 wird bei t0+60 frei (20 min), Seite 2 bei t0+90 (50 min).
+	// t0+40: user 1 frees up at t0+60 (20 min), page 2 at t0+90 (50 min).
 	w := callNotifyLimit(r, "/pages/2/x", 1)
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.Equal(t, "3000", w.Header().Get("Retry-After"))
-	// Umgekehrt: Seite 1 wird bei t0+60 frei, Nutzer 2 bei t0+90.
+	// Conversely: page 1 frees up at t0+60, user 2 at t0+90.
 	w = callNotifyLimit(r, "/pages/1/x", 2)
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.Equal(t, "3000", w.Header().Get("Retry-After"))
 }
 
-// Die Domain-Prüfung ist auf zehn Aufrufe je Minute, Seite und Nutzer begrenzt.
+// Domain verification is limited to ten calls per minute, page and user.
 func TestCustomDomainVerifyLimit_TenPerMinutePerPageAndUser(t *testing.T) {
 	clock := fakeNotifyClock(t)
 	r := notifyLimitRouterWith(CustomDomainVerifyLimit())

@@ -1,22 +1,30 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Seitenkopf mit Brotkrumen, Titel (h1, per `level` h2),
-  Untertitel und Aktionen (Slot "actions"). Ersetzt die .page-header-Varianten
-  pro View. Der Seitentitel ist die einzige h1 der Seite (umsetzung.md,
-  Barrierefreiheit); Views, die heute h2 nutzen, wechseln in Stufe 4.
-  Brotkrumen: Einträge mit `to` sind Links, der letzte Eintrag (ohne `to`) ist
-  die aktuelle Seite (aria-current="page").
+  Redesign stage 3: page header with breadcrumbs, title (h1, h2 via `level`),
+  subtitle and actions (slot "actions"). Replaces the per-view .page-header
+  variants. The page title is the only h1 of the page (umsetzung.md,
+  accessibility); views that use h2 today switch over in stage 4.
+  Breadcrumbs: entries with `to` are links, the last entry (without `to`) is
+  the current page (aria-current="page").
 */
+import type { PropType } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
+interface Breadcrumb {
+  label: string
+  to?: RouteLocationRaw
+}
+
+// Runtime declaration (not type-based) to keep the `level` validator.
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
 defineProps({
   title: { type: String, required: true },
-  subtitle: { type: String, default: null },
-  breadcrumbs: { type: Array, default: () => [] }, // [{ label, to? }]
-  // Überschriftenebene: 1 (Standard, öffentliche Seiten) oder 2 (Admin-Views, dort
-  // trägt die Topbar die h1, Marke).
-  level: { type: Number, default: 1, validator: v => v === 1 || v === 2 },
+  subtitle: { type: String as PropType<string | null>, default: null },
+  breadcrumbs: { type: Array as PropType<Breadcrumb[]>, default: () => [] },
+  // Heading level: 1 (default, public pages) or 2 (admin views, where the
+  // topbar carries the h1, the brand).
+  level: { type: Number as PropType<1 | 2>, default: 1, validator: (v: number) => v === 1 || v === 2 },
 })
 // Stryker restore all
 

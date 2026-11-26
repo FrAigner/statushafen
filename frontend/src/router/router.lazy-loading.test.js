@@ -1,20 +1,20 @@
 import { describe, it, expect, vi } from 'vitest'
 
-// Admin- und Public-Views sollen per dynamischem import() statt
-// statischem Top-Level-Import geladen werden, damit Vite pro View einen
-// eigenen Chunk erzeugt statt alles in den initialen Bundle zu packen. Ein
-// per component: SomeView.vue statisch importiertes SFC ist ein Objekt,
-// niemals eine parameterlose Arrow-Function, die beim Aufruf ein Promise
-// liefert - genau das unterscheidet einen () => import(...)-Lazy-Loader
-// zuverlässig vom bisherigen statischen Import.
+// Admin and public views should be loaded via dynamic import() instead of a
+// static top-level import, so that Vite creates a separate chunk per view
+// instead of packing everything into the initial bundle. An SFC imported
+// statically via component: SomeView.vue is an object,
+// never a parameterless arrow function that returns a promise when called
+// - exactly that reliably distinguishes a () => import(...) lazy loader
+// from the former static import.
 //
-// Eigene Datei statt ein Test in router.test.js: vue-router ersetzt
-// route.components.default nach der ersten erfolgreichen Auflösung eines
-// Async-Components durch die aufgelöste Komponente selbst (Caching). In
-// router.test.js navigieren vorherige Tests bereits zu vielen dieser Routes,
-// wodurch component() dort schon durch die aufgelöste Komponente ersetzt
-// wäre. Diese Datei importiert den Router frisch und prüft die
-// Komponenten-Referenzen, bevor irgendeine Navigation stattfindet.
+// A separate file instead of a test in router.test.js: vue-router replaces
+// route.components.default after the first successful resolution of an
+// async component with the resolved component itself (caching). In
+// router.test.js earlier tests already navigate to many of these routes,
+// so component() would already be replaced there by the resolved component.
+// This file imports the router fresh and checks the
+// component references before any navigation takes place.
 vi.mock('../composables/useAuth', () => ({
   useAuth: vi.fn(() => ({
     isLoggedIn: { value: false },
@@ -69,9 +69,9 @@ describe('Lazy-Loading der Views', () => {
 
     const result = component()
     expect(result).toBeInstanceOf(Promise)
-    // Den Import abwarten: Sonst lädt Vite die View erst nach dem Testende
-    // nach, und ein Einzellauf dieser Datei endet mit
-    // EnvironmentTeardownError (Exit 1, gesehen 2026-10-29).
+    // Wait for the import: otherwise Vite loads the view only after the test has ended,
+    // and a single run of this file ends with
+    // EnvironmentTeardownError (exit 1, seen 2026-10-29).
     await expect(result).resolves.toBeTruthy()
   })
 })

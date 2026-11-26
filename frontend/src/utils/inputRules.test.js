@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { MIN_PASSWORD_LENGTH, MAX_PASSWORD_BYTES, isPasswordTooLong, isPasswordTooShort, isValidLanguageCode, serverInputErrorText } from './inputRules'
 
-// gleiche Regeln wie handlers/input_validation.go.
+// Same rules as handlers/input_validation.go.
 describe('inputRules', () => {
   it('Mindestlänge 8 zählt Zeichen, nicht Bytes', () => {
     expect(MIN_PASSWORD_LENGTH).toBe(8)

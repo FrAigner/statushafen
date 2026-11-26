@@ -5,8 +5,8 @@ import { incidentBadge, maintenanceBadge, noticeBadge, actionBadge } from '../ut
 import de from './locales/de.json'
 import en from './locales/en.json'
 
-// Rohwerte, englische Reste und Sie/du-Mischung in der deutschen
-// Oberfläche. Jeder Test bildet einen der gefundenen Fälle ab.
+// Raw values, English leftovers and a mix of Sie/du in the German
+// UI. Every test covers one of the cases found.
 
 function values(obj) {
   return Object.values(obj).flatMap(v => (v && typeof v === 'object' ? values(v) : [String(v)]))
@@ -14,8 +14,8 @@ function values(obj) {
 
 describe('Anrede in de.json', () => {
   it('verwendet nirgends die förmliche Sie-Anrede (Projekt duzt)', () => {
-    // Imperativ-/Modalformen mit "Sie" bzw. Possessiv "Ihr..." als Anrede;
-    // "Sie gelten" (sie = Plural) und "Ihre Bausteine" (Quelle) bleiben erlaubt.
+    // Imperative/modal forms with "Sie" or possessive "Ihr..." as an address;
+    // "Sie gelten" (sie = plural) and "Ihre Bausteine" (source) stay allowed.
     const formal = /\b(Fügen Sie|Geben Sie|Bitte (prüfen|versuchen|wählen|geben) Sie|Sie (können|müssen|sollten|haben)|bei Ihr\w*|Ihr(e|en|em|er)? (DNS|Konto|Passwort|E-Mail))\b/
     const hits = values(de).filter(v => formal.test(v))
     expect(hits).toEqual([])
@@ -55,8 +55,8 @@ describe('Audit-Aktionen', () => {
   })
 })
 
-// defaultRoleHint behauptete, die Standard-Rolle gelte für jeden
-// eingeloggten Account; tatsächlich greift sie nur mit passender E-Mail-Domain.
+// defaultRoleHint claimed the default role applied to every
+// signed-in account; in fact it only applies with a matching email domain.
 describe('statusPages.defaultRoleHint', () => {
   it('nennt die E-Mail-Domain-Bedingung und behauptet nicht "jeder Account"', () => {
     for (const loc of [de, en]) {
@@ -67,10 +67,10 @@ describe('statusPages.defaultRoleHint', () => {
   })
 })
 
-// Rest: Die Audit-Aktionen entstehen im Backend; jede dort
-// geschriebene Aktion braucht eine Beschriftung in de und en, sonst zeigt die
-// Liste den Rohschlüssel ("language.deleted"). Der Test liest die Aktions-Literale
-// aus handlers/*.go, damit eine neue Aktion ohne Übersetzung rot wird.
+// Remainder: the audit actions originate in the backend; every action written
+// there needs a label in de and en, otherwise the list shows
+// the raw key ("language.deleted"). The test reads the action literals
+// from handlers/*.go, so that a new action without a translation turns red.
 describe('Backend-Audit-Aktionen sind übersetzt', () => {
   const dir = resolve(__dirname, '../../../backend/handlers')
   const source = readdirSync(dir)
@@ -115,7 +115,7 @@ describe('Status-, Stufen- und Aktionswerte werden nie roh angezeigt', () => {
         const label = fn(v, t(messages)).label
         expect(label, `${fn.name}(${v})`).not.toBe(v)
         expect(label, `${fn.name}(${v})`).not.toMatch(/^[a-z]+\.[A-Za-z]+$/)
-        // Englisch darf dem Rohwert bis auf die Großschreibung gleichen (Investigating); "Info" ist auch deutsch.
+        // English may equal the raw value except for capitalization (Investigating); "Info" is German too.
         if (name === 'de' && v !== 'info') expect(label.toLowerCase(), `${fn.name}(${v})`).not.toBe(v.toLowerCase())
       }
     }

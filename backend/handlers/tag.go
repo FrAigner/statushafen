@@ -10,19 +10,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const whereTagIDEquals = "tag_id = ?"
 
-// tagNameTakenMessage ist die 409-Meldung, wenn ein aktiver Tag im selben Scope
-// den Namen schon trägt (zusätzlich mit Fehlercode tag_name_taken).
+// tagNameTakenMessage is the 409 message when an active tag in the same scope
+// already carries the name (additionally with error code tag_name_taken).
 const tagNameTakenMessage = "Ein Tag mit diesem Namen existiert in diesem Scope bereits"
 
-// GetTagsHandler liefert den Tag-Katalog (Schritt 3/4).
-// Ohne status_page_id werden alle Tags zurückgegeben (global + alle
-// Statusseiten) - für die globale Verwaltungsseite, die beide Scopes in
-// einer Übersicht zeigt. Mit status_page_id werden nur die für diese Seite
-// relevanten Tags geliefert (global + genau diese Seite), analog zum
-// page_id-Scoping in GetComponentsHandler.
+// GetTagsHandler returns the tag catalog (step 3/4).
+// Without status_page_id all tags are returned (global + all
+// status pages) - for the global management page, which shows both scopes in
+// one overview. With status_page_id only the tags relevant for this page
+// are returned (global + exactly this page), analogous to the
+// page_id scoping in GetComponentsHandler.
 func (h *Handler) GetTagsHandler(c *gin.Context) {
 	tags := []models.Tag{}
 	query := h.DB.Order("status_page_id asc, name asc")
@@ -43,13 +43,13 @@ func (h *Handler) GetTagsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
-// GetPageTagsHandler liefert die für eine Statusseite wählbaren Tags
-// globale Tags plus die Tags genau dieser Seite, nie Tags
-// anderer Seiten (Mandantentrennung). Anders als GetTagsHandler braucht er
-// nur ein Seitenrecht (Route: components:read), damit Seiten-Rollen das
-// Tag-Feld in Komponenten-/Vorfallformularen nutzen können. Jeder Tag trägt
-// ohnehin status_page_id; das Frontend nutzt es, um globale Tags für
-// Seiten-Rollen zu sperren (die Vergabe prüft das Backend zusätzlich).
+// GetPageTagsHandler returns the tags selectable for a status page:
+// global tags plus the tags of exactly this page, never tags
+// of other pages (tenant isolation). Unlike GetTagsHandler it only needs
+// a page permission (route: components:read), so that page roles can use the
+// tag field in component/incident forms. Every tag carries
+// status_page_id anyway; the frontend uses it to lock global tags for
+// page roles (the backend additionally checks assignment).
 func (h *Handler) GetPageTagsHandler(c *gin.Context) {
 	pageID, ok := parseTenantID(c)
 	if !ok {
@@ -68,8 +68,8 @@ func (h *Handler) GetPageTagsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
-// CreateTagHandler legt einen neuen Tag im Katalog an - global (StatusPageID
-// == nil) oder an eine Statusseite gebunden, siehe models.Tag.
+// CreateTagHandler creates a new tag in the catalog - global (StatusPageID
+// == nil) or bound to a status page, see models.Tag.
 func (h *Handler) CreateTagHandler(c *gin.Context) {
 	type CreateTagReq struct {
 		Name         string `json:"name" binding:"required"`
@@ -93,11 +93,11 @@ func (h *Handler) CreateTagHandler(c *gin.Context) {
 		}
 	}
 
-	// Fallunabhängiger Duplikat-Check im selben Scope, konsistent mit den
-	// partiellen Unique-Indizes idx_tags_global_name_active / idx_tags_scoped_name_active aus
-	// CreateSoftDeleteUniqueIndexes() in backend/database/db.go. Der
-	// Pre-Check liefert eine saubere 409-Antwort statt eines rohen DB-Fehlers;
-	// die Indizes bleiben zusätzlich als DB-seitiges Sicherheitsnetz gegen Races.
+	// Case-insensitive duplicate check in the same scope, consistent with the
+	// partial unique indexes idx_tags_global_name_active / idx_tags_scoped_name_active from
+	// CreateSoftDeleteUniqueIndexes() in backend/database/db.go. The
+	// pre-check yields a clean 409 response instead of a raw DB error;
+	// the indexes additionally remain as a DB-side safety net against races.
 	dupQuery := h.DB.Model(&models.Tag{}).Where("LOWER(name) = LOWER(?)", name)
 	if req.StatusPageID != nil {
 		dupQuery = dupQuery.Where("status_page_id = ?", *req.StatusPageID)
@@ -127,12 +127,12 @@ func (h *Handler) CreateTagHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, tag)
 }
 
-// UpdateTagHandler benennt einen bestehenden Tag um (nennt explizit
-// "Anlegen, Umbenennen und Löschen"). Der Scope (global vs. Statusseite) ist
-// bewusst nicht änderbar - ein nachträgliches Verschieben zwischen den Scopes
-// ist nicht Teil der Anforderung und würde bereits zugewiesene
-// ComponentTag/IncidentTag/UserTag-Zeilen in einen inkonsistenten
-// Zustand bringen.
+// UpdateTagHandler renames an existing tag (the requirement explicitly names
+// "create, rename and delete"). The scope (global vs. status page) is
+// deliberately not changeable - a later move between the scopes
+// is not part of the requirement and would put already assigned
+// ComponentTag/IncidentTag/UserTag rows into an inconsistent
+// state.
 func (h *Handler) UpdateTagHandler(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -188,10 +188,10 @@ func (h *Handler) UpdateTagHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tag)
 }
 
-// DeleteTagHandler entfernt einen Tag aus dem Katalog. Die Zuweisung von Tags
-// zu Components/Incidents/Usern (ComponentTag/IncidentTag/UserTag) ist nicht
-// Teil dieser Änderung - beim Löschen müssen die entsprechenden
-// Join-Zeilen dennoch aufgeräumt werden.
+// DeleteTagHandler removes a tag from the catalog. The assignment of tags
+// to components/incidents/users (ComponentTag/IncidentTag/UserTag) is not
+// part of this change - when deleting, the corresponding
+// join rows must nevertheless be cleaned up.
 func (h *Handler) DeleteTagHandler(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -204,11 +204,11 @@ func (h *Handler) DeleteTagHandler(c *gin.Context) {
 		return
 	}
 
-	// Analog zu DeleteIncidentHandler: Tag nutzt wie alle Modelle hier
-	// Soft-Delete (gorm.Model -> UPDATE statt DELETE), das DB-seitige
-	// OnDelete:CASCADE auf ComponentTag/IncidentTag/UserTag feuert
-	// dabei nie - Join-Zeilen daher explizit aufräumen statt sich auf die
-	// FK-Constraint zu verlassen.
+	// Analogous to DeleteIncidentHandler: Tag uses soft delete like all models here
+	// (gorm.Model -> UPDATE instead of DELETE), the DB-side
+	// OnDelete:CASCADE on ComponentTag/IncidentTag/UserTag never fires
+	// in that case - so clean up join rows explicitly instead of relying on the
+	// FK constraint.
 	if err := h.DB.Where(whereTagIDEquals, tag.ID).Delete(&models.ComponentTag{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clean up component tag links", "code": "server_error"})
 		return

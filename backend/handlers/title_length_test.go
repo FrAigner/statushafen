@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Titel und Seitennamen sind auf 200 Zeichen begrenzt (Code title_too_long
-// beziehungsweise page_name_too_long). Ohne Grenze wurden Titel bis zum
-// Body-Limit gespeichert und sprengten die Admin-Tabellen. Die Grenze zählt
-// Zeichen, nicht Bytes, und gilt an allen Stellen, an denen ein Titel
-// gespeichert wird.
+// Titles and page names are limited to 200 characters (code title_too_long
+// or page_name_too_long respectively). Without a limit, titles up to the
+// body limit were stored and broke the admin tables. The limit counts
+// characters, not bytes, and applies at every place where a title
+// is stored.
 const (
 	titleAtLimit   = 200
 	titleOverLimit = 201
@@ -102,7 +102,7 @@ func TestTitleLength_AllEntryPoints(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, status, "%v", out)
 			assert.Equal(t, "title_too_long", out["code"], "%v", out)
 			assert.Contains(t, out["error"], "200")
-			// An der Grenze (200 Zeichen, auch Mehrbyte-Zeichen) wird nicht wegen der Länge abgelehnt.
+			// At the limit (200 characters, also multibyte characters) it is not rejected because of length.
 			status, out = doJSON(t, r, e.method, e.url, adminTok, e.body(strings.Repeat("ä", titleAtLimit)))
 			assert.NotEqual(t, "title_too_long", out["code"], "%v", out)
 			assert.Less(t, status, 500)
@@ -110,7 +110,7 @@ func TestTitleLength_AllEntryPoints(t *testing.T) {
 	}
 }
 
-// Seitenname: gleiche Grenze wie die Titel, eigener Code.
+// Page name: same limit as the titles, own code.
 func TestPageNameLength_CreateAndUpdate(t *testing.T) {
 	h, r, adminTok, _, page, _ := newCodeEnvRouter(t)
 	engine := r.(*gin.Engine)

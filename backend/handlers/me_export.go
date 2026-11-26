@@ -10,9 +10,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// meExportPageRole beschreibt eine einzelne Rollenzuweisung des Users für
-// den Datenexport, mit aufgelöstem Namen von Statusseite und Rolle, damit
-// der Export ohne weitere Nachschlagewerke lesbar ist.
+// meExportPageRole describes a single role assignment of the user for
+// the data export, with the resolved names of status page and role, so that
+// the export is readable without further lookups.
 type meExportPageRole struct {
 	StatusPageID   uint   `json:"status_page_id"`
 	StatusPageName string `json:"status_page_name"`
@@ -20,11 +20,11 @@ type meExportPageRole struct {
 	RoleName       string `json:"role_name"`
 }
 
-// meExportResponse fasst alle personenbezogenen Daten eines eingeloggten
-// Users für den DSGVO-Datenexport zusammen. Enthält
-// bewusst NICHT PasswordHash (schon per json:"-" auf models.User
-// ausgeschlossen) und keine Daten anderer Nutzer - jede Teilmenge wird
-// explizit per userID gefiltert statt z.B. über Preloads voller Relationen.
+// meExportResponse summarizes all personal data of a logged-in
+// user for the GDPR data export. Deliberately does
+// NOT contain PasswordHash (already excluded via json:"-" on models.User)
+// and no data of other users - every subset is
+// explicitly filtered by userID instead of e.g. full relation preloads.
 type meExportResponse struct {
 	Profile       models.User          `json:"profile"`
 	PageRoles     []meExportPageRole   `json:"page_roles"`
@@ -33,8 +33,8 @@ type meExportResponse struct {
 	Invitations   []meExportInvitation `json:"invitations"`
 }
 
-// meExportInvitation: offene Einladung an die eigene Adresse,
-// ohne Token-Hash und ohne Angaben zum Einladenden.
+// meExportInvitation: open invitation to the user's own address,
+// without token hash and without details about the inviter.
 type meExportInvitation struct {
 	StatusPageID   uint      `json:"status_page_id"`
 	StatusPageName string    `json:"status_page_name"`
@@ -43,11 +43,11 @@ type meExportInvitation struct {
 	ExpiresAt      time.Time `json:"expires_at"`
 }
 
-// MeExportHandler liefert GET /api/me/export: alle personenbezogenen Daten
-// des eingeloggten Users als JSON-Download (DSGVO Art.
-// 15/20). Die Route hängt hinter authGroup (JWT-Middleware in main.go) -
-// ohne gültiges Token antwortet bereits die Middleware mit 401, bevor dieser
-// Handler überhaupt läuft.
+// MeExportHandler serves GET /api/me/export: all personal data
+// of the logged-in user as a JSON download (GDPR Art.
+// 15/20). The route sits behind authGroup (JWT middleware in main.go) -
+// without a valid token the middleware already answers with 401, before this
+// handler even runs.
 func (h *Handler) MeExportHandler(c *gin.Context) {
 	userID := getUserID(c)
 
@@ -57,8 +57,8 @@ func (h *Handler) MeExportHandler(c *gin.Context) {
 		return
 	}
 
-	// H4: Jeder Lesefehler bricht den Export mit 500 ab. Ein
-	// unvollständiger Export wäre für einen DSGVO-Auszug stillschweigend falsch.
+	// H4: every read error aborts the export with 500. An
+	// incomplete export would be silently wrong for a GDPR extract.
 	exportFailed := func() {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Export", "code": "server_error"})
 	}
@@ -77,9 +77,9 @@ func (h *Handler) MeExportHandler(c *gin.Context) {
 		}
 	}
 
-	// Selbst angelegte Abos: Ersteller-Abos mit fremder Adresse nur, solange der
-	// User noch zur Seite gehört (Global Admin oder Rolle), sonst nur die mit
-	// der eigenen Adresse.
+	// Self-created subscriptions: creator subscriptions with a foreign address only while the
+	// user still belongs to the page (Global Admin or role), otherwise only those with
+	// their own address.
 	subsQuery := h.DB.Where("created_by_user_id = ?", userID)
 	if !user.IsGlobalAdmin {
 		subsQuery = subsQuery.Where("lower(email) = ? OR status_page_id IN (?)", strings.ToLower(strings.TrimSpace(user.Email)),
@@ -114,10 +114,10 @@ func (h *Handler) MeExportHandler(c *gin.Context) {
 	})
 }
 
-// exportInvitations (F7/H4): offene Einladungen, die diesem Konto
-// gelten (InvitedUserID = Konto, nicht abgelaufen). Eine Einladung ohne Konto
-// (ID 0) oder an ein früheres Konto mit gleicher Adresse gehört nicht in den
-// Auszug. Die Seitennamen kommen mit EINER Abfrage statt einer je Einladung.
+// exportInvitations (F7/H4): open invitations that apply to this account
+// (InvitedUserID = account, not expired). An invitation without an account
+// (ID 0) or to a former account with the same address does not belong in the
+// extract. The page names come with ONE query instead of one per invitation.
 func (h *Handler) exportInvitations(user models.User) ([]meExportInvitation, error) {
 	var invs []models.PageInvitation
 	if err := h.DB.Where("invited_user_id = ? AND email = ? AND expires_at > ?", user.ID, strings.ToLower(strings.TrimSpace(user.Email)), time.Now()).

@@ -1,10 +1,10 @@
-// jsdom: renderRichText bereinigt mit DOMPurify.
+// jsdom: renderRichText sanitizes with DOMPurify.
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { renderRichText } from './richText'
 import { applyFormat, minimalReplace } from './richTextEditing'
 
-// Reine Werkzeugleisten-Funktionen.
+// Pure toolbar functions.
 describe('applyFormat', () => {
   it('fett und kursiv umschließen die Auswahl und behalten sie markiert', () => {
     expect(applyFormat('ab cd', 3, 5, 'bold')).toEqual({ value: 'ab **cd**', start: 5, end: 7 })
@@ -35,11 +35,11 @@ describe('applyFormat', () => {
 
   it('Liste schaltet zurück, wenn alle Zeilen schon das Präfix tragen', () => {
     expect(applyFormat('- a\n- b', 0, 7, 'list').value).toBe('a\nb')
-    // gemischt: es wird ergänzt, nicht entfernt
+    // mixed: it is added, not removed
     expect(applyFormat('- a\nb', 0, 5, 'list').value).toBe('- - a\n- b')
   })
 
-  // Review: Kursiv auf fettem Text nahm die Fettung weg, Fett auf `***ab***` ergab `*ab*`.
+  // Review: italic on bold text removed the bold, bold on `***ab***` produced `*ab*`.
   describe('fett und kursiv kombiniert', () => {
     const sel = (text, kind) => {
       const i = text.indexOf('ab')
@@ -100,7 +100,7 @@ describe('applyFormat', () => {
     })
   })
 
-  // Die erzeugte Syntax muss vom Renderer auch als Link bzw. Code verstanden werden.
+  // The generated syntax must also be understood by the renderer as a link or code.
   it('maskierter Link und Backtick-Zaun rendern als Link bzw. Code', () => {
     const link = applyFormat('a]b', 0, 3, 'link').value.replace('https://', 'https://x.de')
     expect(renderRichText(link)).toContain('>a]b</a>')

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// 90-Tage-Verfügbarkeit.
+// 90-day availability.
 
 type availResp struct {
 	From          string   `json:"from"`
@@ -84,7 +84,7 @@ func (e *availEnv) get(path string, headers ...string) (*httptest.ResponseRecord
 func (e *availEnv) page(slug string, private bool) models.StatusPage {
 	p := models.StatusPage{Name: slug, Slug: slug, IsPrivate: private}
 	require.NoError(e.t, e.db.Create(&p).Error)
-	// Seite existiert seit langem, sonst fehlen Daten im 90-Tage-Fenster.
+	// Page has existed for a long time, otherwise data is missing in the 90-day window.
 	require.NoError(e.t, e.db.Model(&p).Update("created_at", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)).Error)
 	return p
 }
@@ -157,8 +157,8 @@ func TestAvailability_VorfallUndKomponenten(t *testing.T) {
 	_, resp := e.get("/api/public/pages/acme/availability?include=components")
 	d := day(t, resp.Days, "2026-10-20")
 	assert.Equal(t, "degraded_performance", d.Status)
-	// Gesamtseite = Durchschnitt der Komponenten. Web: 6 h x 0,3 =
-	// 1,8 h (92,5 %), API 100 % -> 96,25 %, gewichtete Ausfallzeit gemittelt.
+	// Overall page = average of the components. Web: 6 h x 0.3 =
+	// 1.8 h (92.5 %), API 100 % -> 96.25 %, weighted downtime averaged.
 	assert.Equal(t, int64(3240), d.DowntimeSeconds)
 	require.NotNil(t, d.Availability)
 	assert.InDelta(t, 96.25, *d.Availability, 1e-9)
@@ -188,9 +188,9 @@ func TestAvailability_GruppeSeitenweiterVorfallUndGeloeschteKomponente(t *testin
 	gone := e.comp(p.ID, "Gelöscht", "operational", nil)
 	require.NoError(t, e.db.Delete(&gone).Error)
 
-	e.incident(p.ID, "resolved", *utc(10, 0), utc(10, 6), group.ID) // Gruppe -> Kind
+	e.incident(p.ID, "resolved", *utc(10, 0), utc(10, 6), group.ID) // group -> child
 	e.incident(p.ID, "resolved", *utc(11, 0), utc(11, 6))           // seitenweit
-	e.incident(p.ID, "resolved", *utc(12, 0), utc(12, 6), gone.ID)  // nur gelöschte Komponente
+	e.incident(p.ID, "resolved", *utc(12, 0), utc(12, 6), gone.ID)  // only deleted component
 
 	_, resp := e.get("/api/public/pages/grp/availability?include=components")
 	assert.Equal(t, "degraded_performance", day(t, resp.Days, "2026-10-10").Status)
@@ -216,13 +216,13 @@ func TestAvailability_GruppeSeitenweiterVorfallUndGeloeschteKomponente(t *testin
 func TestAvailability_LaufenderVorfallWartungUndAltdaten(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("lauf", false)
-	// laufend: seit 06:00 heute, Jetzt 12:00 -> 6 von 12 beobachteten Stunden
+	// ongoing: since 06:00 today, now 12:00 -> 6 of 12 observed hours
 	e.incident(p.ID, "investigating", *utc(29, 6), nil)
-	// Wartung gestern: kein Ausfall
+	// maintenance yesterday: no outage
 	m := models.Incident{StatusPageID: p.ID, Title: "W", Message: "m", Status: "resolved", IsMaintenance: true,
 		ScheduledStartAt: utc(28, 2), ScheduledEndAt: utc(28, 4)}
 	require.NoError(t, e.db.Create(&m).Error)
-	// behoben ohne ResolvedAt (Altdaten): Ende = letzte Änderung
+	// resolved without ResolvedAt (legacy data): end = last change
 	old := e.incident(p.ID, "resolved", *utc(25, 0), nil)
 	require.NoError(t, e.db.Model(&old).UpdateColumn("updated_at", *utc(25, 3)).Error)
 
@@ -244,13 +244,13 @@ func TestAvailability_MandantenTrennung(t *testing.T) {
 	b := e.page("mandant-b", false)
 	bComp := e.comp(b.ID, "Nur B", "operational", nil)
 	e.incident(b.ID, "resolved", *utc(20, 0), utc(20, 12), bComp.ID)
-	// Vorfall von A zeigt (fehlerhaft) auf Komponente von B: darf B nicht berühren und A nicht preisgeben
+	// Incident of A points (erroneously) to a component of B: must not touch B and must not reveal A
 	e.incident(a.ID, "resolved", *utc(21, 0), utc(21, 12), bComp.ID)
 
 	_, respA := e.get("/api/public/pages/mandant-a/availability?include=components")
 	assert.Equal(t, "operational", day(t, respA.Days, "2026-10-20").Status, "Vorfall von B in A")
 	assert.Empty(t, respA.Components)
-	// Vorfall von A mit nur fremder Komponente wird ignoriert
+	// Incident of A with only a foreign component is ignored
 	assert.Equal(t, "operational", day(t, respA.Days, "2026-10-21").Status)
 
 	_, respB := e.get("/api/public/pages/mandant-b/availability?include=components")
@@ -324,13 +324,13 @@ func TestAvailability_CacheBisTTLDanachNeu(t *testing.T) {
 	_, fresh := e.get("/api/public/pages/cache/availability")
 	assert.Equal(t, "degraded_performance", day(t, fresh.Days, "2026-10-28").Status, "nach Ablauf neu berechnet")
 
-	// Uhr springt zurück: Eintrag gilt nicht als frisch
+	// Clock jumps back: entry does not count as fresh
 	e.now = e.now.Add(-time.Hour)
 	_, back := e.get("/api/public/pages/cache/availability")
 	assert.Equal(t, "2026-10-29", back.To)
 }
 
-// 400 ms nach 00:00 UTC lieferte die Route 500 (NaN im JSON).
+// 400 ms after 00:00 UTC the route returned 500 (NaN in the JSON).
 func TestAvailability_KnappNachMitternachtAntwortet200(t *testing.T) {
 	e := newAvailEnv(t)
 	e.page("mitternacht", false)
@@ -358,9 +358,9 @@ func TestAvailability_KomponentenFehlerGibt500(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-// Frisch angelegte Seite (6 h Beobachtung) mit offenem Vorfall
-// lieferte uptime_percent 0 und damit "0,00 % verfügbar"; ohne belastbare
-// Datenbasis (< 24 h) muss die Gesamtzahl null sein.
+// Freshly created page (6 h of observation) with an open incident
+// returned uptime_percent 0 and thus "0.00 % available"; without a reliable
+// data basis (< 24 h) the overall figure must be null.
 func TestAvailability_KeineGesamtzahlBeiKurzerBeobachtung(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("frisch", false)

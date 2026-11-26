@@ -6,8 +6,8 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// buildTree darf bei leerer Eingabe keine nil-Liste liefern
-// (würde als JSON "null" serialisiert).
+// buildTree must not return a nil list for empty input
+// (it would be serialized as JSON "null").
 func TestBuildTree_EmptyInputReturnsNonNil(t *testing.T) {
 	got := buildTree(nil, nil)
 	if got == nil || len(got) != 0 {

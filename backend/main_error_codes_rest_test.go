@@ -22,11 +22,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Rest: Fehlerantworten tragen einen Fehlercode, den das
-// Frontend unter api.errors.<code> übersetzt. Dieser Test geht über den echten
-// Router (newRouter) und prüft je Handler-Familie 400/401/403/404/409/410 samt
-// Mandantentrennung. Die statische Ratsche (handlers/error_codes_static_test.go)
-// sichert zusätzlich, dass keine Klartext-Fehler ohne Code hinzukommen.
+// Rest: error responses carry an error code that the
+// frontend translates under api.errors.<code>. This test goes through the real
+// router (newRouter) and checks per handler family 400/401/403/404/409/410 including
+// tenant separation. The static ratchet (handlers/error_codes_static_test.go)
+// additionally ensures that no plain-text errors without a code are added.
 
 type restCodeCase struct {
 	name, method, url, token string
@@ -83,7 +83,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 	pageAdminOfA := mkUser("pa634@example.com", false, "pages:write,notices:write", &page)
 	noRole := mkUser("nr634@example.com", false, "", nil)
 
-	// Seed für Ablauf-/Konfliktfälle.
+	// Seed for expiry/conflict cases.
 	past, future := time.Now().Add(-time.Hour), time.Now().Add(time.Hour)
 	require.NoError(t, db.Create(&models.PageOrder{CompanyName: "X", Email: "x1@example.com", Status: "pending_confirmation", ConfirmTokenHash: models.HashToken("tok-exp"), ConfirmTokenExpiry: &past}).Error)
 	require.NoError(t, db.Create(&models.PageOrder{CompanyName: "X", Email: "x2@example.com", Status: "confirmed", SetPasswordTokenHash: models.HashToken("pw-exp"), SetPasswordTokenExpiry: &past}).Error)
@@ -103,7 +103,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 	require.NoError(t, db.Create(&models.Language{Code: "en", Name: "English"}).Error)
 
 	cases := []restCodeCase{
-		// page_order.go (öffentlich, 5 Anfragen/min Limit auf POST /orders)
+		// page_order.go (public, 5 requests/min limit on POST /orders)
 		{"Bestätigung: unbekannter Link", "POST", "/api/public/orders/confirm", "", map[string]any{"token": "gibt-es-nicht"}, 400, "confirm_link_invalid"},
 		{"Bestätigung: abgelaufen", "POST", "/api/public/orders/confirm", "", map[string]any{"token": "tok-exp"}, 410, "order_link_expired"},
 		{"Passwort-Link unbekannt", "POST", "/api/public/orders/set-password", "", map[string]any{"token": "nope", "password": "langgenug-1"}, 400, "password_link_invalid"},
@@ -123,7 +123,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 		{"Bestätigung: unbekannter Link", "POST", "/api/public/subscribers/confirm", "", map[string]any{"token": "nope"}, 400, "confirm_link_invalid"},
 		{"Bestätigung: abgelaufen", "POST", "/api/public/subscribers/confirm", "", map[string]any{"token": "sub-exp"}, 410, "subscription_link_expired"},
 		{"Abbestellen: ungültiger Link", "POST", "/api/public/subscribers/unsubscribe", "", map[string]any{"token": "nope"}, 400, "unsubscribe_link_invalid"},
-		// statuspage.go: 400 / 403 / 404 und Mandantentrennung
+		// statuspage.go: 400 / 403 / 404 and tenant separation
 		{"Seite ändern: ID keine Zahl", "PUT", "/api/admin/pages/abc", admin, map[string]any{"name": "N"}, 404, "page_not_found"},
 		{"Seite ändern: unbekannt", "PUT", "/api/admin/pages/99999", admin, map[string]any{"name": "N"}, 404, "page_not_found"},
 		{"Seite ändern: ohne Rolle", "PUT", "/api/admin/pages/" + pid, noRole, map[string]any{"name": "N"}, 403, "forbidden"},
@@ -139,7 +139,7 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 		{"Ohne Token", "GET", "/api/me", "", nil, 401, "unauthorized"},
 		{"Nicht Global Admin", "GET", "/api/users", reader, nil, 403, "forbidden"},
 		{"Profil: Sprache unbekannt", "PATCH", "/api/me", reader, map[string]any{"preferred_language": "xx"}, 400, "invalid_request"},
-		// Ankündigungen, Rollen, Vorfälle, Übersetzungen, externe Quellen
+		// announcements, roles, incidents, translations, external sources
 		{"Ankündigung ändern: unbekannt", "PUT", "/api/pages/" + pid + "/notices/99999", pageAdminOfA, map[string]any{"title": "T", "message": "m", "level": "info"}, 404, "notice_not_found"},
 		{"Ankündigung: Level ungültig", "POST", "/api/pages/" + pid + "/notices", pageAdminOfA, map[string]any{"title": "T", "message": "m", "level": "boese"}, 400, "notice_level_invalid"},
 		{"Ankündigung: Mandantentrennung", "POST", "/api/pages/" + oid + "/notices", pageAdminOfA, map[string]any{"title": "T", "message": "m", "level": "info"}, 403, "forbidden"},
@@ -162,14 +162,14 @@ func TestRouter_Fehlercodes_RestDerHandler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) { restCall(t, r, tc) })
 	}
 
-	// Self-Service-Bestellung abgeschaltet -> 403 orders_disabled (zuletzt, wirkt global).
+	// Self-service ordering disabled -> 403 orders_disabled (last, takes effect globally).
 	require.NoError(t, db.Create(&models.SystemSetting{Key: "orders.enabled", Value: "false"}).Error)
 	t.Run("Bestellung abgeschaltet", func(t *testing.T) {
 		restCall(t, r, restCodeCase{"", "POST", "/api/public/orders", "", map[string]any{"company_name": "N", "email": "n9@example.com"}, 403, "orders_disabled"})
 	})
 }
 
-// failTable lässt Abfragen/Schreibzugriffe auf table scheitern (500-Pfade).
+// failTable makes queries/writes on table fail (500 paths).
 func failTable(t *testing.T, db *gorm.DB, table string, ops ...string) {
 	t.Helper()
 	hook := func(tx *gorm.DB) {

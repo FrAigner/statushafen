@@ -12,16 +12,16 @@ import (
 	"testing"
 )
 
-// Rest: Das Projekt duzt. Nutzer sehen Fehlermeldungen,
-// Mails und Vorlagentexte aus dem Backend; dieser Test durchsucht alle
-// String-Literale (keine Kommentare, keine Testdateien) nach förmlicher Anrede.
+// Note: the project uses the informal "du" form of address. Users see error messages,
+// emails and template texts from the backend; this test scans all
+// string literals (no comments, no test files) for the formal form of address.
 //
-// Konservative Regel: großes "Sie" mitten im Satz (nach einem kleingeschriebenen
-// Wort), Imperativ am Satzanfang ("Stellen Sie", "Bitte lesen Sie") und das
-// Possessiv "Ihr/Ihre/Ihren/..." bzw. "Ihnen". Pronomen "Sie" am Satzanfang für
-// Dinge bleibt erlaubt. Berechtigte Treffer stehen in anredeErlaubt.
+// Conservative rule: capital "Sie" mid-sentence (after a lowercase
+// word), imperative at the start of a sentence ("Stellen Sie", "Bitte lesen Sie") and the
+// possessive "Ihr/Ihre/Ihren/..." or "Ihnen". Pronoun "Sie" at the start of a sentence for
+// things remains allowed. Legitimate hits are listed in anredeErlaubt.
 var anredeErlaubt = []string{
-	"Ihr zuletzt bekannter Status", // Status der externen Quelle
+	"Ihr zuletzt bekannter Status", // status of the external source
 	"Ihr aktueller Status",         // dito
 }
 

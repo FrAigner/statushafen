@@ -3,9 +3,9 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// DSGVO: Schriften werden selbst gehostet (npm-Pakete @fontsource/*, vom Build
-// ausgeliefert), es gibt keine Verweise auf Google Fonts (die IP der Besucher
-// ginge sonst an Google). Lizenz: SIL Open Font License 1.1, Hinweise in THIRD_PARTY_NOTICES.
+// GDPR: fonts are self-hosted (npm packages @fontsource/*, served by the
+// build); there are no references to Google Fonts (otherwise visitors' IPs
+// would go to Google). License: SIL Open Font License 1.1, notices in THIRD_PARTY_NOTICES.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(resolve(root, p), 'utf-8')
 
@@ -21,7 +21,7 @@ function sourceFiles(dir = 'src') {
   return readdirSync(resolve(root, dir), { withFileTypes: true }).flatMap((e) => {
     const path = `${dir}/${e.name}`
     if (e.isDirectory()) return sourceFiles(path)
-    return /\.(vue|css|js)$/.test(e.name) && !e.name.endsWith('.test.js') ? [path] : []
+    return /\.(vue|css|js|ts)$/.test(e.name) && !e.name.endsWith('.test.js') ? [path] : []
   })
 }
 
@@ -43,7 +43,7 @@ describe('selbst gehostete Schriften', () => {
     const files = sourceFiles()
     expect(files).toContain('src/style.css')
     expect(files).toContain('src/assets/tokens.css')
-    expect(files).toContain('src/main.js')
+    expect(files).toContain('src/main.ts')
     expect(files.some((f) => f.endsWith('.vue'))).toBe(true)
     expect(files.some((f) => f.endsWith('.test.js'))).toBe(false)
   })
@@ -65,7 +65,7 @@ describe('selbst gehostete Schriften', () => {
     expect(idx).toBeGreaterThanOrEqual(0)
     const before = tokens.slice(0, idx).replace(/\/\*[\s\S]*?\*\//g, '').trim()
     expect(before).toBe('@layer app-reset;')
-    expect(read('src/main.js')).not.toContain('fonts.css')
+    expect(read('src/main.ts')).not.toContain('fonts.css')
   })
 
   it.each(['inter', 'ibm-plex-sans', 'ibm-plex-mono'])('Lizenztext (OFL) liegt dem Paket @fontsource/%s bei', (slug) => {

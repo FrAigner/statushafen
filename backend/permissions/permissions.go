@@ -66,7 +66,7 @@ type Resource struct {
 }
 
 // Resources are all tabs in navigation order. The keys are also
-// in the frontend (frontend/src/utils/permissionResources.js); a test
+// in the frontend (RESOURCES in frontend/src/utils/permissions.ts); a test
 // keeps both sides equal.
 var Resources = []Resource{
 	{"overview", GroupOperations, ScopeGlobal},

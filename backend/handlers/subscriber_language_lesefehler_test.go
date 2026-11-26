@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Review, Punkt 5: Ein Lesefehler bei der Sprachprüfung ist nicht
-// "ungültig". Er darf eine gültige Sprache nicht still durch "" ersetzen.
+// Review, item 5: A read error during the language check is not
+// "invalid". It must not silently replace a valid language with "".
 
 func failLanguageReads(db *gorm.DB, name, secret string) {
 	_ = db.Callback().Query().Before("gorm:query").Register(name, func(tx *gorm.DB) {

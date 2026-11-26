@@ -6,7 +6,7 @@ import { onyxFormStubs, OnyxCheckboxStub } from '../test-support/onyxStubs'
 import { useTranslationEnabled } from '../composables/useTranslationEnabled'
 import TranslationSettings from './TranslationSettings.vue'
 
-// Abschnitt „Automatische Übersetzung“ der Systemeinstellungen.
+// Section "Automatic translation" of the system settings.
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const BASE = { provider: '', url: '', api_key_set: false, env_url_set: true, env_api_key_set: false, effective_provider: 'libretranslate', configured: true }

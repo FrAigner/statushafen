@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 // Since SSO is configured per status page, this page is no static Google/GitHub guide
@@ -26,8 +26,8 @@ test.describe('Admin SSO Configuration Page', () => {
     await expect(page.locator('.provider-tab')).toHaveCount(0);
   });
 
-  // Regression Die Rückruf-Adressen waren hartcodiert. Heute liefert sie der Server und die
-  // Oberfläche zeigt sie nur an: schreibgeschützt, mit der Seiten-ID, nie als Platzhalter.
+  // Regression: the callback addresses were hard-coded. Now the server provides them and the
+  // UI only displays them: read-only, with the page ID, never as a placeholder.
   test('the callback address is read-only and contains the page id', async ({ page }) => {
     const oidc = page.getByLabel('ACS URL', { exact: true });
     await expect(oidc).toHaveAttribute('readonly', '');

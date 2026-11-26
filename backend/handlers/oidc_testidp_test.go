@@ -14,24 +14,24 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// testIdP ist ein minimaler OIDC-Anbieter für die Tests:
-// Discovery, JWKS und Token-Endpunkt inkl. PKCE-Prüfung. Das ID-Token wird
-// mit einem echten RSA-Schlüssel signiert, damit die Signaturprüfung von
-// go-oidc wirklich greift.
+// testIdP is a minimal OIDC provider for the tests:
+// discovery, JWKS and token endpoint including PKCE verification. The ID token is
+// signed with a real RSA key so that the signature check by
+// go-oidc actually takes effect.
 type testIdP struct {
 	t   *testing.T
 	srv *httptest.Server
 
 	mu            sync.Mutex
 	discoveryHits int
-	challenge     string // aus der Authorize-URL des Logins
-	nonce         string // aus der Authorize-URL des Logins
-	tokenStatus   int    // != 0: Token-Endpunkt antwortet mit diesem Status
+	challenge     string // from the login's authorize URL
+	nonce         string // from the login's authorize URL
+	tokenStatus   int    // != 0: token endpoint answers with this status
 	omitIDToken   bool
-	// authEndpoint/tokenEndpoint: != "" ersetzt die Adresse im Discovery-Dokument.
+	// authEndpoint/tokenEndpoint: != "" replaces the address in the discovery document.
 	authEndpoint  string
 	tokenEndpoint string
-	signWith      *rsa.PrivateKey // nil: Schlüssel aus dem JWKS
+	signWith      *rsa.PrivateKey // nil: key from the JWKS
 	claims        map[string]interface{}
 }
 
@@ -52,9 +52,9 @@ func testIdPKeys(t *testing.T) (*rsa.PrivateKey, *rsa.PrivateKey) {
 
 const testIdPClientID = "statuspage-client"
 
-// newTestIdP startet den Anbieter und biegt oidcHTTPClient für die Dauer des
-// Tests auf dessen TLS-Client um. Der Provider-Cache wird vorher und nachher
-// geleert, damit Tests sich nicht gegenseitig Discovery-Ergebnisse vererben.
+// newTestIdP starts the provider and redirects oidcHTTPClient for the duration of the
+// test to its TLS client. The provider cache is cleared before and after
+// so tests do not pass discovery results on to each other.
 func newTestIdP(t *testing.T) *testIdP {
 	t.Helper()
 	idp := newTestIdPServer(t, httptest.NewTLSServer)
@@ -71,10 +71,10 @@ func newTestIdP(t *testing.T) *testIdP {
 	return idp
 }
 
-// newPlainHTTPTestIdP startet den Anbieter ohne TLS auf
-// 127.0.0.1, wie der Mock-OIDC-Dienst aus docker-compose.yml. oidcHTTPClient
-// bleibt dabei der echte Client mit SSRF-Schutz: Kommt ein Login trotzdem
-// durch, hat der Entwickler-Client gegriffen.
+// newPlainHTTPTestIdP starts the provider without TLS on
+// 127.0.0.1, like the mock OIDC service from docker-compose.yml. oidcHTTPClient
+// remains the real client with SSRF protection: if a login gets
+// through anyway, the developer client took effect.
 func newPlainHTTPTestIdP(t *testing.T) *testIdP {
 	t.Helper()
 	idp := newTestIdPServer(t, httptest.NewServer)
@@ -148,8 +148,8 @@ func (idp *testIdP) handleToken(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// signIDToken baut ein gültiges ID-Token; idp.claims überschreibt einzelne
-// Claims (z. B. aud, exp, nonce) für die Fehlerfälle.
+// signIDToken builds a valid ID token; idp.claims overrides individual
+// claims (e.g. aud, exp, nonce) for the error cases.
 func (idp *testIdP) signIDToken() string {
 	key, _ := testIdPKeys(idp.t)
 	if idp.signWith != nil {

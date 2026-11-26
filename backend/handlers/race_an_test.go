@@ -2,8 +2,8 @@
 
 package handlers_test
 
-// Der Race-Detektor verlangsamt CPU-lastige Abfragen um ein
-// Vielfaches (Heim-Runner: 19 s statt unter 3 s). Zeitgrenzen in Tests
-// werden mit diesem Faktor gedehnt, damit der race-Job nicht an der
-// Wanduhr scheitert.
+// The race detector slows CPU-heavy queries by a
+// multiple (home runner: 19 s instead of under 3 s). Time limits in tests
+// are stretched by this factor so that the race job does not fail on the
+// wall clock.
 const raceZeitfaktor = 20

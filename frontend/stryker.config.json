@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Mutationstests. In der CI wird --mutate auf die im PR geänderten Zeilen gesetzt (coveragegate mutate-ranges); jeder überlebende Mutant lässt den Lauf scheitern (break: 100).",
+  "_comment": "Mutation tests. In CI, --mutate is set to the lines changed in the PR (coveragegate mutate-ranges); every surviving mutant fails the run (break: 100).",
   "testRunner": "vitest",
   "vitest": { "configFile": "vitest.config.js" },
   "coverageAnalysis": "perTest",

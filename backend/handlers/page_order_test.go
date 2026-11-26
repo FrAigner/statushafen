@@ -19,9 +19,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// setupOrderRouter registriert nur die drei Bestell-Routen, analog zum
-// Muster in statuspage_test.go (doStatusPageRequest/requireStatusCode/
-// requireBodyContains werden von dort mitbenutzt, gleiches Testpaket).
+// setupOrderRouter registers only the three order routes, analogous to the
+// pattern in statuspage_test.go (doStatusPageRequest/requireStatusCode/
+// requireBodyContains are shared from there, same test package).
 func setupOrderRouter(h *handlers.Handler) *gin.Engine {
 	r := testutils.SetupRouter()
 	r.POST("/api/public/orders", h.CreateOrderHandler)
@@ -30,10 +30,10 @@ func setupOrderRouter(h *handlers.Handler) *gin.Engine {
 	return r
 }
 
-// seedPageAdminRole legt die "Page Admin"-Rolle an, die ConfirmOrderHandler
-// dem Besteller zuweist (in Produktion durch database.SeedData() vorhanden,
-// hier für die schlanken Handler-Tests einzeln nachgebildet, ohne die
-// restlichen SeedData-Fixtures wie Testnutzer/-seiten mitzuschleppen).
+// seedPageAdminRole creates the "Page Admin" role that ConfirmOrderHandler
+// assigns to the orderer (present in production via database.SeedData(),
+// recreated here individually for the lean handler tests, without dragging in the
+// remaining SeedData fixtures such as test users/pages).
 func seedPageAdminRole(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	role := models.Role{
@@ -45,9 +45,9 @@ func seedPageAdminRole(t *testing.T, db *gorm.DB) {
 	}
 }
 
-// testToken erzeugt einen zufälligen Hex-Token fürs Testsetup, ohne auf das
-// unexportierte generateWebhookToken aus dem handlers-Paket zugreifen zu
-// müssen (dieses Testpaket ist handlers_test, siehe Package-Deklaration).
+// testToken generates a random hex token for test setup, without having to access the
+// unexported generateWebhookToken from the handlers package
+// (this test package is handlers_test, see package declaration).
 func testToken(t *testing.T) string {
 	t.Helper()
 	buf := make([]byte, 32)
@@ -57,18 +57,18 @@ func testToken(t *testing.T) string {
 	return hex.EncodeToString(buf)
 }
 
-// plainTokens merkt sich zu jedem gespeicherten Token-Hash den Klartext, damit
-// Tests Zeilen mit Hash anlegen und den Klartext wie ein Client einreichen können.
+// plainTokens remembers the plaintext for each stored token hash, so that
+// tests can create rows with a hash and submit the plaintext like a client.
 var plainTokens sync.Map
 
-// hashedToken liefert die gespeicherte Form (Hash) eines Klartext-Tokens.
+// hashedToken returns the stored form (hash) of a plaintext token.
 func hashedToken(plain string) string {
 	h := models.HashToken(plain)
 	plainTokens.Store(h, plain)
 	return h
 }
 
-// plainToken liefert den Klartext zu einem mit hashedToken gespeicherten Hash.
+// plainToken returns the plaintext for a hash stored with hashedToken.
 func plainToken(hash string) string {
 	v, ok := plainTokens.Load(hash)
 	if !ok {
@@ -77,9 +77,9 @@ func plainToken(hash string) string {
 	return v.(string)
 }
 
-// createPendingOrder legt eine PageOrder im Status "pending_confirmation"
-// direkt in der DB an (spart den Umweg über CreateOrderHandler in Tests, die
-// nur den Confirm-/Set-Password-Schritt prüfen wollen).
+// createPendingOrder creates a PageOrder in status "pending_confirmation"
+// directly in the DB (saves the detour via CreateOrderHandler in tests that
+// only want to check the confirm/set-password step).
 func createPendingOrder(t *testing.T, db *gorm.DB, companyName, email, slug string) models.PageOrder {
 	t.Helper()
 	expiry := time.Now().Add(24 * time.Hour)
@@ -197,11 +197,11 @@ func TestCreateOrderHandler(t *testing.T) {
 	})
 }
 
-// TestCreateOrderHandler_SendsConfirmationMail deckt den Regressionsfall ab:
-// Der Body der Bestätigungsmail entstand aus einem mehrzeiligen
-// Raw-String, wodurch der CR/LF-Guard (hasHeaderInjectionChars) immer anschlug
-// und die Mail nie verschickt wurde. Der Test schickt die Bestellung gegen
-// einen Fake-SMTP-Server und erwartet dort eine Mail mit Bestätigungslink.
+// TestCreateOrderHandler_SendsConfirmationMail covers the regression case:
+// The body of the confirmation mail was built from a multi-line
+// raw string, which made the CR/LF guard (hasHeaderInjectionChars) always trigger
+// and the mail was never sent. The test submits the order against
+// a fake SMTP server and expects a mail with a confirmation link there.
 func TestCreateOrderHandler_SendsConfirmationMail(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -223,9 +223,9 @@ func TestCreateOrderHandler_SendsConfirmationMail(t *testing.T) {
 	}
 }
 
-// TestCreateOrderHandler_CRLFInCompanyNameBlocksMail sichert ab, dass der Fix
-// den CR/LF-Guard nicht aufweicht: Umbrüche aus Nutzereingaben
-// landen weiterhin im Body und verhindern den Versand.
+// TestCreateOrderHandler_CRLFInCompanyNameBlocksMail ensures that the fix
+// does not weaken the CR/LF guard: line breaks from user input
+// still end up in the body and prevent sending.
 func TestCreateOrderHandler_CRLFInCompanyNameBlocksMail(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -342,11 +342,11 @@ func TestConfirmOrderHandler(t *testing.T) {
 		requireStatusCode(t, w, 410)
 	})
 
-	// Sicherheitsprüfung: ConfirmOrderHandler hängte sich bei
-	// Email-Übereinstimmung bisher an ein BESTEHENDES User-Konto -
-	// SetOrderPasswordHandler hätte danach dessen PasswordHash überschrieben
-	// (inkl. Global Admin, ohne Owner-Prüfung). Eine Order mit der Email eines
-	// bestehenden Kontos muss abgelehnt werden, nicht wiederverwendet.
+	// Security check: ConfirmOrderHandler used to attach itself on
+	// email match to an EXISTING user account -
+	// SetOrderPasswordHandler would then have overwritten its PasswordHash
+	// (including Global Admin, without owner check). An order with the email of an
+	// existing account must be rejected, not reused.
 	t.Run("email colliding with an existing User account is rejected, that account is untouched", func(t *testing.T) {
 		existing := models.User{Email: "victim@example.com", PasswordHash: testutils.MustHash("original-password")}
 		if err := db.Create(&existing).Error; err != nil {
@@ -361,9 +361,9 @@ func TestConfirmOrderHandler(t *testing.T) {
 		})
 		requireStatusCode(t, w, 409)
 
-		// Explizit vorher/nachher verglichen, nicht nur der Status-Code: das
-		// bestehende Konto darf durch den abgelehnten Versuch in keiner Weise
-		// verändert worden sein.
+		// Explicitly compared before/after, not just the status code: the
+		// existing account must not have been changed in any way
+		// by the rejected attempt.
 		var reloadedUser models.User
 		if err := db.First(&reloadedUser, existing.ID).Error; err != nil {
 			t.Fatalf("could not reload existing user: %v", err)
@@ -378,9 +378,9 @@ func TestConfirmOrderHandler(t *testing.T) {
 			t.Errorf("expected exactly 1 User row for victim@example.com, got %d", userCount)
 		}
 
-		// Kein set-password-Token darf entstanden sein - sonst könnte der
-		// letzte Schritt trotz 409 auf der Confirm-Antwort noch missbraucht
-		// werden.
+		// No set-password token may have been created - otherwise the
+		// last step could still be abused despite the 409 on the confirm
+		// response.
 		var reloadedOrder models.PageOrder
 		if err := db.First(&reloadedOrder, order.ID).Error; err != nil {
 			t.Fatalf("could not reload order: %v", err)
@@ -392,8 +392,8 @@ func TestConfirmOrderHandler(t *testing.T) {
 			t.Error("expected no SetPasswordToken to be issued after an email collision rejection")
 		}
 
-		// Die gesamte Transaktion muss zurückgerollt sein - auch keine
-		// verwaiste StatusPage.
+		// The entire transaction must be rolled back - also no
+		// orphaned StatusPage.
 		var pageCount int64
 		db.Model(&models.StatusPage{}).Where("name = ?", "Hijack Attempt GmbH").Count(&pageCount)
 		if pageCount != 0 {
@@ -401,10 +401,10 @@ func TestConfirmOrderHandler(t *testing.T) {
 		}
 	})
 
-	// Ein soft-gelöschter User mit
-	// derselben Email findet First() nicht, der uniqueIndex auf email schlägt
-	// dann beim Create zu. Erwartet ist dieselbe 409 wie beim aktiven Konto,
-	// keine 500 und keine verwaiste StatusPage.
+	// A soft-deleted user with the
+	// same email is not found by First(), the uniqueIndex on email then fails
+	// on Create. The same 409 as for the active account is expected,
+	// no 500 and no orphaned StatusPage.
 	t.Run("email of a soft-deleted User account is rejected with 409", func(t *testing.T) {
 		deleted := models.User{Email: "deleted-user@example.com", PasswordHash: testutils.MustHash("old-password")}
 		if err := db.Create(&deleted).Error; err != nil {
@@ -427,8 +427,8 @@ func TestConfirmOrderHandler(t *testing.T) {
 		}
 	})
 
-	// Schlägt das Anlegen des Users fehl (DB-Fehler),
-	// muss die ganze Transaktion zurückgerollt werden und die Antwort 500 sein.
+	// If creating the user fails (DB error),
+	// the whole transaction must be rolled back and the response must be 500.
 	t.Run("DB error while creating the User rolls back everything with 500", func(t *testing.T) {
 		const cb = "test:fail_user_create"
 		if err := db.Callback().Create().Before("gorm:create").Register(cb, func(tx *gorm.DB) {
@@ -468,9 +468,9 @@ func TestConfirmOrderHandler(t *testing.T) {
 		}
 	})
 
-	// Gegenprobe: eine komplett neue Email-Adresse (kein bestehender User)
-	// muss weiterhin ganz normal bestätigt werden - sonst wäre der Bestellflow
-	// insgesamt kaputt statt nur die Verwechslungslücke geschlossen.
+	// Control case: a completely new email address (no existing user)
+	// must still be confirmed completely normally - otherwise the order flow would be
+	// broken overall instead of just closing the mix-up gap.
 	t.Run("Gegenprobe: a brand-new email with no existing account still confirms normally", func(t *testing.T) {
 		order := createPendingOrder(t, db, "Legit New GmbH", "brand-new-user@example.com", "")
 
@@ -500,7 +500,7 @@ func TestSetOrderPasswordHandler(t *testing.T) {
 			"token": plainToken(order.ConfirmTokenHash),
 		})
 		requireStatusCode(t, w, 200)
-		// Die Antwort trägt den Klartext; der Hash dazu steht in der Datenbank.
+		// The response carries the plaintext; the hash for it is in the database.
 		pwToken, _ := responseField(t, w, "set_password_token").(string)
 		hashedToken(pwToken)
 		var confirmed models.PageOrder
@@ -535,11 +535,11 @@ func TestSetOrderPasswordHandler(t *testing.T) {
 		}
 	})
 
-	// Orders, die VOR dem Fix bestätigt wurden,
-	// können noch auf ein bestehendes fremdes Konto zeigen. Der Schritt, der
-	// tatsächlich überschreibt, muss daher selbst prüfen, dass das Konto
-	// frisch aus dieser Bestellung stammt (kein Hash, kein SSO, kein Global
-	// Admin), sonst 409 ohne jede Änderung.
+	// Orders confirmed BEFORE the fix
+	// may still point to an existing account belonging to someone else. The step that
+	// actually overwrites must therefore itself check that the account
+	// freshly originates from this order (no hash, no SSO, no Global
+	// Admin), otherwise 409 without any change.
 	legacyConfirmedOrder := func(t *testing.T, victim models.User) models.PageOrder {
 		t.Helper()
 		if err := db.Create(&victim).Error; err != nil {

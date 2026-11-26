@@ -16,9 +16,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// countStatements zählt alle Abfragen und Raw-Statements der Datenbank, bis
-// die zurückgegebene Funktion aufgerufen wird. Der Name hängt am Test, damit
-// parallele Registrierungen sich nicht überschneiden.
+// countStatements counts all queries and raw statements of the database until
+// the returned function is called. The name is tied to the test so that
+// parallel registrations do not overlap.
 func countStatements(t *testing.T, db *gorm.DB) (count *atomic.Int64) {
 	t.Helper()
 	count = &atomic.Int64{}
@@ -33,7 +33,7 @@ func countStatements(t *testing.T, db *gorm.DB) (count *atomic.Int64) {
 	return count
 }
 
-// seedTaggedComponents legt n Komponenten mit je zwei Tags an.
+// seedTaggedComponents creates n components with two tags each.
 func (e *visEnv) seedTaggedComponents(n int) []models.Component {
 	e.t.Helper()
 	tags := []models.Tag{{Name: "eins"}, {Name: "zwei"}}
@@ -57,9 +57,9 @@ func (e *visEnv) statementsFor(path string) int64 {
 	return count.Load()
 }
 
-// Die Zahl der Datenbankabfragen hängt nicht von der Komponentenzahl ab. Vorher
-// holte die Route die Tags jeder Komponente einzeln (n + 4 Abfragen, 53 ms CPU
-// je Anfrage bei 200 Komponenten), und das ohne Limit für jeden Besucher.
+// The number of database queries does not depend on the number of components. Previously
+// the route fetched each component's tags individually (n + 4 queries, 53 ms CPU
+// per request with 200 components), and that without a limit for every visitor.
 func TestGetComponents_StatementCountIsIndependentOfComponentCount(t *testing.T) {
 	small := newVisEnv(t)
 	small.seedTaggedComponents(3)
@@ -83,8 +83,8 @@ func TestPublicDashboard_StatementCountIsIndependentOfComponentCount(t *testing.
 	assert.Equal(t, few, many, "Abfragen bei 3 und bei 60 Komponenten")
 }
 
-// Gegenprobe: Die gebündelte Abfrage ordnet die Tags weiter der richtigen
-// Komponente zu und lässt gelöschte Tags und Zuordnungen aus.
+// Control check: the bundled query still assigns the tags to the correct
+// component and leaves out deleted tags and assignments.
 func TestGetComponents_BatchedTagsStayWithTheirComponent(t *testing.T) {
 	e := newVisEnv(t)
 	a := e.comp("A", nil, true, "operational")
@@ -132,9 +132,9 @@ func TestGetComponents_BatchedTagsStayWithTheirComponent(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), `"Tags":null`)
 }
 
-// Die gebündelte Tag-Abfrage ist auf die Komponenten der angefragten Seite
-// eingeschränkt. Ohne diese Einschränkung lüde jeder anonyme Aufruf die
-// Tag-Zuordnungen aller Seiten, um sie danach zu verwerfen.
+// The bundled tag query is restricted to the components of the requested
+// page. Without this restriction every anonymous request would load the
+// tag assignments of all pages, only to discard them afterwards.
 func TestGetComponents_TagQueryIsRestrictedToThePage(t *testing.T) {
 	e := newVisEnv(t)
 	e.seedTaggedComponents(3)

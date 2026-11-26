@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetSSO — GET /api/admin/pages/:page_id/sso — liest SSO-Config pro Seite
+// GetSSO — GET /api/admin/pages/:page_id/sso — reads the SSO config per page
 func (h *Handler) GetSSO(c *gin.Context) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -28,9 +28,9 @@ func (h *Handler) GetSSO(c *gin.Context) {
 
 	var ssoConfig models.StatusPageSSOConfig
 	if err := h.DB.Where("status_page_id = ?", pageID).First(&ssoConfig).Error; err != nil {
-		// Keine Config noch vorhanden — Default zurückgeben (SSO deaktiviert)
-		// dieselbe Antwortform wie mit Config, damit das
-		// Admin-Formular alle Felder vorfindet.
+		// No config exists yet — return the default (SSO disabled)
+		// same response shape as with a config, so that the
+		// admin form finds all fields.
 		def := models.StatusPageSSOConfig{
 			StatusPageID:       uint(pageID),
 			OIDCScopes:         models.SSODefaultScopes,
@@ -100,59 +100,59 @@ func (h *Handler) UpdateSSO(c *gin.Context) {
 	const oidcIncompleteMessage = "OIDC enabled erfordert Discovery URL, Client ID und Secret"
 	errBadRequest := errors.New(oidcIncompleteMessage)
 	err = h.DB.Transaction(func(tx *gorm.DB) error {
-		// Upsert auf die bestehende Zeile der Seite – auch eine
-		// soft-gelöschte (Unscoped). Früher legte jeder PUT eine neue Zeile an
-		// (Save ohne ID = INSERT, das Where wird dabei ignoriert); der Unique-Index
-		// auf status_page_id ließ deshalb jeden zweiten PUT und jeden PUT nach
-		// DELETE mit 500 scheitern. Die gelöschte Zeile wiederzuverwenden statt den
-		// Index partiell zu machen hält genau eine Zeile pro Seite.
+		// Upsert onto the page's existing row – including a
+		// soft-deleted one (Unscoped). Previously every PUT created a new row
+		// (Save without ID = INSERT, the Where is ignored); the unique index
+		// on status_page_id therefore made every second PUT and every PUT after
+		// DELETE fail with 500. Reusing the deleted row instead of making the
+		// index partial keeps exactly one row per page.
 		if err := tx.Unscoped().Where("status_page_id = ?", pageID).Limit(1).Find(&ssoConfig).Error; err != nil {
 			return err
 		}
 
-		// GET liefert das Secret nie aus. Ein leeres Secret behält
-		// deshalb das gespeicherte, damit das Admin-Formular es nicht bei jedem
-		// Speichern neu verlangt. Das Secret einer per DELETE entfernten Config
-		// gilt nicht mehr – sonst würde es beim Reaktivieren still weiterleben.
+		// GET never returns the secret. An empty secret therefore keeps
+		// the stored one, so that the admin form does not demand it anew on every
+		// save. The secret of a config removed via DELETE
+		// no longer applies – otherwise it would silently live on when reactivating.
 		secret := req.OIDCClientSecret
 		if secret == "" && !ssoConfig.DeletedAt.Valid {
 			secret = ssoConfig.OIDCClientSecret
 		}
-		// Validierung: wenn OIDC enabled, dann muss Discovery URL + Credentials gesetzt sein
+		// Validation: if OIDC is enabled, discovery URL + credentials must be set
 		if req.OIDCEnabled && (req.OIDCDiscoveryURL == "" || req.OIDCClientID == "" || secret == "") {
 			return errBadRequest
 		}
 
-		// GORM überspringt bei INSERT Nullwerte für Spalten mit
-		// default-Tag und speichert den DB-Default (test_login_enabled=false
-		// wurde so zu true). Neue Zeilen deshalb nur mit der Seiten-ID anlegen
-		// und alle Felder per UPDATE schreiben – das übernimmt Nullwerte. Kein
-		// Pointer-Typ, damit Model, Schema und die übrigen Leser unverändert
-		// bleiben; die Transaktion verhindert eine halbe Zeile.
+		// On INSERT, GORM skips zero values for columns with a
+		// default tag and stores the DB default (test_login_enabled=false
+		// thus became true). New rows are therefore created with only the page ID
+		// and all fields written via UPDATE – which accepts zero values. Not a
+		// pointer type, so that model, schema and the other readers stay unchanged;
+		// the transaction prevents a half-written row.
 		if ssoConfig.ID == 0 {
 			ssoConfig = models.StatusPageSSOConfig{StatusPageID: uint(pageID)}
 			if err := tx.Create(&ssoConfig).Error; err != nil {
 				return err
 			}
 		}
-		// Vertrauensanker vor dem Überschreiben merken.
+		// Remember the trust anchor before overwriting.
 		before := ssoConfig
-		ssoConfig.DeletedAt = gorm.DeletedAt{} // reaktiviert eine per DELETE entfernte Config
+		ssoConfig.DeletedAt = gorm.DeletedAt{} // reactivates a config removed via DELETE
 		ssoConfig.OIDCEnabled = req.OIDCEnabled
 		ssoConfig.OIDCDiscoveryURL = req.OIDCDiscoveryURL
 		ssoConfig.OIDCClientID = req.OIDCClientID
 		ssoConfig.OIDCClientSecret = secret
-		// Leere Scopes/Attribute bekommen bewusst die Model-Defaults – beim
-		// Anlegen wie beim Aktualisieren gleich (früher nur beim INSERT).
+		// Empty scopes/attributes deliberately get the model defaults – the same on
+		// creation as on update (previously only on INSERT).
 		ssoConfig.OIDCScopes = orDefault(req.OIDCScopes, models.SSODefaultScopes)
 		ssoConfig.OIDCAttributeEmail = orDefault(req.OIDCAttributeEmail, models.SSODefaultAttributeEmail)
 		ssoConfig.OIDCAttributeName = orDefault(req.OIDCAttributeName, models.SSODefaultAttributeName)
 		ssoConfig.OIDCAttributeRole = req.OIDCAttributeRole
-		ssoConfig.OIDCACSUrl = oidcRedirectURL(uint(pageID)) // nur informativ, s. ssoPublicResponse
+		ssoConfig.OIDCACSUrl = oidcRedirectURL(uint(pageID)) // informational only, see ssoPublicResponse
 		ssoConfig.TestLoginEnabled = req.TestLoginEnabled
 
-		// Save mit ID = UPDATE aller Spalten (inkl. deleted_at = NULL, deshalb
-		// Unscoped – sonst träfe das UPDATE die gelöschte Zeile nicht).
+		// Save with ID = UPDATE of all columns (incl. deleted_at = NULL, hence
+		// Unscoped – otherwise the UPDATE would not hit the deleted row).
 		if err := tx.Unscoped().Save(&ssoConfig).Error; err != nil {
 			return err
 		}
@@ -176,7 +176,7 @@ func (h *Handler) UpdateSSO(c *gin.Context) {
 	c.JSON(http.StatusOK, ssoPublicResponse(&ssoConfig))
 }
 
-// DeleteSSO — DELETE /api/admin/pages/:page_id/sso — löscht SSO-Config
+// DeleteSSO — DELETE /api/admin/pages/:page_id/sso — deletes the SSO config
 func (h *Handler) DeleteSSO(c *gin.Context) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -211,7 +211,7 @@ func resetChangedSSOIdentities(tx *gorm.DB, before, after models.StatusPageSSOCo
 	return res.RowsAffected, res.Error
 }
 
-// orDefault liefert def, wenn v leer ist.
+// orDefault returns def if v is empty.
 func orDefault(v, def string) string {
 	if v == "" {
 		return def

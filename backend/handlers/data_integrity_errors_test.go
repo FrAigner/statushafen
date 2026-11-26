@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Scheitert das Aufräumen der Seitenrollen, wird nichts gelöscht
-// (Transaktion) und die Antwort ist 500.
+// If cleaning up the page roles fails, nothing is deleted
+// (transaction) and the response is 500.
 func TestDeleteRoleAndUserHandlers_CleanupFailureIs500(t *testing.T) {
 	e := newUserGuardEnv(t)
 	h := handlers.NewHandler(e.db)

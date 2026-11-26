@@ -4,10 +4,10 @@ import { defineComponent, h, ref } from 'vue'
 import i18n from '../i18n'
 import FormMultiSelect from './FormMultiSelect.vue'
 import { useFormPanel } from '../composables/useFormPanel'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
-// Bewusst das ECHTE OnyxSelect (kein Stub): frühere Fehler betrafen genau das,
-// was Onyx am Eingabefeld rendert (id, aria-invalid, aria-describedby).
+// Deliberately the REAL OnyxSelect (no stub): earlier bugs concerned exactly
+// what Onyx renders on the input (id, aria-invalid, aria-describedby).
 const options = [{ value: '1', label: 'API' }, { value: '2', label: 'Web' }]
 
 let wrapper = null
@@ -28,8 +28,8 @@ function mountField(props = {}) {
 const input = () => wrapper.find('input[role="combobox"]')
 
 describe('FormMultiSelect', () => {
-  // Regression: `label for` zeigte ins Leere, weil die Feld-ID nie am
-  // Eingabefeld von OnyxSelect ankam.
+  // Regression: `label for` pointed nowhere because the field ID never
+  // reached the OnyxSelect input.
   it('verknüpft das Label mit dem Eingabefeld der Mehrfachauswahl', () => {
     mountField()
     const label = wrapper.find('label.form-field__label')
@@ -40,8 +40,8 @@ describe('FormMultiSelect', () => {
     expect(target.getAttribute('role')).toBe('combobox')
   })
 
-  // Regression (Sichtprüfung): Onyx-`required` blendete beim Fokus einen
-  // englischen Tooltip „Please fill out this field.“ ein.
+  // Regression (visual check): Onyx `required` showed an English tooltip
+  // "Please fill out this field." on focus.
   it('kennzeichnet Pflicht per aria-required, ohne Onyx-required (kein englischer Tooltip)', async () => {
     mountField({ error: 'Fehler' })
     await flushPromises()
@@ -74,7 +74,7 @@ describe('FormMultiSelect', () => {
     expect(input().attributes('aria-describedby')).toBeUndefined()
   })
 
-  // Regression: Der Pflichtfeld-Fehler stand nicht am Feld.
+  // Regression: the required-field error was not attached to the field.
   it('zeigt den Fehler einmal in der FormField-Zeile und setzt aria-invalid/-describedby am Eingabefeld', async () => {
     mountField({ error: 'Komponente ist ein Pflichtfeld.' })
     await flushPromises()
@@ -110,7 +110,7 @@ describe('FormMultiSelect', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // useFormPanel.focusInvalid() springt aufs Eingabefeld der Auswahl.
+  // useFormPanel.focusInvalid() jumps to the select's input.
   it('erhält den Fokus über useFormPanel.validateRequired, wenn keine Komponente gewählt ist', async () => {
     const Host = defineComponent({
       setup() {

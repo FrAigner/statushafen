@@ -32,7 +32,7 @@ describe('permissionMatrix', () => {
     for (const act of ['create', 'update', 'delete']) {
       expect(setCell([], 'notices', act, true)).toEqual([`notices:${act}`, 'notices:read'])
     }
-    // Lesen selbst setzt nur sich selbst; doppelte Einträge entstehen nicht.
+    // Read itself only sets itself; no duplicate entries arise.
     expect(setCell([], 'notices', 'read', true)).toEqual(['notices:read'])
     expect(setCell(['notices:read'], 'notices', 'update', true)).toEqual(['notices:read', 'notices:update'])
     expect(setCell(['notices:update'], 'notices', 'update', true)).toEqual(['notices:update', 'notices:read'])
@@ -42,7 +42,7 @@ describe('permissionMatrix', () => {
     const all = setRow([], 'notices', true)
     expect(all).toEqual(['notices:create', 'notices:read', 'notices:update', 'notices:delete'])
     expect(setCell([...all, 'components:read'], 'notices', 'read', false)).toEqual(['components:read'])
-    // Ein anderes Recht entziehen lässt Lesen stehen.
+    // Revoking another permission leaves read in place.
     expect(setCell(all, 'notices', 'delete', false)).toEqual(['notices:create', 'notices:read', 'notices:update'])
   })
 

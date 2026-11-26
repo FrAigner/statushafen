@@ -14,9 +14,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Dependabot soll jedes Paketmanifest des Repos aktuell halten, nicht nur
-// Pakete mit bekannter Schwachstelle. Der Test findet die Manifeste selbst; ein
-// neues Manifest ohne Eintrag in .github/dependabot.yml macht ihn rot.
+// Dependabot should keep every package manifest of the repo up to date, not only
+// packages with a known vulnerability. The test finds the manifests itself; a
+// new manifest without an entry in .github/dependabot.yml turns it red.
 type dependabotUpdate struct {
 	Ecosystem string `yaml:"package-ecosystem"`
 	Directory string `yaml:"directory"`
@@ -41,7 +41,7 @@ func loadDependabotConfig(t *testing.T) dependabotConfig {
 	return cfg
 }
 
-// manifestEcosystems ordnet Dateinamen dem Dependabot-Ökosystem zu.
+// manifestEcosystems maps file names to the Dependabot ecosystem.
 func manifestEcosystem(name string) string {
 	switch {
 	case name == "go.mod":
@@ -60,7 +60,7 @@ func TestDependabot_EveryManifestHasAnUpdateEntry(t *testing.T) {
 	cfg := loadDependabotConfig(t)
 	require.Equal(t, 2, cfg.Version)
 
-	covered := map[string]bool{} // "ökosystem|verzeichnis"
+	covered := map[string]bool{} // "ecosystem|directory"
 	for _, u := range cfg.Updates {
 		covered[u.Ecosystem+"|"+u.Directory] = true
 	}
@@ -89,7 +89,7 @@ func TestDependabot_EveryManifestHasAnUpdateEntry(t *testing.T) {
 	}))
 	assert.GreaterOrEqual(t, found, 4, "go.mod, package.json, Dockerfile und docker-compose.yml erwartet")
 
-	// GitHub Actions liegen unter .github/workflows und brauchen "/".
+	// GitHub Actions live under .github/workflows and need "/".
 	assert.True(t, covered["github-actions|/"], "github-actions fehlt")
 }
 

@@ -19,13 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ausfall-Meldung, Gruppen-Kopplung, Abruf-Sperre.
+// Outage message, group link, fetch lock.
 
 var errBoom = errors.New("HTTP 503 von https://status.example.com")
 
-// outageSetup legt eine Quelle samt gekoppelter Komponente an (externer Status
-// major_outage), setzt den letzten Erfolg 50 Minuten vor die Fake-Uhr und lässt
-// den Anbieter fehlschlagen.
+// outageSetup creates a source with a linked component (external status
+// major_outage), sets the last success 50 minutes before the fake clock and makes
+// the provider fail.
 func outageSetup(t *testing.T) (*extFixture, uint) {
 	t.Helper()
 	f := newExtFixture(t)
@@ -49,7 +49,7 @@ func (f *extFixture) fetchAt(srcID uint, at time.Time) externalstatus.FetchResul
 	return res
 }
 
-// mails sammelt die bis jetzt zugestellten Mails (Empfänger → Betreff, Text).
+// mails collects the mails delivered so far (recipient -> subject, text).
 type testMail struct{ to, subject, body string }
 
 func drainMails(t *testing.T, srv *fakeSMTPServer, want int) []testMail {
@@ -64,7 +64,7 @@ func drainMails(t *testing.T, srv *fakeSMTPServer, want int) []testMail {
 			t.Fatalf("erwartet %d Mails, erhalten %d", want, len(out))
 		}
 	}
-	// Weitere unerwünschte Mails treffen kurz danach ein.
+	// More unwanted mails arrive shortly afterwards.
 	select {
 	case raw := <-srv.dataCh:
 		t.Fatalf("unerwartete zusätzliche Mail: %s", raw)
@@ -143,12 +143,12 @@ func TestOutageMail_NurEinmalErinnerungEntwarnung(t *testing.T) {
 	first := drainMails(t, srv, 2)
 	assert.Contains(t, first[0].subject, "nicht erreichbar")
 
-	// Jeder weitere fehlgeschlagene Abruf: keine Mail.
+	// Every further failed poll: no mail.
 	f.fetchAt(srcID, start.Add(time.Hour))
 	f.fetchAt(srcID, start.Add(2*time.Hour))
 	drainMails(t, srv, 0)
 
-	// Nach 24 Stunden eine Erinnerung, danach nichts mehr.
+	// After 24 hours a reminder, then nothing more.
 	f.fetchAt(srcID, start.Add(10*time.Minute+externalstatus.OutageReminderAfter))
 	reminder := drainMails(t, srv, 2)
 	assert.Contains(t, reminder[0].subject, "Erinnerung")
@@ -156,7 +156,7 @@ func TestOutageMail_NurEinmalErinnerungEntwarnung(t *testing.T) {
 	f.fetchAt(srcID, start.Add(72*time.Hour))
 	drainMails(t, srv, 0)
 
-	// Wiederherstellung: Entwarnung.
+	// Recovery: all clear.
 	f.provider.err = nil
 	f.provider.sum = &externalstatus.Summary{Components: []externalstatus.Component{{ExternalID: "vm", Name: "VM", Status: "operational", RawStatus: "operational"}}}
 	f.fetchAt(srcID, start.Add(73*time.Hour))
@@ -181,7 +181,7 @@ func TestOutageMail_EmailSchalterAus(t *testing.T) {
 	assert.Equal(t, "ExternalSource", entry.TargetType)
 	assert.Equal(t, "Example Cloud", entry.TargetName)
 
-	// Die Admin-Meldung bleibt.
+	// The admin message stays.
 	w := f.do(http.MethodGet, "/api/pages/"+pid(f.page)+"/external-outages", f.viewerTok, nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	var list []map[string]any
@@ -205,7 +205,7 @@ func TestOutageMail_OhneEmpfaenger(t *testing.T) {
 
 func TestOutageMail_VersandfehlerUndUngueltigeAdresse(t *testing.T) {
 	t.Setenv("SMTP_HOST", "127.0.0.1")
-	t.Setenv("SMTP_PORT", "1") // niemand lauscht
+	t.Setenv("SMTP_PORT", "1") // nobody is listening
 	f, srcID := outageSetup(t)
 	require.NoError(t, f.db.Create(&models.User{Email: "kaputt", IsGlobalAdmin: true}).Error)
 
@@ -215,8 +215,8 @@ func TestOutageMail_VersandfehlerUndUngueltigeAdresse(t *testing.T) {
 	assert.EqualValues(t, 0, f.auditCount("external_source.outage_email_sent"))
 }
 
-// Die Seitenadresse wirkt nur als Reply-To; mit Zeilenumbruch wird sie
-// verworfen, die Mail geht ohne Reply-To und ohne eingeschleuste Header raus.
+// The site address only acts as Reply-To; with a line break it is
+// discarded, the mail goes out without Reply-To and without injected headers.
 func TestOutageMail_ReplyToMitZeilenumbruchWirdVerworfen(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -230,8 +230,8 @@ func TestOutageMail_ReplyToMitZeilenumbruchWirdVerworfen(t *testing.T) {
 	assert.EqualValues(t, 0, f.auditCount("external_source.outage_email_failed"))
 }
 
-// Der Link der Ausfall-Mail führte auf /admin/components;
-// seit es die Seite "Externe Quellen" gibt, muss er dorthin zeigen.
+// The outage mail's link led to /admin/components;
+// since the "Externe Quellen" page exists, it must point there.
 func TestOutageMail_LinkFuehrtAufQuellenseite(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -277,7 +277,7 @@ func TestExternalOutages_Banner(t *testing.T) {
 	assert.JSONEq(t, "[]", w.Body.String(), "ohne Ausfall eine leere Liste")
 
 	f.fetchAt(srcID, f.clock.Add(10*time.Minute))
-	// Zweite, jüngere Störung und eine inaktive Quelle.
+	// Second, more recent outage and an inactive source.
 	second := f.createSourceNamed(f.page, "Zweite", "https://zweite.example")
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", second).
 		Updates(map[string]any{"outage_since": f.clock.Add(-30 * time.Minute), "last_error": "timeout"}).Error)
@@ -299,7 +299,7 @@ func TestExternalOutages_Banner(t *testing.T) {
 	assert.NotNil(t, list[0]["notified_at"])
 	assert.NotNil(t, list[0]["last_success_at"])
 
-	// Mandantentrennung und Berechtigung.
+	// Tenant separation and permission.
 	assert.Equal(t, http.StatusForbidden, f.do(http.MethodGet, path, f.otherTok, nil).Code)
 	other := f.do(http.MethodGet, "/api/pages/"+pid(f.other)+"/external-outages", f.otherTok, nil)
 	assert.JSONEq(t, "[]", other.Body.String())
@@ -340,7 +340,7 @@ func TestExternalSources_OutageFelder(t *testing.T) {
 	assert.Contains(t, outage["last_error"], "HTTP 503")
 	assert.NotContains(t, m, "outage_notified_at")
 
-	// Frist ändern: 10 bis 1440 Minuten.
+	// Change the deadline: 10 to 1440 minutes.
 	for _, bad := range []int{9, 1441, -1} {
 		w := f.do(http.MethodPut, srcPath, f.pageAdminTok, map[string]any{"outage_after_minutes": bad})
 		assert.Equal(t, http.StatusBadRequest, w.Code, "%d", bad)
@@ -352,7 +352,7 @@ func TestExternalSources_OutageFelder(t *testing.T) {
 	}
 }
 
-// Veralteter Status im Komponentenbaum: ausgefallen → "unknown" für die Seite.
+// Stale status in the component tree: failed -> "unknown" for the site.
 func TestOutage_KomponentenbaumZeigtAusfallUndFrischenStatus(t *testing.T) {
 	f, srcID := outageSetup(t)
 	tree := func() *treeNode {
@@ -379,7 +379,7 @@ func TestOutage_KomponentenbaumZeigtAusfallUndFrischenStatus(t *testing.T) {
 	assert.False(t, n.ExternalSources[0].SourceOutage)
 }
 
-// Kopplung einer ganzen externen Gruppe über die API.
+// Linking a whole external group via the API.
 func TestExternalLinks_GanzeGruppeKoppeln(t *testing.T) {
 	f := newExtFixture(t)
 	srcID := f.createSource(f.page, f.adminTok, "https://status.example.com")
@@ -414,14 +414,14 @@ func TestExternalLinks_GanzeGruppeKoppeln(t *testing.T) {
 	assert.Equal(t, "Group A", ref.GroupName)
 	assert.Equal(t, &models.ExternalWorst{Name: "Service 03", Status: "partial_outage"}, ref.Worst)
 
-	// Neues Mitglied mit schlimmerem Status zählt automatisch.
+	// A new member with a worse status counts automatically.
 	neu := f.extComp(srcID, "neu", "Neu", "major_outage")
 	assert.Equal(t, "major_outage", tree().EffectiveStatus)
-	// Verschwunden zählt nicht mehr.
+	// Disappeared no longer counts.
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", neu.ID).Update("vanished", true).Error)
 	assert.Equal(t, "partial_outage", tree().EffectiveStatus)
 
-	// Dieselbe Gruppe plus einer ihrer Bausteine: erlaubt, Warnung an beiden Kopplungen.
+	// Same group plus one of its components: allowed, warning on both links.
 	w = f.linkVia(f.page, f.pageAdminTok, f.comp.ID, vm.ID)
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var second map[string]any
@@ -438,11 +438,11 @@ func TestExternalLinks_GanzeGruppeKoppeln(t *testing.T) {
 		assert.Equal(t, []any{"overlaps_group"}, l["warnings"], l["external_component_name"])
 	}
 
-	// Bestehende Kopplung erneut: 200 mit derselben Warnung.
+	// Existing link again: 200 with the same warning.
 	w = f.linkVia(f.page, f.pageAdminTok, f.comp.ID, vm.ID)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Ein anderer Baustein oder eine andere Komponente: keine Warnung.
+	// A different member or a different component: no warning.
 	other := f.extComp(srcID, "x", "Andere Gruppe", "operational")
 	require.NoError(t, f.db.Model(&models.ExternalComponent{}).Where("id = ?", other.ID).Update("group_external_id", "g2").Error)
 	w = f.linkVia(f.page, f.pageAdminTok, f.comp.ID, other.ID)
@@ -470,11 +470,11 @@ func TestExternalLinks_GruppeMandantentrennung(t *testing.T) {
 	var nodes []treeNode
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &nodes))
 	assert.Equal(t, "operational", findNode(nodes, "API").EffectiveStatus, "Mitglieder fremder Quellen zählen nicht")
-	// Die fremde Gruppe ist über die Seite nicht koppelbar.
+	// The foreign group cannot be linked via the site.
 	assert.Equal(t, http.StatusNotFound, f.linkVia(f.other, f.otherTok, f.otherComp.ID, grp.ID).Code)
 }
 
-// "Jetzt abrufen" wartet nicht auf einen laufenden Abruf.
+// "Fetch now" does not wait for a running poll.
 type blockingExtProvider struct {
 	entered chan struct{}
 	release chan struct{}
@@ -518,9 +518,9 @@ func TestFetchExternalSource_LaeuftSchonEinAbruf(t *testing.T) {
 }
 
 func TestNewHandler_VerdrahtetAusfallMeldung(t *testing.T) {
-	// NewHandler setzt sich selbst als Empfänger der Ausfall-Ereignisse: Der
-	// echte Abruf einer gesperrten Adresse (Loopback) scheitert, die Quelle ist
-	// seit zwei Stunden ohne Erfolg - die Mail geht ohne weitere Verdrahtung raus.
+	// NewHandler registers itself as the receiver of outage events: The
+	// real poll of a blocked address (loopback) fails, the source has been
+	// without success for two hours - the mail goes out without further wiring.
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
 	f := newExtFixture(t)

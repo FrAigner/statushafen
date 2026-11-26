@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { languageDisplayName } from './languageFlags'
 
-// Liefert Intl.DisplayNames keinen Namen (undefined), zeigt die Tabelle den Code.
+// If Intl.DisplayNames returns no name (undefined), the table shows the code.
 describe('languageDisplayName: Rückfall ohne Namen', () => {
   afterEach(() => vi.unstubAllGlobals())
 

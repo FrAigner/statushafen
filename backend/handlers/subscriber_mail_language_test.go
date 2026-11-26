@@ -12,11 +12,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Teil 1: Mails an Abonnenten folgen der Standardsprache der
-// Statusseite (vorher fest "de"). Vorlage der Seitenstandardsprache, sonst
-// eingebauter Standardtext (de oder en) - nie eine Vorlage einer anderen Sprache.
+// Part 1: mails to subscribers follow the default language of the
+// status page (previously hard-wired "de"). Template of the page default language, otherwise
+// built-in default text (de or en) - never a template of another language.
 
-// setPageDefaultLanguage legt Katalogsprache und Seitenzuordnung als Standard an.
+// setPageDefaultLanguage creates the catalog language and page assignment as the default.
 func setPageDefaultLanguage(t *testing.T, db *gorm.DB, pageID uint, code string) {
 	t.Helper()
 	require.NoError(t, db.Where("code = ?", code).FirstOrCreate(&models.Language{Code: code, Name: code, IsActive: true}).Error)
@@ -28,7 +28,7 @@ func addEmailSubscriber(t *testing.T, db *gorm.DB, pageID uint, email string) {
 	require.NoError(t, db.Create(&models.Subscriber{StatusPageID: pageID, Email: email, Channel: "email", SubscribedComponentIDs: "all"}).Error)
 }
 
-// --- Vorfälle ---------------------------------------------------------------
+// --- Incidents ---------------------------------------------------------------
 
 func TestSubscriberMailSprache_Vorfall_SeitenstandardEnglisch_Standardtext(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "sl-inc-default", "sl-inc-admin@example.com")
@@ -85,7 +85,7 @@ func TestSubscriberMailSprache_Vorfall_NurDeutscheVorlageBeiEnglischerSeiteFaell
 	assert.Contains(t, msg, "Subject: [ALERT]")
 }
 
-// --- Ankündigungen ----------------------------------------------------------
+// --- Announcements ----------------------------------------------------------
 
 func noticeFor(pageID uint) models.GeneralNotice {
 	return models.GeneralNotice{StatusPageID: pageID, Title: "Hinweis", Message: "Text", Level: "critical", IsActive: true, NotifySubscribers: true}
@@ -130,7 +130,7 @@ func TestSubscriberMailSprache_Ankuendigung_VorlageDerSeitenstandardsprache(t *t
 	assert.NotContains(t, msg, "DE-NOTICE")
 }
 
-// --- Abo-Bestätigung --------------------------------------------------------
+// --- Subscription confirmation --------------------------------------------------------
 
 func TestSubscriberMailSprache_Bestaetigung_SeitenstandardEnglisch(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
@@ -176,7 +176,7 @@ func TestSubscriberMailSprache_Bestaetigung_DeutschBleibtDeutsch(t *testing.T) {
 	assert.Contains(t, msg, "Abonnement bestätigen")
 }
 
-// --- Externe Meldungen ------------------------------------------------------
+// --- External notices ------------------------------------------------------
 
 func TestSubscriberMailSprache_Extern_VorlageDerSeitenstandardspracheNichtDeEn(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)

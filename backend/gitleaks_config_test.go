@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// Die Allowlist von gitleaks darf nur genau die bekannten Fehlalarme
-// unterdrücken. Mit regexTarget = "line" und unverankerten Mustern verschwand
-// jede Zeile, in der ein solcher Name nur vorkam, samt echtem Geheimnis. Der
-// Test liest .gitleaks.toml und prüft das Verhalten der Muster ohne gitleaks.
+// The gitleaks allowlist must suppress exactly the known false positives
+// and nothing more. With regexTarget = "line" and unanchored patterns, every
+// line in which such a name merely occurred vanished, real secret included. The
+// test reads .gitleaks.toml and checks the behavior of the patterns without gitleaks.
 func gitleaksAllowlist(t *testing.T) (target string, patterns []*regexp.Regexp) {
 	t.Helper()
 	raw, err := os.ReadFile("../.gitleaks.toml")
@@ -47,7 +47,7 @@ func TestGitleaksAllowlist_PatternsAreAnchored(t *testing.T) {
 	}
 }
 
-// dash setzt Beispielwerte aus Teilen zusammen, damit der Scanner die Testdaten nicht selbst als Fund meldet.
+// dash assembles example values from parts so that the scanner does not itself report the test data as a finding.
 func dash(parts ...string) string { return strings.Join(parts, "-") }
 
 func TestGitleaksAllowlist_SuppressesOnlyKnownFalsePositives(t *testing.T) {

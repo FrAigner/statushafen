@@ -23,12 +23,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Teil B2: Vorfälle und Wartungen externer Quellen an
-// Abonnenten der eigenen Statusseite melden und lesend ausliefern. Der
-// Abfrage-Dienst (externalstatus) erkennt neue und geänderte Meldungen, die
-// gekoppelte Komponenten betreffen, und ruft ExternalIncident; hier liegen
-// Empfängerkreis, Mailtext und Versand (der Dienst darf handlers nicht
-// importieren, deliverMail liegt hier).
+// Part B2: report incidents and maintenances of external sources to
+// subscribers of the own status page and serve them read-only. The
+// polling service (externalstatus) detects new and changed reports that
+// affect linked components and calls ExternalIncident; recipients,
+// mail text and delivery live here (the service must not import handlers,
+// and deliverMail lives here).
 
 const (
 	auditActionIncidentMirrored = "external_incident.mirrored"
@@ -37,7 +37,7 @@ const (
 	auditActionIncidentPruned   = "external_incident.pruned"
 	auditTargetExternalIncident = "ExternalIncident"
 
-	// Standardfenster, in dem beendete Meldungen noch gelistet werden.
+	// Default window in which finished reports are still listed.
 	externalIncidentDefaultDays = 30
 	externalIncidentMaxDays     = 365
 	externalIncidentDefaultMax  = 50
@@ -45,9 +45,9 @@ const (
 	publicExternalIncidentDays  = 14
 )
 
-// ExternalIncident implementiert externalstatus.IncidentNotifier. Der Versand
-// läuft in einer eigenen Goroutine, damit ein langsamer SMTP-Server den
-// Abruf-Takt nicht aufhält; WaitIncidentMails wartet darauf (Tests).
+// ExternalIncident implements externalstatus.IncidentNotifier. Delivery
+// runs in its own goroutine so a slow SMTP server does not hold up the
+// polling cycle; WaitIncidentMails waits for it (tests).
 func (h *Handler) ExternalIncident(_ context.Context, ev externalstatus.IncidentEvent) {
 	h.incidentMails.Add(1)
 	go func() {
@@ -56,17 +56,17 @@ func (h *Handler) ExternalIncident(_ context.Context, ev externalstatus.Incident
 	}()
 }
 
-// MirroredIncidentsPruned implementiert externalstatus.RetentionReporter
-// Audit-Eintrag mit der Anzahl der aufgeräumten Meldungen.
+// MirroredIncidentsPruned implements externalstatus.RetentionReporter.
+// Audit entry with the number of cleaned-up reports.
 func (h *Handler) MirroredIncidentsPruned(_ context.Context, count int, retention time.Duration) {
 	h.RecordSystemAudit(auditActionIncidentPruned, "config", auditTargetExternalIncident, "", "",
 		fmt.Sprintf("count=%d retention_days=%d", count, int(retention.Hours()/24)))
 }
 
-// WaitIncidentMails blockiert, bis alle angestoßenen Vorfall-Benachrichtigungen verarbeitet sind.
+// WaitIncidentMails blocks until all triggered incident notifications have been processed.
 func (h *Handler) WaitIncidentMails() { h.incidentMails.Wait() }
 
-// externalIncidentKind bildet (Art, Anlass) auf den Vorlagen-Kind ab.
+// externalIncidentKind maps (kind, trigger) to the template kind.
 func externalIncidentKind(kind string, event externalstatus.IncidentEventKind) string {
 	maintenance := kind == models.ExternalIncidentKindMaintenance
 	switch event {
@@ -87,22 +87,22 @@ func externalIncidentKind(kind string, event externalstatus.IncidentEventKind) s
 	return NotificationKindExternalIncidentUpdated
 }
 
-// extIncidentMail bündelt die pro Ereignis einmal berechneten Werte.
+// extIncidentMail bundles the values computed once per event.
 type extIncidentMail struct {
 	ev   externalstatus.IncidentEvent
 	page models.StatusPage
 	cfg  smtpConfig
-	lang string // Sprache des eingebauten Standardtexts (je Abonnent gesetzt)
+	lang string // Language of the built-in default text (set per subscriber)
 	tmpl *models.NotificationTemplate
-	// subTemplate: Vorlage/Sprache für die gewählte Sprache eines Abonnenten
+	// subTemplate: template/language for a subscriber's chosen language
 	// "" = Seitenstandardsprache.
 	subTemplate func(preferred string) (*models.NotificationTemplate, string)
-	// chatLang: effektive Sprache des Abonnenten für Chat-Texte.
+	// chatLang: effective language of the subscriber for chat texts.
 	chatLang  func(preferred string) string
 	front     string
 	compNames string
 	compIDs   []uint
-	message   string // jüngstes Update, einzeilig
+	message   string // latest update, single line
 	target    mailAuditTarget
 	sent      int
 	failed    int
@@ -126,8 +126,8 @@ func (h *Handler) dispatchExternalIncident(ev externalstatus.IncidentEvent) {
 	cfg := loadSMTPConfig()
 	cfg.applyPageSender(page)
 	m := &extIncidentMail{ev: ev, page: page, cfg: cfg, front: getFrontendURL(), target: target}
-	// Vorlage nach dem echten Sprachcode des Abonnenten, sonst der
-	// Seitenstandardsprache; Standardtext weiter in de oder en.
+	// Template by the subscriber's actual language code, otherwise the
+	// site default language; default text still in de or en.
 	m.subTemplate = h.memoSubscriberTemplate(page.ID, externalIncidentKind(inc.Kind, ev.Kind))
 	m.chatLang = h.memoSubscriberChatLang(page.ID)
 	names := make([]string, 0, len(ev.Components))
@@ -141,7 +141,7 @@ func (h *Handler) dispatchExternalIncident(ev externalstatus.IncidentEvent) {
 	}
 
 	var subs []models.Subscriber
-	// nur bestätigte Abos.
+	// confirmed subscriptions only.
 	h.DB.Where("status_page_id = ? AND status = ?", page.ID, models.SubscriberStatusActive).
 		FindInBatches(&subs, 100, func(_ *gorm.DB, _ int) error {
 			for _, sub := range subs {
@@ -155,8 +155,8 @@ func (h *Handler) dispatchExternalIncident(ev externalstatus.IncidentEvent) {
 	}
 }
 
-// notifyExternalSubscriber meldet an einen Abonnenten, sofern er eine der
-// betroffenen Komponenten abonniert hat (Muster notifySubscriber).
+// notifyExternalSubscriber notifies one subscriber, provided they subscribed
+// to one of the affected components (pattern of notifySubscriber).
 func (h *Handler) notifyExternalSubscriber(m *extIncidentMail, sub models.Subscriber) {
 	if !SubscriberHasAnyComponent(sub.SubscribedComponentIDs, m.compIDs) {
 		return
@@ -182,8 +182,8 @@ func (h *Handler) notifyExternalSubscriber(m *extIncidentMail, sub models.Subscr
 		fmt.Sprintf("subscriber_id=%d channel=%s error=%s", sub.ID, sub.Channel, truncateAudit(err.Error())))
 }
 
-// errMailDisabled: E-Mail-Versand global abgeschaltet (deliverMail hat den
-// Audit-Eintrag email.skipped_disabled geschrieben), weder gesendet noch Fehler.
+// errMailDisabled: email delivery disabled globally (deliverMail wrote the
+// audit entry email.skipped_disabled), neither sent nor an error.
 var errMailDisabled = errors.New("email disabled")
 
 func truncateAudit(s string) string {
@@ -199,8 +199,8 @@ func (h *Handler) sendExternalIncidentWebhook(m *extIncidentMail, sub models.Sub
 		return errors.New("google_chat subscriber without webhook url")
 	}
 	inc := m.ev.Incident
-	// Beschriftungen in der Sprache des Abonnenten (de/en) bzw. der Seite.
-	lang := "de" // wie bisher, wenn keine Sprachwahl vorbereitet ist
+	// Labels in the subscriber's language (de/en) or the site's.
+	lang := "de" // as before if no language choice has been prepared
 	if m.chatLang != nil {
 		lang = m.chatLang(sub.Language)
 	}
@@ -212,11 +212,11 @@ func (h *Handler) sendExternalIncidentWebhook(m *extIncidentMail, sub models.Sub
 		text = fmt.Sprintf("🌐 **[EXTERN] Status Update** (%s)\n**Quelle:** %s\n**Komponenten:** %s\n**Meldung:** %s\n**Status:** %s\n**Details:** %s\n**Link:** %s",
 			m.ev.Kind, m.ev.Source.Name, m.compNames, inc.Title, externalStatusLabel(inc.Status, "de"), m.message, inc.URL)
 	}
-	// SSRF-Schutz wie bei Incidents: postWebhook sendet über webhookTestClient
-	// (IP-Prüfung beim Connect); Ratenlimit/Retry zentral, der
-	// Fehler enthält nie die URL.
+	// SSRF protection as with incidents: postWebhook sends via webhookTestClient
+	// (IP check on connect); rate limit/retry handled centrally, the
+	// error never contains the URL.
 	res := postWebhook(context.Background(), sub.WebhookURL, map[string]any{"text": text}, webhookModeNotify)
-	// Admins sehen Ratenlimit und dauerhafte Ablehnung in der Glocke.
+	// Admins see rate limiting and permanent rejection in the bell.
 	h.reportWebhookProblem(sub.StatusPageID, sub.ID, "google_chat", res)
 	return res.Err()
 }
@@ -235,7 +235,7 @@ func (h *Handler) sendExternalIncidentMail(m *extIncidentMail, sub models.Subscr
 			front = m.front + "/status/" + m.page.Slug + "?token=" + url.QueryEscape(token)
 		}
 	}
-	// Kopie nur für diesen Empfänger: Sprache/Vorlage des Abonnenten, Zähler bleiben unberührt.
+	// Copy for this recipient only: subscriber's language/template, counters stay untouched.
 	loc := *m
 	loc.tmpl, loc.lang = m.subTemplate(sub.Language)
 	subject, body := buildExternalIncidentMail(&loc, front, unsub)
@@ -262,10 +262,10 @@ func (h *Handler) sendExternalIncidentMail(m *extIncidentMail, sub models.Subscr
 	return nil
 }
 
-// buildExternalIncidentMail liefert Betreff und Body: die Vorlage der Seite
-// (Kind external_*, Audience subscriber), sonst den Standardtext. Alle Werte
-// der Fremdseite werden entschärft (HTML-escaped, Zeilenumbrüche im Betreff
-// und in Platzhaltern durch Leerzeichen ersetzt, im Standardtext durch <br>).
+// buildExternalIncidentMail returns subject and body: the site's template
+// (kind external_*, audience subscriber), otherwise the default text. All values
+// from the third-party site are sanitized (HTML-escaped, line breaks replaced by
+// spaces in the subject and in placeholders, by <br> in the default text).
 func buildExternalIncidentMail(m *extIncidentMail, frontendURL, unsubscribeURL string) (subject, body string) {
 	inc, src := m.ev.Incident, m.ev.Source
 	statusLabel := externalStatusLabel(inc.Status, m.lang)
@@ -285,7 +285,7 @@ func buildExternalIncidentMail(m *extIncidentMail, frontendURL, unsubscribeURL s
 		StatusLabel:    statusLabel,
 		ComponentNames: oneLine(m.compNames),
 		Message:        m.message,
-		MessageHTML:    htmltemplate.HTML(escapeMultiline(m.message)), // #nosec G203 -- HTML-maskiert, Umbrüche als <br>; Fremdtext wird nicht als Markdown gelesen
+		MessageHTML:    htmltemplate.HTML(escapeMultiline(m.message)), // #nosec G203 -- HTML-escaped, line breaks as <br>; third-party text is not read as Markdown
 		Action:         string(m.ev.Kind),
 		Language:       m.lang,
 		FrontendURL:    frontendURL,
@@ -299,9 +299,9 @@ func buildExternalIncidentMail(m *extIncidentMail, frontendURL, unsubscribeURL s
 
 var htmlLineBreaks = strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
 
-// escapeMultiline escaped HTML und macht Zeilenumbrüche zu <br>: Der Body darf
-// kein CR/LF enthalten (Header-Injection-Schutz), Updates der Fremdseite sind
-// aber mehrzeilig.
+// escapeMultiline escapes HTML and turns line breaks into <br>: the body must
+// not contain CR/LF (header injection protection), but updates from the third-party site are
+// multi-line.
 func escapeMultiline(s string) string { return htmlLineBreaks.Replace(html.EscapeString(s)) }
 
 func buildExternalIncidentHTML(m *extIncidentMail, statusLabel, frontendURL, unsubscribeURL string) string {
@@ -374,8 +374,8 @@ func externalIntro(kind string, ev externalstatus.IncidentEventKind, de bool) st
 	return "There is an update on an incident of an external source."
 }
 
-// externalStatusLabel: lokalisierte Bezeichnung eines normalisierten Status;
-// unbekannte Werte erscheinen roh.
+// externalStatusLabel: localized label of a normalized status;
+// unknown values appear raw.
 func externalStatusLabel(status, lang string) string {
 	switch status {
 	case "in_progress":
@@ -392,7 +392,7 @@ func externalStatusLabel(status, lang string) string {
 	return statusLabelFor(status, lang)
 }
 
-// ---- Lesende API (Teil C/D) ----------------------------------------------
+// ---- Read API (part C/D) ----------------------------------------------
 
 type externalIncidentComponentView struct {
 	ExternalID string `json:"external_id"`
@@ -411,7 +411,7 @@ type externalIncidentUpdateView struct {
 	DisplayAt time.Time `json:"display_at"`
 }
 
-// externalIncidentView ist die Auslieferung einer gespiegelten Meldung.
+// externalIncidentView is the delivery format of a mirrored report.
 type externalIncidentView struct {
 	ID                 uint                               `json:"id"`
 	SourceID           uint                               `json:"source_id"`
@@ -436,15 +436,15 @@ type externalIncidentView struct {
 }
 
 type externalIncidentQuery struct {
-	kind     string // "" = alle
+	kind     string // "" = all
 	state    string // "" | "open" | "closed"
 	sourceID uint
 	days     int
 	limit    int
-	now      time.Time // Bezugszeit; leer = jetzt (Tests, Verfügbarkeit)
+	now      time.Time // reference time; empty = now (tests, availability)
 }
 
-// activeSourceIDs: Quellen der Seite, die abgefragt werden (aktiv, nicht gelöscht).
+// activeSourceIDs: sources of the site that are polled (active, not deleted).
 func (h *Handler) activeSourceIDs(pageID uint) *gorm.DB {
 	return h.DB.Model(&models.ExternalSource{}).Select("id").Where("status_page_id = ? AND active = ?", pageID, true)
 }
@@ -458,9 +458,9 @@ func (h *Handler) externalIncidentNow() time.Time {
 	return time.Now()
 }
 
-// externalIncidentViews liefert die gespiegelten Meldungen der Seite, die
-// mindestens eine gekoppelte Komponente betreffen. Offene zuerst, dann nach
-// letzter Änderung; beendete nur innerhalb von q.days.
+// externalIncidentViews returns the mirrored reports of the site that affect
+// at least one linked component. Open first, then by
+// last change; finished ones only within q.days.
 func (h *Handler) externalIncidentViews(pageID uint, q externalIncidentQuery) ([]externalIncidentView, error) {
 	db := h.DB.Where("status_page_id = ? AND external_source_id IN (?)", pageID, h.activeSourceIDs(pageID))
 	if q.kind != "" {
@@ -577,10 +577,10 @@ func parseExternalIncidentQuery(c *gin.Context) (externalIncidentQuery, string) 
 	return q, ""
 }
 
-// GET /api/pages/:page_id/external-incidents (components:read) - gespiegelte
-// Vorfälle und Wartungen, die gekoppelte Komponenten der Seite betreffen.
-// Filter: kind, state (open|closed), source_id, days (Fenster für beendete,
-// Standard 30), limit (Standard 50).
+// GET /api/pages/:page_id/external-incidents (components:read) - mirrored
+// incidents and maintenances that affect linked components of the site.
+// Filters: kind, state (open|closed), source_id, days (window for finished,
+// default 30), limit (default 50).
 func (h *Handler) GetExternalIncidentsHandler(c *gin.Context) {
 	tenantID, ok := parseTenantID(c)
 	if !ok {
@@ -599,9 +599,9 @@ func (h *Handler) GetExternalIncidentsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, items)
 }
 
-// GET /api/pages/:page_id/external-incidents/:id (components:read) - eine
-// gespiegelte Meldung; 404, wenn sie nicht zu dieser Seite gehört oder keine
-// gekoppelte Komponente betrifft.
+// GET /api/pages/:page_id/external-incidents/:id (components:read) - one
+// mirrored report; 404 if it does not belong to this site or has no
+// linked component.
 func (h *Handler) GetExternalIncidentHandler(c *gin.Context) {
 	tenantID, ok := parseTenantID(c)
 	if !ok {
@@ -645,9 +645,9 @@ func (h *Handler) externalIncidentNotFoundOr500(c *gin.Context, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch external incident", "code": "server_error"})
 }
 
-// publicExternalIncidents: Auszug fürs öffentliche Dashboard (Teil D): offene
-// und kürzlich beendete Meldungen. Fehler werden geloggt, das Dashboard
-// bleibt erreichbar (leere Liste).
+// publicExternalIncidents: excerpt for the public dashboard (part D): open
+// and recently finished reports. Errors are logged, the dashboard
+// stays reachable (empty list).
 func (h *Handler) publicExternalIncidents(pageID uint) []externalIncidentView {
 	items, err := h.externalIncidentViews(pageID, externalIncidentQuery{days: publicExternalIncidentDays, limit: externalIncidentDefaultMax})
 	if err != nil {

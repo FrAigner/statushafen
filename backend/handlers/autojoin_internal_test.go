@@ -2,9 +2,9 @@ package handlers
 
 import "testing"
 
-// Grenzfälle von emailMatchesAutoJoin. Eine E-Mail ohne lokalen
-// Teil ("@acme.example") ist keine gültige Adresse und darf nie Auto-Join
-// auslösen; ein einzelnes Zeichen davor genügt.
+// Edge cases of emailMatchesAutoJoin. An email without a local
+// part ("@acme.example") is not a valid address and must never trigger auto-join;
+// a single character before it suffices.
 func TestEmailMatchesAutoJoinGrenzfaelle(t *testing.T) {
 	cases := []struct {
 		name    string

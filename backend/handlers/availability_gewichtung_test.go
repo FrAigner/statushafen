@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Gesamtseite = Durchschnitt der sichtbaren Komponenten; Schweregrade
-// werden gewichtet, Überlappungen zählen nicht doppelt, Versteckte zählen nicht.
+// Overall page = average of the visible components; severities
+// are weighted, overlaps do not count twice, hidden ones do not count.
 func TestAvailability_GewichtungMehrereKomponentenUndUeberlappung(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("gew", false)
@@ -19,10 +19,10 @@ func TestAvailability_GewichtungMehrereKomponentenUndUeberlappung(t *testing.T) 
 	hidden := e.comp(p.ID, "Versteckt", "operational", nil)
 	require.NoError(t, e.db.Model(&hidden).Update("visible", false).Error)
 
-	// A: zwei überlappende eigene Vorfälle 00-12 und 06-18 (je degraded) = 18 h x 0,3.
+	// A: two overlapping own incidents 00-12 and 06-18 (each degraded) = 18 h x 0.3.
 	e.incident(p.ID, "resolved", *utc(20, 0), utc(20, 12), a.ID)
 	e.incident(p.ID, "resolved", *utc(20, 6), utc(20, 18), a.ID)
-	// Nur die versteckte Komponente ist betroffen: darf nichts verändern.
+	// Only the hidden component is affected: must change nothing.
 	e.incident(p.ID, "resolved", *utc(21, 0), utc(21, 12), hidden.ID)
 
 	_, resp := e.get("/api/public/pages/gew/availability?include=components")
@@ -48,15 +48,15 @@ func TestAvailability_GewichtungMehrereKomponentenUndUeberlappung(t *testing.T) 
 	assert.Equal(t, "operational", day(t, resp.Days, "2026-10-21").Status, "Vorfall an versteckter Komponente zählt nicht")
 }
 
-// Ein längerer, schwererer externer Zeitraum verdrängt den eigenen Vorfall;
-// Mitternachtsgrenze und mehrtägige Dauer werden je Tag gewichtet.
+// A longer, more severe external period displaces the own incident;
+// the midnight boundary and multi-day duration are weighted per day.
 func TestAvailability_ExternSchwererVerdraengtEigenenVorfall(t *testing.T) {
 	x := newExtAvail(t)
 	x.incident(x.page.ID, "resolved", *utc(20, 0), utc(20, 12), x.comp.ID)
 	x.add(models.ExternalIncidentKindIncident, "critical", utc(20, 6), utc(21, 6), true)
 	days := x.days()
 	d20 := day(t, days, "2026-10-20")
-	// 00-06 degraded (6 h x 0,3) + 06-24 critical (18 h) = 1,8 h + 18 h
+	// 00-06 degraded (6 h x 0.3) + 06-24 critical (18 h) = 1.8 h + 18 h
 	assert.EqualValues(t, int64((1.8+18)*3600), d20.DowntimeSeconds)
 	assert.Equal(t, "major_outage", d20.Status)
 	assert.Equal(t, []availImpairment{{Status: "major_outage", Seconds: 18 * 3600}, {Status: "degraded_performance", Seconds: 6 * 3600}}, d20.Impairments)

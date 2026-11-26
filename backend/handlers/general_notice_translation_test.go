@@ -330,7 +330,7 @@ func TestDeleteGeneralNoticeTranslationHandler_InvalidID(t *testing.T) {
 	}
 }
 
-// Speichern je Sprache aus dem Bearbeiten-Formular.
+// Saving per language from the edit form.
 func saveNoticeTransSetup(t *testing.T) (*gorm.DB, http.Handler, string) {
 	t.Helper()
 	db, r, h := newTestSetup()
@@ -368,7 +368,7 @@ func TestSaveGeneralNoticeTranslationHandler_CreatesThenUpdates(t *testing.T) {
 
 func TestSaveGeneralNoticeTranslationHandler_RejectsBadInput(t *testing.T) {
 	_, r, base := saveNoticeTransSetup(t)
-	for _, code := range []string{"de", "fr"} { // Standardsprache bzw. nicht aktiv
+	for _, code := range []string{"de", "fr"} { // default language or not active
 		if c := putNoticeTrans(r, base+code, "draft"); c != http.StatusBadRequest {
 			t.Errorf("%s: erwartet 400, war %d", code, c)
 		}

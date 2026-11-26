@@ -7,9 +7,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// soft-gelöschte Join-Zeilen dürfen beim Lesen der Tags nicht
-// mehr auftauchen (sonst wirken Replace/Entfernen wie Duplikate bzw. wie ein
-// No-Op).
+// soft-deleted join rows must no longer appear when reading the tags
+// (otherwise replace/remove would look like duplicates or like a
+// no-op).
 func TestTagsFor_IgnorierenSoftGeloeschteZeilen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

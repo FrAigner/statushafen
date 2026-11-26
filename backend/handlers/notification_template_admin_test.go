@@ -17,15 +17,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// CRUD- und Preview-Tests für die Admin-Endpunkte.
-// Der Fokus liegt darauf, dass die Handler-Kette (Route + pages:write-
-// Middleware + Handler) die geforderten Wirkungen erzielt:
-// Upsert einer Vorlage, Reset per DELETE, Vorschau mit Beispieldaten,
-// 403 für User ohne pages:write.
+// CRUD and preview tests for the admin endpoints.
+// The focus is on the handler chain (route + pages:write
+// middleware + handler) achieving the required effects:
+// upsert of a template, reset via DELETE, preview with sample data,
+// 403 for users without pages:write.
 
-// notifAdminHarness bündelt den vollständigen Aufbau, den jeder
-// Admin-Endpunkt-Test braucht: Test-DB + Global-Admin + Statusseite +
-// Gin-Router mit derselben AuthGroup-Middleware wie in main.go.
+// notifAdminHarness bundles the complete setup that every
+// admin endpoint test needs: test DB + global admin + status page +
+// Gin router with the same AuthGroup middleware as in main.go.
 type notifAdminHarness struct {
 	db     *gorm.DB
 	router *gin.Engine
@@ -93,10 +93,10 @@ func (h *notifAdminHarness) do(t *testing.T, method, path string, body any) *htt
 	return rec
 }
 
-// TestNotificationTemplate_Upsert_CreatesThenUpdates prüft den Kern der
-// Admin-Endpunkte: der erste PUT legt einen neuen Eintrag an, der zweite
-// PUT mit derselben (Kind, Language) aktualisiert ihn, ohne einen zweiten
-// Datensatz zu erzeugen.
+// TestNotificationTemplate_Upsert_CreatesThenUpdates checks the core of the
+// admin endpoints: the first PUT creates a new entry, the second
+// PUT with the same (kind, language) updates it without creating a second
+// record.
 func TestNotificationTemplate_Upsert_CreatesThenUpdates(t *testing.T) {
 	env := newNotifAdminHarness(t)
 
@@ -129,11 +129,11 @@ func TestNotificationTemplate_Upsert_CreatesThenUpdates(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_Delete_ResetsToDefault deckt die
-// geforderte "Reset auf Default"-Möglichkeit ab: nach DELETE existiert
-// keine Custom-Zeile mehr, die Statusseite fällt beim nächsten Versand
-// auf den hartkodierten Default zurück (davon macht der Renderer
-// sich abhängig, es reicht also die reine Row-Löschung nachzuweisen).
+// TestNotificationTemplate_Delete_ResetsToDefault covers the
+// required "reset to default" capability: after DELETE no
+// custom row exists anymore, and on the next dispatch the status page falls back
+// to the hard-coded default (the renderer
+// depends on that, so it suffices to prove the plain row deletion).
 func TestNotificationTemplate_Delete_ResetsToDefault(t *testing.T) {
 	env := newNotifAdminHarness(t)
 	env.db.Create(&models.NotificationTemplate{
@@ -155,18 +155,18 @@ func TestNotificationTemplate_Delete_ResetsToDefault(t *testing.T) {
 		t.Fatalf("expected the row to be gone, got %d rows", count)
 	}
 
-	// Zweites DELETE liefert 404, weil es keinen Eintrag mehr gibt - dokumentiert
-	// die (bewusst nicht-idempotente) Fehlermeldung aus dem Handler-Kommentar.
+	// A second DELETE returns 404 because there is no entry anymore - documents
+	// the (deliberately non-idempotent) error message from the handler comment.
 	rec = env.do(t, http.MethodDelete, "/api/pages/1/notification-templates/incident_resolved/subscriber/de", nil)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 on second delete, got %d", rec.Code)
 	}
 }
 
-// TestNotificationTemplate_Preview_UsesSampleData weist nach, dass der
-// Preview-Endpunkt Platzhalter durch die vom Handler bereitgestellten
-// Beispielwerte ersetzt - der Admin bekommt also eine realistische
-// Vorschau, nicht die rohen {{.Placeholder}}-Zeichenfolgen.
+// TestNotificationTemplate_Preview_UsesSampleData proves that the
+// preview endpoint replaces placeholders with the sample values
+// provided by the handler - so the admin gets a realistic
+// preview, not the raw {{.Placeholder}} strings.
 func TestNotificationTemplate_Preview_UsesSampleData(t *testing.T) {
 	env := newNotifAdminHarness(t)
 
@@ -189,9 +189,9 @@ func TestNotificationTemplate_Preview_UsesSampleData(t *testing.T) {
 	}
 }
 
-// Eine Vorlage, die sich parsen, aber nicht ausführen lässt (Vergleich
-// unterschiedlicher Typen), meldet die Vorschau als 400 mit dem Vorlagenfehler
-// statt als 500; gespeichert wird nichts.
+// A template that can be parsed but not executed (comparison
+// of different types) makes the preview report 400 with the template error
+// instead of 500; nothing is stored.
 func TestNotificationTemplate_Preview_ExecutionErrorReturns400(t *testing.T) {
 	env := newNotifAdminHarness(t)
 
@@ -212,10 +212,10 @@ func TestNotificationTemplate_Preview_ExecutionErrorReturns400(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_Put_RejectsHeaderInjection weist nach, dass die
-// Validierung durch den Save-Handler tatsächlich aufgerufen wird -
-// ein Subject mit CR/LF muss mit 400 abgelehnt werden statt still in die
-// DB durchzurutschen.
+// TestNotificationTemplate_Put_RejectsHeaderInjection proves that the
+// validation is actually invoked by the save handler -
+// a subject with CR/LF must be rejected with 400 instead of silently slipping into the
+// DB.
 func TestNotificationTemplate_Put_RejectsHeaderInjection(t *testing.T) {
 	env := newNotifAdminHarness(t)
 
@@ -233,15 +233,15 @@ func TestNotificationTemplate_Put_RejectsHeaderInjection(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_Put_RejectsInvalidKindOrLang deckt die
-// URL-Parameter-Validierung ab. Ohne diese Guards würden beliebige Kind-
-// Werte akzeptiert (und beim Versand mangels Lookup wieder ignoriert),
-// was still ein "kaputtes" Template hinterlassen könnte.
+// TestNotificationTemplate_Put_RejectsInvalidKindOrLang covers the
+// URL parameter validation. Without these guards, arbitrary kind
+// values would be accepted (and ignored again at dispatch for lack of a lookup),
+// which could silently leave a "broken" template behind.
 //
-// Die Testseite hat (wie in newNotifAdminHarness angelegt) keine einzige
-// StatusPageLanguage-Zeile - isValidNotificationLanguage fällt für sie
-// deshalb auf die alte en/de-Konvention zurück (siehe Kommentar dort), "fr"
-// bleibt also ungültig, bis die Seite einen echten Sprachkatalog hat.
+// The test page has (as created in newNotifAdminHarness) no single
+// StatusPageLanguage row - isValidNotificationLanguage therefore falls back
+// to the old en/de convention for it (see the comment there), "fr"
+// thus stays invalid until the page has a real language catalog.
 func TestNotificationTemplate_Put_RejectsInvalidKindOrLang(t *testing.T) {
 	env := newNotifAdminHarness(t)
 
@@ -260,10 +260,10 @@ func TestNotificationTemplate_Put_RejectsInvalidKindOrLang(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_Put_AcceptsMaintenanceKinds sichert die
-// Erweiterung: die drei Wartungsfenster-Kinds müssen von PUT akzeptiert
-// werden. Wenn diese Zeile bricht, hat jemand Kinds aus der Whitelist
-// oder Konstanten entfernt.
+// TestNotificationTemplate_Put_AcceptsMaintenanceKinds secures the
+// extension: the three maintenance-window kinds must be
+// accepted by PUT. If this line breaks, someone has removed kinds from the whitelist
+// or constants.
 func TestNotificationTemplate_Put_AcceptsMaintenanceKinds(t *testing.T) {
 	env := newNotifAdminHarness(t)
 	payload := map[string]string{"Subject": "Wartung", "BodyHTML": "<p>Body</p>"}
@@ -280,9 +280,9 @@ func TestNotificationTemplate_Put_AcceptsMaintenanceKinds(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_Preview_MaintenanceSampleData - die
-// Vorschau-Sample-Data muss pro Kind unterschiedliche Beispiele liefern,
-// sonst sieht ein Admin auf jedem Kind dieselbe Zahlungs-Gateway-Story.
+// TestNotificationTemplate_Preview_MaintenanceSampleData - the
+// preview sample data must provide different examples per kind,
+// otherwise an admin sees the same payment-gateway story on every kind.
 func TestNotificationTemplate_Preview_MaintenanceSampleData(t *testing.T) {
 	env := newNotifAdminHarness(t)
 	rec := env.do(t, http.MethodPost, "/api/pages/1/notification-templates/maintenance_started/staff/en/preview", map[string]string{
@@ -301,10 +301,10 @@ func TestNotificationTemplate_Preview_MaintenanceSampleData(t *testing.T) {
 	}
 }
 
-// TestNotificationTemplate_List_ReturnsPageScopedOnly stellt sicher, dass
-// die GET-Liste nur Templates der angefragten Statusseite zurückgibt -
-// mandantenübergreifende Leaks (analog auf anderen Modellen)
-// sind hier durch das WHERE gesichert, dieser Test wacht darüber.
+// TestNotificationTemplate_List_ReturnsPageScopedOnly ensures that
+// the GET list returns only templates of the requested status page -
+// cross-tenant leaks (analogous on other models)
+// are secured here by the WHERE, this test guards that.
 func TestNotificationTemplate_List_ReturnsPageScopedOnly(t *testing.T) {
 	env := newNotifAdminHarness(t)
 	other := models.StatusPage{Name: "Other", Slug: "other"}

@@ -14,44 +14,44 @@ import (
 	"gorm.io/gorm"
 )
 
-// Mail-Versand für General Notices. Bewusst schlank gehalten
-// und getrennt von DispatchNotifications - Notices haben keine
-// Komponenten-Zuordnung und keinen Status-Lebenszyklus, sondern nur
-// Title/Message/Level. Der SMTP-Pfad selbst (loadSMTPConfig +
-// sendAlertEmail) wird geteilt, damit From-Fallback, Header-Injection-
-// Guard und Absender-Konfig identisch zum Incident-Pfad bleiben.
+// Mail dispatch for General Notices. Deliberately kept lean
+// and separate from DispatchNotifications - notices have no
+// component assignment and no status lifecycle, only
+// Title/Message/Level. The SMTP path itself (loadSMTPConfig +
+// sendAlertEmail) is shared, so that From fallback, header injection
+// guard and sender config stay identical to the incident path.
 //
-// Die Subscriber-Filterung ist schwächer als bei Incidents: eine Notice
-// gilt immer für die ganze Statusseite, nicht für einzelne Komponenten.
-// Deshalb bekommen alle Email-Subscriber der Seite die Notice, egal
-// welche Komponenten sie abonniert haben. Interne User (Admin/Editor)
-// werden nicht benachrichtigt - Notices sind an das öffentliche
-// Publikum gerichtet.
+// Subscriber filtering is weaker than for incidents: a notice
+// always applies to the whole status page, not to individual components.
+// Therefore all email subscribers of the page receive the notice, regardless of
+// which components they subscribed to. Internal users (Admin/Editor)
+// are not notified - notices are aimed at the general
+// public.
 
-// noticeDispatchContext bündelt die pro Dispatch einmalig berechneten Werte,
-// die jede Subscriber-Mail braucht - vermeidet, dass sendNoticeToSubscriber
-// eine lange Parameterliste bekommt.
+// noticeDispatchContext bundles the values computed once per dispatch
+// that every subscriber mail needs - avoids giving sendNoticeToSubscriber
+// a long parameter list.
 type noticeDispatchContext struct {
 	notice      models.GeneralNotice
 	action      string
 	page        models.StatusPage
 	smtpCfg     smtpConfig
 	frontendURL string
-	// subTemplate: Vorlage und Sprache (de/en des eingebauten Standardtexts) für
-	// die gewählte Sprache eines Abonnenten; "" = Seitenstandard.
+	// subTemplate: template and language (de/en of the built-in default text) for
+	// the subscriber's chosen language; "" = page default.
 	subTemplate    func(preferred string) (*models.NotificationTemplate, string)
 	escTitle       string
 	messageHTML    string // richtext.ToMailHTML(notice.Message)
 	defaultSubject string
 }
 
-// sendNoticeToSubscriber baut den individuellen (Token/Unsubscribe-Link)
-// Mailinhalt für einen Subscriber und verschickt ihn. Ausgelagert aus
-// DispatchNoticeNotifications, damit dessen kognitive Komplexität die
-// SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// sendNoticeToSubscriber builds the individual (token/unsubscribe link)
+// mail content for a subscriber and sends it. Extracted from
+// DispatchNoticeNotifications so that its cognitive complexity does not exceed the
+// SonarCloud limit (go:S3776).
 func (h *Handler) sendNoticeToSubscriber(ctx noticeDispatchContext, sub models.Subscriber) {
-	// Hinweise privater Seiten nur an Abos, deren
-	// Ersteller die Seite noch sehen darf (siehe subscriberCreatorMayReadPage).
+	// Notices of private pages only to subscriptions whose
+	// creator may still see the page (see subscriberCreatorMayReadPage).
 	if ctx.page.IsPrivate && !h.subscriberCreatorMayReadPage(sub, ctx.page.ID) {
 		slog.Info("Skipping notice subscriber on private page without authorized creator", "subscriber_id", sub.ID)
 		return
@@ -77,9 +77,9 @@ func (h *Handler) sendNoticeToSubscriber(ctx noticeDispatchContext, sub models.S
 	h.sendAlertEmail(ctx.smtpCfg, sub.Email, subject, body, "notice subscriber", ctx.notice.ID, ctx.notice.Title, extraHeaders...)
 }
 
-// DispatchNoticeNotifications versendet die Notice per Mail an alle
-// Email-Subscriber der Statusseite. action: "created" | "updated" |
-// "ended" - mappt auf die entsprechenden Kinds.
+// DispatchNoticeNotifications sends the notice by mail to all
+// email subscribers of the status page. action: "created" | "updated" |
+// "ended" - maps to the corresponding kinds.
 func (h *Handler) DispatchNoticeNotifications(notice models.GeneralNotice, action string) {
 	if !notice.NotifySubscribers {
 		return
@@ -98,7 +98,7 @@ func (h *Handler) DispatchNoticeNotifications(notice models.GeneralNotice, actio
 			page:        page,
 			smtpCfg:     smtpCfg,
 			frontendURL: getFrontendURL(),
-			// Sprache des Abonnenten, sonst der Seite.
+			// Language of the subscriber, otherwise of the page.
 			subTemplate:    h.memoSubscriberTemplate(notice.StatusPageID, resolveNoticeKind(action)),
 			escTitle:       html.EscapeString(notice.Title),
 			messageHTML:    richtext.ToMailHTML(notice.Message),
@@ -106,7 +106,7 @@ func (h *Handler) DispatchNoticeNotifications(notice models.GeneralNotice, actio
 		}
 
 		var subscribers []models.Subscriber
-		// nur bestätigte Abos.
+		// only confirmed subscriptions.
 		h.DB.Where("status_page_id = ? AND channel = ? AND status = ?", notice.StatusPageID, "email", models.SubscriberStatusActive).FindInBatches(&subscribers, 100, func(tx *gorm.DB, batch int) error {
 			for _, sub := range subscribers {
 				h.sendNoticeToSubscriber(ctx, sub)
@@ -116,8 +116,8 @@ func (h *Handler) DispatchNoticeNotifications(notice models.GeneralNotice, actio
 	}()
 }
 
-// resolveNoticeKind mappt die "created"/"updated"/"ended"-Actions auf
-// die Notice-Kinds. Leere Rückgabe = unbekannt, DEFAULT-Renderer greift.
+// resolveNoticeKind maps the "created"/"updated"/"ended" actions to
+// the notice kinds. Empty return = unknown, DEFAULT renderer applies.
 func resolveNoticeKind(action string) string {
 	switch action {
 	case "created":
@@ -144,9 +144,9 @@ func newNoticeTemplateData(notice models.GeneralNotice, messageHTML, action, lan
 	}
 }
 
-// noticeLevelPrefix liefert das Subject-Prefix pro Level. "INFO"/"WARN"/
-// "CRITICAL" statt der bunten Farben aus dem Frontend, weil Subjects
-// reiner Text sind.
+// noticeLevelPrefix returns the subject prefix per level. "INFO"/"WARN"/
+// "CRITICAL" instead of the colored badges from the frontend, because subjects
+// are plain text.
 func noticeLevelPrefix(level string) string {
 	switch level {
 	case "warning":
@@ -157,15 +157,15 @@ func noticeLevelPrefix(level string) string {
 	return "INFO"
 }
 
-// buildNoticeEmailHTML rendert den Default-Body für Notice-Mails, wenn
-// keine Vorlage hinterlegt ist. Bewusst simpler als
-// buildNotificationEmailHTML (kein Status-Badge, keine Komponenten-
-// Meta), weil Notices strukturell schlanker sind. Layout/Farben
-// spiegeln buildNotificationEmailHTML, damit beide Mail-Typen visuell
-// zusammengehören.
+// buildNoticeEmailHTML renders the default body for notice mails when
+// no template is stored. Deliberately simpler than
+// buildNotificationEmailHTML (no status badge, no component
+// meta), because notices are structurally leaner. Layout/colors
+// mirror buildNotificationEmailHTML, so that both mail types
+// visually belong together.
 func buildNoticeEmailHTML(lang, level, escTitle, messageHTML, frontendURL, unsubscribeURL string) string {
 	badgeColor, badgeBG := "#4c6ef5", "#eaf2fc"
-	// Texte in der Versandsprache (de, sonst en).
+	// Texts in the dispatch language (de, otherwise en).
 	de := lang == "de"
 	levelLabel, headLabel, linkLabel, unsubLabel := "Info", "Notice", "View status page", "Unsubscribe"
 	if de {
@@ -189,10 +189,10 @@ func buildNoticeEmailHTML(lang, level, escTitle, messageHTML, frontendURL, unsub
 	if unsubscribeURL != "" {
 		unsubscribeHTML = fmt.Sprintf(`<a href="%s" style="color:#8b95a3;font-size:11px;text-decoration:underline;">%s</a>`, unsubscribeURL, unsubLabel)
 	}
-	// Ein einzelner Sprintf-Template-String, dessen Zeilenumbrüche vorab
-	// entfernt werden - selber Trick wie bei buildNotificationEmailHTML,
-	// damit sendAlertEmail's CR/LF-Guard nur an echten Nutzerinhalten
-	// anschlagen kann.
+	// A single Sprintf template string whose line breaks are removed
+	// beforehand - same trick as in buildNotificationEmailHTML,
+	// so that sendAlertEmail's CR/LF guard can only
+	// trigger on genuine user content.
 	tmpl := `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6f8;padding:32px 16px;"><div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden;"><div style="background:%s;padding:20px 24px;"><span style="color:#ffffff;font-size:16px;font-weight:600;">%s</span></div><div style="padding:24px;"><span style="display:inline-block;padding:2px 10px;border-radius:12px;background:%s;color:%s;font-size:12px;font-weight:600;margin-bottom:12px;">%s</span><h2 style="margin:0 0 12px;font-size:18px;color:#1a2230;">%s</h2><div style="margin:0 0 20px;color:#1a2230;font-size:14px;line-height:1.6;">%s</div><a href="%s" style="display:inline-block;background:#4c6ef5;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:10px 20px;border-radius:6px;">%s</a></div><div style="padding:16px 24px;border-top:1px solid #e6e8ec;"><p style="margin:0;color:#8b95a3;font-size:12px;">Statushafen</p>%s</div></div></div>`
 	return fmt.Sprintf(tmpl, badgeColor, headLabel, badgeBG, badgeColor, levelLabel, escTitle, messageHTML, frontendURL, linkLabel, unsubscribeHTML)
 }

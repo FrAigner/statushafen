@@ -14,10 +14,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Die SSO-Doku unter docs/sso/ ist Teil des Produkts. Diese Tests
-// halten sie prüfbar: alle Dateien sind da, relative Links zeigen auf
-// existierende Dateien, die Architektur-Datei enthält Mermaid-Diagramme und
-// die Endpunkte in api.md entsprechen den Routen des echten Routers.
+// The SSO docs under docs/sso/ are part of the product. These tests
+// keep them verifiable: all files are present, relative links point to
+// existing files, the architecture file contains Mermaid diagrams, and
+// the endpoints in api.md match the routes of the real router.
 
 const ssoDocsDir = "../docs/sso"
 
@@ -47,8 +47,8 @@ var mdLink = regexp.MustCompile(`\]\(([^)\s]+)\)`)
 
 var mdHeading = regexp.MustCompile(`(?m)^#{1,6}\s+(.+?)\s*#*\s*$`)
 
-// headingSlug bildet die GitHub-Anker-Regel nach: klein, Leerzeichen zu "-",
-// Satzzeichen außer "-" und "_" entfallen, Buchstaben (auch Umlaute) bleiben.
+// headingSlug replicates the GitHub anchor rule: lowercase, spaces to "-",
+// punctuation except "-" and "_" dropped, letters (including umlauts) kept.
 func headingSlug(h string) string {
 	var sb strings.Builder
 	for _, r := range strings.ToLower(strings.TrimSpace(h)) {
@@ -70,9 +70,9 @@ func headingAnchors(md string) map[string]bool {
 	return anchors
 }
 
-// relativeLinkProblems liefert alle kaputten relativen Links einer Datei:
-// fehlende Zieldatei oder ein Anker, der unter den Überschriften der
-// Zieldatei (bzw. der Datei selbst bei reinen #-Links) nicht vorkommt.
+// relativeLinkProblems returns all broken relative links of a file:
+// a missing target file or an anchor that does not occur among the headings of the
+// target file (or of the file itself for pure #-links).
 func relativeLinkProblems(dir, name string) ([]string, error) {
 	b, err := os.ReadFile(filepath.Join(dir, name))
 	if err != nil {
@@ -100,7 +100,7 @@ func relativeLinkProblems(dir, name string) ([]string, error) {
 	return problems, nil
 }
 
-// checkRelativeLinks prüft alle relativen Markdown-Links einer Datei.
+// checkRelativeLinks checks all relative Markdown links of a file.
 func checkRelativeLinks(t *testing.T, dir, name string) {
 	t.Helper()
 	problems, err := relativeLinkProblems(dir, name)
@@ -112,7 +112,7 @@ func checkRelativeLinks(t *testing.T, dir, name string) {
 	}
 }
 
-// Anker müssen geprüft werden, nicht nur Dateien.
+// Anchors must be checked, not just files.
 func TestSSODocs_AnchorCheck(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) {
@@ -203,8 +203,8 @@ func TestSSODocs_GuidesDescribeOIDCOnly(t *testing.T) {
 	}
 }
 
-// Das Login-Token geht per X-Auth-Token; die API-Doku muss das
-// nennen, sonst schicken Integrationen weiter nur den Authorization-Header.
+// The login token is sent via X-Auth-Token; the API docs must
+// mention that, otherwise integrations keep sending only the Authorization header.
 func TestSSODocs_APINamesAuthTokenHeader(t *testing.T) {
 	if !strings.Contains(readSSODoc(t, "api.md"), "`X-Auth-Token: <token>`") {
 		t.Error("api.md nennt den Header X-Auth-Token nicht")
@@ -230,8 +230,8 @@ func TestSSODocs_AdminGuideLinksToSSO(t *testing.T) {
 
 var apiHeading = regexp.MustCompile("(?m)^### `(GET|POST|PUT|DELETE) (/api/[^`]+)`")
 
-// docRoutePath wandelt die Schreibweise der Doku (`:page_id`) unverändert
-// durch; gin nutzt dieselbe. Der Vergleich ist deshalb 1:1.
+// docRoutePath passes the docs notation (`:page_id`) through
+// unchanged; gin uses the same one. The comparison is therefore 1:1.
 func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	r := newRouter(handlers.NewHandler(testutils.SetupTestDB()))
@@ -272,8 +272,8 @@ func TestSSODocs_APIEndpointsMatchRouter(t *testing.T) {
 			t.Errorf("api.md dokumiert %q, der Router kennt die Route nicht", d)
 		}
 	}
-	// Umgekehrt: Jede SSO-Route des Routers steht in api.md, damit neue
-	// Endpunkte nicht undokumentiert bleiben.
+	// Conversely: every SSO route of the router is in api.md, so that new
+	// endpoints do not remain undocumented.
 	documentedSet := map[string]bool{}
 	for _, d := range documented {
 		documentedSet[d] = true

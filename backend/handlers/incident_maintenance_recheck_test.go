@@ -16,10 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateIncidentHandler prüft nach dem Binden selbst, ob der
-// Nutzer maintenance:create hat, wenn der Body IsMaintenance setzt. Der Handler
-// hängt hier OHNE die vorgeschaltete Arterkennung am Router: ein Fehler dort
-// darf nie zu einer Wartung ohne Recht führen.
+// CreateIncidentHandler itself checks after binding whether the
+// user has maintenance:create if the body sets IsMaintenance. Here the handler
+// is attached to the router WITHOUT the upstream kind detection: a failure there
+// must never lead to a maintenance without permission.
 func TestCreateIncidentHandler_WartungPrueftRechtErneut(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -69,7 +69,7 @@ func TestCreateIncidentHandler_WartungPrueftRechtErneut(t *testing.T) {
 	assert.EqualValues(t, 1, count())
 }
 
-// Ein zu großer Body wird auch vom Handler selbst mit 413 abgewiesen.
+// A too large body is also rejected by the handler itself with 413.
 func TestCreateIncidentHandler_ZuGrosserBody413(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -84,9 +84,9 @@ func TestCreateIncidentHandler_ZuGrosserBody413(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"request_too_large"`)
 }
 
-// actAsGlobalAdmin legt einen Global Admin an und lässt alle Anfragen des
-// Routers als dieser Nutzer laufen. Handler-Tests ohne vorgeschaltete
-// Authentifizierung brauchen das für Wartungen.
+// actAsGlobalAdmin creates a global admin and lets all requests of the
+// router run as this user. Handler tests without upstream
+// authentication need this for maintenances.
 func actAsGlobalAdmin(r gin.IRoutes, db *gorm.DB) {
 	admin := models.User{Email: "admin-745@example.com", IsGlobalAdmin: true}
 	db.Create(&admin)

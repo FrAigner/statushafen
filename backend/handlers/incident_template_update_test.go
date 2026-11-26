@@ -14,9 +14,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// UpdateIncidentTemplateHandler war bisher ungetestet (0 %).
-// Abgedeckt: Normalfall, Kind-Fallback, ungültige Parameter, fremde Seite
-// (Mandantentrennung), ungültiger Body und Speicherfehler.
+// UpdateIncidentTemplateHandler was previously untested (0 %).
+// Covered: normal case, kind fallback, invalid parameters, foreign page
+// (tenant isolation), invalid body and save error.
 func TestUpdateIncidentTemplateHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

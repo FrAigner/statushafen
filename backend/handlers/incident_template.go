@@ -10,14 +10,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// IncidentTemplate-CRUD: wiederverwendbare Vorlagen für
-// Vorfälle/Wartungsfenster. Seiten-scoped analog zu Components/Incidents -
-// dieselbe RequirePermission("incidents:write")-Berechtigung wird
-// verwendet, da Vorlagen nur beim Anlegen von Incidents relevant sind und
-// keine eigene Permission die Rollenmatrix unnötig verkomplizieren soll.
+// IncidentTemplate CRUD: reusable templates for
+// incidents/maintenance windows. Page-scoped like Components/Incidents -
+// the same RequirePermission("incidents:write") permission is
+// used, since templates are only relevant when creating incidents and
+// a separate permission should not needlessly complicate the role matrix.
 
-// parsePageIDParam extrahiert und validiert :page_id, schreibt bei Fehler
-// direkt die Fehlerantwort und liefert ok=false zurück.
+// parsePageIDParam extracts and validates :page_id, writes the error response
+// directly on error and returns ok=false.
 func parsePageIDParam(c *gin.Context) (uint64, bool) {
 	tenantIDStr := c.Param("page_id")
 	if tenantIDStr == "" {
@@ -32,8 +32,8 @@ func parsePageIDParam(c *gin.Context) (uint64, bool) {
 	return tenantID, true
 }
 
-// parseTemplateIDParam extrahiert und validiert :id, schreibt bei Fehler
-// direkt die Fehlerantwort und liefert ok=false zurück.
+// parseTemplateIDParam extracts and validates :id, writes the error response
+// directly on error and returns ok=false.
 func parseTemplateIDParam(c *gin.Context) (uint64, bool) {
 	tmplID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -174,11 +174,11 @@ func (h *Handler) DeleteIncidentTemplateHandler(c *gin.Context) {
 		return
 	}
 
-	// Bewusst KEIN Aufräumen von Incidents, die aus dieser Vorlage entstanden
-	// sind: es gibt keine FK-Beziehung zurück zur Vorlage - die
-	// Feldwerte wurden beim Anlegen nur kopiert, das Löschen der Vorlage hat
-	// also keine Auswirkung auf bereits erstellte Incidents/Wartungsfenster.
-	// Soft-Delete löst das FK-Cascade nicht aus, die Übersetzungen der Vorlage mitlöschen.
+	// Deliberately NO cleanup of incidents that originated from this template:
+	// there is no FK relation back to the template - the
+	// field values were only copied on creation, so deleting the template has
+	// no effect on already created incidents/maintenance windows.
+	// Soft delete does not trigger the FK cascade, so delete the template's translations too.
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("incident_template_id = ?", tmpl.ID).Delete(&models.IncidentTemplateTranslation{}).Error; err != nil {
 			return err

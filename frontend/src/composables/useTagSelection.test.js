@@ -43,8 +43,8 @@ describe('tagNames', () => {
   })
 })
 
-// Global Admins laden über /api/tags, Seiten-Rollen über
-// /api/pages/:id/tags und bekommen nur seiteneigene Tags angeboten.
+// Global admins load via /api/tags, page roles via
+// /api/pages/:id/tags and are only offered page-specific tags.
 describe('useAvailableTags', () => {
   afterEach(() => useAuth().logout())
   const pageId = ref('3')

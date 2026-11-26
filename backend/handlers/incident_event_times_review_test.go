@@ -13,8 +13,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Statuswechsel über die
-// Detailseite und geleerte Zeitfelder im Bearbeiten-Formular.
+// Status change via the
+// detail page and cleared time fields in the edit form.
 func TestIncidentEventTimesReview(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

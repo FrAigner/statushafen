@@ -9,47 +9,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Anfragen, die Benachrichtigungen an Abonnenten auslösen (neuer Vorfall,
-// Wartung, Meldung, Update, geänderte Abo-Adresse), brauchen ein Limit je Seite
-// und je Nutzer, nicht nur je IP: Ein angemeldeter Nutzer mit Schreibrecht
-// konnte sonst in kurzer Zeit tausende Mails an alle Abonnenten und die
-// Mitglieder der Seite auslösen. Die Grenzen sind großzügig und stören den
-// normalen Betrieb nicht (auch ein langer Vorfall mit vielen Updates).
+// Requests that trigger notifications to subscribers (new incident,
+// maintenance, notice, update, changed subscription address) need a limit per page
+// and per user, not just per IP: a logged-in user with write permission
+// could otherwise trigger thousands of mails to all subscribers and the
+// page's members in a short time. The limits are generous and do not disturb
+// normal operation (even a long incident with many updates).
 const (
-	// Neu angelegte Vorfälle, Wartungen und Meldungen je Stunde.
+	// Newly created incidents, maintenances and notices per hour.
 	notifyCreatePerPagePerHour = 30
 	notifyCreatePerUserPerHour = 60
-	// Änderungen und Updates, die ebenfalls benachrichtigen, je Stunde.
+	// Changes and updates that also notify, per hour.
 	notifyChangePerPagePerHour = 120
 	notifyChangePerUserPerHour = 120
 
-	// notifyLimitSweepEvery: nach so vielen Aufrufen werden abgelaufene
-	// Schlüssel aus dem Speicher entfernt, damit die Map nicht wächst.
+	// notifyLimitSweepEvery: after this many calls, expired
+	// keys are removed from memory so the map does not grow.
 	notifyLimitSweepEvery = 500
 
-	// Domain-Prüfungen (DNS-Abfrage des Servers) je Minute.
+	// Domain checks (server-side DNS lookup) per minute.
 	customDomainVerifyPerMinute = 10
 )
 
-// NotificationCreateLimit begrenzt das Anlegen benachrichtigender Datensätze.
+// NotificationCreateLimit limits the creation of notifying records.
 func NotificationCreateLimit() gin.HandlerFunc {
 	return NewNotificationRateLimiter(notifyCreatePerPagePerHour, notifyCreatePerUserPerHour, time.Hour)
 }
 
-// NotificationChangeLimit begrenzt Änderungen und Updates, die benachrichtigen.
+// NotificationChangeLimit limits changes and updates that notify.
 func NotificationChangeLimit() gin.HandlerFunc {
 	return NewNotificationRateLimiter(notifyChangePerPagePerHour, notifyChangePerUserPerHour, time.Hour)
 }
 
-// CustomDomainVerifyLimit begrenzt die Domain-Prüfung je Seite und je Nutzer.
-// Jeder Aufruf löst eine DNS-Abfrage des Servers aus; ohne Grenze ließe sich der
-// Server als Werkzeug für beliebig viele Abfragen auf selbst gewählte Hostnamen
-// nutzen.
+// CustomDomainVerifyLimit limits domain verification per page and per user.
+// Every call triggers a DNS lookup by the server; without a limit the
+// server could be exploited as a tool for any number of lookups
+// on self-chosen hostnames.
 func CustomDomainVerifyLimit() gin.HandlerFunc {
 	return NewNotificationRateLimiter(customDomainVerifyPerMinute, customDomainVerifyPerMinute, time.Minute)
 }
 
-// notifyLimitNow ist die Uhr des Begrenzers; Tests setzen sie.
+// notifyLimitNow is the limiter's clock; tests set it.
 var notifyLimitNow = time.Now
 
 type notifyLimiter struct {
@@ -65,7 +65,7 @@ func newNotifyLimiter(perPage, perUser int, window time.Duration) *notifyLimiter
 	return &notifyLimiter{perPage: perPage, perUser: perUser, window: window, hits: map[string][]time.Time{}}
 }
 
-// live liefert die Zeitpunkte des Schlüssels innerhalb des Fensters.
+// live returns the key's timestamps within the window.
 func (l *notifyLimiter) live(key string, now time.Time) []time.Time {
 	cutoff := now.Add(-l.window)
 	hits := l.hits[key]
@@ -84,9 +84,9 @@ func (l *notifyLimiter) live(key string, now time.Time) []time.Time {
 	return hits
 }
 
-// allow zählt einen Aufruf für Seite und Nutzer (leerer Schlüssel: nicht
-// begrenzt). Ist eine der Grenzen erreicht, wird nichts gezählt und die
-// Wartezeit bis zum nächsten freien Platz geliefert.
+// allow counts a call for page and user (empty key: not
+// limited). If one of the limits is reached, nothing is counted and the
+// wait time until the next free slot is returned.
 func (l *notifyLimiter) allow(pageKey, userKey string) (bool, time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -113,7 +113,7 @@ func (l *notifyLimiter) allow(pageKey, userKey string) (bool, time.Duration) {
 	for _, b := range buckets {
 		hits := l.live(b.key, now)
 		if len(hits) >= b.max {
-			// Frei wird ein Platz, wenn der (len-max+1)-älteste Aufruf das Fenster verlässt.
+			// A slot becomes free when the (len-max+1)-oldest call leaves the window.
 			free := hits[len(hits)-b.max].Add(l.window).Sub(now)
 			wait = max(wait, free)
 		}
@@ -127,11 +127,11 @@ func (l *notifyLimiter) allow(pageKey, userKey string) (bool, time.Duration) {
 	return true, 0
 }
 
-// NewNotificationRateLimiter erlaubt je Seite (Pfadparameter page_id) und je
-// angemeldetem Nutzer höchstens perPage bzw. perUser Aufrufe im Zeitfenster
-// window. Darüber antwortet er mit 429 rate_limited und Retry-After. Er gehört
-// hinter die Anmeldung und die Rechteprüfung, damit nur echte Seiten und Nutzer
-// als Schlüssel vorkommen.
+// NewNotificationRateLimiter allows each page (path parameter page_id) and each
+// logged-in user at most perPage and perUser calls, respectively, within the time window
+// window. Beyond that it answers with 429 rate_limited and Retry-After. It belongs
+// behind authentication and the permission check, so that only real pages and users
+// occur as keys.
 func NewNotificationRateLimiter(perPage, perUser int, window time.Duration) gin.HandlerFunc {
 	l := newNotifyLimiter(perPage, perUser, window)
 	return func(c *gin.Context) {

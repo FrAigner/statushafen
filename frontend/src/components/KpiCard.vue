@@ -1,17 +1,19 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Kennzahl-Karte. Wert in Inter 28/600, keine
-  Regenbogenfarben: nur `alert` färbt den Wert (--major-text) und fügt für
-  Screenreader „Handlungsbedarf“ an, damit der Alarm nicht nur über Farbe
-  läuft. Typischer Fall: „Offene Vorfälle“ > 0.
+  Redesign stage 3: KPI card. Value in Inter 28/600, no rainbow
+  colours: only `alert` colours the value (--major-text) and appends
+  "action needed" for screen readers, so the alert is not conveyed by colour
+  alone. Typical case: "Open incidents" > 0.
 */
 import { useI18n } from 'vue-i18n'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  label: { type: String, required: true },
-  value: { type: [Number, String], required: true },
-  alert: { type: Boolean, default: false },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  label: string
+  value: number | string
+  alert?: boolean
+}>(), {
+  alert: false,
 })
 // Stryker restore all
 

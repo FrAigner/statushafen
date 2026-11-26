@@ -4,18 +4,18 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve, join } from 'path'
 import { RESOURCES, ACTIONS } from './utils/permissions'
 
-// Nach der Umstellung auf Create/Read/Update/Delete
-// verwies `e2e/admin-roles.spec.js` weiter auf das entfernte Recht
-// `incidents:write`. Playwright-Specs laufen nur in der E2E-Umgebung und
-// fallen deshalb erst spät auf. Dieser schnelle Test liest alle E2E-Specs und
-// verlangt, dass jedes dort genannte Recht `<ressource>:<aktion>` im
-// Rechtekatalog existiert (Ressourcen und Aktionen wie im Backend).
+// After the switch to Create/Read/Update/Delete,
+// `e2e/admin-roles.spec.js` still referred to the removed permission
+// `incidents:write`. Playwright specs only run in the E2E environment and
+// therefore fail late. This fast test reads all E2E specs and requires that
+// every permission `<resource>:<action>` named there exists in the
+// permission catalog (resources and actions as in the backend).
 const e2eDir = resolve(dirname(fileURLToPath(import.meta.url)), '../e2e')
 const resources = new Set(RESOURCES.map(r => r.key))
 const actions = new Set(ACTIONS)
 
-// Alle `ressource:aktion`-Kandidaten, deren Aktionsteil wie eine Rechte-Aktion
-// aussieht (auch das entfernte `write`), damit Veraltetes auffällt.
+// All `resource:action` candidates whose action part looks like a permission
+// action (including the removed `write`), so stale ones stand out.
 const findePermissionRefs = (source) =>
   [...source.matchAll(/\b([a-z][a-z_]*):(read|write|create|update|delete)\b/g)].map(m => ({
     resource: m[1], action: m[2], text: m[0],

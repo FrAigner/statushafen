@@ -1,8 +1,8 @@
-/* Selbst gehostete Schriften (DSGVO: keine Requests an Google).
-   Quelle: npm-Pakete @fontsource/* (lateinische Zeichen, woff2). Vite legt die
-   Dateien beim Build mit Hash im Namen unter /assets ab, sie werden vom eigenen
-   Host ausgeliefert. Lizenz: SIL Open Font License 1.1 (Texte und Copyright-Zeilen
-   in THIRD_PARTY_NOTICES und im jeweiligen Paket unter node_modules). */
+/* Self-hosted fonts (GDPR: no requests to Google).
+   Source: npm packages @fontsource/* (Latin subset, woff2). At build time Vite
+   places the files with a hashed name under /assets; they are served from our
+   own host. License: SIL Open Font License 1.1 (texts and copyright lines in
+   THIRD_PARTY_NOTICES and in each package under node_modules). */
 @import '@fontsource/inter/latin-400.css';
 @import '@fontsource/inter/latin-500.css';
 @import '@fontsource/inter/latin-600.css';

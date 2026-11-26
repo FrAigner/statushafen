@@ -1,16 +1,16 @@
 /* =============================================================================
-   Einstiegsseiten (Redesign Stufe 4e): Login, Bestellung,
-   Bestätigungs- und Abmeldeseiten.
+   Entry pages (redesign stage 4e): login, subscription,
+   confirmation and unsubscribe pages.
 
-   Vorher trug jede dieser Views dieselben ~100 Zeilen Karte, Formularfeld und
-   Knopf selbst (mit Indigo-Verlauf und festen rgba-Werten). Jetzt eine Quelle,
-   nur Tokens aus tokens.css, keine Hex-Werte.
+   Previously each of these views carried the same ~100 lines of card, form
+   field and button styles itself (with an indigo gradient and fixed rgba
+   values). Now there is one source, only tokens from tokens.css, no hex values.
 
-   Die alten Klassen (.btn-login, .login-alert, .btn-confirm, …) bleiben als
-   Test-Haken an den Elementen (e2e-Specs anderer Bereiche melden sich darüber
-   an); das Aussehen kommt von den entry-*-Klassen. Formularfelder sind bewusst
-   als Block "Label + Eingabe + Hinweis" gebaut (.entry-field), damit der
-   spätere Wechsel auf die FormField-Komponente (Stufe 3) nur das Markup tauscht.
+   The old classes (.btn-login, .login-alert, .btn-confirm, …) stay on the
+   elements as test hooks (e2e specs of other areas sign in through them); the
+   look comes from the entry-* classes. Form fields are deliberately built as a
+   "label + input + hint" block (.entry-field) so that the later switch to the
+   FormField component (stage 3) only swaps the markup.
    ============================================================================ */
 
 .entry-page {
@@ -63,7 +63,7 @@
 }
 .entry-head .entry-subtitle { margin-bottom: 0; }
 
-/* Symbol über der Überschrift (Bestätigungsseiten) */
+/* Icon above the heading (confirmation pages) */
 .entry-icon {
   display: flex;
   justify-content: center;
@@ -72,7 +72,7 @@
 }
 .entry-icon--danger { color: var(--major-text); }
 
-/* Fehlermeldung: Form + Farbe + Text, nie nur Farbe (Rahmen, Fläche, Schrift). */
+/* Error message: shape + color + text, never color alone (border, background, text). */
 .entry-alert {
   background: var(--major-soft);
   border: 1px solid var(--major);
@@ -149,7 +149,7 @@
 .entry-toggle:hover { background: var(--surface-2); color: var(--text); }
 .entry-toggle:focus-visible { outline: 2px solid var(--focus); }
 
-/* Knöpfe: Primär (auch als Link) und Sekundär (SSO). */
+/* Buttons: primary (also as a link) and secondary (SSO). */
 .entry-btn {
   display: flex;
   align-items: center;
@@ -208,7 +208,7 @@
   background: var(--border);
 }
 
-/* Für Bots sichtbar, für Menschen nicht (Honeypot der Bestellung). */
+/* Visible to bots, not to humans (subscription honeypot). */
 .entry-honeypot {
   position: absolute;
   left: -9999px;

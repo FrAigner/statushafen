@@ -1,8 +1,8 @@
 import { expect } from '@playwright/test';
 
-// Zeilenmenü (RowMenu) öffnen und einen Eintrag wählen. Lädt die Liste nach dem Speichern
-// noch einmal nach, schließt das ein schon geöffnetes Menü; deshalb so lange wiederholen, bis der
-// Eintrag klickbar war (ein bereits offenes Menü wird nicht erneut umgeschaltet).
+// Open the row menu (RowMenu) and pick an entry. If the list reloads once more after saving,
+// that closes an already opened menu; so retry until the entry was clickable
+// (an already open menu is not toggled again).
 export async function clickRowMenuItem(page, menuButton, name, { exact = false } = {}) {
   await expect(async () => {
     if ((await menuButton.getAttribute('aria-expanded')) !== 'true') await menuButton.click();

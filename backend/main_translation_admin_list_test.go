@@ -14,11 +14,11 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Die Admin-Übersetzungsseiten luden ihre Tabelle über die
-// öffentliche Route, die nur bestätigte Übersetzungen liefert - frisch
-// angelegte Entwürfe verschwanden. GET .../translations/all liefert dem Admin
-// Entwürfe und Bestätigte, die öffentliche Route bleibt bei "nur confirmed",
-// und fremde Seiten bleiben gesperrt.
+// The admin translation pages loaded their table via the
+// public route, which returns only confirmed translations - freshly
+// created drafts disappeared. GET .../translations/all returns drafts
+// and confirmed ones to the admin, the public route stays at "confirmed only",
+// and foreign pages stay blocked.
 func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 	for _, tc := range translationRouteCases() {
 		t.Run(tc.name, func(t *testing.T) {
@@ -42,8 +42,8 @@ func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 
 			ownParent, _ := tc.seed(db, own.ID, "de") // Entwurf
 			foreignParent, _ := tc.seed(db, foreign.ID, "de")
-			// Bestätigte Übersetzung an dasselbe Elternobjekt hängen: seed legt
-			// stets ein neues Elternobjekt an, deshalb umhängen.
+			// Attach a confirmed translation to the same parent object: seed always
+			// creates a new parent object, hence re-parent it.
 			_, confirmedID := tc.seed(db, own.ID, "en")
 			table := map[string][2]string{
 				"incident":  {"incident_translations", "incident_id"},
@@ -96,7 +96,7 @@ func TestRouter_AdminTranslationListIncludesDrafts(t *testing.T) {
 	}
 }
 
-// statuses fasst die Antwort als "status:sprache,..." zusammen.
+// statuses summarizes the response as "status:language,..."
 func statuses(t *testing.T, body []byte) string {
 	t.Helper()
 	var list []struct {

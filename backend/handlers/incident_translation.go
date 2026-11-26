@@ -14,15 +14,15 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IncidentTranslation: Stage 2 der Mehrsprachigkeit - Incident-
-// Titel und Meldungen in mehreren Sprachen mit Draft/Confirmed-Workflow.
+// IncidentTranslation: stage 2 of multilingual support - incident
+// titles and messages in multiple languages with a draft/confirmed workflow.
 //
-// Draft-Translations sind nur für Admins sichtbar; Confirmed-Translations
-// werden über die öffentliche API auch für Subscriber sichtbar.
-// Source wird zum Tracking gesetzt (manual vs. deepl).
+// Draft translations are visible to admins only; confirmed translations
+// are also visible to subscribers through the public API.
+// Source is set for tracking (manual vs. deepl).
 //
-// Routen (main.go):
-//   öffentlich: r.GET("/api/incidents/:incident_id/translations", h.GetIncidentTranslationsHandler)
+// Routes (main.go):
+//   public:  r.GET("/api/incidents/:incident_id/translations", h.GetIncidentTranslationsHandler)
 //   admin:      translationAdmin (RequirePermission "incidents:write")
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -70,9 +70,9 @@ func (h *Handler) GetIncidentTranslationsHandler(c *gin.Context) {
 		return
 	}
 
-	// Translation-Endpunkt lief über eine globale incident_id
-	// ohne status_page_id-Join - wer die ID kannte/erriet, bekam Translations
-	// auch für Incidents auf privaten Statusseiten ohne Rolle darauf.
+	// The translation endpoint ran on a global incident_id
+	// without a status_page_id join - anyone who knew/guessed the ID got translations
+	// even for incidents on private status pages without a role on them.
 	var page models.StatusPage
 	if err := h.DB.First(&page, incident.StatusPageID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errIncidentNotFound, "code": "incident_not_found"})
@@ -207,12 +207,12 @@ func (h *Handler) DeleteIncidentTranslationHandler(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
-// SaveIncidentTranslationHandler speichert die Übersetzung eines Vorfalls für
-// genau eine Sprache: legt sie an oder ändert die bestehende, und
-// setzt den Stand (draft = in Arbeit, confirmed = fertig und öffentlich).
-// Das Bearbeiten-Formular schickt je Sprachreiter einen solchen Aufruf. Die
-// Standardsprache der Seite ist der Vorfall selbst und hat keine Übersetzung;
-// andere als die aktiven Sprachen der Seite werden abgewiesen.
+// SaveIncidentTranslationHandler saves the translation of an incident for
+// exactly one language: it creates it or changes the existing one, and
+// sets the state (draft = in progress, confirmed = finished and public).
+// The edit form sends one such call per language tab. The
+// default language of the page is the incident itself and has no translation;
+// languages other than the page's active ones are rejected.
 func (h *Handler) SaveIncidentTranslationHandler(c *gin.Context) {
 	incidentID, ok := parseIncidentID(c)
 	if !ok {
@@ -266,9 +266,9 @@ func (h *Handler) SaveIncidentTranslationHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, trans)
 }
 
-// requireAdditionalLanguage prüft für das Speichern je Sprache, dass
-// code eine aktive, nicht als Standard geführte Sprache der Seite ist; sonst
-// antwortet sie mit 400 language_not_available und liefert false.
+// requireAdditionalLanguage checks, for saving per language, that
+// code is an active language of the page that is not its default; otherwise it
+// responds with 400 language_not_available and returns false.
 func (h *Handler) requireAdditionalLanguage(c *gin.Context, pageID uint, code string) bool {
 	var pageLang models.StatusPageLanguage
 	if err := h.DB.Where("status_page_id = ? AND language_code = ? AND language_code IN ?", pageID, code, database.ContentLanguageCodes).First(&pageLang).Error; err != nil || pageLang.IsDefault {

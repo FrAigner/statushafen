@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import i18n from '../i18n'
 import { helpDomId, helpTextFor } from './useHelpText'
 
-// Hilfetexte per Schlüssel, nichts bei unvollständigem Eintrag.
+// Help texts by key, nothing for an incomplete entry.
 
 describe('helpTextFor', () => {
   afterEach(() => {

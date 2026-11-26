@@ -21,8 +21,8 @@ type failingBody struct{}
 func (failingBody) Read([]byte) (int, error) { return 0, errors.New("kaputt") }
 func (failingBody) Close() error             { return nil }
 
-// Die Art des Datensatzes (Vorfall/Wartung) bestimmt die Ressource;
-// unlesbare oder zu große Bodys brechen ab (eigener Test).
+// The kind of the record (incident/maintenance) determines the resource;
+// unreadable or too large bodies abort (separate test).
 func TestIncidentResourceFromBody(t *testing.T) {
 	h := &Handler{}
 	resolve := h.IncidentResourceFromBody()
@@ -36,21 +36,21 @@ func TestIncidentResourceFromBody(t *testing.T) {
 	assert.Equal(t, resourceMaintenance, resolve(ctx(io.NopCloser(strings.NewReader(`{"IsMaintenance":true}`)))))
 	assert.Equal(t, resourceIncidents, resolve(ctx(io.NopCloser(strings.NewReader(`{"IsMaintenance":false}`)))))
 
-	// Der Body bleibt für den Handler lesbar.
+	// The body stays readable for the handler.
 	c := ctx(io.NopCloser(strings.NewReader(`{"IsMaintenance":true}`)))
 	resolve(c)
 	again, _ := io.ReadAll(c.Request.Body)
 	assert.JSONEq(t, `{"IsMaintenance":true}`, string(again))
 
-	// Ungültige IDs fallen auf "incidents" zurück.
+	// Invalid IDs fall back to "incidents".
 	c = ctx(nil)
 	c.Params = gin.Params{{Key: "id", Value: "abc"}, {Key: "translation_id", Value: "abc"}}
 	assert.Equal(t, resourceIncidents, h.IncidentResourceByParam("id")(c))
 	assert.Equal(t, resourceIncidents, h.IncidentResourceByTranslation()(c))
 }
 
-// Übersetzung -> Vorfall -> Art: eine Wartung vererbt "maintenance" an ihre Übersetzungen,
-// unbekannte Übersetzungen und Vorfälle einer anderen Seite fallen auf "incidents".
+// Translation -> incident -> kind: a maintenance passes "maintenance" on to its translations,
+// unknown translations and incidents of another page fall back to "incidents".
 func TestIncidentResourceByTranslation_LiestArtAusDerDatenbank(t *testing.T) {
 	db := testutils.SetupTestDB()
 	page := models.StatusPage{Name: "P", Slug: "p-kind"}
@@ -74,8 +74,8 @@ func TestIncidentResourceByTranslation_LiestArtAusDerDatenbank(t *testing.T) {
 	assert.Equal(t, resourceIncidents, h.IncidentResourceByTranslation()(ctx(gin.Param{Key: "translation_id", Value: id}, gin.Param{Key: "page_id", Value: strconv.Itoa(int(other.ID))})), "fremde Seite verrät die Art nicht")
 }
 
-// Die Arterkennung bricht bei Lese-/Parse-Fehlern und zu großen
-// Bodys selbst ab (400/413) und fällt nie still auf "incidents" zurück.
+// The kind detection itself aborts on read/parse errors and too large
+// bodies (400/413) and never silently falls back to "incidents".
 func TestIncidentResourceFromBody_BrichtBeiFehlernAb(t *testing.T) {
 	h := &Handler{}
 	run := func(body io.ReadCloser) (*gin.Context, *httptest.ResponseRecorder) {
@@ -104,8 +104,8 @@ func TestIncidentResourceFromBody_BrichtBeiFehlernAb(t *testing.T) {
 	}
 }
 
-// Ein Datenbankfehler bei der Arterkennung per ID bricht mit 500
-// ab, statt still "incidents" anzunehmen; "nicht gefunden" bleibt beim Handler (404).
+// A database error in the kind detection by ID aborts with 500
+// instead of silently assuming "incidents"; "not found" is left to the handler (404).
 func TestIncidentResourceByParam_DBFehlerBrichtAb(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := &Handler{DB: db}

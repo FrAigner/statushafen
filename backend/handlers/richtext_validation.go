@@ -9,11 +9,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// requireMessageLength prüft die Länge einer formatierten Nachricht bzw.
-// Beschreibung (höchstens richtext.MaxLen Zeichen) und beantwortet
-// eine zu lange Eingabe mit 400 und dem Code message_too_long (Text de/en unter
-// api.errors.message_too_long). Rückgabe false = Antwort ist bereits gesendet.
-// Gezählt werden Zeichen des Markdown-Quelltexts, so wie sie gespeichert werden.
+// requireMessageLength checks the length of a formatted message or
+// description (at most richtext.MaxLen characters) and answers
+// an overlong input with 400 and the code message_too_long (text de/en under
+// api.errors.message_too_long). Return value false = response has already been sent.
+// Characters of the Markdown source are counted as they are stored.
 func requireMessageLength(c *gin.Context, message string) bool {
 	if !richtext.TooLong(message) {
 		return true
@@ -22,17 +22,17 @@ func requireMessageLength(c *gin.Context, message string) bool {
 	return false
 }
 
-// maxTitleLen ist die Obergrenze (in Zeichen) für Titel und Seitennamen. Eine
-// Zeile in den Admin-Listen und im Betreff von Mails bleibt so lesbar; ohne
-// Grenze wurden Titel bis zum Body-Limit gespeichert. Komponentennamen sind
-// mit maxComponentNameLen enger gefasst.
+// maxTitleLen is the upper limit (in characters) for titles and page names. A
+// row in the admin lists and in the subject of mails thus stays readable; without a
+// limit, titles were stored up to the body limit. Component names are
+// more tightly constrained by maxComponentNameLen.
 const maxTitleLen = 200
 
-// requireTitleLength prüft die Länge eines Titels in Zeichen (nicht Bytes) und
-// beantwortet eine zu lange Eingabe mit 400 und dem Code title_too_long
-// (Text de/en unter api.errors.title_too_long). Rückgabe false = Antwort ist
-// bereits gesendet. Ein leerer Titel besteht die Prüfung; Pflichtfelder prüft
-// der Aufrufer.
+// requireTitleLength checks the length of a title in characters (not bytes) and
+// answers an overlong input with 400 and the code title_too_long
+// (text de/en under api.errors.title_too_long). Return value false = response is
+// already sent. An empty title passes the check; required fields are checked by
+// the caller.
 func requireTitleLength(c *gin.Context, title string) bool {
 	if utf8.RuneCountInString(title) <= maxTitleLen {
 		return true
@@ -41,7 +41,7 @@ func requireTitleLength(c *gin.Context, title string) bool {
 	return false
 }
 
-// requirePageNameLength ist requireTitleLength für Seitennamen (Code
+// requirePageNameLength is requireTitleLength for page names (code
 // page_name_too_long).
 func requirePageNameLength(c *gin.Context, name string) bool {
 	if utf8.RuneCountInString(name) <= maxTitleLen {

@@ -25,10 +25,10 @@ func countingWebhookServer(t *testing.T) (*httptest.Server, *atomic.Int32) {
 	return srv, &n
 }
 
-// Der Betreiber-Webhook bekommt nur Vorfälle öffentlicher Seiten. Vorfälle
-// privater Seiten gehören dem jeweiligen Mandanten und gehen nicht in einen
-// Chat, den der Betreiber instanzweit liest; ist die Seite nicht geladen
-// (Datenbankfehler), gilt das ebenso (fail closed).
+// The operator webhook only receives incidents of public sites. Incidents
+// of private sites belong to the respective tenant and do not go into a
+// chat the operator reads instance-wide; if the site is not loaded
+// (database error), the same applies (fail closed).
 func TestDispatchGlobalGoogleChatWebhook_NurOeffentlicheSeiten(t *testing.T) {
 	newWebhookEnv(t)
 	srv, calls := countingWebhookServer(t)
@@ -47,16 +47,16 @@ func TestDispatchGlobalGoogleChatWebhook_NurOeffentlicheSeiten(t *testing.T) {
 	assert.EqualValues(t, 1, calls.Load(), "Gegenprobe: öffentliche Seite wird weitergegeben")
 }
 
-// Ende-zu-Ende über DispatchNotifications: Der Vorfall einer privaten Seite
-// erreicht den Attrappen-Listener nicht, der einer öffentlichen Seite schon.
+// End to end via DispatchNotifications: The incident of a private site
+// does not reach the dummy listener, that of a public site does.
 func TestDispatchNotifications_BetreiberWebhookAusgenommenPrivateSeite(t *testing.T) {
 	newWebhookEnv(t)
 	srv, calls := countingWebhookServer(t)
 	t.Setenv("GOOGLE_CHAT_WEBHOOK_URL", srv.URL)
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
-	// Der Versand läuft in Goroutinen und liest Variablen, die newWebhookEnv
-	// beim Aufräumen zurücksetzt; vorher abwarten (LIFO: läuft zuerst).
+	// Delivery runs in goroutines and reads variables that newWebhookEnv
+	// resets on cleanup; wait first (LIFO: runs first).
 	t.Cleanup(h.WaitNotifications)
 	private := models.StatusPage{Name: "Intern", Slug: "intern-wh", IsPrivate: true}
 	public := models.StatusPage{Name: "Offen", Slug: "offen-wh"}
@@ -69,7 +69,7 @@ func TestDispatchNotifications_BetreiberWebhookAusgenommenPrivateSeite(t *testin
 		h.DispatchNotifications(inc, nil, "created")
 	}
 	run(private)
-	time.Sleep(300 * time.Millisecond) // der Versand läuft in einer Goroutine
+	time.Sleep(300 * time.Millisecond) // delivery runs in a goroutine
 	assert.Zero(t, calls.Load(), "Vorfall der privaten Seite bleibt beim Mandanten")
 
 	run(public)

@@ -21,9 +21,9 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// Monitoring-Webhook per Kennung (Slug). Die Seite kommt aus dem
-// Token, die Kennung wird nur dort aufgelöst; Speichern, Historie und Audit
-// laufen über denselben Pfad wie der ID-Weg.
+// Monitoring webhook by identifier (slug). The page comes from the
+// token, the identifier is only resolved there; saving, history and audit
+// run through the same path as the ID route.
 
 func slugWebhookPost(r http.Handler, slug, status, token string) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(map[string]string{"status": status})
@@ -166,8 +166,8 @@ func TestComponentStatusWebhookBySlug(t *testing.T) {
 	})
 }
 
-// Punkt 1: Leere (und sonst ungültige) Kennung darf nie eine
-// Komponente mit leerem Slug treffen; gleiche Antwort wie unbekannte Kennung.
+// Point 1: An empty (and otherwise invalid) identifier must never hit a
+// component with an empty slug; same response as for an unknown identifier.
 func TestComponentStatusWebhookBySlug_UngueltigeKennung(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -189,11 +189,11 @@ func TestComponentStatusWebhookBySlug_UngueltigeKennung(t *testing.T) {
 	var fresh models.Component
 	require.NoError(t, db.First(&fresh, noSlug.ID).Error)
 	assert.Equal(t, "operational", fresh.Status)
-	// Token bleibt zuerst: ungültiger Token + leere Kennung = 401.
+	// Token still comes first: invalid token + empty identifier = 401.
 	assert.Equal(t, http.StatusUnauthorized, slugWebhookPost(r, "", "major_outage", "falsch").Code)
 }
 
-// Punkt 3: Body-Größenlimit auf beiden Wegen.
+// Point 3: body size limit on both routes.
 func TestComponentStatusWebhook_BodyZuGross(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -218,8 +218,8 @@ func TestComponentStatusWebhook_BodyZuGross(t *testing.T) {
 	assert.Equal(t, "operational", fresh.Status)
 }
 
-// Punkt 4: Fehlversuche (falscher Token, unbekannte Kennung)
-// erzeugen keine GORM-Fehlerzeile "record not found"; das Token steht nie im Log.
+// Point 4: failed attempts (wrong token, unknown identifier)
+// do not produce a GORM "record not found" error line; the token never appears in the log.
 func TestComponentStatusWebhookBySlug_KeinLogRauschen(t *testing.T) {
 	base := testutils.SetupTestDB()
 	var buf bytes.Buffer
@@ -237,8 +237,8 @@ func TestComponentStatusWebhookBySlug_KeinLogRauschen(t *testing.T) {
 	assert.NotContains(t, buf.String(), "geheimes-token")
 }
 
-// Hinweis: setComponentStatus darf eine parallel gesetzte
-// Archivierung nicht überschreiben (Omit("archived_at")).
+// Note: setComponentStatus must not overwrite an
+// archiving set in parallel (Omit("archived_at")).
 func TestComponentStatusWebhookBySlug_ParallelArchivierungBleibt(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -248,7 +248,7 @@ func TestComponentStatusWebhookBySlug_ParallelArchivierungBleibt(t *testing.T) {
 	require.NoError(t, db.Create(&page).Error)
 	comp := models.Component{StatusPageID: page.ID, Name: "API", Slug: "api", Status: "operational"}
 	require.NoError(t, db.Create(&comp).Error)
-	// Archivierung zwischen Lesen der Komponente und Speichern des Status.
+	// Archiving between reading the component and saving the status.
 	require.NoError(t, db.Callback().Query().After("gorm:query").Register("test:archive_after_read", func(tx *gorm.DB) {
 		if tx.Statement.Table == "components" && !tx.Statement.SkipHooks {
 			tx.Session(&gorm.Session{NewDB: true, SkipHooks: true}).Table("components").Where("id = ?", comp.ID).Update("archived_at", time.Now())

@@ -12,12 +12,12 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// GET /api/pages/:page_id/languages und
-// GET /api/pages/:page_id/ui-overrides waren für JEDEN eingeloggten Nutzer
-// auf JEDER Seite lesbar. Das öffentliche Frontend braucht sie nicht
-// (anonyme Besucher nutzen /api/public/ui-overrides, die Seiten-Endpunkte
-// ruft nur der Admin-Bereich auf: AdminLayout.vue, useContentLanguages.js),
-// daher sind sie jetzt an eine Rolle auf der Seite gebunden.
+// GET /api/pages/:page_id/languages and
+// GET /api/pages/:page_id/ui-overrides were readable by EVERY logged-in user
+// on EVERY page. The public frontend does not need them
+// (anonymous visitors use /api/public/ui-overrides; the page endpoints
+// are only called by the admin area: AdminLayout.vue, useContentLanguages.js),
+// so they are now bound to a role on the page.
 func TestRouter_PageLanguagesAndUiOverridesRequireRoleOnPage(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := newRouter(handlers.NewHandler(db))

@@ -41,7 +41,7 @@ describe('subscriberLanguage', () => {
     expect(subscriberLanguageOptions(withInactive, () => 'S').map(o => o.value)).toEqual(['', 'en', 'fr'])
     expect(hasLanguageChoice([langs[1], { code: 'hr', name: 'H', is_default: false, is_active: false }])).toBe(false)
     expect(selectableSubscriberLanguage('hr', withInactive)).toBe('')
-    // is_active fehlt (ältere Antwort): gilt als aktiv
+    // is_active missing (older response): counts as active
     expect(subscriberLanguageOptions(langs, () => 'S')).toHaveLength(3)
   })
 
@@ -59,7 +59,7 @@ describe('subscriberLanguage', () => {
       { value: 'en', label: 'English' },
       { value: 'fr', label: 'Français' },
     ])
-    // ohne Standard in der Liste: Beschriftung ohne Namen, keine Ausnahme
+    // without a default in the list: label without a name, no exception
     expect(subscriberLanguageOptions([], (n) => `S(${n})`)).toEqual([{ value: '', label: 'S()' }])
     expect(subscriberLanguageOptions(undefined, (n) => `S(${n})`)).toEqual([{ value: '', label: 'S()' }])
   })

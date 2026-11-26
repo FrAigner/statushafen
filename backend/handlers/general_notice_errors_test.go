@@ -16,10 +16,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Die Notice-Admin-Handler hatten nur den Normalfall getestet.
-// Ergänzt: ungültige/fehlende Parameter, Validierung, Mandantentrennung,
-// Standardwerte und Datenbankfehler. NotifySubscribers bleibt bewusst aus,
-// damit kein Versand-Goroutine in den Tests läuft.
+// The notice admin handlers had only tested the normal case.
+// Added: invalid/missing parameters, validation, tenant separation,
+// default values and database errors. NotifySubscribers deliberately stays off
+// so no delivery goroutine runs in the tests.
 func TestNoticeAdminHandlers_Fehlerpfade(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -79,7 +79,7 @@ func TestNoticeAdminHandlers_Fehlerpfade(t *testing.T) {
 			}
 		})
 	}
-	// failOnWrites lässt Lesezugriffe durch und scheitert nur bei Schreibzugriffen.
+	// failOnWrites lets reads through and fails only on writes.
 	failOnWrites := func(t *testing.T, name, table string) {
 		cb := func(tx *gorm.DB) {
 			if tx.Statement.Table == table {
@@ -266,8 +266,8 @@ func TestNoticeAdminHandlers_Fehlerpfade(t *testing.T) {
 		}
 	})
 
-	// Inaktiv, damit beim Update kein Versand startet. Das Feld wird per Update gesetzt,
-	// weil GORM beim Create einen false-Zero-Value/Default sonst nicht von true unterscheidet.
+	// Inactive so no delivery starts on update. The field is set via Update,
+	// because on Create GORM cannot tell a false zero value/default from true otherwise.
 	newInactiveNotifying := func(title string) models.GeneralNotice {
 		n := models.GeneralNotice{StatusPageID: page.ID, Title: title, Message: "m", Level: "info", IsActive: false}
 		db.Create(&n)

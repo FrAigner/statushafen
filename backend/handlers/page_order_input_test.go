@@ -20,8 +20,8 @@ func postOrder(t *testing.T, r http.Handler, body map[string]any) (int, []byte) 
 	return w.Code, w.Body.Bytes()
 }
 
-// Das Limit offener Bestellungen zählt je Postfach: Schreibvarianten derselben
-// Adresse (Groß-/Kleinschreibung, "+tag") teilen sich die drei Plätze.
+// The limit on open orders counts per mailbox: spelling variants of the same
+// address (case, "+tag") share the three slots.
 func TestOrderCreate_PendingLimitCountsPerMailbox(t *testing.T) {
 	db, r := newInputValidationRouter(t)
 	for _, email := range []string{"opfer@example.com", "Opfer@Example.com", "OPFER+a@example.com"} {
@@ -35,15 +35,15 @@ func TestOrderCreate_PendingLimitCountsPerMailbox(t *testing.T) {
 	}
 	assert.EqualValues(t, 3, count(db, &models.PageOrder{}, "lower(email) LIKE ?", "opfer%@example.com"))
 
-	// Gegenprobe: ein anderes Postfach und eine andere Domain sind unberührt.
+	// Control case: a different mailbox and a different domain are unaffected.
 	for _, email := range []string{"anderer@example.com", "opfer@example.org", "opfer-x@example.com"} {
 		code, body := postOrder(t, r, map[string]any{"company_name": "Firma", "email": email})
 		assert.Equal(t, http.StatusCreated, code, "%s: %s", email, body)
 	}
 }
 
-// "_" und "%" gelten in der Postfach-Suche als Zeichen, nicht als Platzhalter:
-// Wer "a_b@example.com" bestellt, nutzt nicht die Plätze von "axb@example.com".
+// "_" and "%" count as characters in the mailbox search, not as wildcards:
+// Whoever orders "a_b@example.com" does not use the slots of "axb@example.com".
 func TestOrderCreate_PendingLimitTreatsWildcardCharactersLiterally(t *testing.T) {
 	_, r := newInputValidationRouter(t)
 	for _, email := range []string{"axb+1@example.com", "axb+2@example.com", "axb+3@example.com", "100abc+1@example.com", "100abc+2@example.com", "100abc+3@example.com"} {
@@ -56,8 +56,8 @@ func TestOrderCreate_PendingLimitTreatsWildcardCharactersLiterally(t *testing.T)
 	}
 }
 
-// Die Felder der Bestellung sind begrenzt, bevor etwas gespeichert oder per Mail
-// verschickt wird.
+// The order fields are limited before anything is stored or sent
+// by mail.
 func TestOrderCreate_FieldLengthLimits(t *testing.T) {
 	db, r := newInputValidationRouter(t)
 	long := func(n int) string { return strings.Repeat("a", n) }
@@ -88,8 +88,8 @@ func TestOrderCreate_FieldLengthLimits(t *testing.T) {
 	assert.EqualValues(t, 3, count(db, &models.PageOrder{}, "1 = 1"), "abgelehnte Bestellungen werden nicht gespeichert")
 }
 
-// Ein NUL-Byte lässt PostgreSQL das Speichern ablehnen (vorher 500). Es ist eine
-// ungültige Eingabe und wird mit 400 beantwortet.
+// A NUL byte makes PostgreSQL reject the save (previously 500). It is an
+// invalid input and is answered with 400.
 func TestOrderCreate_NulByteIsBadRequest(t *testing.T) {
 	db, r := newInputValidationRouter(t)
 	for name, body := range map[string]map[string]any{
@@ -108,8 +108,8 @@ func TestOrderCreate_NulByteIsBadRequest(t *testing.T) {
 	assert.Zero(t, count(db, &models.PageOrder{}, "1 = 1"))
 }
 
-// Die neuen Fehlercodes stehen als Konstanten, nicht als Literal in gin.H; die
-// Übersetzungsprüfung der Handler findet sie daher nicht. Sie werden hier einzeln geprüft.
+// The new error codes are constants, not literals in gin.H; the
+// handlers' translation check therefore does not find them. They are checked individually here.
 func TestOrderCreate_NewErrorCodesAreTranslated(t *testing.T) {
 	for _, lang := range []string{"de", "en"} {
 		raw, err := os.ReadFile(filepath.Join("..", "..", "frontend", "src", "i18n", "locales", lang+".json"))

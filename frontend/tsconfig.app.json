@@ -1,6 +1,5 @@
-// Browser code in src/. New files are TypeScript (.ts, <script setup lang="ts">) and are checked with
-// strict. Existing JavaScript is compiled along (allowJs) but not yet checked (checkJs: false); it is
-// migrated step by step.
+// Browser code in src/: TypeScript only (.ts, <script setup lang="ts">), checked with strict.
+// src/tsconfigStrict.test.js guards that no JavaScript application code comes back.
 {
   "compilerOptions": {
     "target": "ES2022",
@@ -18,8 +17,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
 
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
 
     "strict": true,
     // An index lookup (array[i], record[key]) may be undefined. Cheap to have from the start; turning it
@@ -33,6 +31,6 @@
     "types": ["vite/client"],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   },
-  "include": ["env.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.vue"],
+  "include": ["env.d.ts", "src/**/*.ts", "src/**/*.vue"],
   "exclude": ["src/**/*.test.*", "src/**/*.spec.*", "src/test-support/**"]
 }

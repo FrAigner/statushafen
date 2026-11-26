@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ComponentTreeNode from './ComponentTreeNode.vue'
 import StatusBadge from './StatusBadge.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 function mountNode(status, extra = {}, depth = 0) {
   return mount(ComponentTreeNode, {

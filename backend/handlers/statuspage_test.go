@@ -22,9 +22,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// doStatusPageRequest führt einen Request gegen den Test-Router aus und
-// JSON-kodiert payload (falls gesetzt) als Body; reduziert die sonst pro
-// Subtest wiederholte Request/Serve-Boilerplate.
+// doStatusPageRequest executes a request against the test router and
+// JSON-encodes payload (if set) as the body; reduces the otherwise per-
+// subtest-repeated request/serve boilerplate.
 func doStatusPageRequest(r http.Handler, method, path string, payload interface{}) *httptest.ResponseRecorder {
 	var body io.Reader
 	if payload != nil {
@@ -40,9 +40,9 @@ func doStatusPageRequest(r http.Handler, method, path string, payload interface{
 	return w
 }
 
-// requireStatusCode bricht den (Sub-)Test ab, wenn der Response-Code nicht
-// wie erwartet ist - reduziert die sonst pro Testfall wiederholte
-// if/Fatalf-Boilerplate der Slug-Kollisions-Tests.
+// requireStatusCode aborts the (sub)test if the response code is not
+// as expected - reduces the if/Fatalf boilerplate otherwise repeated per
+// test case in the slug collision tests.
 func requireStatusCode(t *testing.T, w *httptest.ResponseRecorder, expected int) {
 	t.Helper()
 	if w.Code != expected {
@@ -50,8 +50,8 @@ func requireStatusCode(t *testing.T, w *httptest.ResponseRecorder, expected int)
 	}
 }
 
-// requireBodyContains bricht den (Sub-)Test ab, wenn der Response-Body die
-// angegebene Substring nicht enthält.
+// requireBodyContains aborts the (sub)test if the response body does not contain the
+// given substring.
 func requireBodyContains(t *testing.T, w *httptest.ResponseRecorder, substr string) {
 	t.Helper()
 	if !strings.Contains(w.Body.String(), substr) {
@@ -59,8 +59,8 @@ func requireBodyContains(t *testing.T, w *httptest.ResponseRecorder, substr stri
 	}
 }
 
-// requireBodyNotContains bricht den (Sub-)Test ab, wenn der Response-Body die
-// angegebene Substring enthält (z.B. für Datenleck-Regressionstests).
+// requireBodyNotContains aborts the (sub)test if the response body contains the
+// given substring (e.g. for data leak regression tests).
 func requireBodyNotContains(t *testing.T, w *httptest.ResponseRecorder, substr string) {
 	t.Helper()
 	if strings.Contains(w.Body.String(), substr) {
@@ -175,10 +175,10 @@ func TestStatusPageHandlers(t *testing.T) {
 	})
 }
 
-// Regressionstest: GET /api/pages liefert ALLE Statusseiten ungefiltert (auch
-// private/unlisted) und muss deshalb Global Admins vorbehalten sein. War zuvor
-// komplett öffentlich erreichbar und leakte Namen/Slugs aller Mandanten (u.a.
-// sichtbar über AdminOverview.vues Degraded-Mode-Fallback für Nicht-Admins).
+// Regression test: GET /api/pages returns ALL status pages unfiltered (including
+// private/unlisted) and must therefore be reserved for Global Admins. Was previously
+// completely publicly reachable and leaked names/slugs of all tenants (among others
+// visible via AdminOverview.vue's degraded-mode fallback for non-admins).
 func TestGetStatusPagesRequiresGlobalAdmin(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -236,13 +236,13 @@ func TestGetStatusPagesRequiresGlobalAdmin(t *testing.T) {
 	})
 }
 
-// Branding-Felder (LogoURL, PrimaryColor, SecondaryColor,
-// HeaderStyle) müssen über Create/Update persistiert und in der Response
-// zurückgegeben werden. Zusätzlich wird geprüft, dass ungültige Werte
-// (kein Hex-Farbwert / unbekannter HeaderStyle) mit 400 abgelehnt werden und
-// dass eine bestehende Seite ohne gesetzte Farben (leerer String) weiterhin
-// so ausgeliefert wird - der Fallback auf die globalen CSS-Defaults passiert
-// bewusst erst im Frontend, nicht im Backend.
+// Branding fields (LogoURL, PrimaryColor, SecondaryColor,
+// HeaderStyle) must be persisted via create/update and returned in the response.
+// Additionally it is checked that invalid values
+// (not a hex color / unknown HeaderStyle) are rejected with 400 and
+// that an existing page without set colors (empty string) is still
+// returned that way - the fallback to the global CSS defaults deliberately
+// happens only in the frontend, not in the backend.
 func TestStatusPageBrandingFields(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -279,7 +279,7 @@ func TestStatusPageBrandingFields(t *testing.T) {
 			t.Errorf("HeaderStyle not persisted, got %q", page.HeaderStyle)
 		}
 
-		// Auch über die öffentliche GET-Route sichtbar (Response, nicht nur DB).
+		// Also visible via the public GET route (response, not only DB).
 		w2 := doStatusPageRequest(r, "GET", "/api/pages/slug/branded-page", nil)
 		var resp map[string]interface{}
 		_ = json.Unmarshal(w2.Body.Bytes(), &resp)
@@ -351,10 +351,10 @@ func TestStatusPageBrandingFields(t *testing.T) {
 	})
 }
 
-// PageLayout ("standard" | "liste") ist ein eigenes, additives
-// Feld neben HeaderStyle. Fehlt es im Body, bleibt der Wert bzw. der Default
-// "standard" erhalten; ein explizit gesendeter unbekannter oder leerer Wert
-// wird mit 400 abgelehnt, ohne den gespeicherten Wert zu verändern.
+// PageLayout ("standard" | "liste") is a separate, additive
+// field alongside HeaderStyle. If it is missing from the body, the value or the default
+// "standard" is kept; an explicitly sent unknown or empty value
+// is rejected with 400 without changing the stored value.
 func TestStatusPagePageLayout(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -598,10 +598,10 @@ func TestGetStatusPageBySlugHandler_PrivatePageRequiresAccess(t *testing.T) {
 	})
 }
 
-// TestCreateStatusPageHandler_SlugAutoGeneration: eine neue
-// Statusseite ist automatisch unter <slug>.<Basisdomain> erreichbar (Caddy
-// routet die Wildcard-Domain bereits vollständig),
-// der Nutzer muss dafür aber keinen Slug mehr manuell im Formular vergeben.
+// TestCreateStatusPageHandler_SlugAutoGeneration: a new
+// status page is automatically reachable as <slug>.<base domain> (Caddy
+// already routes the wildcard domain completely),
+// but the user no longer has to assign a slug manually in the form.
 func TestCreateStatusPageHandler_SlugAutoGeneration(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -611,15 +611,15 @@ func TestCreateStatusPageHandler_SlugAutoGeneration(t *testing.T) {
 	db.Create(&models.StatusPage{Name: "Acme", Slug: "acme"})
 	db.Create(&models.StatusPage{Name: "Beta", Slug: "beta-manual"})
 
-	// Tabellengetrieben statt separater Subtest-Bodies: die
-	// Request/Assert-Logik ist strukturell für alle vier Fälle identisch und
-	// wurde von SonarCloud als Duplikat markiert, als sie noch pro Subtest
-	// dupliziert war.
+	// Table-driven instead of separate subtest bodies: the
+	// request/assert logic is structurally identical for all four cases and
+	// was flagged as a duplicate by SonarCloud when it was still per subtest
+	// duplicated.
 	cases := []struct {
 		name       string
 		payload    map[string]interface{}
 		wantStatus int
-		wantSlug   string // leer = nicht geprüft
+		wantSlug   string // empty = not checked
 	}{
 		{
 			name:       "Leerer Slug wird aus dem Namen generiert (inkl. Umlaut-Transliteration)",
@@ -661,9 +661,9 @@ func TestCreateStatusPageHandler_SlugAutoGeneration(t *testing.T) {
 	}
 }
 
-// TestUpdateStatusPageHandler_SlugCollision deckt denselben Kollisions-Schutz
-// beim nachträglichen Ändern des Slugs (und damit der Subdomain) einer
-// bestehenden Statusseite ab.
+// TestUpdateStatusPageHandler_SlugCollision covers the same collision protection
+// when later changing the slug (and thus the subdomain) of an
+// existing status page.
 func TestUpdateStatusPageHandler_SlugCollision(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

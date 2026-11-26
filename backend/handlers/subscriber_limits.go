@@ -7,15 +7,15 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Grenzen für das Anlegen von E-Mail-Abonnenten durch Seiten-Admins. Jedes
-// neue Abo löst eine Bestätigungsmail an eine Adresse aus, die nie zugestimmt
-// hat; ohne Grenzen ließe sich der Server zum Mailbomben fremder Adressen
+// Limits for creating email subscribers by page admins. Every
+// new subscription triggers a confirmation mail to an address that never agreed;
+// without limits the server could be used to mail-bomb third-party addresses
 // missbrauchen.
 const (
-	// MaxAdminSubscriberCreatesPerHour: neue E-Mail-Abos je Seite und Stunde.
+	// MaxAdminSubscriberCreatesPerHour: new email subscriptions per page and hour.
 	MaxAdminSubscriberCreatesPerHour = 30
-	// maxPendingSubscriptionsPerRecipient: unbestätigte Abos je Empfänger über
-	// alle Seiten innerhalb von 24 Stunden (jedes löst eine Mail aus).
+	// maxPendingSubscriptionsPerRecipient: unconfirmed subscriptions per recipient across
+	// all pages within 24 hours (each one triggers a mail).
 	maxPendingSubscriptionsPerRecipient = 3
 )
 
@@ -23,9 +23,9 @@ func errSubscriberRateLimited() error {
 	return newCodedError("subscriber_rate_limited", "Zu viele neue Abonnenten in kurzer Zeit")
 }
 
-// checkAdminSubscriberLimits prüft die Grenzen für ein neues E-Mail-Abo.
-// Gelöschte Zeilen zählen mit (Unscoped), sonst ließe sich die Grenze durch
-// Löschen und Neuanlegen umgehen.
+// checkAdminSubscriberLimits checks the limits for a new email subscription.
+// Deleted rows count too (Unscoped), otherwise the limit could be bypassed by
+// deleting and recreating.
 func (h *Handler) checkAdminSubscriberLimits(pageID uint, email string, now time.Time) error {
 	var perPage int64
 	if err := h.DB.Unscoped().Model(&models.Subscriber{}).

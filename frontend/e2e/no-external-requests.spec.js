@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// DSGVO: Beim Laden gehen keine Requests an fremde Hosts
-// (z. B. Google Fonts), und die Schriften kommen vom eigenen Host.
+// GDPR: loading sends no requests to third-party hosts
+// (e.g. Google Fonts), and the fonts come from our own host.
 const OWN_ORIGIN = `http://localhost:${PORT}`;
 
 for (const path of ['/', '/login']) {
@@ -21,8 +21,8 @@ for (const path of ['/', '/login']) {
     });
 
     await page.goto(`${OWN_ORIGIN}${path}`, { waitUntil: 'networkidle' });
-    // Schriften werden erst bei Verwendung geladen; explizit anstoßen, damit
-    // der Test unabhängig vom gerade gerenderten Inhalt ist.
+    // Fonts are only loaded when used; trigger them explicitly so the test
+    // does not depend on the content currently rendered.
     await page.evaluate(() =>
       Promise.all(
         ['Inter', 'IBM Plex Sans', 'IBM Plex Mono'].flatMap((f) =>

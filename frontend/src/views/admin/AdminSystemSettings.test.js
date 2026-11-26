@@ -4,10 +4,10 @@ import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import { onyxFormStubs, OnyxCheckboxStub } from '../../test-support/onyxStubs'
 import AdminSystemSettings from './AdminSystemSettings.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
-// Component-Tests für die Systemeinstellungen - beide
-// Schalter rendern, laden den Stand und speichern nur Änderungen (gemockter
+// Component tests for the system settings - both
+// switches render, load the state and only save changes (mocked
 // fetch).
 
 function jsonResponse(body, status = 200) {
@@ -36,7 +36,7 @@ async function mountView({ fetchImpl, globalAdmin = true } = {}) {
   return wrapper
 }
 
-// fetchWithPut liefert ALL_ON für GET und putBody (bzw. Fehler) für PUT.
+// fetchWithPut returns ALL_ON for GET and putBody (or an error) for PUT.
 function fetchWithPut(putResponse) {
   return vi.fn(async (url, options = {}) => {
     if ((options.method || 'GET') === 'PUT') return putResponse
@@ -89,7 +89,7 @@ describe('AdminSystemSettings', () => {
     expect(checkbox(wrapper, 'email_enabled').element.checked).toBe(false)
     expect(checkbox(wrapper, 'orders_enabled').element.checked).toBe(true)
 
-    // Dismiss-Button schließt die Meldung wieder.
+    // The dismiss button closes the message again.
     await wrapper.find('.alert-close').trigger('click')
     expect(wrapper.find('.alert').exists()).toBe(false)
   })
@@ -160,8 +160,8 @@ describe('AdminSystemSettings', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Brotkrumen und Einstellungen in einer Karte; die
-  // Abschnitte stehen als h4 unter dem Kartentitel (h3), die Seite hat nur die h2.
+  // Direction C: breadcrumbs and settings in one card; the
+  // sections are h4 below the card title (h3), the page only has the h2.
   it('zeigt Brotkrumen und die Schalter in einer Karte mit Titel', async () => {
     const wrapper = await mountView()
 

@@ -18,6 +18,8 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"go/scanner"
+	"go/token"
 	"io"
 	"path"
 	"slices"
@@ -55,16 +57,22 @@ func ParseDiff(r io.Reader) (ChangedLines, error) {
 	// outside the body is "+++ " a file header; an added
 	// content line "++ x" also appears in the diff as "+++ x".
 	remOld, remNew := 0, 0
+	var h hunk
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, maxDiffLine)
 	for sc.Scan() {
 		line := sc.Text()
 		if remOld > 0 || remNew > 0 {
 			if consumeHunkLine(line, &remOld, &remNew) {
+				h.add(line)
+				if remOld == 0 && remNew == 0 {
+					h.dropCommentOnlyChanges(changed)
+				}
 				continue
 			}
 			// Unexpected line: hunk was shorter than announced.
 			remOld, remNew = 0, 0
+			h.dropCommentOnlyChanges(changed)
 		}
 		switch {
 		case strings.HasPrefix(line, "+++ "):
@@ -83,6 +91,7 @@ func ParseDiff(r io.Reader) (ChangedLines, error) {
 				return nil, err
 			}
 			remOld, remNew = oldCount, count
+			h = hunk{file: current, next: start}
 			if current == "" || count == 0 {
 				continue
 			}
@@ -98,6 +107,80 @@ func ParseDiff(r io.Reader) (ChangedLines, error) {
 		return nil, err
 	}
 	return changed, nil
+}
+
+// hunk collects the body of one hunk so that comment-only changes in Go files
+// can be told apart from code changes.
+type hunk struct {
+	file     string
+	next     int // new-side line number of the next "+" or context line
+	removed  []string
+	added    []string
+	addedNum []int
+}
+
+func (h *hunk) add(line string) {
+	switch {
+	case strings.HasPrefix(line, "-"):
+		h.removed = append(h.removed, line[1:])
+	case strings.HasPrefix(line, "+"):
+		h.added = append(h.added, line[1:])
+		h.addedNum = append(h.addedNum, h.next)
+		h.next++
+	case strings.HasPrefix(line, "\\"):
+	default: // context line
+		h.next++
+	}
+}
+
+// dropCommentOnlyChanges removes new-side lines of a Go hunk that hold only a
+// comment, and, when the hunk replaces as many lines as it removes, lines whose
+// code (comments stripped) equals the line they replace. Translating a comment
+// inside a function is no untested code. Other file types are left alone.
+func (h *hunk) dropCommentOnlyChanges(changed ChangedLines) {
+	if strings.HasSuffix(h.file, ".go") {
+		paired := len(h.removed) == len(h.added)
+		for i, text := range h.added {
+			code, ok := goCode(text)
+			if !ok {
+				continue
+			}
+			if code == "" {
+				delete(changed[h.file], h.addedNum[i])
+				continue
+			}
+			if paired {
+				if old, ok := goCode(h.removed[i]); ok && old == code {
+					delete(changed[h.file], h.addedNum[i])
+				}
+			}
+		}
+	}
+	*h = hunk{file: h.file, next: h.next}
+}
+
+// goCode returns the tokens of one line of Go code without comments. ok is false
+// when the scanner cannot read the line on its own (then the line counts as code).
+func goCode(line string) (string, bool) {
+	var s scanner.Scanner
+	src := []byte(line)
+	fset := token.NewFileSet()
+	failed := false
+	s.Init(fset.AddFile("", -1, len(src)), src, func(token.Position, string) { failed = true }, 0)
+	var b strings.Builder
+	for {
+		_, tok, lit := s.Scan()
+		if tok == token.EOF {
+			break
+		}
+		if tok == token.SEMICOLON && lit == "\n" {
+			continue // inserted at the end of the line
+		}
+		b.WriteString(tok.String())
+		b.WriteString(lit)
+		b.WriteByte(' ')
+	}
+	return b.String(), !failed
 }
 
 // consumeHunkLine counts a body line off the open lines and

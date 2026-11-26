@@ -65,12 +65,12 @@ func TestIsBootstrapAdminEmailInternal(t *testing.T) {
 	})
 }
 
-// TestSweepExpiredSSOCodes: ssoCodeStore wuchs unbegrenzt,
-// weil consumeSSOCode Einträge nur beim tatsächlichen Zugriff löschte -
-// nie eingelöste Codes (z.B. Browser vor dem Redirect geschlossen) blieben
-// für immer in der Map. sweepExpiredSSOCodes ist der aus der
-// Sleep-Schleife ausgelagerte Einzeldurchlauf, den cleanupSSOCodeStore in
-// Produktion alle 5 Minuten aufruft.
+// TestSweepExpiredSSOCodes: ssoCodeStore grew without bound,
+// because consumeSSOCode only deleted entries on actual access -
+// codes that were never redeemed (e.g. browser closed before the redirect) stayed
+// in the map forever. sweepExpiredSSOCodes is the single pass extracted from the
+// sleep loop that cleanupSSOCodeStore calls in
+// production every 5 minutes.
 func TestSweepExpiredSSOCodes(t *testing.T) {
 	ssoCodeMu.Lock()
 	ssoCodeStore = map[string]ssoCodeEntry{}
@@ -84,7 +84,7 @@ func TestSweepExpiredSSOCodes(t *testing.T) {
 	expiredCode := storeSSOCode("expired-token", "", "", "")
 	ssoCodeMu.Lock()
 	entry := ssoCodeStore[expiredCode]
-	entry.expires = time.Now().Add(-time.Minute) // in der Vergangenheit, nie konsumiert
+	entry.expires = time.Now().Add(-time.Minute) // in the past, never consumed
 	ssoCodeStore[expiredCode] = entry
 	ssoCodeMu.Unlock()
 
@@ -105,11 +105,11 @@ func TestSweepExpiredSSOCodes(t *testing.T) {
 	}
 }
 
-// TestCleanupSSOCodeStoreStopsOnContextCancel: die
-// Aufräum-Goroutine lief vorher in init() ohne Cancellation für immer -
-// dieser Test stellt sicher, dass cleanupSSOCodeStore zurückkehrt, sobald
-// der übergebene Context gecancelt wird, statt bis zum nächsten Tick (5
-// Minuten) oder für immer weiterzulaufen.
+// TestCleanupSSOCodeStoreStopsOnContextCancel: the
+// cleanup goroutine previously ran forever in init() without cancellation -
+// this test ensures that cleanupSSOCodeStore returns as soon as
+// the passed context is cancelled, instead of running on until the next tick (5
+// minutes) or forever.
 func TestCleanupSSOCodeStoreStopsOnContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -123,21 +123,21 @@ func TestCleanupSSOCodeStoreStopsOnContextCancel(t *testing.T) {
 
 	select {
 	case <-done:
-		// erwartet: cleanupSSOCodeStore kehrt nach Cancellation zurück
+		// expected: cleanupSSOCodeStore returns after cancellation
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected cleanupSSOCodeStore to return promptly after context cancellation")
 	}
 }
 
-// TestStartSSOCleanupWorker stellt sicher, dass StartSSOCleanupWorker die
-// Goroutine tatsächlich startet und die zurückgegebene CancelFunc sie wieder
-// beendet - die main()-Verdrahtung (defer StartSSOCleanupWorker(...)())
-// hängt davon ab, dass hier keine Goroutine ohne Shutdown-Pfad übrig bleibt.
+// TestStartSSOCleanupWorker ensures that StartSSOCleanupWorker actually starts the
+// goroutine and the returned CancelFunc stops it again -
+// the main() wiring (defer StartSSOCleanupWorker(...)())
+// depends on no goroutine being left over here without a shutdown path.
 func TestStartSSOCleanupWorker(t *testing.T) {
 	cancel := StartSSOCleanupWorker(context.Background())
 	cancel()
-	// Kein direktes Signal von StartSSOCleanupWorker aus (fire-and-forget,
-	// wie in main.go verwendet) - ein kurzes Warten reicht, um sicherzustellen,
-	// dass der Aufruf selbst nicht blockiert oder paniert.
+	// No direct signal from StartSSOCleanupWorker (fire-and-forget,
+	// as used in main.go) - a short wait is enough to ensure
+	// that the call itself neither blocks nor panics.
 	time.Sleep(50 * time.Millisecond)
 }

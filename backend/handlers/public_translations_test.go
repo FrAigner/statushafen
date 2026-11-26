@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// gebündelter öffentlicher Übersetzungs-Endpunkt.
+// bundled public translations endpoint.
 
 type ptResp struct {
 	Language        string                       `json:"language"`
@@ -64,7 +64,7 @@ func (e *ptEnv) get(path string, headers ...string) (*httptest.ResponseRecorder,
 	return w, resp
 }
 
-// page legt eine Seite mit den Sprachen de (Standard) und en/fr an.
+// page creates a page with the languages de (default) and en/fr.
 func (e *ptEnv) page(slug string, private bool) models.StatusPage {
 	p := models.StatusPage{Name: slug, Slug: slug, IsPrivate: private}
 	require.NoError(e.t, e.db.Create(&p).Error)
@@ -106,18 +106,18 @@ func TestPublicTranslations_NurBestaetigteUndRueckfall(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "en", resp.Language)
 	assert.Equal(t, "de", resp.DefaultLanguage)
-	// bestätigt in der gewünschten Sprache
+	// confirmed in the requested language
 	assert.Equal(t, "Conf EN", resp.Components[itoa(conf.ID)]["title"])
 	assert.Equal(t, "Conf EN d", resp.Components[itoa(conf.ID)]["text"])
-	// Entwurf nie, auch nicht als Rückfall auf Original-Auswahl
+	// draft never, not even as a fallback to original selection
 	assert.NotContains(t, resp.Components, itoa(draft.ID))
 	assert.NotContains(t, w.Body.String(), "Entwurf EN")
-	// Rückfall: gewünschte Sprache fehlt -> Standardsprache der Seite
+	// Fallback: requested language missing -> page's default language
 	assert.Equal(t, "Nur DE", resp.Components[itoa(onlyDe.ID)]["title"])
-	// weder noch -> kein Eintrag (Frontend zeigt das Original)
+	// neither -> no entry (frontend shows the original)
 	assert.NotContains(t, resp.Components, itoa(none.ID))
 
-	// Ohne lang: Standardsprache der Seite
+	// Without lang: page's default language
 	_, def := e.get("/api/public/pages/pt/translations")
 	assert.Equal(t, "de", def.Language)
 	assert.Equal(t, "Nur DE", def.Components[itoa(onlyDe.ID)]["title"])
@@ -156,8 +156,8 @@ func TestPublicTranslations_UnsichtbareKomponentenUndGruppenKinder(t *testing.T)
 	assert.NotContains(t, resp.Components, itoa(child.ID), "Mitglieder einer unsichtbaren Gruppe bleiben verborgen")
 }
 
-// Review: archivierte Komponenten und ihre Gruppen-Nachfahren
-// fehlen im öffentlichen Übersetzungs-Bündel (archived_at muss geladen werden).
+// Review: archived components and their group descendants
+// are missing from the public translations bundle (archived_at must be loaded).
 func TestPublicTranslations_ArchivierteKomponentenUndGruppenKinder(t *testing.T) {
 	e := newPTEnv(t)
 	p := e.page("pt", false)
@@ -211,7 +211,7 @@ func TestPublicTranslations_VorfaelleUndAnkuendigungen(t *testing.T) {
 func TestPublicTranslations_Mandantentrennung(t *testing.T) {
 	e := newPTEnv(t)
 	a := e.page("seite-a", false)
-	// zweite Seite: Sprachen wurden schon angelegt, nur Zeilen für die Seite
+	// second page: languages were already created, only rows for the page
 	b := models.StatusPage{Name: "b", Slug: "seite-b"}
 	require.NoError(t, e.db.Create(&b).Error)
 	require.NoError(t, e.db.Create(&models.StatusPageLanguage{StatusPageID: b.ID, LanguageCode: "de", IsDefault: true}).Error)
@@ -233,15 +233,15 @@ func TestPublicTranslations_Validierung404(t *testing.T) {
 	w, _ := e.get("/api/public/pages/gibt-es-nicht/translations?lang=en")
 	assert.Equal(t, http.StatusNotFound, w.Code)
 	assert.Contains(t, w.Body.String(), "page_not_found")
-	// Groß-/Kleinschreibung egal (Codes sind klein gespeichert)
+	// case-insensitive (codes are stored lowercase)
 	w, resp := e.get("/api/public/pages/pt/translations?lang=EN")
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "en", resp.Language)
-	// Sprache nicht bei der Seite aktiv
+	// language not active for the page
 	w, _ = e.get("/api/public/pages/pt/translations?lang=es")
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "invalid_request")
-	// Ungültige Form
+	// Invalid form
 	for _, bad := range []string{"%27%3B--", "de%00", "1234567890", "e"} {
 		w, _ = e.get("/api/public/pages/pt/translations?lang=" + bad)
 		assert.Equal(t, http.StatusBadRequest, w.Code, bad)
@@ -276,7 +276,7 @@ func TestPublicTranslations_PrivateSeite(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "Intern EN", resp.Components[itoa(c.ID)]["title"])
 
-	// Subscriber-Token der richtigen Seite gewährt Zugriff, einer anderen Seite nicht.
+	// Subscriber token of the right page grants access, one of another page does not.
 	sub := models.Subscriber{StatusPageID: p.ID, Email: "sub-646@example.com", Channel: "email", Status: models.SubscriberStatusActive, CreatedByUserID: &member.ID}
 	require.NoError(t, e.db.Create(&sub).Error)
 	tok, err := middleware.GenerateSubscriberToken(sub.ID, p.ID)
@@ -306,7 +306,7 @@ func TestPublicTranslations_CacheBisTTLDanachNeu(t *testing.T) {
 	e.now = e.now.Add(2 * time.Second)
 	_, r3 := e.get("/api/public/pages/pt/translations?lang=en")
 	assert.Equal(t, "Neu", r3.Components[itoa(c.ID)]["title"], "nach 60 s neu geladen")
-	// Uhr läuft rückwärts: Eintrag gilt nicht
+	// Clock runs backwards: entry does not apply
 	e.now = e.now.Add(-time.Hour)
 	require.NoError(t, e.db.Model(&models.ComponentTranslation{}).Where("component_id = ?", c.ID).Update("title", "Zurück").Error)
 	_, r4 := e.get("/api/public/pages/pt/translations?lang=en")
@@ -325,7 +325,7 @@ func TestPublicTranslations_SeiteOhneStandardsprache(t *testing.T) {
 	assert.NotNil(t, resp.Components, "leere Maps statt null")
 }
 
-// Datenbankfehler je Abfrage ergeben 500 mit Code, nie Teildaten.
+// Database errors per query result in 500 with a code, never partial data.
 func TestPublicTranslations_Datenbankfehler500(t *testing.T) {
 	for _, table := range []string{"status_page_languages", "components", "incidents", "general_notices", "component_translations", "incident_translations", "general_notice_translations"} {
 		t.Run(table, func(t *testing.T) {

@@ -1,30 +1,29 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
-// Vitest deckt die Frontend-Unit-Tests ab. Die Playwright-E2E-Specs unter
-// e2e/ teilen sich zwar die *.spec.js-Endung, nutzen aber die Playwright-
-// test.describe()-API - würde Vitest sie einsammeln, bricht der Lauf mit
-// "Playwright Test did not expect test.describe() to be called here" ab.
-// Deshalb bleibt der Testlauf bewusst auf src/ begrenzt; E2E läuft separat
-// über `npm run test:e2e` (playwright test).
+// Vitest covers the frontend unit tests. The Playwright e2e specs under e2e/ share the *.spec.js
+// suffix but use Playwright's test.describe() API; if Vitest collected them, the run would abort with
+// "Playwright Test did not expect test.describe() to be called here". The test run is therefore
+// deliberately limited to src/; e2e runs separately via `npm run test:e2e` (playwright test).
 export default defineConfig({
   plugins: [vue()],
   test: {
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
-    // Aktuell existieren noch keine Unit-Tests - ein leerer Lauf darf die CI
-    // nicht rot färben. Sobald src/-Tests hinzukommen, greifen sie automatisch.
+    // An empty run (e.g. a filter that matches no test) must not fail CI.
     passWithNoTests: true,
-    // Standard sind 5 s je Test. Auf ausgelasteten Maschinen (wenige Kerne, parallele Läufe, Coverage an)
-    // reißen einzelne Admin-View-Tests die Grenze ohne echten Fehler (AdminLayout, AdminUiTranslations).
+    // The default is 5 s per test. On busy machines (few cores, parallel runs, coverage on) single admin
+    // view tests exceed that limit without a real failure (AdminLayout, AdminUiTranslations).
     testTimeout: 20000,
     hookTimeout: 30000,
     environment: 'happy-dom',
-    setupFiles: ['./src/test-support/vitestSetup.js'],
+    setupFiles: ['./src/test-support/vitestSetup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['lcov', 'text'],
       reportsDirectory: 'coverage',
+      // Application code is TypeScript (.ts, .vue); .js stays listed so that a stray JavaScript file
+      // would still show up as uncovered instead of silently missing from the report.
       include: ['src/**/*.{js,ts,vue}'],
       exclude: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     },

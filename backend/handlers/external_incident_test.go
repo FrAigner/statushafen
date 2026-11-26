@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Teil B2: gespiegelte Vorfälle und Wartungen,
-// Benachrichtigung der Abonnenten und lesende API.
+// Part B2: mirrored incidents and maintenances,
+// subscriber notification and read API.
 
 const fixtureBase = "https://status.example.com"
 
@@ -27,8 +27,8 @@ type incidentSetup struct {
 	vm    models.ExternalComponent
 }
 
-// newIncidentSetup: Quelle mit gekoppelter externer Komponente "vm" ↔ f.comp,
-// Erstimport (leer) schon erledigt.
+// newIncidentSetup: source with linked external component "vm" <-> f.comp,
+// initial import (empty) already done.
 func newIncidentSetup(t *testing.T) *incidentSetup {
 	t.Helper()
 	f := newExtFixture(t)
@@ -87,13 +87,13 @@ func TestExternalIncidentMail_ErstimportStillDannMailUndIdempotent(t *testing.T)
 	s := newIncidentSetup(t)
 	s.subscriber("alle@example.com", "all")
 	s.subscriber("api@example.com", uid(s.comp.ID))
-	s.subscriber("andere@example.com", uid(s.otherComp.ID)) // abonniert nur eine andere Komponente
+	s.subscriber("andere@example.com", uid(s.otherComp.ID)) // subscribes to another component only
 	pending := models.Subscriber{StatusPageID: s.page.ID, Email: "offen@example.com", Channel: "email", SubscribedComponentIDs: "all", Status: models.SubscriberStatusPending}
 	require.NoError(t, s.db.Create(&pending).Error)
 	foreign := models.Subscriber{StatusPageID: s.other.ID, Email: "fremd@example.com", Channel: "email", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}
 	require.NoError(t, s.db.Create(&foreign).Error)
 
-	// Die Quelle hat schon einen offenen Vorfall, bevor wir sie je abgefragt haben (Erstimport dieses Feeds).
+	// The source already has an open incident before we ever polled it (initial import of this feed).
 	require.NoError(t, s.db.Model(&models.ExternalSource{}).Where("id = ?", s.srcID).Updates(map[string]any{"IncidentsSyncedAt": nil, "MaintenancesSyncedAt": nil}).Error)
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("alt1", "investigating", "Wir prüfen"))
 	require.True(t, s.poll().OK)
@@ -101,7 +101,7 @@ func TestExternalIncidentMail_ErstimportStillDannMailUndIdempotent(t *testing.T)
 	assert.EqualValues(t, 0, s.auditCount("external_incident.notified"), "Erstimport: still")
 	assert.EqualValues(t, 1, s.auditCount("external_incident.mirrored"), "aber gespiegelt und protokolliert")
 
-	// Neuer Vorfall nach dem Erstimport: Mail an die richtigen Abonnenten.
+	// New incident after the initial import: mail to the right subscribers.
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("alt1", "investigating", "Wir prüfen"), extInc("fx0000000062", "investigating", "Seit 10:00 Uhr gestört"))
 	require.True(t, s.poll().OK)
 	mails := drainMails(t, srv, 2)
@@ -124,7 +124,7 @@ func TestExternalIncidentMail_ErstimportStillDannMailUndIdempotent(t *testing.T)
 	assert.Contains(t, notified.Details, "sent=2 failed=0")
 	assert.Equal(t, "ExternalIncident", notified.TargetType)
 
-	// Zweimal pollen ohne Änderung: keine zweite Mail.
+	// Polling twice without a change: no second mail.
 	require.True(t, s.poll().OK)
 	require.True(t, s.poll().OK)
 	drainMails(t, srv, 0)
@@ -177,9 +177,9 @@ func TestExternalIncidentMail_Wartung(t *testing.T) {
 	assert.True(t, row.ScheduledFor.Equal(sched))
 }
 
-// Regressionstest: Update-Texte der Fremdseite sind mehrzeilig. Der CR/LF-Schutz
-// des Mailversands verwirft Mails mit Zeilenumbruch im Body - dadurch wäre die
-// Benachrichtigung bei jedem mehrzeiligen Update (also fast immer) still ausgefallen.
+// Regression test: update texts from the third-party site are multi-line. The CR/LF protection
+// of mail delivery discards mails with a line break in the body - which would have
+// silently broken the notification on every multi-line update (so almost always).
 func TestExternalIncidentMail_MehrzeiligerTextUndEntschaerfung(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -258,10 +258,10 @@ func TestExternalIncidentMail_EmailSchalterAus(t *testing.T) {
 
 func TestExternalIncidentMail_VersandfehlerWirdProtokolliert(t *testing.T) {
 	t.Setenv("SMTP_HOST", "127.0.0.1")
-	t.Setenv("SMTP_PORT", "1") // niemand lauscht
+	t.Setenv("SMTP_PORT", "1") // nobody is listening
 	s := newIncidentSetup(t)
 	s.subscriber("alle@example.com", "all")
-	s.subscriber("kaputt", "all") // ungültige Adresse
+	s.subscriber("kaputt", "all") // invalid address
 
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("i1", "investigating", "a"))
 	s.poll()
@@ -274,9 +274,9 @@ func TestExternalIncidentMail_VersandfehlerWirdProtokolliert(t *testing.T) {
 	assert.Contains(t, notified.Details, "sent=0 failed=2")
 }
 
-// Die Seitenadresse wirkt nur als Reply-To. Enthält sie einen Zeilenumbruch,
-// wird sie verworfen (kein Header, keine Einschleusung); die Mail selbst geht
-// mit dem Betreiberabsender raus.
+// The site address only acts as Reply-To. If it contains a line break,
+// it is discarded (no header, no injection); the mail itself goes out
+// with the operator sender.
 func TestExternalIncidentMail_ReplyToMitZeilenumbruchWirdVerworfen(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -294,10 +294,10 @@ func TestExternalIncidentMail_ReplyToMitZeilenumbruchWirdVerworfen(t *testing.T)
 
 func TestExternalIncidentWebhook_FehlerPfade(t *testing.T) {
 	s := newIncidentSetup(t)
-	// Webhook auf Loopback: der SSRF-Schutz des Webhook-Clients lehnt ab.
+	// Webhook on loopback: the webhook client's SSRF protection rejects it.
 	require.NoError(t, s.db.Create(&models.Subscriber{StatusPageID: s.page.ID, Channel: "google_chat", WebhookURL: "http://127.0.0.1:9/hook",
 		SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}).Error)
-	// Google-Chat-Abo ohne Webhook-URL.
+	// Google Chat subscription without webhook URL.
 	require.NoError(t, s.db.Exec("INSERT INTO subscribers (status_page_id, channel, subscribed_component_ids, status, created_at, updated_at) VALUES (?, 'google_chat', 'all', 'active', datetime('now'), datetime('now'))", s.page.ID).Error)
 
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("i1", "investigating", "a"))
@@ -310,7 +310,7 @@ func TestExternalIncidentMail_PrivateSeiteNurBerechtigteAbonnenten(t *testing.T)
 	defer srv.close()
 	s := newIncidentSetup(t)
 	require.NoError(t, s.db.Model(&models.StatusPage{}).Where("id = ?", s.page.ID).Update("is_private", true).Error)
-	s.subscriber("ohne-konto@example.com", "all") // kein Ersteller mit Leserecht
+	s.subscriber("ohne-konto@example.com", "all") // no creator with read permission
 
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("i1", "investigating", "a"))
 	s.poll()
@@ -388,7 +388,7 @@ func TestExternalIncidentsAPI_FormatUndFilter(t *testing.T) {
 	assert.Len(t, s.list(s.viewerTok, "source_id="+uid(s.srcID)), 3)
 	assert.Len(t, s.list(s.viewerTok, "source_id=999"), 0)
 
-	// Beendete außerhalb des Fensters entfallen, offene bleiben.
+	// Finished ones outside the window drop out, open ones stay.
 	old := s.clock.AddDate(0, 0, -60)
 	require.NoError(t, s.db.Model(&models.ExternalIncident{}).Where("external_id = ?", "done1").
 		Updates(map[string]any{"resolved_at": old, "external_updated_at": old}).Error)
@@ -430,20 +430,20 @@ func TestExternalIncidentsAPI_RechteUndMandanten(t *testing.T) {
 	require.NoError(t, s.db.First(&row).Error)
 	detail := s.incidentsPath(s.page, "") + "/" + uid(row.ID)
 
-	// Ohne Anmeldung 401, ohne Rolle auf der Seite 403.
+	// Without login 401, without a role on the site 403.
 	assert.Equal(t, http.StatusUnauthorized, s.do(http.MethodGet, s.incidentsPath(s.page, ""), "", nil).Code)
 	assert.Equal(t, http.StatusForbidden, s.do(http.MethodGet, s.incidentsPath(s.page, ""), s.otherTok, nil).Code)
 	assert.Equal(t, http.StatusForbidden, s.do(http.MethodGet, detail, s.otherTok, nil).Code)
-	// Rolle ohne external_sources:read.
+	// Role without external_sources:read.
 	noRead := models.Role{Name: "Nur Vorfälle", Permissions: "incidents:read"}
 	require.NoError(t, s.db.Create(&noRead).Error)
 	tok := s.user("incidents-only@example.com", false, map[uint]uint{s.page.ID: noRead.ID})
 	assert.Equal(t, http.StatusForbidden, s.do(http.MethodGet, s.incidentsPath(s.page, ""), tok, nil).Code)
 	assert.Equal(t, http.StatusForbidden, s.do(http.MethodGet, detail, tok, nil).Code)
 
-	// Fremder Mandant: Die Liste der anderen Seite zeigt nichts von uns, die
-	// Einzelmeldung unserer Seite ist über deren Pfad nicht auffindbar (404),
-	// auch nicht für einen Global Admin.
+	// Foreign tenant: The other site's list shows nothing of ours, the
+	// single report of our site cannot be found via their path (404),
+	// not even for a Global Admin.
 	assert.JSONEq(t, "[]", s.do(http.MethodGet, s.incidentsPath(s.other, ""), s.otherTok, nil).Body.String())
 	otherDetail := s.incidentsPath(s.other, "") + "/" + uid(row.ID)
 	assert.Equal(t, http.StatusNotFound, s.do(http.MethodGet, otherDetail, s.otherTok, nil).Code)
@@ -493,7 +493,7 @@ func TestPublicDashboard_ExternalIncidents(t *testing.T) {
 	s := newIncidentSetup(t)
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("open1", "investigating", "a"), extInc("done1", "resolved", "b"))
 	s.poll()
-	// done1 war beim ersten Auftauchen schon beendet und ist trotzdem sichtbar.
+	// done1 was already finished when it first appeared and is visible anyway.
 
 	dash := func() []any {
 		w := s.do(http.MethodGet, "/api/public/pages/eigene/dashboard", "", nil)
@@ -512,7 +512,7 @@ func TestPublicDashboard_ExternalIncidents(t *testing.T) {
 		Updates(map[string]any{"resolved_at": old, "external_updated_at": old}).Error)
 	assert.Len(t, dash(), 1, "beendete nach 14 Tagen nicht mehr")
 
-	// Die andere Seite sieht nichts davon.
+	// The other site sees none of this.
 	w := s.do(http.MethodGet, "/api/public/pages/fremde/dashboard", "", nil)
 	require.Equal(t, http.StatusOK, w.Code)
 	var body map[string]any

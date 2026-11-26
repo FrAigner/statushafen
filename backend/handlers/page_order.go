@@ -20,74 +20,74 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Self-Service-Bestellung neuer Statusseiten über die öffentliche Startseite
-// ("Eingangstor"-Homepage). Ablauf:
+// Self-service ordering of new status pages via the public landing page
+// ("gateway" homepage). Flow:
 //
 //  1. POST /api/public/orders          -> CreateOrderHandler
-//     legt eine PageOrder("pending_confirmation") an und verschickt eine
-//     Bestätigungsmail. Es wird bewusst NOCH KEIN User angelegt - sonst wäre
-//     das öffentliche Formular selbst schon ein Vektor für beliebig viele
-//     leere User-Zeilen.
+//     creates a PageOrder("pending_confirmation") and sends a
+//     confirmation email. Deliberately NO user is created yet - otherwise
+//     the public form itself would already be a vector for arbitrarily many
+//     empty user rows.
 //  2. POST /api/public/orders/confirm  -> ConfirmOrderHandler
-//     legt StatusPage + User (ohne Passwort) + UserStatusPageRole("Page
-//     Admin") an und liefert einen frischen Set-Password-Token.
+//     creates StatusPage + User (without password) + UserStatusPageRole("Page
+//     Admin") and returns a fresh set-password token.
 //  3. POST /api/public/orders/set-password -> SetOrderPasswordHandler
-//     setzt das Passwort, danach ist ein normaler Login über /api/login
-//     möglich (bewusst kein Auto-Login hier, siehe Handler-Kommentar).
+//     sets the password, after which a normal login via /api/login is
+//     possible (deliberately no auto-login here, see handler comment).
 //
-// Missbrauchsschutz (ohne Drittanbieter-Captcha, siehe main.go-Registrierung
-// für die konkreten Rate-Limits): IP-Rate-Limiting + Honeypot-Feld + Pflicht-
-// Email-Bestätigung per Einmal-Link + Cap auf gleichzeitig offene
-// Bestellungen je Email-Adresse.
+// Abuse protection (without a third-party captcha, see the main.go registration
+// for the concrete rate limits): IP rate limiting + honeypot field + mandatory
+// email confirmation via one-time link + cap on simultaneously open
+// orders per email address.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const (
-	// maxPendingOrdersPerEmail begrenzt, wie viele gleichzeitig unbestätigte
-	// Bestellungen eine Email-Adresse haben darf - verhindert, dass eine
-	// einzelne Adresse mit Bestätigungsmails geflutet oder für beliebig viele
-	// Slug-Reservierungen missbraucht wird.
+	// maxPendingOrdersPerEmail limits how many simultaneously unconfirmed
+	// orders an email address may have - prevents a
+	// single address from being flooded with confirmation emails or abused for
+	// arbitrarily many slug reservations.
 	maxPendingOrdersPerEmail = 3
-	// orderTokenTTL gilt sowohl für den Bestätigungs- als auch den separat
-	// erzeugten Set-Password-Token.
+	// orderTokenTTL applies to both the confirmation token and the separate
+	// generated set-password token.
 	orderTokenTTL = 24 * time.Hour
 
-	// orderExpiredRetention: so lange bleibt eine als abgelaufen markierte
-	// Bestellung (mit E-Mail-Adresse) noch gespeichert, bevor der
-	// Aufräumjob sie endgültig löscht.
+	// orderExpiredRetention: how long an order marked as expired
+	// (with its email address) is still kept before the
+	// cleanup job deletes it permanently.
 	orderExpiredRetention = 30 * 24 * time.Hour
 
-	// orderPendingExpiredSQL: Bedingung (ein Zeitparameter "jetzt"), unter der
-	// eine unbestätigte Bestellung als abgelaufen gilt. Ohne Ablaufzeit zählt
-	// sie wie in ConfirmOrderHandler als abgelaufen.
+	// orderPendingExpiredSQL: condition (a time parameter "now") under which
+	// an unconfirmed order counts as expired. Without an expiry time it
+	// counts as expired, as in ConfirmOrderHandler.
 	orderPendingExpiredSQL = "status = 'pending_confirmation' AND (confirm_token_expiry IS NULL OR confirm_token_expiry < ?)"
 
-	// Längengrenzen der Eingaben der öffentlichen Bestellung (Zeichen, nicht Byte).
-	// Der Name erscheint in der Bestätigungsmail und als Seitenname; der Slug
-	// folgt dem dokumentierten Höchstwert von 60 Zeichen.
+	// Length limits for the inputs of the public order (characters, not bytes).
+	// The name appears in the confirmation email and as the page name; the slug
+	// follows the documented maximum of 60 characters.
 	maxOrderNameLength = 120
 	maxOrderSlugLength = 60
 
 	orderCreatedMessage = "Bitte bestätige deine Email-Adresse über den Link, den wir dir geschickt haben."
 )
 
-// errSlugTaken signalisiert innerhalb der ConfirmOrderHandler-Transaktion eine
-// Slug-Kollision, die erst dort (nach dem Öffnen der Transaktion) final
-// geprüft werden kann - siehe Kommentar in ConfirmOrderHandler.
+// errSlugTaken signals, within the ConfirmOrderHandler transaction, a
+// slug collision that can only be finally checked there (after the transaction
+// is opened) - see comment in ConfirmOrderHandler.
 var errSlugTaken = errors.New("slug bereits vergeben")
 
-// errEmailTaken signalisiert innerhalb derselben Transaktion, dass für
-// order.Email bereits ein User-Konto existiert (Sicherheitsprüfung):
-// ConfirmOrderHandler darf sich NIE an ein bestehendes Konto hängen - der
-// nachfolgende SetOrderPasswordHandler würde sonst dessen PasswordHash
-// überschreiben (inkl. Global Admin, ohne jede Owner- oder SSO-Prüfung). Wie
-// bei errSlugTaken muss die Prüfung innerhalb der Transaktion laufen (nicht
-// vorher), sonst entsteht dieselbe Race-Lücke zwischen zwei nebenläufigen
-// Bestätigungen.
+// errEmailTaken signals, within the same transaction, that a user account
+// already exists for order.Email (security check):
+// ConfirmOrderHandler must NEVER attach itself to an existing account - the
+// subsequent SetOrderPasswordHandler would otherwise overwrite its PasswordHash
+// (including a Global Admin, without any owner or SSO check). As
+// with errSlugTaken, the check must run inside the transaction (not
+// before), otherwise the same race gap arises between two concurrent
+// confirmations.
 var errEmailTaken = errors.New("email bereits vergeben")
 
-// errOrderLinkUsed: Ein gleichzeitiger Request hat den Set-Password-Link
-// zwischen Laden und Einlösen bereits verbraucht. errAccountAlreadySecured: Das
-// Konto hat zwischen Prüfung und Schreiben ein Passwort oder SSO bekommen.
+// errOrderLinkUsed: A concurrent request has already consumed the set-password link
+// between loading and redeeming. errAccountAlreadySecured: The
+// account received a password or SSO between the check and the write.
 var (
 	errOrderLinkUsed         = errors.New("link bereits verbraucht")
 	errAccountAlreadySecured = errors.New("konto bereits eingerichtet")
@@ -97,8 +97,8 @@ type createOrderRequest struct {
 	CompanyName string `json:"company_name" binding:"required"`
 	Email       string `json:"email" binding:"required"`
 	Slug        string `json:"slug"`
-	// Website: Honeypot-Feld. Echte Nutzer sehen/befüllen es nie
-	// (im Formular per CSS versteckt) - ein befüllter Wert heißt Bot.
+	// Website: honeypot field. Real users never see or fill it
+	// (hidden via CSS in the form) - a filled value means a bot.
 	Website string `json:"website"`
 }
 
@@ -111,9 +111,9 @@ type setOrderPasswordRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-// rejectInvalidOrderFields beantwortet überlange Felder und ungültige Zeichen
-// (NUL, ungültiges UTF-8) mit 400 und Fehlercode und meldet true, wenn die
-// Anfrage damit beendet ist.
+// rejectInvalidOrderFields answers overlong fields and invalid characters
+// (NUL, invalid UTF-8) with 400 and an error code and returns true if the
+// request is thereby finished.
 func rejectInvalidOrderFields(c *gin.Context, in createOrderRequest) bool {
 	name, slug, email := strings.TrimSpace(in.CompanyName), strings.TrimSpace(in.Slug), strings.TrimSpace(in.Email)
 	switch {
@@ -131,11 +131,11 @@ func rejectInvalidOrderFields(c *gin.Context, in createOrderRequest) bool {
 	return true
 }
 
-// POST /api/public/orders — Formular "Eigene Statusseite bestellen".
+// POST /api/public/orders — form "Order your own status page".
 func (h *Handler) CreateOrderHandler(c *gin.Context) {
-	// Ist die Self-Service-Bestellung global deaktiviert, wird hier
-	// vor jeder Verarbeitung abgebrochen (Default "an", nur ein explizites
-	// orders.enabled=false sperrt). Bewusst 403 statt der Honeypot-Erfolgsantwort.
+	// If self-service ordering is globally disabled, processing is aborted here
+	// before anything else (default "on", only an explicit
+	// orders.enabled=false blocks). Deliberately 403 instead of the honeypot success response.
 	if !h.getSystemSettingBool(settingOrdersEnabled, true) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Die Self-Service-Bestellung ist derzeit nicht verfügbar.", "code": "orders_disabled"})
 		return
@@ -147,15 +147,15 @@ func (h *Handler) CreateOrderHandler(c *gin.Context) {
 		return
 	}
 
-	// Honeypot: identische Erfolgsantwort wie der echte Fall, aber ohne jede
-	// Nebenwirkung - ein Bot bekommt kein Signal, dass er erkannt wurde.
+	// Honeypot: identical success response as the real case, but without any
+	// side effect - a bot gets no signal that it was detected.
 	if in.Website != "" {
 		h.RecordSystemAudit("pageorder.honeypot_triggered", "auth", "PageOrder", "", limitEmail(in.Email), "ip="+c.ClientIP())
 		c.JSON(http.StatusCreated, gin.H{"message": orderCreatedMessage})
 		return
 	}
 
-	// Länge und Zeichen prüfen, bevor etwas geparst, gesucht oder gespeichert wird.
+	// Check length and characters before anything is parsed, searched or stored.
 	if rejectInvalidOrderFields(c, in) {
 		return
 	}
@@ -189,16 +189,16 @@ func (h *Handler) CreateOrderHandler(c *gin.Context) {
 			return
 		}
 		var existingOrder models.PageOrder
-		// Eine nie bestätigte Bestellung mit abgelaufenem Link sperrt den Slug
-		// nicht mehr, auch wenn der Aufräumjob sie noch nicht erfasst hat.
+		// A never-confirmed order with an expired link no longer blocks the slug,
+		// even if the cleanup job has not picked it up yet.
 		if err := h.DB.Where("slug = ? AND status <> ? AND NOT ("+orderPendingExpiredSQL+")", slug, "expired", time.Now()).First(&existingOrder).Error; err == nil {
 			c.JSON(http.StatusConflict, gin.H{"error": "Slug wird bereits in einer anderen Bestellung verwendet", "code": "slug_taken_order"})
 			return
 		}
 	}
 
-	// Das Limit gilt je Postfach (Groß-/Kleinschreibung und "+tag" zählen nicht
-	// als andere Adresse), nicht je Zeichenfolge.
+	// The limit applies per mailbox (case and "+tag" do not count
+	// as a different address), not per character string.
 	var pendingCount int64
 	mailboxCond, mailboxArgs := mailboxMatch(email)
 	h.DB.Model(&models.PageOrder{}).
@@ -233,12 +233,12 @@ func (h *Handler) CreateOrderHandler(c *gin.Context) {
 		return
 	}
 
-	// Mailversand-Fehler dürfen die Bestellung selbst nicht scheitern lassen -
-	// die Zeile existiert bereits, ein Resend-Endpunkt ist bewusst nicht im
-	// Scope (wäre selbst wieder ein neuer Missbrauchsvektor). Der Versand läuft
-	// über die begrenzte Hintergrund-Warteschlange (mail_queue.go): Der Endpunkt
-	// ist anonym, ein hängender Mailserver bände die Anfrage sonst bis zur
-	// SMTP-Gesamtfrist, und die Antwortzeit verriete, ob eine Mail rausgeht.
+	// Mail sending errors must not make the order itself fail -
+	// the row already exists, a resend endpoint is deliberately out of
+	// scope (it would itself be a new abuse vector). Sending runs
+	// via the bounded background queue (mail_queue.go): the endpoint
+	// is anonymous, a hanging mail server would otherwise tie up the request until the
+	// overall SMTP deadline, and the response time would reveal whether a mail goes out.
 	smtpCfg := loadSMTPConfig()
 	h.queueMail("order_confirmation", func() { h.sendOrderConfirmationEmail(smtpCfg, order, token) }, mailSourceKey(c.ClientIP()))
 
@@ -246,10 +246,10 @@ func (h *Handler) CreateOrderHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": orderCreatedMessage})
 }
 
-// POST /api/public/orders/confirm — wird vom expliziten "Jetzt bestätigen"-
-// Button auf der Frontend-Confirm-Seite ausgelöst (bewusst kein GET-Link
-// direkt aus der Mail, damit Mail-Gateways mit Link-Prefetching den
-// Einmal-Token nicht schon vor dem eigentlichen Klick verbrauchen).
+// POST /api/public/orders/confirm — triggered by the explicit "Jetzt bestätigen"
+// button on the frontend confirm page (deliberately not a GET link
+// directly from the mail, so that mail gateways with link prefetching do not
+// consume the one-time token before the actual click).
 func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 	var in confirmOrderRequest
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -293,9 +293,9 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 			slug = h.uniqueSlug(slugify(order.CompanyName))
 		} else {
 			var existing models.StatusPage
-			// Defensiv: erneute Prüfung innerhalb der Transaktion, falls der
-			// Slug zwischen Bestellung und Bestätigung anderweitig vergeben
-			// wurde (der uniqueIndex auf StatusPage.Slug fängt den Rest ab).
+			// Defensive: check again inside the transaction in case the
+			// slug was assigned elsewhere between order and confirmation
+			// (the uniqueIndex on StatusPage.Slug catches the rest).
 			if err := tx.Where(slugWhereClause, slug).First(&existing).Error; err == nil {
 				return errSlugTaken
 			}
@@ -303,7 +303,7 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 
 		page = models.StatusPage{Name: order.CompanyName, Slug: slug}
 		if err := tx.Create(&page).Error; err != nil {
-			if isUniqueViolation(err) { // Race nach der Prüfung oben
+			if isUniqueViolation(err) { // Race after the check above
 				return errSlugTaken
 			}
 			return err
@@ -312,14 +312,14 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 			slog.Error("Failed to seed default languages for self-service status page", "status_page_id", page.ID, "error", err)
 		}
 
-		// Sicherheitsprüfung: existiert bereits ein User mit dieser
-		// Email, wird die Bestellung abgelehnt statt sich an das bestehende
-		// Konto zu hängen - SetOrderPasswordHandler würde sonst dessen
-		// Passwort überschreiben können. Ein separater, owner-verifizierter
-		// Passwort-Reset-Flow ist ein eigenes Feature und nicht Teil dieses
-		// Fixes.
-		// Unscoped: auch soft-gelöschte Konten belegen die Email (uniqueIndex),
-		// sonst würde Create unten mit 500 scheitern.
+		// Security check: if a user with this
+		// email already exists, the order is rejected instead of attaching to the existing
+		// account - SetOrderPasswordHandler could otherwise overwrite its
+		// password. A separate, owner-verified
+		// password reset flow is a feature of its own and not part of
+		// this fix.
+		// Unscoped: soft-deleted accounts also occupy the email (uniqueIndex),
+		// otherwise Create below would fail with 500.
 		if err := tx.Unscoped().Where("email = ?", order.Email).First(&user).Error; err == nil {
 			return errEmailTaken
 		}
@@ -374,11 +374,11 @@ func (h *Handler) ConfirmOrderHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"set_password_token": setPasswordToken, "slug": page.Slug})
 }
 
-// POST /api/public/orders/set-password — letzter Schritt: Passwort setzen,
-// danach ist ein normaler Login über /api/login möglich. Bewusst kein
-// automatisches Einloggen hier (kein JWT-Issuing) - der bereits gehärtete
-// Login-Pfad wird stattdessen wiederverwendet, statt an einer neuen,
-// ungeprüften Stelle vorbei eine Session zu erzeugen.
+// POST /api/public/orders/set-password — last step: set the password,
+// after which a normal login via /api/login is possible. Deliberately no
+// automatic login here (no JWT issuing) - the already hardened
+// login path is reused instead of creating a session
+// at a new, unchecked place.
 func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
 	if rejectDisabledPasswordLogin(c) {
 		return
@@ -412,28 +412,28 @@ func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Setzen des Passworts", "code": "server_error"})
 		return
 	}
-	// Orders, die vor dem Fix in ConfirmOrderHandler
-	// bestätigt wurden, können noch auf ein bestehendes fremdes Konto zeigen.
-	// Überschrieben wird nur ein Konto, das frisch aus dieser Bestellung
-	// stammt: ConfirmOrderHandler legt es ohne Hash, ohne SSO und ohne
-	// Global-Admin-Recht an. Alles andere: 409, nichts wird verändert.
+	// Orders confirmed before the fix in ConfirmOrderHandler
+	// may still point to an existing account belonging to someone else.
+	// Only an account that freshly originates from this order is overwritten:
+	// ConfirmOrderHandler creates it without hash, without SSO and without
+	// Global Admin right. Anything else: 409, nothing is changed.
 	if user.PasswordHash != "" || user.SSOProvider != "" || user.IsGlobalAdmin {
 		c.JSON(http.StatusConflict, gin.H{"error": "Für dieses Konto ist bereits eine Anmeldung eingerichtet", "code": "password_already_set"})
 		return
 	}
-	// Vor jeder Änderung hashen: scheitert es, bleiben Konto und Bestellung
-	// unberührt und der Link weiter benutzbar.
+	// Hash before any change: if it fails, account and order remain
+	// untouched and the link stays usable.
 	hash, err := hashPassword(in.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Setzen des Passworts", "code": "server_error"})
 		return
 	}
-	// Link verbrauchen und Passwort setzen in einer Transaktion. Der Link wird
-	// per bedingtem UPDATE (Token noch gesetzt, Status confirmed) beansprucht und
-	// die Zeilenzahl geprüft: Bei gleichzeitigen Einlösungen gewinnt genau eine,
-	// die anderen sehen 0 Zeilen. Das Konto wird ebenfalls nur bedingt
-	// geschrieben (noch ohne Passwort, ohne SSO, kein Global Admin). Scheitert
-	// ein Schritt, wird alles zurückgerollt und der Link bleibt benutzbar.
+	// Consume the link and set the password in one transaction. The link is
+	// claimed via a conditional UPDATE (token still set, status confirmed) and
+	// the row count is checked: with concurrent redemptions exactly one wins,
+	// the others see 0 rows. The account is likewise written only conditionally
+	// (still without password, without SSO, not Global Admin). If
+	// a step fails, everything is rolled back and the link stays usable.
 	txErr := h.DB.Transaction(func(tx *gorm.DB) error {
 		claim := tx.Model(&models.PageOrder{}).
 			Where("id = ? AND set_password_token = ? AND set_password_token <> '' AND status = ?", order.ID, models.HashToken(in.Token), "confirmed").
@@ -479,13 +479,13 @@ func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"slug": slug})
 }
 
-// pageOrderConfirmSubject: fester deutscher Betreff, analog zu den übrigen
-// Transaktionsmails (keine Sprachauswahl - die App ist de-first, siehe
-// vue-i18n-Default in frontend/src/i18n/index.js).
+// pageOrderConfirmSubject: fixed German subject, analogous to the other
+// transactional emails (no language selection - the app is de-first, see
+// i18n default in frontend/src/i18n/index.ts).
 const pageOrderConfirmSubject = "Bitte bestätige deine Statushafen-Bestellung"
 
-// rawPageOrderConfirmEmailTemplate ist der lesbar formatierte HTML-Body der
-// Bestätigungsmail (Platzhalter: Firmenname, Bestätigungslink).
+// rawPageOrderConfirmEmailTemplate is the readably formatted HTML body of the
+// confirmation email (placeholders: company name, confirmation link).
 const rawPageOrderConfirmEmailTemplate = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6f8;padding:32px 16px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden;">
     <div style="background:#4c6ef5;padding:20px 24px;">
@@ -500,20 +500,20 @@ const rawPageOrderConfirmEmailTemplate = `<div style="font-family:-apple-system,
   </div>
 </div>`
 
-// pageOrderConfirmEmailTemplate ist rawPageOrderConfirmEmailTemplate ohne die
-// eigenen Formatierungs-Zeilenumbrüche/Tabs. Der CR/LF-Guard
-// (hasHeaderInjectionChars) prüft den fertigen Body und schlug bei dem
-// mehrzeiligen Raw-String immer an - die Mail wurde nie verschickt. Statt den
-// Guard aufzuweichen, entfernen wir die Umbrüche einmalig beim Package-Init
-// (gleiches Muster wie notificationEmailTemplate in incident.go); injizierte
-// CR/LF aus Nutzereingaben werden weiterhin erkannt.
+// pageOrderConfirmEmailTemplate is rawPageOrderConfirmEmailTemplate without the
+// formatting line breaks/tabs. The CR/LF guard
+// (hasHeaderInjectionChars) checks the finished body and always triggered on the
+// multi-line raw string - the mail was never sent. Instead of
+// weakening the guard, we strip the line breaks once at package init
+// (same pattern as notificationEmailTemplate in incident.go); CR/LF
+// injected via user input is still detected.
 var pageOrderConfirmEmailTemplate = strings.NewReplacer("\n", "", "\t", "").Replace(rawPageOrderConfirmEmailTemplate)
 
-// sendOrderConfirmationEmail folgt demselben Aufbau wie sendAlertEmail
-// (incident.go): mail.ParseAddress, Header-Injection-Guard, rohe
-// net/smtp.SendMail-Nachricht über die globale SMTP-Konfiguration. Bewusst
-// eine eigenständige Funktion statt eines Aufrufs von sendAlertEmail, da
-// dieser fest an Incident-Audit-Felder gekoppelt ist.
+// sendOrderConfirmationEmail follows the same structure as sendAlertEmail
+// (incident.go): mail.ParseAddress, header injection guard, raw
+// net/smtp.SendMail message via the global SMTP configuration. Deliberately
+// a standalone function instead of a call to sendAlertEmail, since
+// that one is tightly coupled to incident audit fields.
 func (h *Handler) sendOrderConfirmationEmail(smtpCfg smtpConfig, order models.PageOrder, token string) {
 	addr, err := mail.ParseAddress(order.Email)
 	if err != nil {
@@ -550,11 +550,11 @@ func (h *Handler) sendOrderConfirmationEmail(smtpCfg smtpConfig, order models.Pa
 	slog.Info("Order confirmation email sent via SMTP", "email", recipient, "smtp_addr", smtpCfg.addr())
 }
 
-// pruneExpiredOrders räumt Bestellungen auf: unbestätigte Bestellungen mit
-// abgelaufenem Link werden auf "expired" gesetzt (Token entwertet), bereits
-// länger abgelaufene endgültig gelöscht. Idempotent; läuft im Wartungs-Tick.
-// Ohne den Job liefen unbestätigte Bestellungen nur beim Einlösen ihres Links
-// ab und hielten Slug und Bestell-Kontingent einer Adresse beliebig lange.
+// pruneExpiredOrders cleans up orders: unconfirmed orders with an
+// expired link are set to "expired" (token invalidated), those expired for
+// longer are deleted permanently. Idempotent; runs in the maintenance tick.
+// Without the job, unconfirmed orders would only expire when their link is redeemed
+// and would hold an address's slug and order quota indefinitely.
 func pruneExpiredOrders(db *gorm.DB, now time.Time) (marked, deleted int64, err error) {
 	res := db.Model(&models.PageOrder{}).Where(orderPendingExpiredSQL, now).
 		Updates(map[string]any{"status": "expired", "confirm_token": ""})

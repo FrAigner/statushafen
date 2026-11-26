@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Minimale Profilseite (i18n-Infrastruktur).
-  Es existiert noch keine vollständige Profilverwaltung - hier lässt sich
-  vorerst nur die bevorzugte UI-Sprache einstellen, die per PATCH /api/me
-  auf models.User.PreferredLanguage persistiert wird.
+  Minimal profile page (i18n infrastructure).
+  There is no full profile management yet - for now only the preferred UI
+  language can be set here, persisted via PATCH /api/me to
+  models.User.PreferredLanguage.
   Route: /admin/profile (router/index.js)
 */
 import { ref, computed } from 'vue'
@@ -36,7 +36,7 @@ const saveLanguage = async () => {
   statusMsg.value = ''
   try {
     await setLanguage(selectedLanguage.value)
-    // setLanguage wirft nicht, sondern setzt saveError.
+    // setLanguage does not throw; it sets saveError instead.
     statusMsg.value = saveError.value ? t('profile.error') : t('profile.saved')
     statusType.value = saveError.value ? 'warning' : 'success'
   } catch (err) {
@@ -50,8 +50,8 @@ const saveLanguage = async () => {
 
 <template>
   <div>
-    <!-- Stufe 4d: /admin/profile liegt im AdminLayout, dessen Topbar
-         die h1 trägt; der Seitentitel ist deshalb eine h2 (PageHeader :level="2"). -->
+    <!-- Stage 4d: /admin/profile lives in AdminLayout, whose top bar
+         carries the h1; the page title is therefore an h2 (PageHeader :level="2"). -->
     <PageHeader :level="2" :title="t('profile.title')" :breadcrumbs="breadcrumbs" />
 
     <ListCard :title="t('profile.cardTitle')" padded>
@@ -77,17 +77,17 @@ const saveLanguage = async () => {
         <OnyxButton type="submit" :label="t('profile.save')" color="primary" :loading="isSaving" />
       </form>
 
-      <!-- wirkt sofort und wird ohne „Speichern“ am Konto gespeichert. -->
+      <!-- takes effect immediately and is stored on the account without "Save". -->
       <HelpTooltipsToggle class="profile-help-toggle" />
     </ListCard>
 
-    <!-- Konto mit dem SSO einer Statusseite verknüpfen -->
+    <!-- Link the account to a status page's SSO -->
     <SSOLinks />
 
-    <!-- Datenexport (DSGVO Art. 15/20) -->
+    <!-- Data export (GDPR Art. 15/20) -->
     <DataExport />
 
-    <!-- Konto löschen (DSGVO) -->
+    <!-- Delete account (GDPR) -->
     <AccountDeletion />
   </div>
 </template>

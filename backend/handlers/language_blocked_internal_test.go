@@ -2,7 +2,7 @@ package handlers
 
 import "testing"
 
-// Die Ablehnung der Lösch-Transaktion nennt ihren Fehlercode als Text (fürs Log bei errors.As-losen Aufrufern).
+// The rejection of the delete transaction names its error code as text (for the log, for callers without errors.As).
 func TestLanguageBlocked_ErrorNenntCode(t *testing.T) {
 	var err error = &languageBlocked{code: "language_in_use"}
 	if err.Error() != "language_in_use" {

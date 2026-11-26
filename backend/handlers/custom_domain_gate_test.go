@@ -25,9 +25,9 @@ func checkDomain(r http.Handler, domain, token string) *httptest.ResponseRecorde
 	return w
 }
 
-// Der "ask"-Endpunkt für Caddy ist ein Orakel für Kundendomains. Außerhalb der
-// Entwicklung verlangt er deshalb ein gesetztes CADDY_INTERNAL_TOKEN; ohne
-// Token antwortet er 503 und nie mit einer Freigabe, auch nicht mit leerem Header.
+// Caddy's "ask" endpoint is an oracle for customer domains. Outside
+// of development it therefore requires CADDY_INTERNAL_TOKEN to be set; without a
+// token it answers 503 and never grants approval, not even with an empty header.
 func TestInternalCustomDomainCheck_TokenPflichtAusserhalbDerEntwicklung(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupCustomDomainRouter(NewHandler(db))
@@ -52,7 +52,7 @@ func TestInternalCustomDomainCheck_TokenPflichtAusserhalbDerEntwicklung(t *testi
 		assert.Equal(t, http.StatusNotFound, checkDomain(r, "unbekannt.example", "s3cret-token").Code)
 	})
 
-	// Gegenprobe: In der Entwicklung reicht der Aufruf ohne Token.
+	// Control case: in development the call works without a token.
 	for _, env := range []string{"development", "test", "local"} {
 		t.Run("Entwicklung ohne Token, APP_ENV="+env, func(t *testing.T) {
 			t.Setenv("APP_ENV", env)
@@ -63,9 +63,9 @@ func TestInternalCustomDomainCheck_TokenPflichtAusserhalbDerEntwicklung(t *testi
 	}
 }
 
-// Der Wechsel verified -> active geschieht nur über den internen Check
-// (Caddy fragt, bevor es das Zertifikat holt), nicht durch einen anonymen
-// Aufruf von resolve-domain.
+// The transition verified -> active happens only via the internal check
+// (Caddy asks before fetching the certificate), not through an anonymous
+// call to resolve-domain.
 func TestCustomDomain_StatusWechselNurUeberInternenCheck(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("CADDY_INTERNAL_TOKEN", "s3cret-token")
@@ -89,8 +89,8 @@ func TestCustomDomain_StatusWechselNurUeberInternenCheck(t *testing.T) {
 	assertCustomDomainState(t, db, pending.ID, "status.beta.example", "pending")
 }
 
-// resolve-domain liefert den Slug einer privaten Seite nicht an Anonyme und
-// nicht an Angemeldete ohne Rolle auf der Seite; Mitglieder bekommen ihn.
+// resolve-domain does not return the slug of a private page to anonymous users or
+// to logged-in users without a role on the page; members get it.
 func TestResolvePublicDomain_PrivateSeiteOhneSlugFuerAnonyme(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -136,15 +136,15 @@ func TestResolvePublicDomain_PrivateSeiteOhneSlugFuerAnonyme(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "intern-geheim")
 
-	// Gegenprobe: öffentliche Seiten lösen weiter für alle auf.
+	// Control case: public pages continue to resolve for everyone.
 	w = get("status.offen.example", nil)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"slug":"offen"`)
 }
 
-// Das Hochstufen verified -> active gilt nur für die Zeile, die der Check
-// gelesen hat. Ändert sich die Domain zwischen Lesen und Schreiben (hier: der
-// Status wird zurückgesetzt), bleibt die neue Lage bestehen und es wird nichts
+// The promotion verified -> active applies only to the row the check
+// read. If the domain changes between read and write (here: the
+// status is reset), the new state remains and nothing is
 // hochgestuft.
 func TestInternalCustomDomainCheck_HochstufenNurFuerUnveraenderteZeile(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
@@ -160,7 +160,7 @@ func TestInternalCustomDomainCheck_HochstufenNurFuerUnveraenderteZeile(t *testin
 			return
 		}
 		flipped = true
-		// Zwischen Lesen und Schreiben setzt ein anderer Vorgang den Status zurück.
+		// Between read and write, another operation resets the status.
 		tx.Session(&gorm.Session{NewDB: true}).Exec("UPDATE status_pages SET custom_domain_status = 'pending' WHERE id = ?", page.ID)
 	}))
 	t.Cleanup(func() { _ = db.Callback().Query().Remove("test:flip_after_read") })

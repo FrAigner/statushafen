@@ -29,8 +29,8 @@ func TestTagIDList(t *testing.T) {
 	assert.Empty(t, tagIDList(nil))
 }
 
-// Ein unbekannter Nutzer (z. B. nach dem Löschen) erhält weder Adminrechte
-// noch Tags; die Prüfung schlägt zu, statt durchzulassen.
+// An unknown user (e.g. after deletion) receives neither admin rights
+// nor tags; the check blocks instead of letting through.
 func TestUserTagsAndAdmin_UnknownUserHasNothing(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -44,8 +44,8 @@ func TestUserTagsAndAdmin_UnknownUserHasNothing(t *testing.T) {
 	assert.False(t, admin)
 }
 
-// Datenbankfehler beim Auflösen von Tag-IDs werden als Fehler gemeldet und nicht
-// als "Tag nicht gefunden" (das wäre eine falsche Aussage über die Eingabe).
+// Database errors when resolving tag IDs are reported as errors and not
+// as "tag not found" (that would be a false statement about the input).
 func TestResolveTags_DBErrorIsReturned(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -60,8 +60,8 @@ func TestResolveTags_DBErrorIsReturned(t *testing.T) {
 	assert.Equal(t, "", TemplateErrorCode(err))
 }
 
-// Die replace-Funktionen brechen beim ersten Fehler ab und melden ihn, damit die
-// umgebende Transaktion zurückgerollt wird.
+// The replace functions abort at the first error and report it, so that the
+// surrounding transaction is rolled back.
 func TestReplaceTags_ErrorsAreReturned(t *testing.T) {
 	tag := models.Tag{Name: "eu"}
 	require.NoError(t, testutils.SetupTestDB().Create(&tag).Error)
@@ -101,9 +101,9 @@ func TestReplaceTags_ErrorsAreReturned(t *testing.T) {
 	}
 }
 
-// incidentTagFilterScope: Nutzer mit Seiten-Tag sehen Vorfälle ohne Tag und
-// Vorfälle mit passendem oder globalem Tag, aber keine Vorfälle mit fremdem Tag.
-// Nutzer mit globalem Nutzer-Tag und Nutzer ohne Tags sehen alles.
+// incidentTagFilterScope: users with a page tag see incidents without a tag and
+// incidents with a matching or global tag, but no incidents with a foreign tag.
+// Users with a global user tag and users without tags see everything.
 func TestIncidentTagFilterScope(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

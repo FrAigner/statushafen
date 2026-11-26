@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AppIcon from './AppIcon.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 describe('AppIcon', () => {
   it('rendert ein svg mit Default-Größe 16', () => {

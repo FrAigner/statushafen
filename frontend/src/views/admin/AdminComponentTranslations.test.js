@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant as useTenantStatic } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminComponentTranslations from './AdminComponentTranslations.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function componentFixture() {
@@ -37,8 +37,8 @@ function makeFetchRouter({ componentOverride, translationsOverride, catalogOverr
     const method = options.method || 'GET'
     // Switch for translations (system setting); on unless a test turns it off.
     if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: translationEnabled })
-    // Einen Einzel-GET für Komponenten gibt es im Backend nicht,
-    // die View sucht die Komponente im Baum der Seitenliste (hier als Kind).
+    // The backend has no single GET for components;
+    // the view looks the component up in the page list's tree (here as a child).
     if (method === 'GET' && url === `/api/pages/${pageId}/components`) {
       return jsonResponse([{ ID: 7, Name: 'Plattform', Children: [componentOverride ?? componentFixture()] }])
     }
@@ -99,13 +99,13 @@ describe('AdminComponentTranslations with translation switched off', () => {
 
 describe('AdminComponentTranslations', () => {
   beforeEach(() => {
-    // Die Knöpfe hängen jetzt an components:write auf der aktiven Seite.
+    // The buttons now depend on components:write on the active page.
     useAuth().setAuth('jwt-1', { permissions: '' })
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'components:read,components:write' }])
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -214,8 +214,8 @@ describe('AdminComponentTranslations', () => {
     expect(wrapper.text()).toMatch(/Fehler|error/i)
   })
 
-  // Richtung C: Pflichtfelder melden den Fehler am Feld, der Fokus springt
-  // zum ersten Fehlerfeld, und es geht nichts an den Server.
+  // Direction C: required fields report the error at the field, focus jumps
+  // to the first invalid field, and nothing is sent to the server.
   it('meldet fehlende Pflichtfelder am Feld und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountComponent({ fetchImpl: fetchMock, attach: true })
@@ -415,8 +415,8 @@ describe('AdminComponentTranslations', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Ein Viewer (components:read) sah „Neue Übersetzung“, „Bestätigen“
-  // und „Löschen“, das Backend lehnt alle drei mit 403 ab.
+  // A viewer (components:read) saw "New translation", "Confirm"
+  // and "Delete"; the backend rejects all three with 403.
   it('blendet Schreibknöpfe und Aktionen-Spalte ohne components:write aus', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'components:read' }])
     const { wrapper } = await mountComponent()
@@ -462,8 +462,8 @@ describe('AdminComponentTranslations', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Bestätigen und Löschen stehen im Zeilenmenü; während
-  // sie laufen, zeigt der Eintrag die Laufend-Beschriftung und ist gesperrt.
+  // Direction C: confirm and delete are in the row menu; while they
+  // run, the entry shows the in-progress label and is disabled.
   it('bietet Bestätigen nur für Entwürfe an und zeigt während der Aktion die Laufend-Beschriftung', async () => {
     stubConfirm(true)
     const base = makeFetchRouter()
@@ -484,7 +484,7 @@ describe('AdminComponentTranslations', () => {
     vi.unstubAllGlobals()
   })
 
-  // Richtung C: Karte „Übersetzungen“, Brotkrumen mit Seitenname, Titel statt ID.
+  // Direction C: "Translations" card, breadcrumbs with the page name, title instead of the ID.
   it('zeigt Brotkrumen mit Seitenname, Listenkarte, Name fett und Formular als Seitenkarte', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Name: 'Acme', Permissions: 'components:write' }])
     const { wrapper } = await mountComponent()
@@ -518,7 +518,7 @@ describe('AdminComponentTranslations', () => {
     vi.unstubAllGlobals()
   })
 
-  // handleDelete (useAdminTranslationsPanel) löscht nichts, wenn die Rückfrage abgelehnt wird.
+  // handleDelete (useAdminTranslationsPanel) deletes nothing when the confirmation is declined.
   it('Löschen einer Übersetzung: abgelehnt -> kein DELETE', async () => {
     const confirm = stubConfirm(false)
     const base = makeFetchRouter()

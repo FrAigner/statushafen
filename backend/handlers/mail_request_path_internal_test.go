@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Ein HTTP-Handler (Funktion mit *gin.Context) darf keine
-// Mail direkt versenden. Der SMTP-Versand kann bis zur Gesamtfrist hängen und
-// verriete über die Antwortzeit, ob für eine Adresse eine Mail rausgeht. Mails
-// laufen über queueMail (begrenzte Hintergrund-Warteschlange); Versand, dessen
-// Ergebnis die Antwort bestimmt, bräuchte hier eine begründete Ausnahme.
+// Structure guard: an HTTP handler (function with *gin.Context) must not send
+// a mail directly. SMTP sending can hang until the overall deadline and
+// would reveal through response time whether a mail is sent for an address. Mails
+// run through queueMail (bounded background queue); sending whose
+// result determines the response would need a justified exception here.
 var blockingMailFuncs = map[string]bool{
 	"deliverMail":                  true,
 	"sendMailWithTimeout":          true,
@@ -30,9 +30,9 @@ var blockingMailFuncs = map[string]bool{
 	"sendExternalIncidentMail":     true,
 }
 
-// blockingMailCalls liefert "Funktion: Aufruf" für jeden direkten Mailversand
-// in einer Funktion mit *gin.Context-Parameter, ausgenommen Aufrufe innerhalb
-// eines Funktionsliterals, das an queueMail übergeben wird.
+// blockingMailCalls returns "function: call" for every direct mail send
+// in a function with a *gin.Context parameter, except calls inside
+// a function literal that is passed to queueMail.
 func blockingMailCalls(file *ast.File) []string {
 	var found []string
 	for _, decl := range file.Decls {
@@ -47,7 +47,7 @@ func blockingMailCalls(file *ast.File) []string {
 			}
 			name := calleeName(call)
 			if name == "queueMail" {
-				return false // der Versand im Hintergrund-Job ist gewollt
+				return false // sending in the background job is intended
 			}
 			if blockingMailFuncs[name] {
 				found = append(found, fn.Name.Name+": "+name)
@@ -121,8 +121,8 @@ func TestHandlers_SendNoMailInsideRequest(t *testing.T) {
 	assert.Empty(t, offenders, "Mail in der Anfrage senden blockiert sie bis zur SMTP-Frist; über h.queueMail versenden")
 }
 
-// Nur smtp.go spricht SMTP: Dort liegen Dial-Timeout und Gesamtfrist. Ein
-// zweiter Aufruf von smtp.SendMail/smtp.Dial anderswo umginge beides.
+// Only smtp.go speaks SMTP: the dial timeout and overall deadline live there. A
+// second call to smtp.SendMail/smtp.Dial elsewhere would bypass both.
 func TestSMTP_OnlyUsedInSMTPFile(t *testing.T) {
 	var offenders []string
 	err := filepath.WalkDir("..", func(path string, d os.DirEntry, err error) error {

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -27,7 +27,7 @@ onMounted(() => {
     missingToken.value = true
     return
   }
-  token.value = queryToken
+  token.value = queryToken as string
 })
 
 async function submitPassword() {
@@ -36,7 +36,7 @@ async function submitPassword() {
     errorMessage.value = t('order.passwordMismatch')
     return
   }
-  // Mindestlänge vorab (das Backend prüft sie ebenfalls).
+  // Minimum length up front (the backend checks it as well).
   if (isPasswordTooShort(password.value)) {
     errorMessage.value = t('inputErrors.password_too_short', { min: MIN_PASSWORD_LENGTH })
     return
@@ -53,7 +53,7 @@ async function submitPassword() {
     })
     submitted.value = true
   } catch (err) {
-    errorMessage.value = serverInputErrorText(err, t) || err.message
+    errorMessage.value = serverInputErrorText(err, t) || (err as Error).message
   } finally {
     submitting.value = false
   }

@@ -8,10 +8,10 @@ import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminExternalSources from './AdminExternalSources.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
-// Admin-Seite „Externe Quellen“.
+// Admin page "External sources".
 
 const MINUTE = 60 * 1000
 const ago = (ms) => new Date(Date.now() - ms).toISOString()
@@ -67,7 +67,7 @@ const calls = (method, re) => global.fetch.mock.calls.filter(([u, o]) => (o?.met
 const body = (call) => JSON.parse(call[1].body)
 
 let wrapper = null
-// Tab-Rechte statt components:write; Übernehmen braucht zusätzlich components:create.
+// Tab permissions instead of components:write; importing additionally needs components:create.
 const FULL_PERMS = 'external_sources:create,external_sources:update,external_sources:delete,components:create'
 
 async function mountView({ perms = FULL_PERMS, fetchImpl, tenantId = '1' } = {}) {
@@ -163,8 +163,8 @@ describe('AdminExternalSources', () => {
     expect(wrapper.find('a[href="https://status.example.com/incidents/abc"]').attributes('rel')).toContain('noopener')
   })
 
-  // Stand-Zelle zeigte „investigatingOffen“ in einer Zeile, weil der Fremdtext
-  // und das übersetzte Zustandswort ohne Trennung aneinanderklebten.
+  // The state cell showed "investigatingOpen" on one line, because the external text
+  // and the translated state word were glued together without a separator.
   it('trennt in der Stand-Zelle das Zustandswort vom Fremdtext der Quelle', async () => {
     await mountView()
     const cell = wrapper.find('[data-testid="ext-raw-status"]')
@@ -518,7 +518,7 @@ describe('AdminExternalSources', () => {
     })
   })
 
-  // Bausteine samt eigener Komponente übernehmen.
+  // Importing components including an own component.
   describe('Bausteine übernehmen', () => {
     const importList = {
       groups: [],
@@ -582,7 +582,7 @@ describe('AdminExternalSources', () => {
       await chooseSource()
       expect(importCheckbox('Database').attributes('disabled')).toBeDefined()
       expect(rowByName('Database').text()).toContain('Bereits gekoppelt')
-      // Eine Gruppe ohne Mitglieder in der Liste bleibt wählbar (das Backend meldet sie dann als leer).
+      // A group without members in the list stays selectable (the backend then reports it as empty).
       expect(importCheckbox('Compute').attributes('disabled')).toBeDefined()
     })
 
@@ -593,7 +593,7 @@ describe('AdminExternalSources', () => {
       expect(wrapper.findAll('.ext-import__row').map(r => r.find('strong').text())).toEqual(['Database', 'Postgres'])
       await buttonByText('Alle sichtbaren wählen').trigger('click')
       expect(wrapper.find('.ext-import__count').text()).toBe('2 gewählt')
-      // Compute und VM sind (über VM) gekoppelt: nichts Neues wählbar, die Auswahl von vorher bleibt.
+      // Compute and VM are linked (via VM): nothing new is selectable, the earlier selection stays.
       await fieldByLabel('Bausteine durchsuchen').setValue('compute')
       await buttonByText('Alle sichtbaren wählen').trigger('click')
       expect(wrapper.find('.ext-import__count').text()).toBe('2 gewählt')
@@ -763,9 +763,9 @@ describe('AdminExternalSources', () => {
     })
   })
 
-  // Eine nie abgerufene oder inaktive Quelle hat keine Bausteine; das war ein
-  // Ladefehler im Feld ("Die Liste konnte nicht geladen werden"), obwohl nur ein
-  // Abruf fehlt.
+  // A source that was never fetched or is inactive has no components; that used to be a
+  // load error in the field ("The list could not be loaded"), although only a
+  // fetch was missing.
   describe('Bausteinliste einer nie abgerufenen Quelle', () => {
     const fresh = (over = {}) => sourceFixture({ last_fetch_at: null, last_fetch_ok: null, last_success_at: null, component_count: 0, link_count: 0, ...over })
 
@@ -810,7 +810,7 @@ describe('AdminExternalSources', () => {
       await mountView({ perms: 'external_sources:read' })
       expect(wrapper.text()).toContain('Example Cloud')
       expect(buttonByText('Neue Quelle')).toBeUndefined()
-      // Leser können die Quelle ansehen, aber weder abrufen noch löschen.
+      // Readers can view the source, but neither fetch nor delete it.
       expect(wrapper.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Ansehen'])
       expect(wrapper.find('.ext-link-form').exists()).toBe(false)
       expect(buttonByText('Lösen')).toBeUndefined()
@@ -831,8 +831,8 @@ describe('AdminExternalSources', () => {
   })
 })
 
-// Der Koppeln-Knopf saß am unteren Rand der Zeile und rutschte unter die
-// Eingabefelder, sobald ein Feld einen Hinweistext zeigte.
+// The link button sat at the bottom edge of the row and slipped below the
+// input fields as soon as a field showed a hint text.
 describe('AdminExternalSources Koppeln-Zeile (Quelltext)', () => {
   const src = readFileSync(resolve(process.cwd(), 'src/views/admin/AdminExternalSources.vue'), 'utf-8')
   const css = (sel) => src.match(new RegExp(`\\${sel} \\{([^}]*)\\}`))?.[1] ?? ''
@@ -844,7 +844,7 @@ describe('AdminExternalSources Koppeln-Zeile (Quelltext)', () => {
     expect(src).toMatch(/ext-link-form__spacer[^>]*aria-hidden="true"/)
   })
 
-  // Ohne Änderungsrecht öffnet „Ansehen“ das Formular gesperrt, ohne Speichern.
+  // Without update permission "View" opens the form locked, without saving.
   it('öffnet das Formular ohne external_sources:update gesperrt', async () => {
     await mountView({ perms: 'external_sources:read' })
     await menuItem('Ansehen').trigger('click')

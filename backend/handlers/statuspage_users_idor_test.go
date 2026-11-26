@@ -21,9 +21,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// AddStatusPageUserHandler prüfte user_id/role_id nicht; ein Page
-// Owner konnte beliebige Konten (auch fremder Mandanten) auf seine Seite setzen
-// und danach per GET E-Mail, SSO-Kennung und Admin-Flag auslesen.
+// AddStatusPageUserHandler did not check user_id/role_id; a Page
+// Owner could put arbitrary accounts (including those of other tenants) on their page
+// and then read out email, SSO identifier and admin flag via GET.
 func idorRequest(t *testing.T, r http.Handler, method, path, token string, payload any) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
@@ -42,7 +42,7 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Rechte wie in main.go: lesen = pages:read, hinzufügen = pages:create, entfernen = pages:delete.
+	// Permissions as in main.go: read = pages:read, add = pages:create, remove = pages:delete.
 	g := r.Group("/api/admin/pages/:page_id/users")
 	g.Use(middleware.AuthMiddleware())
 	g.GET("", middleware.RequirePermission("pages:read"), h.GetStatusPageUsersHandler)
@@ -117,7 +117,7 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 	t.Run("Global Admin kann weiterhin per user_id hinzufügen", func(t *testing.T) {
 		w := idorRequest(t, r, "POST", base, gaTok, map[string]any{"user_id": foreign.ID, "role_id": editor.ID})
 		requireStatusCode(t, w, http.StatusCreated)
-		// Antwort der Liste ohne sensible Felder, auch für den Global Admin.
+		// List response without sensitive fields, also for the Global Admin.
 		list := idorRequest(t, r, "GET", base, gaTok, nil)
 		requireStatusCode(t, list, http.StatusOK)
 		for _, leak := range []string{"sub-123", "okta", "IsGlobalAdmin", "SSOSubject", "SSOProvider", "PasswordHash"} {
@@ -132,7 +132,7 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 	})
 
 	t.Run("Page Owner lädt per E-Mail ein statt anzuhängen", func(t *testing.T) {
-		// Konten mit SSO-Verknüpfung hängt nur ein Global Admin an.
+		// Only a Global Admin attaches accounts with an SSO link.
 		db.Model(&models.User{}).Where("id = ?", foreign.ID).Updates(map[string]any{"sso_provider": "", "sso_subject": "", "is_global_admin": false})
 		w := idorRequest(t, r, "POST", base, ownerTok, map[string]any{"email": " GEHEIM@fremd.example ", "role_id": editor.ID})
 		requireStatusCode(t, w, http.StatusOK)
@@ -145,7 +145,7 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 		if strings.Contains(w.Body.String(), "sub-123") || strings.Contains(w.Body.String(), "fremd") {
 			t.Errorf("Antwort verrät Kontodaten: %s", w.Body.String())
 		}
-		// Für die folgenden Schritte: Das Konto hat die Einladung angenommen.
+		// For the following steps: the account has accepted the invitation.
 		db.Create(&models.UserStatusPageRole{UserID: foreign.ID, StatusPageID: page.ID, RoleID: editor.ID})
 	})
 
@@ -186,7 +186,7 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 		if ur.RoleID != ownerRole.ID {
 			t.Fatalf("Rolle wurde geändert")
 		}
-		// Auch für andere: stärkere Rolle vergeben -> 403
+		// Also for others: assigning a stronger role -> 403
 		w = idorRequest(t, r, "POST", base, ownerTok, map[string]any{"email": "ga@example.com", "role_id": strong.ID})
 		requireStatusCode(t, w, http.StatusForbidden)
 	})
@@ -225,8 +225,8 @@ func TestStatusPageUsers_Mandantentrennung(t *testing.T) {
 	})
 }
 
-// Review rollenbezogene Prüfungen laufen für Nicht-Global-
-// Admins vor der Konto-Suche; die Antwort hängt nie von der E-Mail-Adresse ab.
+// Review: role-related checks run for non-Global
+// Admins before the account lookup; the response never depends on the email address.
 func TestStatusPageUsers_KeineEnumerationUeberRollen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -273,7 +273,7 @@ func TestStatusPageUsers_KeineEnumerationUeberRollen(t *testing.T) {
 	same(t, "unbekannte Rolle", 88888)
 	same(t, "gelöschte Rolle", deleted.ID)
 
-	// Rollen-IDs werden nicht verraten: Global-Admin-Rolle, unbekannte und nicht abgedeckte Rolle antworten gleich.
+	// Role IDs are not revealed: Global Admin role, unknown role and uncovered role respond the same.
 	r1 := idorRequest(t, r, "POST", base, tok, map[string]any{"email": "known@x.example", "role_id": gaRole.ID})
 	r2 := idorRequest(t, r, "POST", base, tok, map[string]any{"email": "known@x.example", "role_id": 88888})
 	r3 := idorRequest(t, r, "POST", base, tok, map[string]any{"email": "known@x.example", "role_id": tooMuch.ID})
@@ -282,7 +282,7 @@ func TestStatusPageUsers_KeineEnumerationUeberRollen(t *testing.T) {
 	}
 
 	t.Run("Page Owner kann Page Owner und Page Admin vergeben (admin_dashboard)", func(t *testing.T) {
-		// Rollenwechsel per E-Mail gilt für Mitglieder (Einladung angenommen).
+		// A role change by email applies to members (invitation accepted).
 		db.Create(&models.UserStatusPageRole{UserID: known.ID, StatusPageID: page.ID, RoleID: pageAdmin.ID})
 		for _, role := range []models.Role{pageOwner, pageAdmin} {
 			w := idorRequest(t, r, "POST", base, tok, map[string]any{"email": "known@x.example", "role_id": role.ID})
@@ -334,8 +334,8 @@ func TestStatusPageUsers_KeineEnumerationUeberRollen(t *testing.T) {
 	})
 }
 
-// Review E-Mail-Weg bei stärkerem Mitglied neutral; DB-Fehler beim
-// Entfernen brechen ab (fail closed).
+// Review: email path is neutral for a stronger member; DB error on
+// removal abort (fail closed).
 func TestStatusPageUsers_StaerkeresMitgliedUndDBFehler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -376,7 +376,7 @@ func TestStatusPageUsers_StaerkeresMitgliedUndDBFehler(t *testing.T) {
 		db.Create(&victim)
 		db.Create(&models.UserStatusPageRole{UserID: victim.ID, StatusPageID: page.ID, RoleID: strong.ID})
 		_ = db.Callback().Query().Before("gorm:query").Register("fail791", func(tx *gorm.DB) {
-			// Nur die Abfrage nach dem Zielmitglied (erstes Argument = uid) schlägt fehl.
+			// Only the query for the target member (first argument = uid) fails.
 			if tx.Statement.Table == "user_status_page_roles" && strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "["+strconv.Itoa(int(victim.ID))+" ") {
 				_ = tx.AddError(errors.New("boom"))
 			}

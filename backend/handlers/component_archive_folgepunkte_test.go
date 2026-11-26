@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Folgepunkte zum Archivieren von Komponenten.
+// Follow-up points on archiving components.
 
-// foreignTagUser legt einen Nutzer mit Tag DE an und hängt comp den fremden Tag US an.
+// foreignTagUser creates a user with tag DE and attaches the foreign tag US to comp.
 func foreignTagUser(t *testing.T, e *visEnv, email string, comp models.Component) models.User {
 	t.Helper()
 	tagUS := models.Tag{Name: "US-" + email, StatusPageID: &e.page.ID}
@@ -30,7 +30,7 @@ func foreignTagUser(t *testing.T, e *visEnv, email string, comp models.Component
 	return user
 }
 
-// Punkt 2: Die Tag-Prüfung der Kaskade betrifft nur Komponenten, die sich wirklich ändern.
+// Point 2: The tag check of the cascade concerns only components that actually change.
 func TestComponentArchiveFolgepunkte_RestorePrueftNurTatsaechlichWiederkehrende(t *testing.T) {
 	e := newVisEnv(t)
 	group := e.comp("Gruppe", nil, true, "group")
@@ -64,7 +64,7 @@ func TestComponentArchiveFolgepunkte_ArchivePrueftNurNochAktive(t *testing.T) {
 	assert.True(t, before.Equal(*e.reload(early).ArchivedAt), "Zeitpunkt des bereits archivierten Kindes bleibt")
 }
 
-// Punkt 3a: Lesen, Prüfen und Schreiben laufen in EINER Transaktion.
+// Point 3a: Reading, checking and writing run in ONE transaction.
 func TestComponentArchiveFolgepunkte_ArchivierenLaeuftInEinerTransaktion(t *testing.T) {
 	inTx := func(d *gorm.DB) bool {
 		_, ok := d.Statement.ConnPool.(gorm.TxCommitter)
@@ -112,8 +112,8 @@ func TestComponentArchiveFolgepunkte_ArchivierenLaeuftInEinerTransaktion(t *test
 	})
 }
 
-// Punkt 3b: wird die Komponente zwischen Laden und Umhängen archiviert, gilt
-// der frische Stand: kein Herauslösen auf die oberste Ebene.
+// Point 3b: if the component is archived between loading and reparenting,
+// the fresh state applies: no detaching to the top level.
 func TestComponentArchiveFolgepunkte_UmhaengenNutztFrischenArchivStand(t *testing.T) {
 	e := newVisEnv(t)
 	group := e.comp("Gruppe", nil, true, "group")
@@ -122,7 +122,7 @@ func TestComponentArchiveFolgepunkte_UmhaengenNutztFrischenArchivStand(t *testin
 	require.NoError(t, e.db.Callback().Query().After("gorm:query").Register("test:archive-after-load", func(d *gorm.DB) {
 		if d.Statement.Table == "components" {
 			count++
-			if count == 1 { // das Laden der Komponente im Update-Handler
+			if count == 1 { // loading the component in the update handler
 				require.NoError(t, d.Session(&gorm.Session{NewDB: true}).Exec("UPDATE components SET archived_at = ? WHERE id IN (?, ?)", time.Now(), group.ID, member.ID).Error)
 			}
 		}
@@ -137,9 +137,9 @@ func TestComponentArchiveFolgepunkte_UmhaengenNutztFrischenArchivStand(t *testin
 	assert.NotNil(t, got.ArchivedAt)
 }
 
-// Punkt 1/5: Die Baum-Lesung sperrt mit FOR NO KEY UPDATE (kollidiert nicht mit
-// FK-FOR-KEY-SHARE parallel angelegter Vorfälle) und in fester Reihenfolge.
-// SQLite lässt die Klausel weg, deshalb wird das SQL für Postgres im DryRun geprüft.
+// Point 1/5: The tree read locks with FOR NO KEY UPDATE (does not collide with
+// FK FOR KEY SHARE of concurrently created incidents) and in fixed order.
+// SQLite omits the clause, so the SQL for Postgres is checked in DryRun.
 func TestComponentArchiveFolgepunkte_BaumLesungSperrtOhneKeyShareKonflikt(t *testing.T) {
 	db, err := gorm.Open(postgres.New(postgres.Config{DSN: "host=localhost dbname=dryrun sslmode=disable"}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
 	require.NoError(t, err)
@@ -154,8 +154,8 @@ func TestComponentArchiveFolgepunkte_BaumLesungSperrtOhneKeyShareKonflikt(t *tes
 	assert.Contains(t, sql, "ORDER BY")
 }
 
-// Punkt 2: Die Zahl der Abfragen hängt nicht von der Baumgröße ab (die Sperre
-// läuft sonst während hunderter Roundtrips).
+// Point 2: The number of queries does not depend on the tree size (the lock
+// would otherwise be held during hundreds of round trips).
 func TestComponentArchiveFolgepunkte_AbfragenUnabhaengigVonBaumgroesse(t *testing.T) {
 	queries := func(n int) int {
 		e := newVisEnv(t)
@@ -177,7 +177,7 @@ func TestComponentArchiveFolgepunkte_AbfragenUnabhaengigVonBaumgroesse(t *testin
 	assert.Equal(t, queries(2), queries(25))
 }
 
-// Punkt 3: Die Wurzel wird in der Transaktion frisch geprüft.
+// Point 3: The root is checked fresh in the transaction.
 func TestComponentArchiveFolgepunkte_ParallelesDoppeltesArchivierenSchreibtNichtNochmal(t *testing.T) {
 	e := newVisEnv(t)
 	comp := e.comp("A", nil, true, "operational")
@@ -208,7 +208,7 @@ func TestComponentArchiveFolgepunkte_RestoreMitGeaendertemZeitpunktBleibtKonsist
 	require.NoError(t, e.db.Callback().Query().After("gorm:query").Register("test:rearchive", func(d *gorm.DB) {
 		if d.Statement.Table == "components" {
 			count++
-			if count == 1 { // zwischen Laden und Transaktion: wiederhergestellt und neu archiviert
+			if count == 1 { // between loading and transaction: restored and archived again
 				require.NoError(t, d.Session(&gorm.Session{NewDB: true}).Exec("UPDATE components SET archived_at = ? WHERE id IN (?, ?)", second, group.ID, child.ID).Error)
 			}
 		}
@@ -219,7 +219,7 @@ func TestComponentArchiveFolgepunkte_RestoreMitGeaendertemZeitpunktBleibtKonsist
 	assert.Nil(t, e.reload(child).ArchivedAt, "Mitglied kommt mit zurück")
 }
 
-// Punkt 4: Umhängen (Parent-Wechsel) prüft und speichert in einer Transaktion mit Sperre.
+// Point 4: Reparenting (parent change) checks and saves in one transaction with a lock.
 func TestComponentArchiveFolgepunkte_UmhaengenLaeuftInEinerTransaktion(t *testing.T) {
 	e := newVisEnv(t)
 	group := e.comp("Gruppe", nil, true, "group")

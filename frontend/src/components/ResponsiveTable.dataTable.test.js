@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ResponsiveTable from './ResponsiveTable.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
-// Stufe 3: Tabellenstil (dataTable) auf Basis von ResponsiveTable.
-// Der JS-Umschalter (isMobile) spielt hier keine Rolle: im Tabellenstil gibt
-// es nur eine Tabelle, die Kartenansicht kommt aus CSS (siehe patternsCss.test.js).
+// Stage 3: table style (dataTable) based on ResponsiveTable.
+// The JS switch (isMobile) plays no role here: in the table style there is
+// only one table, the card view comes from CSS (see patternsCss.test.js).
 
 beforeEach(() => {
   i18n.global.locale.value = 'de'

@@ -7,8 +7,8 @@ import { useApi } from './useApi'
 import { useFormTranslations } from './useFormTranslations'
 import FormLanguageSwitch from '../components/FormLanguageSwitch.vue'
 
-// „Alles übersetzen“: alle noch leeren weiteren Sprachen nacheinander als Entwurf.
-// Nur „Sprache nicht unterstützt“ überspringt; jeder andere Fehler bricht den Lauf ab (Review).
+// "Translate all": all further languages that are still empty, one after another, as drafts.
+// Only "language not supported" skips; any other error aborts the run (review).
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }, { Code: 'it', Name: 'Italiano' }]
@@ -22,7 +22,7 @@ let trans
 let formData
 let fetchMock
 
-// translateHandler(target, body) -> Antwort oder wirft
+// translateHandler(target, body) -> response, or throws
 async function setup(translateHandler, { titleRequired = true, data } = {}) {
   fetchMock = vi.fn(async (url, o = {}) => {
     if (url === '/api/languages') return json(catalog)
@@ -88,7 +88,7 @@ describe('translateAll', () => {
     ['5xx ohne JSON-Körper', async () => ({ ok: false, status: 500, json: async () => { throw new Error('kein JSON') } }), null],
   ])('bricht bei %s nach der ersten Sprache ab und nennt den Fehler', async (_n, handler, text) => {
     await setup(async (target) => (target === 'en' ? ok(target) : handler()))
-    // en gelingt, fr scheitert: it wird nicht mehr angefragt.
+    // en succeeds, fr fails: it is no longer requested.
     await trans.translateAll()
     expect(translateCalls().map(([, o]) => JSON.parse(o.body).target_language)).toEqual(['en', 'fr'])
     const summary = trans.translateAllSummary.value

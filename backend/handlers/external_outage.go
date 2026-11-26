@@ -18,23 +18,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Meldung bei dauerhaftem Ausfall einer externen
-// Quelle. Der Abfrage-Dienst (externalstatus) erkennt die Übergänge und ruft
-// SourceOutage; hier liegen Empfängerkreis, Mailtext und Versand - der
-// Dienst darf handlers nicht importieren, die zentrale Versandfunktion
-// deliverMail liegt aber hier.
+// Notification on a permanent outage of an external
+// source. The polling service (externalstatus) detects the transitions and calls
+// SourceOutage; recipients, mail text and delivery live here - the
+// service must not import handlers, the central delivery function
+// deliverMail lives here, though.
 
 const (
 	auditActionOutageEmailSent    = "external_source.outage_email_sent"
 	auditActionOutageEmailFailed  = "external_source.outage_email_failed"
 	auditActionOutageEmailSkipped = "external_source.outage_email_skipped"
 	permComponentsWrite           = "external_sources:update"
-	// adminExternalSourcesPath: Ziel des Links in der
-	// Ausfall-Mail, die Admin-Seite „Externe Quellen“ (Route im Frontend).
+	// adminExternalSourcesPath: target of the link in the
+	// outage mail, the admin page "Externe Quellen" (route in the frontend).
 	adminExternalSourcesPath = "/admin/external-sources"
 )
 
-// externalOutageItem: ein aktiver Ausfall für das Admin-Banner (Teil C).
+// externalOutageItem: one active outage for the admin banner (part C).
 type externalOutageItem struct {
 	SourceID      uint       `json:"source_id"`
 	SourceName    string     `json:"source_name"`
@@ -45,8 +45,8 @@ type externalOutageItem struct {
 	NotifiedAt    *time.Time `json:"notified_at"`
 }
 
-// GET /api/pages/:page_id/external-outages (components:read) - alle aktiven
-// Ausfälle der Statusseite (nur aktive Quellen), älteste zuerst.
+// GET /api/pages/:page_id/external-outages (components:read) - all active
+// outages of the status page (active sources only), oldest first.
 func (h *Handler) GetExternalOutagesHandler(c *gin.Context) {
 	tenantID, ok := parseTenantID(c)
 	if !ok {
@@ -68,9 +68,9 @@ func (h *Handler) GetExternalOutagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, items)
 }
 
-// SourceOutage implementiert externalstatus.OutageNotifier. Der Versand läuft
-// in einer eigenen Goroutine, damit ein langsamer SMTP-Server den Abruf-Takt
-// nicht aufhält; WaitOutageMails wartet darauf (Tests, Herunterfahren).
+// SourceOutage implements externalstatus.OutageNotifier. Delivery runs
+// in its own goroutine so a slow SMTP server does not hold up the polling cycle;
+// WaitOutageMails waits for it (tests, shutdown).
 func (h *Handler) SourceOutage(_ context.Context, ev externalstatus.OutageEvent) {
 	h.notifyOutageAdmins(ev)
 	h.outageMails.Add(1)
@@ -80,12 +80,12 @@ func (h *Handler) SourceOutage(_ context.Context, ev externalstatus.OutageEvent)
 	}()
 }
 
-// notifyOutageAdmins legt die Nachricht für die Glocke an,
-// zusätzlich zu Banner und Mail. Ausfall und Erinnerung teilen sich einen
-// Schlüssel je Quelle; die Entwarnung erledigt die Ausfall-Nachricht und
-// meldet die Quelle als wieder erreichbar. Der Quellenname ist Admin-Eingabe
-// und wird vom Frontend als Text (nie als HTML) angezeigt; URL und
-// Fehlertext der Fremdseite gehören nicht hinein.
+// notifyOutageAdmins creates the message for the bell,
+// in addition to banner and mail. Outage and reminder share one
+// key per source; the all-clear resolves the outage message and
+// reports the source as reachable again. The source name is admin input
+// and is shown by the frontend as text (never as HTML); URL and
+// error text of the third-party site do not belong in it.
 func (h *Handler) notifyOutageAdmins(ev externalstatus.OutageEvent) {
 	src := ev.Source
 	pageID := src.StatusPageID
@@ -103,11 +103,11 @@ func (h *Handler) notifyOutageAdmins(ev externalstatus.OutageEvent) {
 		params, adminExternalSourcesPath, key)
 }
 
-// WaitOutageMails blockiert, bis alle angestoßenen Ausfall-Mails verarbeitet sind.
+// WaitOutageMails blocks until all triggered outage mails have been processed.
 func (h *Handler) WaitOutageMails() { h.outageMails.Wait() }
 
-// outageRecipients: alle mit components:write auf der Statusseite plus Global
-// Admins. Betrachter (nur components:read) bekommen nichts.
+// outageRecipients: everyone with components:write on the status page plus Global
+// Admins. Viewers (components:read only) get nothing.
 func (h *Handler) outageRecipients(pageID uint) []models.User {
 	var roles []models.UserStatusPageRole
 	h.DB.Preload("Role").Where(whereStatusPageIDEquals, pageID).Find(&roles)
@@ -169,11 +169,11 @@ func (h *Handler) sendOutageMail(cfg smtpConfig, u models.User, ev externalstatu
 	case sent:
 		h.RecordSystemAudit(auditActionOutageEmailSent, target.Category, target.TargetType, target.TargetID, target.TargetName, details)
 	}
-	// sent=false ohne Fehler: E-Mail global abgeschaltet; deliverMail hat den
-	// Audit-Eintrag email.skipped_disabled schon geschrieben.
+	// sent=false without error: email globally disabled; deliverMail already wrote the
+	// audit entry email.skipped_disabled.
 }
 
-// outageText sind die Texte einer Mail in einer Sprache.
+// outageText holds the texts of a mail in one language.
 type outageText struct {
 	subject, heading, intro, since, errLabel, noError, link, page string
 }
@@ -215,14 +215,14 @@ var outageTexts = map[string]map[externalstatus.OutageKind]outageText{
 	},
 }
 
-// outageLabels sind die sprachabhängigen Beschriftungen (für alle Arten gleich).
+// outageLabels are the language-dependent labels (the same for all kinds).
 var outageLabels = map[string]outageText{
 	"de": {since: "Keine Daten seit", errLabel: "Letzter Fehler", noError: "–", link: "Externe Quellen öffnen", page: "Statusseite"},
 	"en": {since: "No data since", errLabel: "Last error", noError: "-", link: "Open external sources", page: "Status page"},
 }
 
-// outageMailLang wählt Deutsch oder Englisch nach preferred_language des
-// Empfängers; ohne Angabe Deutsch.
+// outageMailLang chooses German or English by the recipient's
+// preferred_language; German if unspecified.
 func outageMailLang(preferred string) string {
 	if strings.HasPrefix(strings.ToLower(preferred), "en") {
 		return "en"
@@ -230,9 +230,9 @@ func outageMailLang(preferred string) string {
 	return "de"
 }
 
-// buildOutageMail liefert Betreff und HTML-Text. Quellenname und Fehler stammen
-// aus Admin-Eingabe bzw. der Fremdseite und werden im Text HTML-escaped; der
-// Betreff bleibt ein Header (CR/LF entfernt, Rest prüft hasHeaderInjectionChars).
+// buildOutageMail returns subject and HTML text. Source name and error come
+// from admin input or the third-party site and are HTML-escaped in the text; the
+// subject stays a header (CR/LF removed, rest checked by hasHeaderInjectionChars).
 func buildOutageMail(ev externalstatus.OutageEvent, page models.StatusPage, preferred string) (string, string) {
 	lang := outageMailLang(preferred)
 	t := outageTexts[lang][ev.Kind]
@@ -248,7 +248,7 @@ func buildOutageMail(ev externalstatus.OutageEvent, page models.StatusPage, pref
 	if src.LastError != "" {
 		lastErr = html.EscapeString(oneLine(src.LastError))
 	}
-	// Mailtext ohne Zeilenumbrüche: hasHeaderInjectionChars prüft den fertigen Body.
+	// Mail text without line breaks: hasHeaderInjectionChars checks the finished body.
 	body := fmt.Sprintf(`<div style="font-family:sans-serif;max-width:560px">`+
 		`<h2>%s</h2><p>%s</p>`+
 		`<table style="border-collapse:collapse">`+
@@ -264,14 +264,14 @@ func buildOutageMail(ev externalstatus.OutageEvent, page models.StatusPage, pref
 	return subject, body
 }
 
-// oneLine ersetzt Zeilenumbrüche durch Leerzeichen: Quellenname und Fehlertext
-// (Fremdseite!) landen in Betreff und Mailtext, der keine CR/LF enthalten darf.
+// oneLine replaces line breaks with spaces: source name and error text
+// (third-party site!) end up in subject and mail text, which must not contain CR/LF.
 func oneLine(s string) string { return lineBreaks.Replace(s) }
 
 var lineBreaks = strings.NewReplacer("\r", " ", "\n", " ")
 
-// formatOutageTime formatiert in UTC mit Zonenangabe: eindeutig und ohne
-// Abhängigkeit von der Zeitzonen-Datenbank des Servers.
+// formatOutageTime formats in UTC with a zone label: unambiguous and without
+// dependence on the server's time zone database.
 func formatOutageTime(t time.Time, lang string) string {
 	if lang == "en" {
 		return t.UTC().Format("2006-01-02 15:04 MST")

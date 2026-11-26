@@ -16,19 +16,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter gegen SQL-Injection durch Zeichenkettenbau: Die Fragmente,
-// die an Where/Raw/Exec/Order/Joins/Select/Having/Group gehen, bestehen aus
-// Literalen und benannten Konstanten. Wo ein Fragment aus einer Variablen
-// zusammengesetzt wird (z. B. ein Spaltenname), steht die Stelle unten in der
-// Liste und wurde geprüft: Der Wert stammt aus dem Code, nie aus einer
-// Anfrage. Eine neue Stelle schlägt hier an und braucht dieselbe Prüfung;
-// Nutzereingaben gehören immer als ?-Parameter in die Abfrage.
+// Structural guard against SQL injection via string building: the fragments
+// passed to Where/Raw/Exec/Order/Joins/Select/Having/Group consist of
+// literals and named constants. Where a fragment is assembled from a variable
+// (e.g. a column name), the site is in the list below
+// and has been reviewed: the value comes from code, never from a
+// request. A new site fails here and needs the same review;
+// user input always belongs in the query as a ? parameter.
 var sqlCallMethods = map[string]bool{
 	"Where": true, "Not": true, "Or": true, "Raw": true, "Exec": true,
 	"Order": true, "Joins": true, "Select": true, "Having": true, "Group": true,
 }
 
-// reviewedDynamicSQL: Fundstelle (Datei:Methode:Ausdruck) -> Herkunft des Werts.
+// reviewedDynamicSQL: site (file:method:expression) -> origin of the value.
 var reviewedDynamicSQL = reviewedSites(
 	"database/admin_notifications.go:Exec:sql",
 	"Schleife über zwei feste Anweisungen im Code",
@@ -68,9 +68,9 @@ var reviewedDynamicSQL = reviewedSites(
 	"col übergeben feste Aufrufer im Selbstmonitor (Spaltennamen im Code)",
 )
 
-// reviewedSites baut die Tabelle aus Paaren (Fundstelle, Herkunft). Als
-// Paarliste statt Map-Literal, weil gofmt die Werte eines Map-Literals je nach
-// Go-Version unterschiedlich ausrichtet und der Lint dann je Version anschlägt.
+// reviewedSites builds the table from pairs (site, origin). As a
+// pair list instead of a map literal, because gofmt aligns the values of a map literal differently depending on the
+// Go version and the lint then fails per version.
 func reviewedSites(pairs ...string) map[string]string {
 	if len(pairs)%2 != 0 {
 		panic("reviewedSites: ungerade Anzahl Einträge")
@@ -82,8 +82,8 @@ func reviewedSites(pairs ...string) map[string]string {
 	return m
 }
 
-// dynamicSQLSites liefert alle Aufrufe, deren erstes Argument nicht nur aus
-// Literalen und benannten Konstanten besteht, als "Datei:Methode:Ausdruck".
+// dynamicSQLSites returns all calls whose first argument does not consist only of
+// literals and named constants, as "file:method:expression".
 func dynamicSQLSites(t *testing.T, root string) []string {
 	t.Helper()
 	type parsed struct {
@@ -92,7 +92,7 @@ func dynamicSQLSites(t *testing.T, root string) []string {
 		file *ast.File
 		src  []byte
 	}
-	consts := map[string]map[string]bool{} // Paketverzeichnis -> Konstantennamen
+	consts := map[string]map[string]bool{} // package directory -> constant names
 	var files []parsed
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -157,8 +157,8 @@ func dynamicSQLSites(t *testing.T, root string) []string {
 		})
 	}
 	sort.Strings(sites)
-	// Gleiche Ausdrücke in einer Datei werden durchnummeriert (" #2", ...), damit
-	// eine weitere Stelle mit demselben Text nicht unter dem alten Eintrag durchgeht.
+	// Identical expressions in one file are numbered (" #2", ...) so that
+	// another site with the same text does not slip through under the old entry.
 	seen := map[string]int{}
 	for i, s := range sites {
 		seen[s]++
@@ -169,9 +169,9 @@ func dynamicSQLSites(t *testing.T, root string) []string {
 	return sites
 }
 
-// isStaticSQL: Literal, benannte Konstante oder Verkettung nur daraus. Nicht
-// zur SQL-Methode gehörende Aufrufe (z. B. Where(gormExpr), Select([]string{...}))
-// bleiben außen vor, solange sie keine Zeichenkette bauen.
+// isStaticSQL: literal, named constant or a concatenation consisting only of them. Calls
+// that do not belong to the SQL method (e.g. Where(gormExpr), Select([]string{...}))
+// are left out as long as they do not build a string.
 func isStaticSQL(e ast.Expr, consts map[string]bool) bool {
 	switch v := e.(type) {
 	case *ast.BasicLit:
@@ -183,12 +183,12 @@ func isStaticSQL(e ast.Expr, consts map[string]bool) bool {
 	case *ast.BinaryExpr:
 		return isStaticOperand(v.X, consts) && isStaticOperand(v.Y, consts)
 	case *ast.CompositeLit, *ast.UnaryExpr, *ast.SelectorExpr, *ast.IndexExpr, *ast.StarExpr, *ast.FuncLit:
-		// Strukturen und Typen (Select([]string{..}), Where(&model), Where(user.ID))
-		// enthalten keinen Zeichenkettenbau auf oberster Ebene.
+		// Structs and types (Select([]string{..}), Where(&model), Where(user.ID))
+		// contain no top-level string building.
 		return true
 	case *ast.CallExpr:
-		// Sprintf & Co. bauen Zeichenketten; Konvertierungen und Konstruktoren
-		// wie gorm.Expr(...) oder clause.Eq{...} nicht.
+		// Sprintf & co. build strings; conversions and constructors
+		// such as gorm.Expr(...) or clause.Eq{...} do not.
 		if sel, ok := v.Fun.(*ast.SelectorExpr); ok && (sel.Sel.Name == "Sprintf" || sel.Sel.Name == "Join" || sel.Sel.Name == "Replace") {
 			return false
 		}
@@ -197,9 +197,9 @@ func isStaticSQL(e ast.Expr, consts map[string]bool) bool {
 	return true
 }
 
-// isStaticOperand: Operand einer Verkettung. Feldzugriffe, Indizes und Aufrufe
-// sind hier dynamisch (jt.legacyIndex, p.column, f(x)), nur Literale, benannte
-// Konstanten und Verkettungen daraus nicht.
+// isStaticOperand: operand of a concatenation. Field accesses, indexes and calls
+// are dynamic here (jt.legacyIndex, p.column, f(x)); only literals, named
+// constants and concatenations of them are not.
 func isStaticOperand(e ast.Expr, consts map[string]bool) bool {
 	switch v := e.(type) {
 	case *ast.BasicLit:
@@ -228,8 +228,8 @@ func TestSQL_NoDynamicFragmentsOutsideReviewedSites(t *testing.T) {
 	}
 }
 
-// Gegenprobe: Der Prüfer erkennt Verkettung mit einer Variablen und Sprintf,
-// lässt Literale, Konstanten und Konstantenverkettung durch.
+// Control case: the checker detects concatenation with a variable and Sprintf,
+// lets literals, constants and constant concatenation through.
 func TestDynamicSQLSites_DetectsConcatenation(t *testing.T) {
 	dir := t.TempDir()
 	src := `package x

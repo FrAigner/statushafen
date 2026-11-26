@@ -20,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Review-Nachbesserung.
+// Review follow-up.
 
 func doTemplateRequestAs(r http.Handler, userID uint, method, path string, payload any) *httptest.ResponseRecorder {
 	var buf *bytes.Buffer
@@ -57,7 +57,7 @@ func (e *visEnv) globalAdmin(email string) models.User {
 	return u
 }
 
-// 1) Die Kaskade prüft die Tag-Rechte für JEDE betroffene Komponente.
+// 1) The cascade checks the tag permissions for EVERY affected component.
 func TestComponentArchiveReview_KaskadePrueftTagRechteJederKomponente(t *testing.T) {
 	e := newVisEnv(t)
 	group := e.comp("Gruppe", nil, true, "group")
@@ -71,14 +71,14 @@ func TestComponentArchiveReview_KaskadePrueftTagRechteJederKomponente(t *testing
 	require.NoError(t, e.db.Create(&user).Error)
 	require.NoError(t, e.db.Create(&models.UserTag{UserID: user.ID, TagID: tagDE.ID}).Error)
 
-	// Archivieren: Wurzel ist ohne Tag erlaubt, das US-Kind nicht -> 403, nichts ändert sich.
+	// Archive: root is allowed without a tag, the US child is not -> 403, nothing changes.
 	w, _ := e.doAs(user.ID, "POST", e.compURL(group, "/archive"), nil)
 	requireStatusCode(t, w, http.StatusForbidden)
 	assert.Nil(t, e.reload(group).ArchivedAt)
 	assert.Nil(t, e.reload(child).ArchivedAt)
 	assert.Zero(t, e.auditCount("component.archived"))
 
-	// Wiederherstellen: gleiche Prüfung über die Kaskade.
+	// Restore: same check via the cascade.
 	e.archiveRaw(group.ID, child.ID)
 	w, _ = e.doAs(user.ID, "POST", e.compURL(group, "/restore"), nil)
 	requireStatusCode(t, w, http.StatusForbidden)
@@ -87,7 +87,7 @@ func TestComponentArchiveReview_KaskadePrueftTagRechteJederKomponente(t *testing
 	assert.Zero(t, e.auditCount("component.restored"))
 }
 
-// 2) Anonyme Vorfall-Routen nennen archivierte und unsichtbare Komponenten nicht.
+// 2) Anonymous incident routes do not name archived and invisible components.
 func TestComponentArchiveReview_AnonymeVorfallRoutenOhneVersteckteKomponenten(t *testing.T) {
 	e := newVisEnv(t)
 	archived := e.comp("Archiviert-Geheim", nil, true, "operational")
@@ -109,7 +109,7 @@ func TestComponentArchiveReview_AnonymeVorfallRoutenOhneVersteckteKomponenten(t 
 		assert.Contains(t, w.Body.String(), "Sichtbar-Offen", path)
 	}
 
-	// Verwalter sehen alle Komponenten des Vorfalls.
+	// Managers see all components of the incident.
 	admin := e.globalAdmin("inc-admin@example.com")
 	for _, path := range []string{pageBase, pageBase + "/" + strconv.Itoa(int(inc.ID))} {
 		w, _ := e.doAs(admin.ID, "GET", path, nil)
@@ -119,7 +119,7 @@ func TestComponentArchiveReview_AnonymeVorfallRoutenOhneVersteckteKomponenten(t 
 	}
 }
 
-// 3) Übersetzungen archivierter/unsichtbarer Komponenten sind anonym nicht abrufbar.
+// 3) Translations of archived/invisible components are not retrievable anonymously.
 func TestComponentArchiveReview_UebersetzungenNurFuerBerechtigte(t *testing.T) {
 	e := newVisEnv(t)
 	require.NoError(t, testutils.EnableTranslation(e.db))
@@ -144,7 +144,7 @@ func TestComponentArchiveReview_UebersetzungenNurFuerBerechtigte(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Arch EN")
 }
 
-// 4) Statusschreiben überschreibt eine zwischenzeitliche Archivierung nicht.
+// 4) Status writes do not overwrite an archiving that happened in the meantime.
 func TestComponentArchiveReview_StatusSchreibenBehaeltArchivierung(t *testing.T) {
 	cases := map[string]func(e *visEnv, c models.Component) *httptest.ResponseRecorder{
 		"PUT Status": func(e *visEnv, c models.Component) *httptest.ResponseRecorder {
@@ -192,7 +192,7 @@ func TestComponentArchiveReview_StatusSchreibenBehaeltArchivierung(t *testing.T)
 	})
 }
 
-// 5) Update-API umgeht die Archiv-Regeln nicht.
+// 5) The update API does not bypass the archive rules.
 func TestComponentArchiveReview_UpdateUmgehtArchivRegelnNicht(t *testing.T) {
 	e := newVisEnv(t)
 	oldGroup := e.comp("Alte Gruppe", nil, true, "group")
@@ -200,13 +200,13 @@ func TestComponentArchiveReview_UpdateUmgehtArchivRegelnNicht(t *testing.T) {
 	e.archiveRaw(oldGroup.ID, member.ID)
 	active := e.comp("Aktiv", nil, true, "operational")
 
-	// Aktive Komponente in eine archivierte Gruppe verschieben: abgelehnt.
+	// Move an active component into an archived group: rejected.
 	w, m := e.do("PUT", e.compURL(active, ""), map[string]any{"status": "operational", "parent_id": oldGroup.ID})
 	requireStatusCode(t, w, http.StatusBadRequest)
 	assert.Equal(t, "parent_archived", m["code"])
 	assert.Nil(t, e.reload(active).ParentID)
 
-	// Archiviertes Mitglied herauslösen (parent_id 0) oder verschieben: abgelehnt (409).
+	// Detach an archived member (parent_id 0) or move it: rejected (409).
 	other := e.comp("Andere Gruppe", nil, true, "group")
 	for _, pid := range []uint{0, other.ID} {
 		w, m = e.do("PUT", e.compURL(member, ""), map[string]any{"status": "operational", "parent_id": pid})
@@ -216,20 +216,20 @@ func TestComponentArchiveReview_UpdateUmgehtArchivRegelnNicht(t *testing.T) {
 		assert.Equal(t, oldGroup.ID, *e.reload(member).ParentID)
 	}
 
-	// Unverändertes parent_id (das Formular schickt es mit) und Umbenennen bleiben möglich.
+	// Unchanged parent_id (the form sends it along) and renaming remain possible.
 	w, _ = e.do("PUT", e.compURL(member, ""), map[string]any{"status": "operational", "name": "Neu", "parent_id": oldGroup.ID})
 	requireStatusCode(t, w, http.StatusOK)
 	w, _ = e.do("PUT", e.compURL(oldGroup, ""), map[string]any{"name": "Gruppe neu", "parent_id": 0})
 	requireStatusCode(t, w, http.StatusOK)
 }
 
-// 5b) Restore prüft die ganze Vorfahrenkette.
+// 5b) Restore checks the whole ancestor chain.
 func TestComponentArchiveReview_RestorePrueftVorfahrenkette(t *testing.T) {
 	e := newVisEnv(t)
 	top := e.comp("Oben", nil, true, "group")
 	mid := e.comp("Mitte", &top.ID, true, "group")
 	leaf := e.comp("Blatt", &mid.ID, true, "operational")
-	e.archiveRaw(top.ID, leaf.ID) // Mitte ist (inkonsistent) aktiv, Oben archiviert
+	e.archiveRaw(top.ID, leaf.ID) // Middle is (inconsistently) active, top archived
 
 	w, m := e.do("POST", e.compURL(leaf, "/restore"), nil)
 	requireStatusCode(t, w, http.StatusConflict)
@@ -237,7 +237,7 @@ func TestComponentArchiveReview_RestorePrueftVorfahrenkette(t *testing.T) {
 	assert.NotNil(t, e.reload(leaf).ArchivedAt)
 }
 
-// 6a) Archivierte Kinder zählen nicht in den Gruppenstatus der aktiven Ansicht.
+// 6a) Archived children do not count toward the group status of the active view.
 func TestComponentArchiveReview_GruppenstatusOhneArchivierteKinder(t *testing.T) {
 	e := newVisEnv(t)
 	group := e.comp("Gruppe", nil, true, "group")
@@ -254,14 +254,14 @@ func TestComponentArchiveReview_GruppenstatusOhneArchivierteKinder(t *testing.T)
 	assert.Equal(t, "operational", tree[0].Status)
 	assert.Len(t, tree[0].Children, 2, "archivierte Kinder bleiben für das Segment Archiviert in der Liste")
 
-	// Ist die Gruppe selbst archiviert, bleibt der Aggregatstatus über alle Kinder.
+	// If the group itself is archived, the aggregate status remains over all children.
 	e.archiveRaw(group.ID)
 	w, _ = e.doAs(admin.ID, "GET", e.base, nil)
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &tree))
 	assert.Equal(t, "major_outage", tree[0].Status)
 }
 
-// 6b) Admin-Übersicht und effektive Status zählen archivierte Komponenten nicht.
+// 6b) Admin overview and effective statuses do not count archived components.
 func TestComponentArchiveReview_UebersichtOhneArchivierte(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -288,7 +288,7 @@ func TestComponentArchiveReview_UebersichtOhneArchivierte(t *testing.T) {
 	assert.Contains(t, w.Body.String(), `"components":1`)
 }
 
-// failNthComponentQuery lässt die n-te Abfrage auf components fehlschlagen.
+// failNthComponentQuery makes the nth query on components fail.
 func failNthComponentQuery(t *testing.T, db *gorm.DB, n int) {
 	t.Helper()
 	count := 0
@@ -333,7 +333,7 @@ func TestComponentArchiveReview_LesefehlerGeben500(t *testing.T) {
 		inc := models.Incident{StatusPageID: e.page.ID, Title: "V", Message: "m", Status: "investigating"}
 		require.NoError(t, e.db.Create(&inc).Error)
 		require.NoError(t, e.db.Create(&models.IncidentComponent{IncidentID: inc.ID, ComponentID: comp.ID}).Error)
-		// Die Vorfall-Abfrage lädt Komponenten per Preload (1.), die Sichtbarkeitsprüfung danach (2.).
+		// The incident query loads components via Preload (1st), the visibility check afterwards (2nd).
 		failNthComponentQuery(t, e.db, 2)
 		w := e.get("/api/pages/" + strconv.Itoa(int(e.page.ID)) + "/incidents")
 		requireStatusCode(t, w, http.StatusOK)
@@ -341,7 +341,7 @@ func TestComponentArchiveReview_LesefehlerGeben500(t *testing.T) {
 	})
 }
 
-// Ein Vorfahr, der nicht (mehr) existiert, blockiert das Wiederherstellen nicht.
+// An ancestor that does not (or no longer) exist does not block restoring.
 func TestComponentArchiveReview_RestoreMitFehlendemElternknoten(t *testing.T) {
 	e := newVisEnv(t)
 	gone := uint(99999)

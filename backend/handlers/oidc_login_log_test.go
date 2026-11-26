@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Fehlschläge beim Anbieter loggen den Fehlertext des HTTP-Clients, und der
-// enthält die abgerufene URL samt Query. Der Discovery-URL pflegt der Seiten-
-// Admin und der Token-Endpunkt kommt vom Anbieter; ein Geheimnis darin darf
-// selbst bei einem Standard-Logger ohne zentrale Bereinigung nicht im Log landen.
+// Failures at the provider log the HTTP client's error text, and it
+// contains the fetched URL including query. The discovery URL is maintained by the page
+// admin and the token endpoint comes from the provider; a secret in it must not
+// end up in the log even with a standard logger without central sanitizing.
 func TestOIDCLogin_ProviderFailuresKeepSecretsOutOfTheLog(t *testing.T) {
 	const secret = "probe-abruf-marker"
 	var buf strings.Builder

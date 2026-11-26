@@ -3,14 +3,14 @@ import { mount, DOMWrapper } from '@vue/test-utils'
 import i18n from '../i18n'
 import SubscribeWizard from './SubscribeWizard.vue'
 import { useAuth } from '../composables/useAuth'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Die komplette Wizard-Vorlage liegt in <Teleport to="body">, ist also
-// außerhalb des von wrapper.find() durchsuchten Baums (gleiches Muster wie
-// StatusPage.test.js für das Incident-History-Modal) - alle Queries laufen
-// daher gegen document.body statt gegen den Mount-Wrapper.
+// The whole wizard template sits in <Teleport to="body">, i.e. outside the
+// tree searched by wrapper.find() (same pattern as StatusPage.test.js for the
+// incident history modal) - so all queries run against document.body instead
+// of the mount wrapper.
 const body = () => new DOMWrapper(document.body)
 
 const components = [
@@ -51,10 +51,10 @@ describe('SubscribeWizard', () => {
     expect(title.textContent).toContain(i18n.global.t('components.subscribeWizard.step1Title'))
   })
 
-  // Die drei Schritte stecken in getrennten
-  // <Transition>s; beim Wechsel stehen alte und neue Überschrift kurz
-  // gleichzeitig im DOM. Mit echter Transition (kein Stub) darf deshalb keine
-  // ID doppelt vorkommen, und aria-labelledby muss auf den NEUEN Titel zeigen.
+  // The three steps sit in separate <Transition>s; while switching, the old
+  // and the new heading are briefly in the DOM at the same time. With a real
+  // transition (no stub) no ID may therefore occur twice, and aria-labelledby
+  // must point to the NEW title.
   describe('aria-labelledby beim Schrittwechsel', () => {
     const t = (key) => i18n.global.t(key)
     const labelText = () => {
@@ -87,7 +87,7 @@ describe('SubscribeWizard', () => {
       await body().find('#subscribe-email').setValue('a@b.de')
       await body().find('.btn-primary').trigger('click')
       await body().findAll('.comp-list-item input')[0].setValue(true)
-      // Während der Leave-Animation steht noch Schritt 1 im DOM: den neuesten Button nehmen.
+      // During the leave animation step 1 is still in the DOM: take the newest button.
       await body().findAll('.wizard-body .btn-primary').at(-1).trigger('click')
       await vi.waitFor(() => expect(body().find('.wizard-success').exists()).toBe(true))
 
@@ -103,9 +103,8 @@ describe('SubscribeWizard', () => {
     expect(body().find('.btn-primary').attributes('disabled')).toBeUndefined()
   })
 
-  // eingeloggte Nutzer sollen ihre Konto-Adresse nicht
-  // erneut eintippen müssen, dürfen sie aber weiterhin ändern (z.B. um eine
-  // andere Adresse zu abonnieren).
+  // Signed-in users should not have to type their account address again, but
+  // may still change it (e.g. to subscribe a different address).
   describe('E-Mail-Vorbelegung für eingeloggte Nutzer', () => {
     afterEach(() => {
       useAuth().logout()
@@ -130,8 +129,8 @@ describe('SubscribeWizard', () => {
     })
   })
 
-  // Vorher blieb „Weiter“ stumm deaktiviert; jetzt nennt der Assistent
-  // den Fehler am Feld (role="alert", aria-invalid, aria-describedby) und setzt den Fokus.
+  // Previously "Next" stayed silently disabled; now the wizard names the error
+  // at the field (role="alert", aria-invalid, aria-describedby) and moves the focus.
   describe('Validierungshinweise in Schritt 1', () => {
     const t = (key) => i18n.global.t(key)
     const next = () => body().find('.btn-primary').trigger('click')
@@ -227,7 +226,7 @@ describe('SubscribeWizard', () => {
     })
   })
 
-  // „0 / 8 ausgewählt“ las sich wie „nichts gewählt“, leer heißt aber „alle“.
+  // "0 / 8 selected" read like "nothing selected", but empty means "all".
   it('beschreibt die Auswahl verständlich: leer = alle Komponenten, sonst „n von m gewählt“', async () => {
     mountWizard()
     await body().findAll('.channel-card')[0].trigger('click')
@@ -245,7 +244,7 @@ describe('SubscribeWizard', () => {
     expect(count()).toContain('1 von 3')
   })
 
-  // .perm-checkbox hatte keine Stil-Regel (Kästchen ohne Abstand zum Text).
+  // .perm-checkbox had no style rule (box without spacing to the text).
   it('stylt .perm-checkbox in style.css: Zeile mit Abstand, 44 px Zielhöhe, Fokus sichtbar', () => {
     const css = readFileSync(resolve(__dirname, '../style.css'), 'utf8')
     const rule = css.match(/\.perm-checkbox\s*\{([^}]*)\}/)?.[1] ?? ''
@@ -282,8 +281,8 @@ describe('SubscribeWizard', () => {
     expect(body().findAll('.comp-list-item.checked')).toHaveLength(0)
   })
 
-  // Ohne Token verknüpft das Backend das neue Abo
-  // nicht mit dem Konto, GET /api/me/subscription findet es dann nicht.
+  // Without the token the backend does not link the new subscription to the
+  // account, and GET /api/me/subscription then does not find it.
   describe.each([
     ['eingeloggt', 'tok123', 'tok123'],
     ['ausgeloggt', '', undefined],
@@ -301,7 +300,7 @@ describe('SubscribeWizard', () => {
       await vi.waitFor(() => expect(global.fetch).toHaveBeenCalled())
 
       const headers = global.fetch.mock.calls[0][1].headers
-      // Authorization bleibt frei für Caddys Basic Auth
+      // Authorization stays free for Caddy's Basic Auth
       expect(headers['X-Auth-Token']).toBe(expected)
       expect(headers.Authorization).toBeUndefined()
       expect(headers['Content-Type']).toBe('application/json')
@@ -333,7 +332,7 @@ describe('SubscribeWizard', () => {
     expect(activeWrapper.emitted('subscribed')).toBeTruthy()
   })
 
-  // Die Sprache des Besuchers wandert als Mailsprache mit dem Abo.
+  // The visitor's language travels with the subscription as the mail language.
   it('sendet die gewählte Besuchersprache als language', async () => {
     i18n.global.locale.value = 'en'
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
@@ -346,8 +345,8 @@ describe('SubscribeWizard', () => {
     expect(JSON.parse(global.fetch.mock.calls[0][1].body).language).toBe('en')
   })
 
-  // Ein unbestätigtes Abo (Double-Opt-in) zeigt statt "Erfolgreich
-  // abonniert" den Hinweis auf die Bestätigungsmail.
+  // An unconfirmed subscription (double opt-in) shows the hint about the
+  // confirmation mail instead of "Successfully subscribed".
   it('zeigt bei status=pending den Hinweis auf die Bestätigungsmail', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: 'pending' }) })
     mountWizard()
@@ -359,7 +358,7 @@ describe('SubscribeWizard', () => {
 
     const success = body().find('.wizard-success')
     expect(success.find('h2').text()).toBe('Bitte bestätige deine E-Mail-Adresse')
-    // Neutral formuliert: Für bereits abonnierte Adressen antwortet der Server genauso.
+    // Neutral wording: the server answers the same way for addresses already subscribed.
     expect(success.text()).toContain('Wenn für a@b.de noch kein Abonnement besteht, haben wir einen Bestätigungslink dorthin geschickt.')
     expect(success.text()).toContain('Besteht das Abonnement bereits, ändert sich nichts.')
     expect(success.text()).not.toContain('Erfolgreich abonniert!')
@@ -395,8 +394,8 @@ describe('SubscribeWizard', () => {
     expect(body().find('.wizard-success').exists()).toBe(false)
   })
 
-  // Kaputter Body (z. B. HTML-Fehlerseite vom Proxy) zeigte den
-  // rohen JSON-Parserfehler ("Unexpected token '<' ...").
+  // A broken body (e.g. an HTML error page from the proxy) showed the
+  // raw JSON parser error ("Unexpected token '<' ...").
   it('zeigt bei unlesbarem Fehler-Body eine verständliche Meldung statt des Parserfehlers', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false, status: 502, json: async () => { throw new SyntaxError("Unexpected token '<'") },
@@ -412,7 +411,7 @@ describe('SubscribeWizard', () => {
     expect(body().find('.wizard-alert').text()).not.toContain('Unexpected')
   })
 
-  // Netzwerkfehler und unlesbarer Erfolgs-Body zeigten englische Browser-/Parsertexte.
+  // Network errors and an unreadable success body showed English browser/parser texts.
   it.each([
     ['Netzwerkfehler', () => vi.fn().mockRejectedValue(new TypeError('Failed to fetch')), 'api.networkError', 'Failed to fetch'],
     ['unlesbarer Erfolgs-Body', () => vi.fn().mockResolvedValue({
@@ -431,8 +430,8 @@ describe('SubscribeWizard', () => {
     expect(body().find('.wizard-alert').text()).not.toContain(rawText)
   })
 
-  // Der Serverfehler in Schritt 2 war eine freie Zeile ohne role=alert
-  // und Fokus und zeigte den rohen Servertext statt der Übersetzung des Fehlercodes.
+  // The server error in step 2 was a loose line without role=alert and focus,
+  // and showed the raw server text instead of the translation of the error code.
   describe('Serverfehler beim Abonnieren', () => {
     const subscribeWithResponse = async (res) => {
       global.fetch = vi.fn().mockResolvedValue(res)
@@ -485,7 +484,7 @@ describe('SubscribeWizard', () => {
     expect(activeWrapper.emitted('close')).toBeTruthy()
   })
 
-  // 4a: Leerfall der Komponentensuche über EmptyState statt Inline-Styles.
+  // 4a: empty case of the component search via EmptyState instead of inline styles.
   it('zeigt bei einer Suche ohne Treffer den Leerzustand und keine Inline-Styles', async () => {
     mountWizard({}, { stubs: { transition: false } })
     await body().findAll('.channel-card')[0].trigger('click')
@@ -524,7 +523,7 @@ describe('SubscribeWizard', () => {
     await body().find('.btn-primary').trigger('click')
     expect(await axe(dialog())).toHaveNoViolations()
   })
-  // 4a: Zweige der geänderten Zeilen.
+  // 4a: branches of the changed lines.
   it('zeigt Komponenten ohne Tags ohne Fehler und schließt mit „Fertig“', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) })
     mountWizard({ components: [{ ID: 1, Name: 'Ohne Tags' }] })

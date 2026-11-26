@@ -19,12 +19,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Ob eine Statusseite privat ist oder nicht existiert, darf ein Besucher ohne
-// Berechtigung nicht erfahren: Beides antwortet mit demselben 404 samt gleichem
-// Body. Der Test schickt an jede anonym erreichbare Route zur Seite oder ihren
-// Unterobjekten (Dashboard, Verfügbarkeit, Übersetzungen, Komponenten, Vorfälle,
-// Hinweise, SSO-Auskunft) dieselbe Anfrage einmal für eine private und einmal
-// für eine nicht vorhandene Seite bzw. ID und vergleicht Status und Body.
+// A visitor without permission must not be able to learn whether a status page is private or
+// does not exist: both answer with the same 404 including the same
+// body. The test sends to every anonymously reachable route of the page or its
+// sub-objects (dashboard, availability, translations, components, incidents,
+// notices, SSO info) the same request once for a private page and once
+// for a non-existent page or ID, and compares status and body.
 
 type existenceFixture struct {
 	db  *gorm.DB
@@ -94,8 +94,8 @@ func (f existenceFixture) get(path, token string) *httptest.ResponseRecorder {
 	return w
 }
 
-// pathPair liefert dieselbe Route einmal für die private Seite und einmal für
-// ein nicht vorhandenes Ziel.
+// pathPair returns the same route once for the private page and once for
+// a non-existent target.
 type pathPair struct{ name, private, missing, public string }
 
 func (f existenceFixture) pairs() []pathPair {
@@ -133,8 +133,8 @@ func (f existenceFixture) pairs() []pathPair {
 	return out
 }
 
-// Angriff: Für jeden Aufrufer ohne Berechtigung ist die private Seite von der
-// fehlenden nicht zu unterscheiden.
+// Attack: for every caller without permission, the private page cannot be told apart from the
+// missing one.
 func TestRouter_PrivatePageLooksLikeMissingPageForUnauthorizedCallers(t *testing.T) {
 	f := setupExistenceFixture(t)
 	callers := map[string]string{
@@ -154,8 +154,8 @@ func TestRouter_PrivatePageLooksLikeMissingPageForUnauthorizedCallers(t *testing
 	}
 }
 
-// Gegenprobe: Dieselben Routen liefern Mitgliedern und Global Admins die Inhalte
-// der privaten Seite und allen die der öffentlichen.
+// Control case: the same routes return the contents of the private page to members and Global Admins,
+// and those of the public one to everyone.
 func TestRouter_PrivatePageContentStillReachableForMembersAndAdmins(t *testing.T) {
 	f := setupExistenceFixture(t)
 	for _, p := range f.pairs() {
@@ -167,8 +167,8 @@ func TestRouter_PrivatePageContentStillReachableForMembersAndAdmins(t *testing.T
 	}
 }
 
-// Der SSO-Hinweis nennt nur Berechtigten Seiten-ID und SSO-Art einer privaten
-// Seite; öffentliche Seiten liefern ihn wie bisher an alle.
+// The SSO hint names the page ID and SSO kind of a private page only to authorized users;
+// public pages return it to everyone as before.
 func TestRouter_SSOInfoOfPrivatePageOnlyForMembers(t *testing.T) {
 	f := setupExistenceFixture(t)
 	private := "/api/public/pages/" + f.privateSlug + "/sso"
@@ -183,9 +183,9 @@ func TestRouter_SSOInfoOfPrivatePageOnlyForMembers(t *testing.T) {
 	assert.Contains(t, pub.Body.String(), `"page_id":`+strconv.Itoa(int(f.pub.page)))
 }
 
-// Auto-Join per Standardrolle bleibt: Ein Konto mit passender E-Mail-Domain
-// sieht die private Seite beim ersten Aufruf und bekommt die Rolle. Ein Konto
-// ohne passende Domain sieht 404 wie bei einer fehlenden Seite.
+// Auto-join via default role remains: an account with a matching email domain
+// sees the private page on first access and gets the role. An account
+// without a matching domain sees 404 as with a missing page.
 func TestRouter_AutoJoinStillWorksForPrivatePage(t *testing.T) {
 	f := setupExistenceFixture(t)
 	role := models.Role{Name: "Auto-Join Lesen", Permissions: "components:read"}
@@ -208,13 +208,13 @@ func TestRouter_AutoJoinStillWorksForPrivatePage(t *testing.T) {
 	_ = gin.Mode
 }
 
-// Strukturwächter: Jede anonym erreichbare GET-Route, die eine Seite oder ein
-// Objekt über Slug oder ID anspricht, steht in pairs() und damit im Vergleich
-// „privat gegen fehlend“. Eine neue Route dieser Art ohne Eintrag fällt hier
-// auf, bevor sie Existenz oder Art einer privaten Seite verrät. Welche Routen
-// anonym sind, ermittelt der Test am Router selbst (weder 401 noch 403 ohne
-// Token). Die Routen unter /api/auth/ gehören nicht dazu: Anmelde-Einstiege
-// (OAuth, OIDC) bleiben bewusst für jeden erreichbar.
+// Structural guard: every anonymously reachable GET route that addresses a page or an
+// object by slug or ID is listed in pairs() and thus in the comparison
+// "private vs. missing". A new route of this kind without an entry is caught here
+// before it reveals the existence or kind of a private page. Which routes
+// are anonymous, the test determines from the router itself (neither 401 nor 403 without
+// token). The routes under /api/auth/ are not included: login entry points
+// (OAuth, OIDC) deliberately remain reachable for everyone.
 func TestRouter_EveryAnonymousObjectRouteIsInTheExistenceComparison(t *testing.T) {
 	f := setupExistenceFixture(t)
 	covered := map[string]bool{}
@@ -240,7 +240,7 @@ func TestRouter_EveryAnonymousObjectRouteIsInTheExistenceComparison(t *testing.T
 			continue
 		}
 		if w := f.get(strings.Join(parts, "/"), ""); w.Code == http.StatusUnauthorized || w.Code == http.StatusForbidden {
-			continue // nur mit Anmeldung lesbar
+			continue // readable only with login
 		}
 		anonymousObjectRoutes = append(anonymousObjectRoutes, ri.Path)
 	}

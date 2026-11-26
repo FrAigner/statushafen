@@ -1,20 +1,22 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C, Verwaltungsseiten: Suchfeld im Kartenkopf (Lupe,
-  type="search"). Das Beschriftungs-Aria ist Pflicht, weil es kein sichtbares
-  Label gibt. Weitere Attribute (z. B. v-help) landen am Eingabefeld.
+  Direction C, admin pages: search field in the card header (magnifier,
+  type="search"). The aria label is required because there is no visible
+  label. Further attributes (e.g. v-help) land on the input field.
 */
 import AppIcon from './AppIcon.vue'
 
 defineOptions({ inheritAttrs: false })
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  label: { type: String, required: true },
-  placeholder: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  label: string
+  placeholder?: string | null
+}>(), {
+  placeholder: null,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const model = defineModel({ type: String, default: '' })
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const model = defineModel<string>({ default: '' })
 </script>
 
 <template>

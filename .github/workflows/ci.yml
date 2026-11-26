@@ -72,7 +72,7 @@ jobs:
           bash scripts/repo_artefakte_test.sh
       - name: Lint Frontend
         run: cd frontend && npm run lint
-      # New frontend code is TypeScript with strict; existing JavaScript is not checked yet (checkJs: false).
+      # Frontend application code is TypeScript with strict (tests are still JavaScript, not checked).
       - name: Typecheck Frontend
         run: cd frontend && npm run typecheck
       - name: Lint Backend

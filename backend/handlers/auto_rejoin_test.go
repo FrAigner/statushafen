@@ -14,20 +14,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// checkPrivatePageAccess fragt UserStatusPageRole
-// ohne Unscoped() ab - ein Soft-Delete durch RemoveStatusPageUserHandler
-// (gezielte, korrekt auditierte Admin-Entscheidung) ist für diese Query nicht
-// von "hatte nie eine Rolle" unterscheidbar. autoAssignDefaultRole vergibt die
-// Rolle deshalb nach einem einfachen Seitenaufruf erneut, OHNE jeden
-// Audit-Eintrag - eine explizite Entfernung wird stillschweigend rückgängig
+// checkPrivatePageAccess queries UserStatusPageRole
+// without Unscoped() - a soft delete by RemoveStatusPageUserHandler
+// (a targeted, correctly audited admin decision) is indistinguishable
+// for this query from "never had a role". autoAssignDefaultRole therefore grants
+// the role again after a simple page view, WITHOUT any
+// audit entry - an explicit removal is silently undone
 // gemacht.
 //
-// Seit der Umstellung nutzt pageIsAccessible denselben checkPrivatePageAccess-Pfad
-// für sieben zusätzliche Endpunkte (Components, Incidents, Notices,
-// Translations x3), nicht mehr nur die Dashboard-Route - der Fix
-// muss also in checkPrivatePageAccess/autoAssignDefaultRole selbst sitzen,
-// nicht nur im Dashboard-Handler. Dieser Test deckt deshalb neben dem
-// Dashboard auch zwei der sieben Batch-1-Endpunkte ab (components, incidents).
+// Since the change, pageIsAccessible uses the same checkPrivatePageAccess path
+// for seven additional endpoints (components, incidents, notices,
+// translations x3), not just the dashboard route anymore - so the fix
+// must sit in checkPrivatePageAccess/autoAssignDefaultRole itself,
+// not just in the dashboard handler. This test therefore covers, besides the
+// dashboard, also two of the seven batch 1 endpoints (components, incidents).
 func TestSoftDeletedRoleDoesNotAutoRejoin(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -61,8 +61,8 @@ func TestSoftDeletedRoleDoesNotAutoRejoin(t *testing.T) {
 	db.Create(&removedUser)
 	removedUserToken, _ := middleware.GenerateToken(removedUser.ID, removedUser.Email, "", "", false)
 
-	// Schritt 1: erstmaliger Auto-Join über das Dashboard, damit überhaupt
-	// eine Rolle existiert, die anschließend gezielt entfernt werden kann.
+	// Step 1: initial auto-join via the dashboard so that a role exists
+	// at all that can then be removed deliberately.
 	joinReq, _ := http.NewRequest("GET", "/api/public/pages/"+page.Slug+"/dashboard", nil)
 	joinReq.Header.Set("Authorization", "Bearer "+removedUserToken)
 	joinW := httptest.NewRecorder()
@@ -72,7 +72,7 @@ func TestSoftDeletedRoleDoesNotAutoRejoin(t *testing.T) {
 	var joined models.UserStatusPageRole
 	assert.NoError(t, db.Where("user_id = ? AND status_page_id = ?", removedUser.ID, page.ID).First(&joined).Error)
 
-	// Schritt 2: Admin entfernt den Nutzer explizit (Soft-Delete, auditiert).
+	// Step 2: admin removes the user explicitly (soft delete, audited).
 	removeReq, _ := http.NewRequest("DELETE", "/api/admin/pages/"+pid+"/users/"+strconv.Itoa(int(removedUser.ID)), nil)
 	removeReq.Header.Set("Authorization", "Bearer "+adminToken)
 	removeW := httptest.NewRecorder()
@@ -115,10 +115,10 @@ func TestSoftDeletedRoleDoesNotAutoRejoin(t *testing.T) {
 		})
 	}
 
-	// Gegenprobe: ein Nutzer, der NIE eine Rolle hatte (keine Soft-Delete-Zeile
-	// vorhanden), wird weiterhin ganz normal per Auto-Join zugelassen - sonst
-	// wäre Auto-Join komplett abgeschafft statt nur die Soft-Delete-Lücke
-	// geschlossen. Prüft zugleich den neuen Audit-Trail für automatische
+	// Control check: a user who NEVER had a role (no soft-delete row
+	// present) is still admitted via auto-join as usual - otherwise
+	// auto-join would be abolished entirely instead of only closing the soft-delete
+	// gap. Also checks the new audit trail for automatic
 	// Rollenvergaben.
 	t.Run("Gegenprobe: Nutzer ohne jede Vorgeschichte wird weiterhin normal auto-gejoint", func(t *testing.T) {
 		newcomer := models.User{Email: "rejoin-newcomer@example.com"}
@@ -141,9 +141,9 @@ func TestSoftDeletedRoleDoesNotAutoRejoin(t *testing.T) {
 
 		var autoAssignAuditCount int64
 		db.Model(&models.AuditLog{}).Where("action = ?", "statuspage.user_role_auto_assigned").Count(&autoAssignAuditCount)
-		// 2: der initiale Auto-Join von removedUser oben (Schritt 1) UND
-		// dieser hier - beide automatischen Rollenvergaben müssen jetzt
-		// auditiert sein, nicht nur der spätere manuelle Entzug.
+		// 2: the initial auto-join of removedUser above (step 1) AND
+		// this one - both automatic role grants must now be
+		// audited, not just the later manual revocation.
 		assert.Equal(t, int64(2), autoAssignAuditCount, "auch automatische Rollenvergaben müssen jetzt im Audit-Log erfasst sein")
 	})
 }

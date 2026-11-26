@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// externe Bausteine direkt übernehmen (Komponente anlegen + koppeln).
+// adopt external building blocks directly (create component + link).
 
 type importResp struct {
 	Created []struct {
@@ -43,7 +43,7 @@ func (f *extFixture) doImport(srcID uint, tok string, body any) (*httptest.Respo
 	return w, resp
 }
 
-// extGroup legt eine externe Gruppe an; Mitglieder per extMember.
+// extGroup creates an external group; members via extMember.
 func (f *extFixture) extGroup(srcID uint, externalID, name string) models.ExternalComponent {
 	f.t.Helper()
 	g := models.ExternalComponent{ExternalSourceID: srcID, ExternalID: externalID, Name: name, IsGroup: true, Status: "operational", LastSeenAt: time.Now()}
@@ -90,7 +90,7 @@ func TestImport_SingleComponents_CreatesAndLinks(t *testing.T) {
 	assert.Equal(t, a.ID, link.ExternalComponentID)
 	assert.Equal(t, f.page.ID, link.StatusPageID)
 
-	// SortOrder ans Ende der obersten Ebene, in Auswahlreihenfolge.
+	// SortOrder at the end of the top level, in selection order.
 	var c2 models.Component
 	require.NoError(t, f.db.First(&c2, resp.Created[1].ComponentID).Error)
 	assert.Equal(t, comp.SortOrder+1, c2.SortOrder)
@@ -208,7 +208,7 @@ func TestImport_Skips_LinkedVanishedEmptyGroup_AndDedupesGroupMember(t *testing.
 	assert.Equal(t, "vanished", reasons[goneGroup.ID])
 	assert.Equal(t, "empty_group", reasons[empty.ID])
 	assert.Equal(t, "already_linked", reasons[m.ID], "Mitglied einer gewählten Gruppe nicht doppelt")
-	// Gruppe G + Mitglied (1x) + Neu = 3.
+	// Group G + member (1x) + new = 3.
 	assert.Len(t, resp.Created, 3)
 	var n int64
 	f.db.Model(&models.ExternalComponentLink{}).Where("external_component_id = ?", m.ID).Count(&n)
@@ -293,8 +293,8 @@ func TestImport_TagAccessForbidden(t *testing.T) {
 
 	w, _ := f.doImport(src, f.pageAdminTok, map[string]any{"external_component_ids": []uint{a.ID}, "tag_ids": []uint{resTag.ID}})
 	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
-	// Auch mit passendem User-Tag darf eine Seiten-Rolle keinen
-	// GLOBALEN Tag vergeben (nur Global Admins).
+	// Even with a matching user tag, a page role may not assign a
+	// GLOBAL tag (global admins only).
 	w, _ = f.doImport(src, f.pageAdminTok, map[string]any{"external_component_ids": []uint{a.ID}, "tag_ids": []uint{userTag.ID}})
 	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), "global_tag_forbidden")
@@ -394,7 +394,7 @@ func TestImport_GroupDBErrors(t *testing.T) {
 		src := f.createSource(f.page, f.pageAdminTok, "https://status.example.org")
 		g := f.extGroup(src, "g1", "G")
 		f.extMember(src, g, "m1", "M1", 1)
-		// Die erste Abfrage (Auswahl laden) gelingt, die zweite (Mitglieder) scheitert.
+		// The first query (load selection) succeeds, the second (members) fails.
 		calls := 0
 		name := "test:import:second-query"
 		require.NoError(t, f.db.Callback().Query().Before("gorm:query").Register(name, func(tx *gorm.DB) {

@@ -12,17 +12,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// Ohne aktive Mitgliedschaft des Ziels darf ein Seiten-Owner
-// über DELETE /api/admin/pages/:p/users/:uid keine Seiten-SSO-Verknüpfungen
-// fremder Konten löschen (es gibt keine Rolle, gegen die seine Rechte geprüft
-// würden). 404 wie bei einem unbekannten Konto, nichts wird gelöscht, kein
-// Audit-Eintrag.
+// Without an active membership of the target, a page owner may not
+// delete page SSO links of other accounts via DELETE /api/admin/pages/:p/users/:uid
+// (there is no role against which their permissions would be checked).
+// 404 as for an unknown account, nothing is deleted, no
+// audit entry.
 func TestRemoveStatusPageUser_NonMemberOwnerGets404(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
 	p.member(owner, p.pageA, p.ownerRol)
 	stranger, _ := p.user("stranger@x.example", false)
-	p.identity(stranger, p.pageA, "sub-stranger") // Verknüpfung ohne Rolle
+	p.identity(stranger, p.pageA, "sub-stranger") // link without a role
 
 	w := idorRequest(t, p.r, "DELETE", p.base(p.pageA)+"/"+strconv.Itoa(int(stranger.ID)), tok, nil)
 	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "user_not_found") {
@@ -38,14 +38,14 @@ func TestRemoveStatusPageUser_NonMemberOwnerGets404(t *testing.T) {
 	}
 }
 
-// Ein Global Admin darf verwaiste Verknüpfungen ohne
-// Mitgliedschaft weiter entfernen; der Audit-Eintrag nennt die Anzahl.
+// A Global Admin may still remove orphaned links without
+// membership; the audit entry states the count.
 func TestRemoveStatusPageUser_GlobalAdminRemovesOrphanIdentity(t *testing.T) {
 	p := setupPageUsers(t)
 	_, gaTok := p.user("ga@x.example", true)
 	stranger, _ := p.user("stranger@x.example", false)
 	p.identity(stranger, p.pageA, "sub-stranger")
-	p.identity(stranger, p.pageB, "sub-b") // andere Seite: bleibt
+	p.identity(stranger, p.pageB, "sub-b") // other page: stays
 
 	w := idorRequest(t, p.r, "DELETE", p.base(p.pageA)+"/"+strconv.Itoa(int(stranger.ID)), gaTok, nil)
 	if w.Code != http.StatusOK {
@@ -57,8 +57,8 @@ func TestRemoveStatusPageUser_GlobalAdminRemovesOrphanIdentity(t *testing.T) {
 	requireRemovedAudit(t, p, "sso_identities_removed=1")
 }
 
-// Beim normalen Entfernen eines Mitglieds nennt der
-// Audit-Eintrag die mitgelöschte Verknüpfung (bzw. 0, wenn keine bestand).
+// When a member is removed normally, the
+// audit entry states the link that was deleted along with it (or 0 if there was none).
 func TestRemoveStatusPageUser_AuditCountsSSOIdentities(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
@@ -92,9 +92,9 @@ func requireRemovedAudit(t *testing.T, p *pageUsers, want string) {
 	}
 }
 
-// Review: Keine Aufzählung von Konten. Unbekanntes Konto,
-// existierendes Nicht-Mitglied und Konto mit nur soft-gelöschter
-// Mitgliedszeile liefern einem Nicht-Global-Admin denselben Status und Body.
+// Review: no enumeration of accounts. An unknown account, an
+// existing non-member and an account with only a soft-deleted
+// membership row return the same status and body to a non-Global Admin.
 func TestRemoveStatusPageUser_NoEnumeration(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
@@ -121,9 +121,9 @@ func TestRemoveStatusPageUser_NoEnumeration(t *testing.T) {
 	}
 }
 
-// Review, TOCTOU: Verschwindet die Mitgliedschaft zwischen
-// Prüfung und Löschen (paralleles Entfernen), rollt der Handler für einen
-// Nicht-Global-Admin zurück und antwortet 404; die Verknüpfung bleibt, kein Audit.
+// Review, TOCTOU: if the membership disappears between
+// the check and the delete (parallel removal), the handler rolls back for a
+// non-Global Admin and responds 404; the link stays, no audit.
 func TestRemoveStatusPageUser_MembershipVanishesBeforeDelete(t *testing.T) {
 	p := setupPageUsers(t)
 	owner, tok := p.user("owner@x.example", false)
@@ -132,8 +132,8 @@ func TestRemoveStatusPageUser_MembershipVanishesBeforeDelete(t *testing.T) {
 	p.member(victim, p.pageA, p.viewer)
 	p.identity(victim, p.pageA, "sub-victim")
 
-	// Nach dem Nachschlagen der Zielmitgliedschaft (erste Abfrage mit der
-	// Ziel-ID) entfernt ein "paralleler" Aufruf die Zeile.
+	// After looking up the target membership (first query with the
+	// target ID) a "parallel" call removes the row.
 	fired := false
 	victimID := fmt.Sprint(victim.ID)
 	if err := p.db.Callback().Query().After("gorm:query").Register("vanish821", func(tx *gorm.DB) {

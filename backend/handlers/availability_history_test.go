@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// nachgetragene Historie: Ein Vorfall vor Anlage der Seite
-// zieht den Datenbeginn vor; Wartung ohne Zeiten bleibt unberücksichtigt.
+// backfilled history: An incident before the page was created
+// pulls the data start earlier; maintenance without times is ignored.
 func TestAvailability_NachgetragenerVorfallVorSeitenanlage(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("historie", false)
@@ -27,8 +27,8 @@ func TestAvailability_NachgetragenerVorfallVorSeitenanlage(t *testing.T) {
 	assert.Equal(t, "operational", day(t, resp.Days, "2026-10-28").Status, "Wartung ohne Beginn ignoriert")
 }
 
-// Dauerflattern über der Obergrenze: Antwort bleibt 200, neueste
-// Wechsel zählen, die Antwort weist auf die Kürzung hin.
+// Permanent flapping above the upper limit: response stays 200, the newest
+// changes count, the response points out the truncation.
 func TestAvailability_DauerflatternWirdGekuerztUndGemeldet(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("flatter", false)
@@ -48,7 +48,7 @@ func TestAvailability_DauerflatternWirdGekuerztUndGemeldet(t *testing.T) {
 	require.Equal(t, 200, w.Code)
 	assert.Contains(t, w.Body.String(), `"history_truncated":true`)
 
-	// Ruhige Seite: kein Hinweis.
+	// Quiet page: no hint.
 	q := e.page("ruhig", false)
 	e.comp(q.ID, "API", "operational", nil)
 	w, _ = e.get("/api/public/pages/ruhig/availability")

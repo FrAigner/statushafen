@@ -18,8 +18,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Seiten-Rollen brauchen einen Lese-Endpunkt für Tags
-// (GET /api/pages/:page_id/tags) und dürfen nur seiteneigene Tags vergeben.
+// Page roles need a read endpoint for tags
+// (GET /api/pages/:page_id/tags) and may only assign the page's own tags.
 type pageTagsFixture struct {
 	db                                           *gorm.DB
 	router                                       http.Handler

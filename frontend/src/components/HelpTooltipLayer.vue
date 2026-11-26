@@ -1,27 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import i18n from '../i18n'
-import { helpDomId, helpTextFor } from '../composables/useHelpText'
+import { HELP_PARTS, helpDomId, helpTextFor } from '../composables/useHelpText'
+import type { HelpText } from '../composables/useHelpText'
 import { activeHelp, cancelHide, helpRegistry, scheduleHide, tooltipPosition } from '../directives/helpTooltipState'
 
-// Tooltip-Ebene für v-help. Wird von der Direktive selbst per
-// render() in <body> gehängt, sobald das erste Element mit Hilfe erscheint,
-// und wieder entfernt, wenn keines mehr da ist (siehe vHelp.js). Deshalb
-// gibt es keinen App-Kontext: Texte kommen über i18n.global.
+// Tooltip layer for v-help. The directive itself mounts it into <body>
+// via render() as soon as the first element with help appears, and removes
+// it again when none is left (see vHelp.ts). Hence there is no app
+// context: texts come via i18n.global.
 //
-// Für jeden benutzten Schlüssel liegt ein Tooltip (role="tooltip") im DOM,
-// auch geschlossen (v-show). So zeigt aria-describedby der Felder immer auf
-// ein vorhandenes Element und Screenreader lesen die Hilfe beim Fokus vor,
-// ohne auf die sichtbare Verzögerung zu warten.
+// Every key in use has a tooltip (role="tooltip") in the DOM, even when
+// closed (v-show). So the fields' aria-describedby always points to an
+// existing element and screen readers read the help on focus without
+// waiting for the visible delay.
 //
-// position: fixed, auf den Viewport begrenzt: so schneiden ihn weder
-// überlaufende Tabellen noch Ränder ab.
+// position: fixed, constrained to the viewport: so neither overflowing
+// tables nor edges clip it.
 
 const { t } = i18n.global
 
 const entries = computed(() => [...helpRegistry.keys()]
   .map(key => ({ key, id: helpDomId(key), help: helpTextFor(key) }))
-  .filter(entry => entry.help))
+  .filter((entry): entry is { key: string, id: string, help: HelpText } => !!entry.help))
 
 const position = ref({ top: '0px', left: '0px' })
 
@@ -32,23 +33,23 @@ function updatePosition() {
   position.value = tooltipPosition(
     active.anchor.getBoundingClientRect(),
     { width: bubble.offsetWidth, height: bubble.offsetHeight },
-    // clientWidth statt innerWidth: ohne die Breite einer Scrollleiste.
+    // clientWidth instead of innerWidth: without the width of a scrollbar.
     { width: document.documentElement.clientWidth, height: window.innerHeight },
   )
 }
 
-function listen(on) {
+function listen(on: boolean) {
   const method = on ? 'addEventListener' : 'removeEventListener'
   window[method]('scroll', updatePosition, true)
   window[method]('resize', updatePosition)
 }
 
-// Mit dem Zeiger in den Tooltip: bleibt offen, Verlassen schließt verzögert.
-function onPointerEnter(event) {
+// Pointer moves into the tooltip: it stays open, leaving closes it with a delay.
+function onPointerEnter(event: PointerEvent) {
   if (event.pointerType !== 'touch') cancelHide()
 }
 
-function onPointerLeave(event) {
+function onPointerLeave(event: PointerEvent) {
   if (event.pointerType !== 'touch') scheduleHide()
 }
 
@@ -74,7 +75,7 @@ onBeforeUnmount(() => listen(false))
     @pointerenter="onPointerEnter"
     @pointerleave="onPointerLeave"
   >
-    <p v-for="part in ['what', 'effect', 'example']" :key="part" class="help-tooltip__part">
+    <p v-for="part in HELP_PARTS" :key="part" class="help-tooltip__part">
       <span class="help-tooltip__heading">{{ t(`help.parts.${part}`) }}<span class="help-tooltip__sr">: </span></span>
       {{ entry.help[part] }}
     </p>
@@ -82,9 +83,8 @@ onBeforeUnmount(() => listen(false))
 </template>
 
 <style>
-/* Nicht scoped: die Ebene hängt außerhalb der App in <body>. Farben nur über
-   Theme-Variablen (tokens.css), damit Hell und Dunkel ohne eigene Regeln
-   funktionieren. */
+/* Not scoped: the layer lives outside the app in <body>. Colours only via
+   theme variables (tokens.css), so light and dark work without extra rules. */
 .help-tooltip {
   position: fixed;
   z-index: 1000;
@@ -98,8 +98,8 @@ onBeforeUnmount(() => listen(false))
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-md);
-  /* Stufe 3: invertierte Blase (Text- auf Flächenfarbe), gleiches
-     Kontrastverhältnis wie --text auf --surface, in beiden Themes. */
+  /* Stage 3: inverted bubble (text colour as background, surface colour as text),
+     same contrast ratio as --text on --surface, in both themes. */
   background: var(--text);
   color: var(--surface);
   box-shadow: var(--shadow-pop);
@@ -133,7 +133,7 @@ onBeforeUnmount(() => listen(false))
   color: var(--surface-2);
 }
 
-/* Doppelpunkt nur für Screenreader (Beschreibung liest sich „Was: …“). */
+/* Colon only for screen readers (the description reads "What: …"). */
 .help-tooltip__sr {
   position: absolute;
   inline-size: 1px;

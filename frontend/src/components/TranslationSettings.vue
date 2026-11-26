@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { OnyxButton, OnyxCheckbox, OnyxInput, OnyxSelect } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -10,8 +10,8 @@ import { useTranslationEnabled } from '../composables/useTranslationEnabled'
 // service (operator default, own LibreTranslate server, DeepL), address and key.
 // The key is write-only: leave empty = keep, tick "remove" = delete. The
 // surrounding view shows the messages (emit message).
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['message'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ message: [text: string, type: 'success' | 'error'] }>()
 const { t } = useI18n()
 const { settings, load, save, test } = useTranslationSettings()
 // Shared flag of the admin views (see useTranslationEnabled), kept in step on save.
@@ -33,7 +33,7 @@ const sync = () => {
   sharedEnabled.value = form.value.enabled
 }
 
-// Zeile unter dem Titel: welcher Dienst gerade wirkt und ob er eingerichtet ist.
+// Line below the title: which service is currently in effect and whether it is set up.
 const statusText = computed(() => {
   if (!settings.value.configured) return t('translationSettings.statusNotConfigured')
   return t('translationSettings.statusActive', { provider: t(`translationSettings.name.${settings.value.effective_provider}`) })
@@ -44,13 +44,13 @@ onMounted(async () => {
     await load()
     sync()
   } catch (err) {
-    emit('message', t('translationSettings.loadError') + err.message, 'error')
+    emit('message', t('translationSettings.loadError') + (err as Error).message, 'error')
   }
 })
 
 const onSave = async () => {
   // The switch is only sent when it changed (no spurious audit entries).
-  const patch = form.value.enabled === (settings.value.enabled === true) ? {} : { enabled: form.value.enabled }
+  const patch: Parameters<typeof save>[0] = form.value.enabled === (settings.value.enabled === true) ? {} : { enabled: form.value.enabled }
   patch.provider = form.value.provider
   if (showUrl.value) patch.url = form.value.url
   if (form.value.clearKey) patch.api_key = ''
@@ -61,7 +61,7 @@ const onSave = async () => {
     sync()
     emit('message', t('translationSettings.saved'), 'success')
   } catch (err) {
-    emit('message', t('translationSettings.saveError') + err.message, 'error')
+    emit('message', t('translationSettings.saveError') + (err as Error).message, 'error')
   } finally {
     busy.value = false
   }
@@ -74,7 +74,7 @@ const onTest = async () => {
     const res = await test()
     testResult.value = t('translationSettings.testOk', { provider: t(`translationSettings.name.${res.provider}`), sample: res.sample })
   } catch (err) {
-    emit('message', t('translationSettings.testError') + err.message, 'error')
+    emit('message', t('translationSettings.testError') + (err as Error).message, 'error')
   } finally {
     busy.value = false
   }
@@ -87,10 +87,10 @@ const onTest = async () => {
     <p class="setting__text">{{ t('translationSettings.description') }}</p>
     <p class="setting__text" data-test="translation-status">{{ statusText }}</p>
 
-    <OnyxCheckbox v-model="form.enabled" :label="t('translationSettings.enabledLabel')" />
+    <OnyxCheckbox v-model="form.enabled" value="enabled" :label="t('translationSettings.enabledLabel')" />
     <p v-if="!form.enabled" class="setting__text" data-test="translation-off-hint">{{ t('translationSettings.offHint') }}</p>
 
-    <OnyxSelect v-model="form.provider" :label="t('translationSettings.providerLabel')" :options="options" />
+    <OnyxSelect v-model="form.provider" :label="t('translationSettings.providerLabel')" :list-label="t('translationSettings.providerLabel')" :options="options" />
     <p v-if="form.provider === 'deepl'" class="setting__text" data-test="deepl-info">{{ t('translationSettings.deeplInfo') }}</p>
     <p v-if="form.provider === ''" class="setting__text">{{ settings.env_url_set ? t('translationSettings.defaultInfo') : t('translationSettings.defaultMissing') }}</p>
 

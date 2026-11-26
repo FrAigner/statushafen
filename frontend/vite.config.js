@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        // E2E_BACKEND_URL erlaubt ein eigenes Test-Backend, Standard bleibt :8080.
+        // E2E_BACKEND_URL allows a separate test backend; the default stays :8080.
         target: process.env.E2E_BACKEND_URL || 'http://localhost:8080',
         changeOrigin: true,
         secure: false,

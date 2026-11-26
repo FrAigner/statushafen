@@ -1,19 +1,17 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useComponentLocalization } from '../composables/useComponentLocalization'
+import type { Component } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  component: {
-    type: Object,
-    required: true
-  }
-})
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps<{
+  component: Component
+}>()
 // Stryker restore all
 
 const { currentTranslation } = useComponentLocalization(
   props.component,
-  (id) => `/api/components/${id}/translations`
+  (id: number) => `/api/components/${id}/translations`
 )
 
 const displayTitle = computed(() => {

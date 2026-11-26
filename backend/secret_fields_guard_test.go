@@ -15,16 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Zwei Strukturwächter für Geheimnisse:
+// Two structural guards for secrets:
 //
-//  1. Ein Modellfeld, das einen Token trägt, speichert nur dessen Hash (Name
-//     endet auf Hash) oder ist Metadaten (Ablauf, Version). Ein Feld mit dem
-//     Klartext eines Zufalls-Tokens stünde im Backup und in jedem Lesezugriff
-//     auf die Datenbank. Ausnahmen stehen in der Liste und haben einen Grund.
-//  2. Ein Log-Aufruf (slog) bekommt keine Variable, deren Name auf ein Geheimnis
-//     hindeutet (Token, Secret, Passwort, Verifier, Authorization). Meldungen
-//     und Fehler gehen über logging.SanitizeErr; hier geht es um Werte, die ein
-//     Aufrufer versehentlich als Feld mitgibt.
+//  1. A model field that carries a token stores only its hash (name
+//     ends in Hash) or is metadata (expiry, version). A field with the
+//     plaintext of a random token would sit in the backup and in every read access
+//     to the database. Exceptions are in the list and have a reason.
+//  2. A log call (slog) gets no variable whose name ends in a secret
+//     term (Token, Secret, Passwort, Verifier, Authorization). Messages
+//     and errors go through logging.SanitizeErr; this is about values that a
+//     caller accidentally passes along as a field.
 
 var allowedPlaintextTokenFields = map[string]string{
 	"CustomDomainVerificationToken": "öffentlicher Wert: steht als TXT-Eintrag im DNS der Domain und beweist nur den Besitz, kein Zugang",
@@ -112,7 +112,7 @@ func TestSlogCallsGetNoSecretVariables(t *testing.T) {
 			slogCalls++
 			for _, arg := range call.Args[1:] {
 				if lit, isLit := arg.(*ast.BasicLit); isLit && lit.Kind == token.STRING {
-					continue // Schlüssel und feste Texte
+					continue // keys and fixed texts
 				}
 				text := string(src[fset.Position(arg.Pos()).Offset:fset.Position(arg.End()).Offset])
 				if secretArgName.MatchString(text) {
@@ -132,8 +132,8 @@ func isSlogLevel(name string) bool {
 	return name == "Debug" || name == "Info" || name == "Warn" || name == "Error"
 }
 
-// Gegenprobe: Die Prüfer schlagen an, wenn der Schutz fehlt, und lassen Hashes,
-// Metadaten und feste Texte zu.
+// Control case: the checkers fire when the protection is missing, and let hashes,
+// metadata and fixed texts through.
 func TestSecretGuards_DetectViolations(t *testing.T) {
 	parse := func(src string) *ast.File {
 		f, err := parser.ParseFile(token.NewFileSet(), "x.go", src, 0)

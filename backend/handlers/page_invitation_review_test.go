@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Security-Review Funde 1-4, je mit Regressionstest.
+// Security review findings 1-4, each with a regression test.
 
 func (f invFixture) onlyInvitation(t *testing.T) models.PageInvitation {
 	t.Helper()
@@ -28,7 +28,7 @@ func (f invFixture) onlyInvitation(t *testing.T) models.PageInvitation {
 	return invs[0]
 }
 
-// Fund 1: Mail-Flut durch wiederholtes Einladen derselben Adresse.
+// Finding 1: mail flood through repeatedly inviting the same address.
 func TestPageInvitationReview_NoMailFloodWithin30Minutes(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -70,7 +70,7 @@ func TestPageInvitationReview_NoMailFloodWithin30Minutes(t *testing.T) {
 	})
 }
 
-// Fund 1: Tageslimit neuer Einladungen je Seite, unabhängig vom Konto.
+// Finding 1: Daily limit of new invitations per page, independent of the account.
 func TestPageInvitationReview_DailyLimit(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -82,7 +82,7 @@ func TestPageInvitationReview_DailyLimit(t *testing.T) {
 		logs = append(logs, models.AuditLog{Action: "statuspage.invitation_created", Category: "config", TargetType: "StatusPage", TargetID: pid})
 	}
 	f.db.Create(&logs)
-	// Einträge anderer Seiten und ältere Einträge zählen nicht.
+	// Entries of other pages and older entries do not count.
 	f.db.Create(&models.AuditLog{Action: "statuspage.invitation_created", TargetType: "StatusPage", TargetID: strconv.Itoa(int(f.other.ID))})
 	for _, email := range []string{"daily@x.example", "niemand@x.example"} {
 		w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": email, "role_id": f.viewer.ID})
@@ -96,7 +96,7 @@ func TestPageInvitationReview_DailyLimit(t *testing.T) {
 	awaitSMTPMessage(t, srv)
 }
 
-// Fund 3: Erneutes Einladen ersetzt keine Einladung mit stärkerer Rolle.
+// Finding 3: Re-inviting does not replace an invitation with a stronger role.
 func TestPageInvitationReview_ReinviteKeepsStrongerInvitation(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -115,8 +115,8 @@ func TestPageInvitationReview_ReinviteKeepsStrongerInvitation(t *testing.T) {
 	if after.TokenHash != inv.TokenHash || after.RoleID != f.strong.ID {
 		t.Fatalf("stärkere Einladung ersetzt: %+v", after)
 	}
-	// Wer die Rolle abdeckt (Global Admin über den direkten Weg betrifft das nicht),
-	// darf ersetzen: Owner mit starker Rolle.
+	// Whoever covers the role may replace (a global admin via the direct path is not affected),
+	// here: owner with a strong role.
 	f.db.Model(&models.UserStatusPageRole{}).Where("user_id = ?", f.owner.ID).Update("role_id", f.strong.ID)
 	w = idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "boss@x.example", "role_id": f.viewer.ID})
 	requireStatusCode(t, w, http.StatusOK)
@@ -127,8 +127,8 @@ func TestPageInvitationReview_ReinviteKeepsStrongerInvitation(t *testing.T) {
 	}
 }
 
-// Fund 2: Einladungen verschwinden mit dem Konto; ein neu angelegtes Konto mit
-// derselben Adresse kann einen alten Link nicht nutzen.
+// Finding 2: Invitations disappear with the account; a newly created account with
+// the same address cannot use an old link.
 func TestPageInvitationReview_AccountDeletionAndReuse(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -137,7 +137,7 @@ func TestPageInvitationReview_AccountDeletionAndReuse(t *testing.T) {
 		f := newInvFixture(t)
 		old, _ := f.account(t, "reuse@x.example")
 		token := f.invite(t, srv, old.Email, f.viewer)
-		f.db.Unscoped().Delete(&old) // Konto weg, Einladung (in diesem Test) bewusst stehen gelassen
+		f.db.Unscoped().Delete(&old) // account gone, invitation deliberately left in place (in this test)
 		fresh, freshTok := f.account(t, "reuse@x.example")
 		w := idorRequest(t, f.r, "POST", "/api/invitations/accept", freshTok, map[string]any{"token": token})
 		requireStatusCode(t, w, http.StatusNotFound)
@@ -202,8 +202,8 @@ func TestPageInvitationReview_AccountDeletionAndReuse(t *testing.T) {
 	})
 }
 
-// seedInvitations: an u (Adresse in anderer Schreibweise), von u ausgesprochen,
-// an u als Konto, und eine fremde, die bleiben muss.
+// seedInvitations: to u (address in different spelling), issued by u,
+// to u as an account, and a foreign one that must remain.
 func seedInvitations(db *gorm.DB, u, other models.User) {
 	exp := time.Now().Add(time.Hour)
 	rows := []models.PageInvitation{
@@ -223,7 +223,7 @@ func assertOnlyForeignInvitation(t *testing.T, db *gorm.DB) {
 	}
 }
 
-// Fund 2: abgelaufene Einladungen räumt der Wartungs-Tick seitenübergreifend ab.
+// Finding 2: expired invitations are cleaned up by the maintenance tick across pages.
 func TestPageInvitationReview_PruneExpired(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -278,7 +278,7 @@ func containsJSONNumber(body string, n int) bool {
 	return re.MatchString(body)
 }
 
-// Fund 2: Datenexport enthält eigene offene Einladungen (ohne Token/Einladenden).
+// Finding 2: Data export contains own open invitations (without token/inviter).
 func TestPageInvitationReview_ExportContainsOwnInvitations(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -290,7 +290,7 @@ func TestPageInvitationReview_ExportContainsOwnInvitations(t *testing.T) {
 	u := models.User{Email: "Exp@X.example"}
 	db.Create(&u)
 	exp := time.Now().Add(time.Hour)
-	db.Create(&models.PageInvitation{StatusPageID: page.ID, Email: "exp@x.example", RoleID: 7, TokenHash: hashToken("geheim-export"), ExpiresAt: exp, InvitedByID: 4242, InvitedUserID: u.ID}) // F7: nur Einladungen an dieses Konto
+	db.Create(&models.PageInvitation{StatusPageID: page.ID, Email: "exp@x.example", RoleID: 7, TokenHash: hashToken("geheim-export"), ExpiresAt: exp, InvitedByID: 4242, InvitedUserID: u.ID}) // F7: only invitations to this account
 	db.Create(&models.PageInvitation{StatusPageID: page.ID, Email: "fremd@x.example", RoleID: 7, TokenHash: hashToken("x"), ExpiresAt: exp, InvitedByID: 1})
 	tok, _ := middleware.GenerateToken(u.ID, u.Email, "", "", false)
 	w := idorRequest(t, r, "GET", "/api/me/export", tok, nil)
@@ -312,7 +312,7 @@ func TestPageInvitationReview_ExportContainsOwnInvitations(t *testing.T) {
 	}
 }
 
-// Fund 4: Rolle auf anderer Seite entsteht zwischen Vorprüfung und Annehmen.
+// Finding 4: Role on another page arises between pre-check and accepting.
 func TestPageInvitationReview_AcceptRechecksOtherPageInTransaction(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -323,8 +323,8 @@ func TestPageInvitationReview_AcceptRechecksOtherPageInTransaction(t *testing.T)
 			token := f.invite(t, srv, u.Email, f.viewer)
 			name := "toctou799" + kind
 			armed := true
-			// Unmittelbar vor dem Verbrauchen der Einladung (nach der Vorprüfung)
-			// vergibt ein "gleichzeitiger" Aufruf eine Rolle auf Seite B.
+			// Immediately before consuming the invitation (after the pre-check)
+			// a "concurrent" call grants a role on page B.
 			_ = f.db.Callback().Delete().Before("gorm:delete").Register(name, func(tx *gorm.DB) {
 				if !armed || tx.Statement.Table != "page_invitations" {
 					return
@@ -380,7 +380,7 @@ func TestPageInvitationReview_AcceptRechecksOtherPageInTransaction(t *testing.T)
 	})
 }
 
-// Zählfehler der Obergrenzen enden fail closed mit 500.
+// Count errors of the upper limits end fail closed with 500.
 func TestPageInvitationReview_LimitCountErrors(t *testing.T) {
 	for _, table := range []string{"page_invitations", "audit_logs"} {
 		t.Run(table, func(t *testing.T) {
@@ -398,9 +398,9 @@ func TestPageInvitationReview_LimitCountErrors(t *testing.T) {
 	}
 }
 
-// Review B1: Zurückziehen hebt die 30-Minuten-Sperre nicht auf.
-// Früher löschte DELETE /invitations/:id die Zeile endgültig; POST -> DELETE ->
-// POST erzeugte so beliebig viele Mails an dieselbe Adresse.
+// Review B1: Revoking does not lift the 30-minute lock.
+// Previously DELETE /invitations/:id deleted the row permanently; POST -> DELETE ->
+// POST thus produced arbitrarily many mails to the same address.
 func TestPageInvitationReview_RevokeDoesNotLiftResendLock(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -417,7 +417,7 @@ func TestPageInvitationReview_RevokeDoesNotLiftResendLock(t *testing.T) {
 	}
 	revoke()
 
-	// Zurückgezogen: nicht in der Liste, nicht annehmbar, nicht im Export.
+	// Revoked: not in the list, not acceptable, not in the export.
 	w := idorRequest(t, f.r, "GET", f.invPath(), f.ownerTok, nil)
 	requireStatusCode(t, w, http.StatusOK)
 	if strings.Contains(w.Body.String(), invitee.Email) {
@@ -428,7 +428,7 @@ func TestPageInvitationReview_RevokeDoesNotLiftResendLock(t *testing.T) {
 	}
 
 	unknown := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "neu-b1@x.example", "role_id": f.viewer.ID})
-	expectNoSMTPMessage(t, srv) // Adresse ohne Konto: nie eine Mail
+	expectNoSMTPMessage(t, srv) // Address without account: never a mail
 	again := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": invitee.Email, "role_id": f.viewer.ID})
 	requireStatusCode(t, again, http.StatusOK)
 	if again.Body.String() != unknown.Body.String() {
@@ -453,7 +453,7 @@ func TestPageInvitationReview_RevokeDoesNotLiftResendLock(t *testing.T) {
 	})
 }
 
-// Review B1: zurückgezogene Zeilen bleiben nur so lange, wie die Sperre gilt.
+// Review B1: revoked rows remain only as long as the lock applies.
 func TestPageInvitationReview_PruneRevoked(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -474,8 +474,8 @@ func TestPageInvitationReview_PruneRevoked(t *testing.T) {
 	}
 }
 
-// Review B1: Auch Ablehnen hebt die Sperre je (Seite, Adresse) nicht auf; der
-// Einladende bekommt keine zweite Mail, wenn der Eingeladene abgelehnt hat.
+// Review B1: Declining also does not lift the lock per (page, address); the
+// inviter gets no second mail if the invitee has declined.
 func TestPageInvitationReview_DeclineDoesNotLiftResendLock(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -483,7 +483,7 @@ func TestPageInvitationReview_DeclineDoesNotLiftResendLock(t *testing.T) {
 	invitee, tok := f.account(t, "decline@x.example")
 	token := f.invite(t, srv, invitee.Email, f.viewer)
 	requireStatusCode(t, idorRequest(t, f.r, "POST", "/api/invitations/decline", tok, map[string]any{"token": token}), http.StatusOK)
-	// Schreibweise der Adresse ändert den Schlüssel nicht (Normalisierung).
+	// Spelling of the address does not change the key (normalization).
 	w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "  DECLINE@X.example ", "role_id": f.viewer.ID})
 	requireStatusCode(t, w, http.StatusOK)
 	expectNoSMTPMessage(t, srv)

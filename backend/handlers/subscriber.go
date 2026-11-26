@@ -17,30 +17,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const (
 	whereSlugEquals  = "slug = ?"
 	errPageIDMissing = "page_id parameter missing"
 	errInvalidPageID = "Invalid page_id parameter"
 )
 
-// webhookLookupIP löst einen Hostnamen zu IPs auf - als Var injizierbar, damit
-// Tests DNS-Rebinding simulieren können (unterschiedliche
-// Antworten für denselben Host bei aufeinanderfolgenden Aufrufen).
+// webhookLookupIP resolves a hostname to IPs - injectable as a var so that
+// tests can simulate DNS rebinding (different
+// answers for the same host on consecutive calls).
 var webhookLookupIP = func(ctx context.Context, host string) ([]net.IP, error) {
 	return net.DefaultResolver.LookupIP(ctx, "ip", host)
 }
 
-// allowLoopbackForTests wird ausschließlich von
-// SetWebhookLoopbackAllowedForTests umgeschaltet, damit Tests aus einem
-// externen _test-Package (das webhookLookupIP nicht überschreiben kann, weil
-// es unexportiert ist) ihre httptest.NewServer-Fakes auf Loopback-Adressen
-// als Webhook-Ziel verwenden können, ohne den SSRF-Schutz selbst zu lockern.
+// allowLoopbackForTests is toggled exclusively by
+// SetWebhookLoopbackAllowedForTests so that tests from an
+// external _test package (which cannot override webhookLookupIP because
+// it is unexported) can use loopback addresses for their httptest.NewServer fakes
+// as webhook targets without loosening the SSRF protection itself.
 var allowLoopbackForTests = false
 
-// isBlockedWebhookIP identifiziert interne/nicht-routbare Adressen, die als
-// Webhook-Ziel nicht erlaubt sind (SSRF-Schutz). Die Liste liegt seit der Umstellung in netguard, damit
-// der Abruf externer Statusseiten dieselbe Prüfung nutzt.
+// isBlockedWebhookIP identifies internal/non-routable addresses that are not allowed as a
+// webhook target (SSRF protection). Since the refactoring the list lives in netguard, so that
+// fetching external status pages uses the same check.
 func isBlockedWebhookIP(ip net.IP) bool {
 	addr, ok := netip.AddrFromSlice(ip)
 	if !ok {
@@ -52,20 +52,20 @@ func isBlockedWebhookIP(ip net.IP) bool {
 	return netguard.IsBlockedAddr(addr)
 }
 
-// SetWebhookLoopbackAllowedForTests erlaubt Loopback-Adressen als
-// Webhook-Ziel für die Dauer eines Tests (z.B. für httptest.NewServer-Fakes
-// in DispatchNotifications-Tests) und macht das über registerCleanup (i.d.R.
-// t.Cleanup) automatisch wieder rückgängig. Nur für Tests gedacht.
+// SetWebhookLoopbackAllowedForTests allows loopback addresses as a
+// webhook target for the duration of a test (e.g. for httptest.NewServer fakes
+// in DispatchNotifications tests) and automatically undoes this via registerCleanup (usually
+// t.Cleanup). Intended for tests only.
 func SetWebhookLoopbackAllowedForTests(registerCleanup func(func())) {
 	allowLoopbackForTests = true
 	registerCleanup(func() { allowLoopbackForTests = false })
 }
 
-// validateWebhookURL lehnt alles außer https-URLs auf öffentlich auflösbare, nicht-interne
-// Hosts ab (SSRF-Schutz für TestWebhookHandler, S4). Diese Prüfung allein reicht
-// nicht aus, um SSRF endgültig auszuschließen (siehe safeDialContext):
-// zwischen dieser Validierung und dem eigentlichen HTTP-Request kann
-// sich der DNS-Eintrag ändern (DNS-Rebinding/TOCTOU).
+// validateWebhookURL rejects everything except https URLs to publicly resolvable, non-internal
+// hosts (SSRF protection for TestWebhookHandler, S4). This check alone is not
+// sufficient to rule out SSRF conclusively (see safeDialContext):
+// between this validation and the actual HTTP request the
+// DNS entry can change (DNS rebinding/TOCTOU).
 func validateWebhookURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" {
@@ -83,17 +83,17 @@ func validateWebhookURL(raw string) error {
 	return nil
 }
 
-// safeDialContext ersetzt den Default-Dialer von webhookTestClient (SSRF-Restrisiko
-// durch DNS-Rebinding/TOCTOU): validateWebhookURL prüft
-// den Host einmalig, bevor http.Client.Post() aufgerufen wird - der Standard-
-// Dialer würde den Host beim eigentlichen Connect aber ERNEUT auflösen, und
-// zwischen beiden Lookups kann ein Angreifer die DNS-Antwort auf eine interne
-// Adresse ändern. safeDialContext führt die Auflösung deshalb selbst durch,
-// prüft jede zurückgelieferte IP erneut gegen dieselbe Blockliste und
-// verbindet sich direkt mit der geprüften Adresse - es gibt also keinen
-// zweiten, unabhängigen Lookup mehr, der ein anderes Ergebnis liefern könnte.
-// Der ursprüngliche Hostname bleibt für SNI/Zertifikatsprüfung erhalten, da
-// http.Transport das TLS-ServerName weiterhin aus der Request-URL ableitet.
+// safeDialContext replaces the default dialer of webhookTestClient (residual SSRF risk
+// from DNS rebinding/TOCTOU): validateWebhookURL checks
+// the host once before http.Client.Post() is called - but the default
+// dialer would resolve the host AGAIN at the actual connect, and
+// between the two lookups an attacker can change the DNS answer to an internal
+// address. safeDialContext therefore performs the resolution itself,
+// re-checks every returned IP against the same blocklist and
+// connects directly to the checked address - so there is no
+// second, independent lookup anymore that could return a different result.
+// The original hostname is retained for SNI/certificate verification, since
+// http.Transport still derives the TLS ServerName from the request URL.
 func safeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -145,12 +145,12 @@ type SubscribeRequest struct {
 	WebhookURL   string `json:"webhook_url"`                // required when channel=google_chat
 	ComponentIDs string `json:"component_ids" binding:"required"`
 	Slug         string `json:"slug"`
-	Language     string `json:"language"` // optional: Mailsprache, nur bei der Seite aktive Codes
+	Language     string `json:"language"` // optional: mail language, only codes active on the page
 }
 
-// validateSubscribeRequest prüft Kanal-abhängige Pflichtfelder inkl. SSRF-Schutz
-// für Google-Chat-Webhooks. Ausgelagert aus SubscribeHandler, damit dessen
-// kognitive Komplexität die SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// validateSubscribeRequest checks channel-dependent required fields including SSRF protection
+// for Google Chat webhooks. Extracted from SubscribeHandler so that its
+// cognitive complexity does not exceed the SonarCloud limit (go:S3776).
 func validateSubscribeRequest(req SubscribeRequest) error {
 	if err := checkSubscriberTexts(req.Email, req.WebhookURL, req.ComponentIDs, req.Language); err != nil {
 		return err
@@ -158,17 +158,17 @@ func validateSubscribeRequest(req SubscribeRequest) error {
 	if err := checkInputTexts(textField{req.Slug, maxSlugInputLength}); err != nil {
 		return err
 	}
-	// nur nackte, gültige Adressen - die Bestätigungsmail geht
-	// direkt an den gespeicherten Wert.
+	// only bare, valid addresses - the confirmation mail goes
+	// directly to the stored value.
 	if req.Channel == "email" && !isPlainEmailAddress(req.Email) {
 		return newCodedError("email_invalid", "Gültige E-Mail-Adresse ist erforderlich.")
 	}
 	if req.Channel == "google_chat" && req.WebhookURL == "" {
 		return newCodedError("webhook_url_required", "Google Chat Webhook-URL ist erforderlich.")
 	}
-	// SSRF-Schutz: Die öffentliche Anmeldung nimmt nur echte Google-Chat-Webhooks
-	// an (siehe validatePublicWebhookURL). Eine bloße Prüfung auf "öffentlich
-	// auflösbar" ließe jeden Dritten den Server POSTs an beliebige Ziele senden.
+	// SSRF protection: the public signup accepts only real Google Chat webhooks
+	// (see validatePublicWebhookURL). A mere check for "publicly
+	// resolvable" would let any third party make the server send POSTs to arbitrary targets.
 	if req.Channel == "google_chat" {
 		if err := validatePublicWebhookURL(req.WebhookURL); err != nil {
 			return err
@@ -180,17 +180,17 @@ func validateSubscribeRequest(req SubscribeRequest) error {
 	return nil
 }
 
-// publicWebhookHost ist der einzige Host, den die öffentliche Anmeldung
-// (POST /api/subscribe) für den Kanal google_chat annimmt.
+// publicWebhookHost is the only host that the public signup
+// (POST /api/subscribe) accepts for the google_chat channel.
 const publicWebhookHost = "chat.googleapis.com"
 
-// validatePublicWebhookURL lässt für anonyme bzw. selbst angemeldete Abos nur
-// https://chat.googleapis.com/v1/spaces/... auf Port 443 ohne Zugangsdaten zu.
-// Alles andere (fremder Host, anderer Port, interne oder nicht auflösbare
-// Adresse) ergibt denselben Code und es findet keine DNS-Auflösung statt, damit
-// weder interne Hostnamen erkennbar sind noch der Server als Absender
-// beliebiger POSTs missbraucht wird. Admin-Wege (validateAdminSubscriberWebhook)
-// und der Webhook-Test bleiben bei der weiteren Prüfung in validateWebhookURL.
+// validatePublicWebhookURL permits for anonymous or self-registered subscriptions only
+// https://chat.googleapis.com/v1/spaces/... on port 443 without credentials.
+// Everything else (foreign host, other port, internal or unresolvable
+// address) yields the same code and no DNS resolution takes place, so that
+// neither internal hostnames can be detected nor the server abused as a sender
+// of arbitrary POSTs. Admin paths (validateAdminSubscriberWebhook)
+// and the webhook test keep the further check in validateWebhookURL.
 func validatePublicWebhookURL(raw string) error {
 	invalid := newCodedError("webhook_url_invalid", "Die Webhook-URL ist ungültig.")
 	u, err := url.Parse(raw)
@@ -206,12 +206,12 @@ func validatePublicWebhookURL(raw string) error {
 	return nil
 }
 
-// validateAdminSubscriberWebhook prüft die Webhook-URL eines im Admin
-// angelegten/geänderten Google-Chat-Abos. Der
-// Admin-Pfad übernahm URLs bisher ungeprüft, während validateSubscribeRequest
-// für den öffentlichen Pfad schon validateWebhookURL aufruft -
-// ein Seiten-Admin konnte so interne Ziele (Loopback, private Netze, http)
-// hinterlegen. Andere Kanäle brauchen keine Webhook-URL.
+// validateAdminSubscriberWebhook checks the webhook URL of a Google Chat
+// subscription created/changed in the admin area. The
+// admin path previously took URLs unchecked, while validateSubscribeRequest
+// already calls validateWebhookURL for the public path -
+// a page admin could thus store internal targets (loopback, private networks, http).
+// Other channels need no webhook URL.
 func validateAdminSubscriberWebhook(channel, webhookURL string) error {
 	if channel != "google_chat" {
 		return nil
@@ -222,9 +222,9 @@ func validateAdminSubscriberWebhook(channel, webhookURL string) error {
 	return validateWebhookURL(webhookURL)
 }
 
-// findExistingSubscriber sucht einen bestehenden Eintrag, gescoped auf die
-// Ziel-Statusseite. E-Mail-Abos werden über das Postfach gefunden (mailboxKey),
-// nicht über die exakte Schreibweise.
+// findExistingSubscriber looks up an existing entry, scoped to the
+// target status page. Email subscriptions are found via the mailbox (mailboxKey),
+// not via the exact spelling.
 func (h *Handler) findExistingSubscriber(req SubscribeRequest, pageID uint) (models.Subscriber, error) {
 	var sub models.Subscriber
 	var err error
@@ -237,11 +237,11 @@ func (h *Handler) findExistingSubscriber(req SubscribeRequest, pageID uint) (mod
 	return sub, err
 }
 
-// createSubscriberFromRequest legt einen neuen Subscriber für die Ziel-
-// Statusseite an, inkl. Email-Fallback für eingeloggte Google-Chat-Nutzer
-// und Verknüpfung mit dem angemeldeten User (falls vorhanden). Rückgabe
-// token: Klartext-Bestätigungstoken, "" wenn keine Bestätigung
-// nötig ist.
+// createSubscriberFromRequest creates a new subscriber for the target
+// status page, including email fallback for signed-in Google Chat users
+// and linking to the signed-in user (if any). Return value
+// token: plaintext confirmation token, "" if no confirmation
+// is needed.
 func (h *Handler) createSubscriberFromRequest(c *gin.Context, req SubscribeRequest, pageID uint) (models.Subscriber, string, error) {
 	lang, langErr := h.resolveSubscriberLanguage(pageID, req.Language)
 	if langErr != nil {
@@ -261,9 +261,9 @@ func (h *Handler) createSubscriberFromRequest(c *gin.Context, req SubscribeReque
 			sub.Email = loggedInEmail
 		}
 	}
-	// Abo mit dem angemeldeten User verknüpfen (falls vorhanden), damit er es
-	// später über /me/subscription wiederfindet – unabhängig vom Kanal, denn
-	// der Email-Fallback oben greift nur bei google_chat.
+	// Link the subscription to the signed-in user (if any) so they can find it
+	// again later via /me/subscription - regardless of channel, because
+	// the email fallback above applies only to google_chat.
 	if uid := getUserID(c); uid != 0 {
 		sub.CreatedByUserID = &uid
 	}
@@ -272,8 +272,8 @@ func (h *Handler) createSubscriberFromRequest(c *gin.Context, req SubscribeReque
 	return sub, token, err
 }
 
-// subscriberConflictMessage liefert die 409-Fehlermeldung für ein bereits
-// bestehendes Abo, passend zum Kanal.
+// subscriberConflictMessage returns the 409 error message for an already
+// existing subscription, matching the channel.
 func subscriberConflictMessage(channel string) string {
 	if channel == "email" {
 		return "Diese E-Mail ist bereits abonniert. Bitte logge dich ein, um dein Abo zu bearbeiten."
@@ -281,8 +281,8 @@ func subscriberConflictMessage(channel string) string {
 	return "Dieser Webhook ist bereits abonniert."
 }
 
-// subscriberConflictCode ist der Fehlercode zu subscriberConflictMessage
-// das Frontend übersetzt ihn unter api.errors.<code>.
+// subscriberConflictCode is the error code for subscriberConflictMessage;
+// the frontend translates it under api.errors.<code>.
 func subscriberConflictCode(channel string) string {
 	if channel == "email" {
 		return "subscription_exists_email"
@@ -302,37 +302,37 @@ func (h *Handler) SubscribeHandler(c *gin.Context) {
 		return
 	}
 
-	// Statusseiten-Lookup vor die Dedup-Prüfung gezogen, damit diese
-	// zusätzlich auf status_page_id einschränken kann - vorher wurde eine
-	// bestehende E-Mail/Webhook-Kombination seitenübergreifend gefunden, sodass
-	// ein Abo auf Seite "acme" ein weiteres Abo derselben Adresse auf Seite
-	// "techstart" fälschlich mit 409 ablehnte (und nebenbei verriet, dass die
-	// Adresse anderswo bereits abonniert ist).
+	// Status page lookup moved before the dedup check so that it
+	// can additionally restrict to status_page_id - previously an
+	// existing email/webhook combination was found across pages, so that
+	// a subscription on page "acme" wrongly rejected another subscription of the same address on page
+	// "techstart" with 409 (and incidentally revealed that the
+	// address is already subscribed elsewhere).
 	var targetPage models.StatusPage
 	if err := h.DB.Where(whereSlugEquals, req.Slug).First(&targetPage).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Statusseite nicht gefunden.", "code": "page_not_found"})
 		return
 	}
-	// Das Subscriber-Token im Mail-Link gewährt Lesezugriff auf
-	// das Dashboard privater Seiten. Ein Abo darf deshalb nur anlegen, wer die
-	// Seite ohnehin sehen darf (Rolle auf der Seite oder Global Admin). Bewusst
-	// userHasRoleOnPrivatePage statt checkPrivatePageAccess: Letzteres vergibt
-	// per Auto-Join nebenbei eine Rolle. Sonst 404 wie beim Dashboard,
-	// damit die Existenz der Seite nicht verraten wird.
+	// The subscriber token in the mail link grants read access to
+	// the dashboard of private pages. A subscription may therefore only be created by someone who may
+	// see the page anyway (role on the page or Global Admin). Deliberately
+	// userHasRoleOnPrivatePage instead of checkPrivatePageAccess: the latter grants
+	// a role as a side effect via auto-join. Otherwise 404 as for the dashboard,
+	// so the existence of the page is not revealed.
 	if targetPage.IsPrivate && !h.userHasRoleOnPrivatePage(c, targetPage.ID) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Statusseite nicht gefunden.", "code": "page_not_found"})
 		return
 	}
 
 	if existing, err := h.findExistingSubscriber(req, targetPage.ID); err == nil {
-		// Bestehendes Abo -> kein offenes Update (Sicherheit!), nur das
-		// Double-Opt-in eines wartenden Abos geht weiter.
+		// Existing subscription -> no open update (security!), only the
+		// double opt-in of a pending subscription continues.
 		h.handleExistingSubscription(c, req, existing)
 		return
 	}
 
-	// Mailbox-Limit: Über dem Limit bleibt die Antwort gleich, es wird aber
-	// weder ein Abo angelegt noch eine Mail verschickt.
+	// Mailbox limit: above the limit the response stays the same, but neither
+	// is a subscription created nor a mail sent.
 	if req.Channel == "email" && !isOwnAccountEmail(c, req.Email) && h.confirmationMailBudgetExhausted(req.Email) {
 		respondSubscribed(c, models.Subscriber{Channel: "email", Status: models.SubscriberStatusPending})
 		return
@@ -368,12 +368,12 @@ func (h *Handler) GetSubscribersHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.subscriberDTOs(subs, uint(tenantID), getUserID(c)))
 }
 
-// findMySubscriber authentifiziert den eingeloggten User, löst die
-// StatusPage über den Query-Parameter "slug" auf und sucht das zugehörige
-// eigene Abonnement - gemeinsame Logik für GetMySubscriptionHandler und
-// UpdateMySubscriptionHandler (vorher fast identisch dupliziert). Bei einem
-// Fehler ist die Response bereits geschrieben, der Aufrufer muss nur noch
-// zurückkehren.
+// findMySubscriber authenticates the signed-in user, resolves the
+// StatusPage via the query parameter "slug" and looks up the associated
+// own subscription - shared logic for GetMySubscriptionHandler and
+// UpdateMySubscriptionHandler (previously duplicated almost identically). On an
+// error the response has already been written, the caller only has to
+// return.
 func (h *Handler) findMySubscriber(c *gin.Context) (models.Subscriber, bool) {
 	email := getEmail(c)
 	if email == "" {
@@ -393,11 +393,11 @@ func (h *Handler) findMySubscriber(c *gin.Context) (models.Subscriber, bool) {
 		return models.Subscriber{}, false
 	}
 
-	// Über die eigene E-Mail-Adresse, und zusätzlich über CreatedByUserID (deckt
-	// auch Webhook-Abos ohne Email ab, die z.B. ein Admin angelegt hat). Das
-	// Ersteller-Recht gilt nur, solange der User noch zur Seite gehört: Wem die
-	// Rolle entzogen wurde, soll die von ihm für Dritte angelegten Abos (fremde
-	// Adressen, Webhook-URLs mit Geheimnis) nicht weiter lesen oder ändern.
+	// Via the own email address, and additionally via CreatedByUserID (also covers
+	// webhook subscriptions without email, e.g. created by an admin). The
+	// creator right applies only as long as the user still belongs to the page: whoever
+	// had their role revoked should no longer read or change the subscriptions they created for third parties (foreign
+	// addresses, webhook URLs with secrets).
 	query := h.DB.Where("status_page_id = ?", page.ID)
 	if uid := getUserID(c); uid != 0 && h.userStillBelongsToPage(uid, page.ID) {
 		query = query.Where("created_by_user_id = ? OR email = ?", uid, email)
@@ -437,7 +437,7 @@ func (h *Handler) UpdateMySubscriptionHandler(c *gin.Context) {
 
 	type UpdateReq struct {
 		ComponentIDs string `json:"component_ids" binding:"required"`
-		// Language: nur wenn angegeben ändern ("" = Seitenstandardsprache).
+		// Language: change only if given ("" = page default language).
 		Language *string `json:"language"`
 	}
 	var req UpdateReq
@@ -473,8 +473,8 @@ func (h *Handler) UpdateMySubscriptionHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Abo erfolgreich aktualisiert"})
 }
 
-// DeleteMySubscriptionHandler beendet das eigene Abonnement
-// ("Abonnement beenden"). Besitzprüfung über findMySubscriber, analog zu
+// DeleteMySubscriptionHandler ends the own subscription
+// ("Abonnement beenden"). Ownership check via findMySubscriber, analogous to
 // GetMySubscriptionHandler/UpdateMySubscriptionHandler.
 func (h *Handler) DeleteMySubscriptionHandler(c *gin.Context) {
 	sub, ok := h.findMySubscriber(c)
@@ -521,7 +521,7 @@ func (h *Handler) UpdateSubscriberHandler(c *gin.Context) {
 		Email                  string `json:"Email"`
 		WebhookURL             string `json:"WebhookURL"`
 		SubscribedComponentIDs string `json:"SubscribedComponentIDs"`
-		// Language: nur wenn angegeben ändern ("" = Seitenstandardsprache).
+		// Language: change only if given ("" = page default language).
 		Language *string `json:"Language"`
 	}
 	var req UpdateSubReq
@@ -541,9 +541,9 @@ func (h *Handler) UpdateSubscriberHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address", "code": "email_invalid"})
 		return
 	}
-	// nur neue Ziele prüfen (geänderte URL oder
-	// Kanalwechsel). Eine unveränderte Bestands-URL sperrt das Abo nicht für
-	// andere Änderungen; beim Versand schützt ohnehin safeDialContext.
+	// check only new targets (changed URL or
+	// channel change). An unchanged existing URL does not block the subscription for
+	// other changes; safeDialContext protects at send time anyway.
 	if req.WebhookURL != sub.WebhookURL || req.Channel != sub.Channel {
 		if err := validateAdminSubscriberWebhook(req.Channel, req.WebhookURL); err != nil {
 			respondCoded(c, http.StatusBadRequest, err)
@@ -551,9 +551,9 @@ func (h *Handler) UpdateSubscriberHandler(c *gin.Context) {
 		}
 	}
 
-	// Eine neue Adresse (oder ein Kanalwechsel) muss erneut
-	// bestätigt werden, sonst ließe sich das Double-Opt-in per Bearbeiten
-	// umgehen. Reine Komponenten-Änderungen lassen den Status unverändert.
+	// A new address (or a channel change) must be confirmed
+	// again, otherwise double opt-in could be bypassed via editing.
+	// Pure component changes leave the status unchanged.
 	addressChanged := req.Channel != sub.Channel || req.Email != sub.Email
 	sub.Channel = req.Channel
 	sub.Email = req.Email
@@ -632,7 +632,7 @@ func (h *Handler) CreateSubscriberAdminHandler(c *gin.Context) {
 		Email                  string `json:"Email"`
 		WebhookURL             string `json:"WebhookURL"`
 		SubscribedComponentIDs string `json:"SubscribedComponentIDs"`
-		// Language: Mailsprache, nur bei der Seite aktive Codes, sonst Seitenstandard.
+		// Language: mail language, only codes active on the page, otherwise page default.
 		Language string `json:"Language"`
 	}
 	var req CreateReq
@@ -654,15 +654,15 @@ func (h *Handler) CreateSubscriberAdminHandler(c *gin.Context) {
 		return
 	}
 
-	// Kein zweites Abo derselben Adresse bzw. Webhook-URL: ein erneutes
-	// Anlegen würde sonst jedes Mal eine weitere Bestätigungsmail auslösen.
+	// No second subscription for the same address or webhook URL: creating it
+	// again would otherwise trigger another confirmation mail every time.
 	if _, err := h.findExistingSubscriber(SubscribeRequest{Channel: req.Channel, Email: req.Email, WebhookURL: req.WebhookURL}, uint(tenantID)); err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": subscriberConflictMessage(req.Channel), "code": subscriberConflictCode(req.Channel)})
 		return
 	}
 	if req.Channel == "email" {
 		if err := h.checkAdminSubscriberLimits(uint(tenantID), req.Email, time.Now()); err != nil {
-			// Coded: 429; Datenbankfehler: 500 (fail closed, nichts wird angelegt).
+			// Coded: 429; database error: 500 (fail closed, nothing is created).
 			respondCoded(c, http.StatusTooManyRequests, err)
 			return
 		}
@@ -681,15 +681,15 @@ func (h *Handler) CreateSubscriberAdminHandler(c *gin.Context) {
 		SubscribedComponentIDs: req.SubscribedComponentIDs,
 		Language:               lang,
 	}
-	// Der anlegende (angemeldete) User wird als Ersteller vermerkt, damit er dieses
-	// Abo später selbst über /me/subscription wiederfindet und bearbeiten kann –
-	// insbesondere bei Google-Chat-Abos ohne Email gab es dafür bisher keine
-	// Verknüpfung zu einem Account.
+	// The creating (signed-in) user is recorded as creator so that they can find this
+	// subscription later via /me/subscription and edit it themselves -
+	// especially for Google Chat subscriptions without email there was previously no
+	// link to an account.
 	if uid := getUserID(c); uid != 0 {
 		sub.CreatedByUserID = &uid
 	}
-	// Auch vom Admin eingetragene fremde Adressen müssen ihr Abo
-	// selbst bestätigen; die eigene Konto-Adresse des Admins nicht.
+	// Foreign addresses entered by the admin must also confirm their subscription
+	// themselves; the admin's own account address need not.
 	token := prepareSubscriptionConfirmation(c, &sub)
 
 	if err := h.DB.Create(&sub).Error; err != nil {
@@ -724,6 +724,6 @@ func (h *Handler) TestWebhookHandler(c *gin.Context) {
 	payload := map[string]interface{}{
 		"text": "👋 **Test-Benachrichtigung**\nDie Verbindung zu deinem Status-Dashboard funktioniert einwandfrei!",
 	}
-	// ein Versuch, nie warten; die Fehlerklasse bestimmt die Antwort.
+	// one attempt, never wait; the error class determines the response.
 	respondWebhookProbe(c, postWebhook(c.Request.Context(), req.WebhookURL, payload, webhookModeProbe))
 }

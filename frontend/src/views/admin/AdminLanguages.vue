@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -24,17 +24,24 @@ import StatusBadge from '../../components/StatusBadge.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { languageFlag, languageDisplayName } from '../../utils/languageFlags'
 import { isValidLanguageCode, serverInputErrorText } from '../../utils/inputRules'
+import type { ApiError, Language } from '../../types/api'
 
-// Sprachverwaltung (Stage 1 von 5 der Mehrsprachigkeit): globaler
-// Katalog (global-admin-only) + pro aktueller Statusseite aktivierte
-// Sprachen inkl. Default. Ersetzt die vorherige, implizit auf en/de fixierte
-// Konvention der Benachrichtigungs-Templates durch einen
-// offen erweiterbaren Katalog.
+/** Edit form of a catalog language. */
+interface LanguageForm {
+  code?: string
+  name?: string
+  is_active?: boolean
+}
+
+// Language management (stage 1 of 5 of multilingual support): global catalog
+// (global admins only) + the languages enabled for the current status page,
+// including the default. Replaces the earlier convention of the notification
+// templates, implicitly fixed to en/de, with an openly extensible catalog.
 
 const { catalog, pageLanguages, loadCatalog, loadPageLanguages, savePageLanguages, createLanguage, updateLanguage } = useContentLanguages()
 const { isGlobalAdmin, hasPerm } = useAuth()
-// Seitensprachen speichern verlangt im Backend languages:update
-// (PutPageLanguagesHandler); lesen darf jede Rolle der Seite.
+// Saving page languages requires languages:update in the backend
+// (PutPageLanguagesHandler); every role of the page may read them.
 const canEditPageLanguages = computed(() => hasPerm('languages:update'))
 // Translation switched off: the page has its default language only (single choice).
 const { enabled: translationEnabled, load: loadTranslationEnabled } = useTranslationEnabled()
@@ -45,15 +52,15 @@ const { t, locale } = useI18n()
 const alertMsg = ref('')
 const alertType = ref('info')
 const isEditing = ref(false)
-const currentEditItem = ref(null)
-const formData = ref({})
+const currentEditItem = ref<'new' | number | null>(null)
+const formData = ref<LanguageForm>({})
 const isSaving = ref(false)
 const query = ref('')
 const editName = ref('')
-const errors = ref({ code: '', name: '' })
+const errors = ref<{ code: string | null, name: string }>({ code: '', name: '' })
 
-// Format des Sprachcodes (Backend: 400 language_code_invalid).
-const codeError = (isNew) => {
+// Format of the language code (backend: 400 language_code_invalid).
+const codeError = (isNew: boolean) => {
   if (!isNew) return ''
   const code = (formData.value.code || '').trim()
   if (!code) return t('languages.codeRequired')
@@ -61,16 +68,16 @@ const codeError = (isNew) => {
 }
 const { formEl, focusForm, focusInvalid } = useFormPanel()
 const loading = ref(true)
-// Stryker disable next-line BooleanLiteral: ListStateRow gibt loading Vorrang vor error und onMounted setzt loadFailed synchron zurück, der Startwert ist nicht beobachtbar
+// Stryker disable next-line BooleanLiteral: ListStateRow gives loading precedence over error and onMounted resets loadFailed synchronously, so the initial value is not observable
 const loadFailed = ref(false)
 
-const selectedCodes = ref([])
+const selectedCodes = ref<string[]>([])
 const selectedDefault = ref('')
 const isSavingPageLanguages = ref(false)
 
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'info') => {
+const showAlert = (msg: string, type = 'info') => {
   alertMsg.value = msg
   alertType.value = type
 }
@@ -88,7 +95,7 @@ const loadAll = async () => {
     }
   } catch (err) {
     loadFailed.value = true
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   } finally {
     loading.value = false
   }
@@ -99,10 +106,9 @@ watch(activeTenantId, loadAll)
 
 const activeLanguages = computed(() => catalog.value.filter(l => l.IsActive))
 
-// selectedCodes ist an die native Checkbox-Gruppe unten per v-model gebunden
-// (Vue verwaltet die Array-Mitgliedschaft dabei selbst) - hier nur noch
-// nachziehen, dass die Default-Auswahl gültig bleibt, wenn ein Code
-// abgewählt wird.
+// selectedCodes is bound to the native checkbox group below via v-model
+// (Vue manages the array membership itself) - here we only make sure the
+// default selection stays valid when a code is deselected.
 watch(selectedCodes, (codes) => {
   if (!codes.includes(selectedDefault.value)) {
     selectedDefault.value = codes[0] || ''
@@ -122,13 +128,13 @@ const savePageSelection = async () => {
     await savePageLanguages(activeTenantId.value, codes, selectedDefault.value)
     showAlert(t('languages.selectionSaved'), 'success')
   } catch (err) {
-    showAlert(t('common.saveError') + err.message, 'error')
+    showAlert(t('common.saveError') + (err as Error).message, 'error')
   } finally {
     isSavingPageLanguages.value = false
   }
 }
 
-const openEdit = (item) => {
+const openEdit = (item: Language | 'new') => {
   if (item === 'new') {
     formData.value = { code: '', name: '' }
   } else {
@@ -150,7 +156,7 @@ const cancelEdit = () => {
 
 const saveItem = async () => {
   const isNew = currentEditItem.value === 'new'
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste fehlerhafte Feld.
+  // Required fields: error at the field instead of a server error, focus on the first invalid field.
   errors.value = {
     code: codeError(isNew),
     name: (formData.value.name || '').trim() ? '' : t('languages.nameRequired'),
@@ -163,13 +169,14 @@ const saveItem = async () => {
   isSaving.value = true
   try {
     if (isNew) {
-      await createLanguage(formData.value.code, formData.value.name)
+      await createLanguage(formData.value.code!, formData.value.name!)
     } else {
-      await updateLanguage(currentEditItem.value, { name: formData.value.name, is_active: formData.value.is_active })
+      await updateLanguage(currentEditItem.value as number, { name: formData.value.name, is_active: formData.value.is_active })
     }
     showAlert(t(isNew ? 'adminFeedback.languageCreated' : 'adminFeedback.languageUpdated'), 'success')
     cancelEdit()
-  } catch (err) {
+  } catch (e) {
+    const err = e as ApiError
     if (err.data?.code === 'language_code_invalid') {
       errors.value = { ...errors.value, code: serverInputErrorText(err, t) }
       await focusInvalid()
@@ -185,7 +192,7 @@ const formTitle = computed(() => currentEditItem.value === 'new'
   ? t('languages.createTitle')
   : t('languages.editTitle', { name: editName.value }))
 
-// Richtung C: Seitenkopf mit Zählung, Suche, Zeilenmenü.
+// Direction C: page header with a count, search, row menu.
 const breadcrumbs = usePageCrumbs(() => t('languages.title'))
 const subtitle = computed(() => t('languages.subtitle', {
   languages: t('languages.countLanguages', { n: catalog.value.length }, catalog.value.length),
@@ -196,16 +203,16 @@ const rows = computed(() => {
   const needle = query.value.trim().toLowerCase()
   return catalog.value.filter(l => `${l.Code} ${l.Name}`.toLowerCase().includes(needle))
 })
-// Löschen steht allen Zeilen offen, der Server entscheidet (409 bei Standardsprache einer
-// Seite oder vorhandenen Mail-Vorlagen) und liefert die Meldung unter api.errors.*.
-const deletingId = ref(null)
+// Delete is open to every row; the server decides (409 for a page's default language
+// or existing mail templates) and returns the message under api.errors.*.
+const deletingId = ref<number | null>(null)
 const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadCatalog, onStart: clearAlert, onDeleted: () => showAlert(t('adminFeedback.deleted'), 'success'), onError: (err) => showAlert(t('common.deleteError') + err.message, 'error') })
-const deleteItem = (l) => deleteAction(`/api/languages/${l.ID}`, l.ID, t('languages.confirmDelete', { name: l.Name }))
-const menuItems = (l) => [
+const deleteItem = (l: Language) => deleteAction(`/api/languages/${l.ID}`, l.ID, t('languages.confirmDelete', { name: l.Name }))
+const menuItems = (l: Language) => [
   { key: 'edit', label: t('common.edit'), icon: 'pencil' },
   { key: 'delete', label: deletingId.value === l.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === l.ID },
 ]
-const onMenuSelect = (l, key) => {
+const onMenuSelect = (l: Language, key: string) => {
   if (key === 'edit') openEdit(l)
   else deleteItem(l)
 }
@@ -225,7 +232,7 @@ const onMenuSelect = (l, key) => {
     </PageHeader>
     <p class="panel-lead">{{ t('languages.catalogDescription') }}</p>
 
-    <!-- Richtung C: Katalog links, Formular als Seitenkarte rechts. -->
+    <!-- Direction C: catalog on the left, form as a side card on the right. -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <div class="split__main">
         <ListCard :title="t('languages.cardTitle')">

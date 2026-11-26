@@ -4,14 +4,13 @@ import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// OnyxButton, OnyxInput-Label/-Text, OnyxSelect usw. erschienen in
-// einer Serifenschrift. sit-onyx setzt in seinen Komponenten
-// font-family: var(--onyx-font-family-paragraph) (bzw. -h1 … -mono) ohne
-// generischen Fallback, und die Tokens zeigen auf Schriften, die onyx nicht
-// mitliefert und wir nicht laden. happy-dom rechnet kein CSS, deshalb prüft
-// der Test die Quellen: Jede Schrift-Variable, die onyx in einer
-// font-family-Deklaration benutzt, muss in tokens.css auf :root auf eine
-// unserer selbst gehosteten Schriften zeigen.
+// OnyxButton, OnyxInput label/text, OnyxSelect etc. appeared in a serif
+// font. In its components sit-onyx sets
+// font-family: var(--onyx-font-family-paragraph) (or -h1 … -mono) without a
+// generic fallback, and the tokens point to fonts that onyx does not ship
+// and we do not load. happy-dom computes no CSS, so the test checks the
+// sources: every font variable onyx uses in a font-family declaration must
+// point, in tokens.css on :root, to one of our self-hosted fonts.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
 const onyxCss = readFileSync(require.resolve('sit-onyx/style.css'), 'utf-8')
@@ -41,7 +40,7 @@ describe('sit-onyx nutzt unsere Schriften', () => {
   const vars = onyxFontVariables(onyxCss)
 
   it('findet die Schrift-Variablen, die onyx in font-family verwendet', () => {
-    // Buttons, Inputs, Selects: Absatzschrift; Überschriften und Mono ebenfalls.
+    // Buttons, inputs, selects: paragraph font; headings and mono as well.
     expect(vars).toEqual(expect.arrayContaining([
       '--onyx-font-family-paragraph',
       '--onyx-font-family-h1',
@@ -50,7 +49,7 @@ describe('sit-onyx nutzt unsere Schriften', () => {
   })
 
   it('onyx setzt .onyx-button ohne generischen Fallback auf die Absatzschrift', () => {
-    // Hält die Annahme fest, auf der der Fix beruht.
+    // Pins the assumption the fix is based on.
     expect(onyxCss).toMatch(/\.onyx-button\s*{[^}]*font-family:\s*var\(--onyx-font-family-paragraph\);/)
   })
 
@@ -61,7 +60,7 @@ describe('sit-onyx nutzt unsere Schriften', () => {
   it('Gegenprobe: ohne Override (alter Stand) schlägt die Prüfung an', () => {
     const old = tokensCss.replace(/--onyx-font-family-[\w-]+:[^;]+;/g, '')
     expect(rootValue(old, '--onyx-font-family-paragraph')).toBeNull()
-    // Ein Wert in einem anderen Selektor als :root zählt nicht.
+    // A value in a selector other than :root does not count.
     expect(rootValue('.x { --onyx-font-family-h1: var(--font-sans); }', '--onyx-font-family-h1')).toBeNull()
     expect(rootValue(':root { --onyx-font-family-h1: var(--font-sans); }', '--onyx-font-family-h1')).toBe('var(--font-sans)')
   })

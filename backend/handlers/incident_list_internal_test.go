@@ -13,8 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Datenbankfehler brechen das Dashboard ab (500) statt eine scheinbar leere
-// Seite zu liefern; beide Abfragen (offene, behobene Vorfälle) sind abgedeckt.
+// Database errors abort the dashboard (500) instead of delivering a seemingly empty
+// page; both queries (open, resolved incidents) are covered.
 func TestPublicDashboard_IncidentQueryErrorFailsClosed(t *testing.T) {
 	for name, skip := range map[string]int{"offene": 0, "behobene": 1} {
 		t.Run(name, func(t *testing.T) {
@@ -37,8 +37,8 @@ func TestPublicDashboard_IncidentQueryErrorFailsClosed(t *testing.T) {
 	}
 }
 
-// Scheitert allein die Abfrage der offenen Vorfälle (die der behobenen gelingt),
-// bricht das Dashboard ebenfalls ab: Sonst fehlten offene Störungen unbemerkt.
+// If only the query for open incidents fails (the one for resolved succeeds),
+// the dashboard also aborts: otherwise open outages would be missing unnoticed.
 func TestPublicDashboard_OpenIncidentQueryErrorAloneFailsClosed(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -55,7 +55,7 @@ func TestPublicDashboard_OpenIncidentQueryErrorAloneFailsClosed(t *testing.T) {
 			return
 		}
 		calls++
-		if calls == 1 { // die Abfrage der offenen Vorfälle läuft zuerst
+		if calls == 1 { // the query for open incidents runs first
 			_ = tx.AddError(errors.New("injizierter Fehler"))
 		}
 	}))

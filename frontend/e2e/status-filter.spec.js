@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// Mehrfachauswahl und UND/ODER-Suche auf der öffentlichen Statusseite.
-// Läuft gegen gemockte API-Antworten (Daten angelehnt an Acme Corp), damit nur der
-// Vite-Dev-Server nötig ist.
+// Multi-select and AND/OR search on the public status page.
+// Runs against mocked API responses (data modelled on Acme Corp), so only the
+// Vite dev server is needed.
 const comp = (ID, Name, Description, Status, tag) => ({ ID, Name, Description, Status, Tags: [{ Name: tag }], Children: [] });
 const dashboard = {
   page: { ID: 1, Name: 'Acme Corp', PrimaryColor: '', SecondaryColor: '', HeaderStyle: 'classic' },

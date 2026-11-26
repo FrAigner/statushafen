@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../../composables/useApi'
@@ -9,6 +9,7 @@ import { flatten } from '../../i18n/overrides'
 import de from '../../i18n/locales/de.json'
 import en from '../../i18n/locales/en.json'
 import { SUPPORTED_LOCALES, getBaseMessages, loadLocaleMessages } from '../../i18n'
+import type { LocaleMessages } from '../../i18n'
 import PageHeader from '../../components/PageHeader.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import ListCard from '../../components/ListCard.vue'
@@ -18,20 +19,28 @@ import PaginationBar from '../../components/PaginationBar.vue'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { confirmDialog } from '../../composables/useConfirm'
 
-// UI-Übersetzungs-Editor: Admin-editierbare Overrides
-// für App-UI-Texte (Nav, Buttons, Formularlabels), ohne Code-Deploy.
-// Bewusst OHNE requiresGlobalAdmin auf Router-Ebene (Muster: AdminLanguages.vue) -
-// ein Seiten-Admin ohne Global-Admin-Rechte muss die Overrides seiner
-// eigenen Seite pflegen können, der global-admin-only Teil (Scope "global")
-// blendet sich hier per isGlobalAdmin aus.
+/** One row of the editor: a flattened message key with its default and override text. */
+interface UiTranslationRow {
+  key: string
+  defaultValue: unknown
+  overrideValue: string
+  hasOverride: boolean
+}
+
+// UI translation editor: admin-editable overrides for app UI texts (nav,
+// buttons, form labels) without a code deploy.
+// Deliberately WITHOUT requiresGlobalAdmin at router level (pattern: AdminLanguages.vue) -
+// a page admin without global admin rights must be able to maintain the
+// overrides of their own page; the global-admin-only part (scope "global")
+// hides itself here via isGlobalAdmin.
 
 const { t } = useI18n()
 const { apiFetch } = useApi()
 const { hasPerm, isGlobalAdmin } = useAuth()
 const { activeTenantId } = useTenant()
 
-// Standardtexte je Sprache; weitere Oberflächensprachen werden bei Auswahl nachgeladen.
-const baseMessages = ref({ de, en })
+// Default texts per language; further UI languages are loaded on selection.
+const baseMessages = ref<{ en: LocaleMessages, [code: string]: LocaleMessages | undefined }>({ de, en })
 const { catalog, pageLanguages, loadCatalog, loadPageLanguages } = useContentLanguages()
 
 const scope = ref(isGlobalAdmin.value ? 'global' : 'page')
@@ -41,10 +50,10 @@ const searchText = ref('')
 
 const canEditCurrentScope = computed(() => scope.value === 'global' ? isGlobalAdmin.value : hasPerm('ui_translations:update'))
 
-// Teil 1: Angeboten werden die Oberflächensprachen (de, en) und alle
-// aktiven Sprachen des Katalogs (Bereich „Global“) bzw. der gewählten Seite, mit
-// Eigenbezeichnung. Gibt es für eine Sprache keine eigenen Standardtexte, zeigt die
-// Spalte „Standard“ den englischen Text (Rückfall Englisch).
+// Part 1: offered are the UI languages (de, en) and all active languages of
+// the catalog (scope "Global") or of the selected page, with their own name.
+// If a language has no default texts of its own, the "Default" column shows
+// the English text (English fallback).
 const languageOptions = computed(() => {
   const names = new Map((Array.isArray(catalog.value) ? catalog.value : []).map(l => [l.Code, l.Name]))
   const codes = scope.value === 'global'
@@ -61,10 +70,10 @@ const namespaces = computed(() => Object.keys(defaultMessages.value).sort())
 
 const allKeys = computed(() => Object.entries(flatten(defaultMessages.value)))
 
-const overrides = ref({})
+const overrides = ref<Record<string, string>>({})
 const alertMsg = ref('')
 const alertType = ref('warning')
-const savingKey = ref(null)
+const savingKey = ref<string | null>(null)
 const loading = ref(false)
 
 const breadcrumbs = usePageCrumbs(computed(() => t('uiTranslations.title')), { global: computed(() => scope.value === 'global') })
@@ -74,7 +83,7 @@ const basePath = computed(() => {
   return `/api/pages/${activeTenantId.value}/ui-overrides`
 })
 
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value = msg
   alertType.value = type
 }
@@ -88,7 +97,7 @@ const loadOverrides = async () => {
   try {
     overrides.value = (await apiFetch(`${basePath.value}?language_code=${language.value}`)) || {}
   } catch (err) {
-    showAlert(t('uiTranslations.loadError') + err.message, 'error')
+    showAlert(t('uiTranslations.loadError') + (err as Error).message, 'error')
   } finally {
     loading.value = false
   }
@@ -100,23 +109,23 @@ watch(language, async (code) => {
   if (await loadLocaleMessages(code)) baseMessages.value = { ...baseMessages.value, [code]: getBaseMessages(code) }
 }, { immediate: true })
 
-// Sprachlisten laden (Fehler: nur de/en bleiben, die Seite bleibt benutzbar).
+// Load the language lists (on error only de/en remain; the page stays usable).
 const loadLanguageOptions = async () => {
   try {
     await loadCatalog()
     if (activeTenantId.value) await loadPageLanguages(activeTenantId.value)
   } catch {
-    // Sprachliste ist nur eine Erweiterung der Auswahl
+    // the language list only extends the selection
   }
 }
 onMounted(loadLanguageOptions)
 watch(activeTenantId, loadLanguageOptions)
-// Eine Sprache, die im neuen Bereich/auf der neuen Seite nicht mehr angeboten wird, wechselt auf Deutsch.
+// A language no longer offered in the new scope/on the new page switches to German.
 watch(languageOptions, (options) => {
   if (!options.some(o => o.code === language.value)) language.value = 'de'
 })
 
-const rows = computed(() => {
+const rows = computed((): UiTranslationRow[] => {
   const ns = namespaceFilter.value
   const search = searchText.value.trim().toLowerCase()
   return allKeys.value
@@ -125,62 +134,60 @@ const rows = computed(() => {
     .map(([key, defaultValue]) => ({
       key,
       defaultValue,
-      overrideValue: Object.hasOwn(overrides.value, key) ? overrides.value[key] : '',
+      overrideValue: Object.hasOwn(overrides.value, key) ? overrides.value[key]! : '',
       hasOverride: Object.hasOwn(overrides.value, key),
     }))
 })
 
-// Ungespeicherte Eingaben liegen im Zustand dieser Ansicht, nicht
-// in der DOM-Zeile. Die Liste zeigt nur eine Seite; beim Blättern oder
-// Filtern werden Zeilen entfernt und neu aufgebaut, die Entwürfe bleiben
-// erhalten. Sie sind je Kontext (Bereich, Seite, Sprache) getrennt, damit ein
-// Entwurf der deutschen Fassung nicht im englischen Feld auftaucht.
+// Unsaved input lives in this view's state, not in the DOM row. The list
+// shows only one page; paging or filtering removes and rebuilds rows, the
+// drafts are kept. They are separated per context (scope, page, language) so
+// that a draft of the German version does not show up in the English field.
 const draftContext = computed(() => `${scope.value}|${scope.value === 'page' ? activeTenantId.value : ''}|${language.value}`)
-const draftValues = ref({})
+const draftValues = ref<Record<string, Record<string, string>>>({})
 const contextDrafts = computed(() => draftValues.value[draftContext.value] || {})
-const draftFor = (row) => Object.hasOwn(contextDrafts.value, row.key) ? contextDrafts.value[row.key] : row.overrideValue
-const setDraft = (key, value) => {
+const draftFor = (row: UiTranslationRow) => Object.hasOwn(contextDrafts.value, row.key) ? contextDrafts.value[row.key]! : row.overrideValue
+const setDraft = (key: string, value: string) => {
   draftValues.value = { ...draftValues.value, [draftContext.value]: { ...contextDrafts.value, [key]: value } }
 }
-const dropDraft = (key) => {
+const dropDraft = (key: string) => {
   draftValues.value = { ...draftValues.value, [draftContext.value]: omitKey(contextDrafts.value, key) }
 }
 
-// Zählung über ALLE Texte, nicht nur die sichtbare Seite.
+// Count over ALL texts, not just the visible page.
 const customizedCount = computed(() => Object.keys(overrides.value).length)
 const unsavedKeys = computed(() => Object.keys(contextDrafts.value)
   .filter(key => contextDrafts.value[key] !== (Object.hasOwn(overrides.value, key) ? overrides.value[key] : '')))
 const saveableKeys = computed(() => unsavedKeys.value.filter(key => String(contextDrafts.value[key]).trim() !== ''))
 
-// Paginierung: 1.700 Zeilen mit je einem Eingabefeld auf einmal
-// machten die Seite träge und für Tastatur und Screenreader unbedienbar.
+// Pagination: 1,700 rows with one input field each at once made the page
+// sluggish and unusable with keyboard and screen reader.
 const page = ref(1)
 const pageSize = ref(50)
-const listRef = ref(null)
+const listRef = ref<HTMLElement | null>(null)
 watch([scope, language, namespaceFilter, searchText, activeTenantId], () => { page.value = 1 })
 const pagedRows = computed(() => {
   const maxPage = Math.max(1, Math.ceil(rows.value.length / pageSize.value))
   const current = Math.min(page.value, maxPage)
   return rows.value.slice((current - 1) * pageSize.value, current * pageSize.value)
 })
-// Fokus nach Seitenwechsel in die Liste (Überschriftenbereich der Tabelle),
-// damit Tastaturnutzer direkt beim ersten Eintrag der neuen Seite weitermachen.
+// After a page change, focus moves into the list (header area of the table),
+// so keyboard users continue right at the first entry of the new page.
 const focusList = async () => {
   await nextTick()
   listRef.value?.focus()
 }
 
-// omitKey liefert eine flache Kopie ohne den angegebenen Key - Ersatz für das
-// Destrukturieren-mit-Rest-Muster ({ [key]: _, ...rest } = obj), dessen
-// absichtlich ungenutzte Extraktionsvariable von SonarCloud als "unused"
-// bemängelt wird.
-const omitKey = (obj, key) => {
+// omitKey returns a shallow copy without the given key - a replacement for
+// the destructure-with-rest pattern ({ [key]: _, ...rest } = obj), whose
+// deliberately unused extraction variable SonarCloud flags as "unused".
+const omitKey = (obj: Record<string, string>, key: string) => {
   const copy = { ...obj }
   delete copy[key]
   return copy
 }
 
-const saveRow = async (row) => {
+const saveRow = async (row: UiTranslationRow) => {
   savingKey.value = row.key
   try {
     await apiFetch(basePath.value, {
@@ -190,23 +197,23 @@ const saveRow = async (row) => {
     overrides.value = { ...overrides.value, [row.key]: draftFor(row) }
     dropDraft(row.key)
   } catch (err) {
-    showAlert(t('uiTranslations.saveError') + err.message, 'error')
+    showAlert(t('uiTranslations.saveError') + (err as Error).message, 'error')
   } finally {
     savingKey.value = null
   }
 }
 
-// Ein leeres Feld darf nie als Override gespeichert werden (das
-// hat den Text bisher für alle geleert, das Backend lehnt es jetzt mit 400
-// ab). Speichern ist deshalb bei leerem Entwurf gesperrt; Entfernen geht nur
-// über den eigenen Zurücksetzen-Knopf.
-const canSave = (row) => String(draftFor(row)).trim() !== ''
+// An empty field must never be stored as an override (that used to blank
+// the text for everyone; the backend now rejects it with 400). Saving is
+// therefore locked for an empty draft; removing only works via the separate
+// reset button.
+const canSave = (row: UiTranslationRow) => String(draftFor(row)).trim() !== ''
 
 const scopeLabel = computed(() => scope.value === 'global' ? t('uiTranslations.scopeGlobal') : t('uiTranslations.scopePage'))
 
-const resetRow = async (row) => {
-  // Bestätigung mit Umfang (Scope + Sprache), damit klar ist, dass nur genau
-  // dieser Eintrag auf den Standardtext zurückfällt.
+const resetRow = async (row: UiTranslationRow) => {
+  // Confirmation with its extent (scope + language), so it is clear that only
+  // exactly this entry falls back to the default text.
   if (!(await confirmDialog({ message: t('uiTranslations.confirmReset', { key: row.key, scope: scopeLabel.value, language: language.value }), confirmLabel: t('confirm.reset') }))) return
   savingKey.value = row.key
   try {
@@ -214,21 +221,21 @@ const resetRow = async (row) => {
     overrides.value = omitKey(overrides.value, row.key)
     dropDraft(row.key)
   } catch (err) {
-    showAlert(t('uiTranslations.resetError') + err.message, 'error')
+    showAlert(t('uiTranslations.resetError') + (err as Error).message, 'error')
   } finally {
     savingKey.value = null
   }
 }
 
-// Alle ungespeicherten, gültigen Änderungen nacheinander senden (das Backend
-// kennt nur einzelne Keys). Fehlgeschlagene bleiben als Entwurf stehen.
+// Send all unsaved, valid changes one after another (the backend only knows
+// single keys). Failed ones remain as drafts.
 const savingAll = ref(false)
 const saveAll = async () => {
   savingAll.value = true
   let failed = 0
   let lastError = ''
   for (const key of [...saveableKeys.value]) {
-    const value = contextDrafts.value[key]
+    const value = contextDrafts.value[key]!
     try {
       await apiFetch(basePath.value, {
         method: 'PUT',
@@ -238,7 +245,7 @@ const saveAll = async () => {
       dropDraft(key)
     } catch (err) {
       failed++
-      lastError = err.message
+      lastError = (err as Error).message
     }
   }
   savingAll.value = false
@@ -254,7 +261,7 @@ const saveAll = async () => {
 
     <p v-if="!hasOwnDefaults" class="mb-16 text-muted" role="status">{{ t('uiTranslations.noOwnDefaults', { language: languageLabels[language] }) }}</p>
 
-    <!-- Richtung C: Karte „Alle Texte“, Filter und Suche im Kartenkopf. -->
+    <!-- Direction C: "All texts" card, filter and search in the card header. -->
     <ListCard :title="t('uiTranslations.cardTitle')">
       <template #tools>
         <select v-if="isGlobalAdmin" v-model="scope" class="comp-filter" :aria-label="t('uiTranslations.ariaScope')">
@@ -285,13 +292,12 @@ const saveAll = async () => {
 
       <EmptyState v-else-if="rows.length === 0" :title="t('uiTranslations.empty')" icon="search" />
 
-      <!-- Bewusst keine ResponsiveTable: Die Liste hat über 1.700 Zeilen mit je einem
-           Eingabefeld; der Slot-Aufwand pro Zelle machte den Mount rund dreimal
-           so langsam (jetzt seitenweise; die Umstellung auf ResponsiveTable
-           wäre damit möglich, ist aber ein eigener Schritt). Aus demselben Grund gibt es hier kein Zeilenmenü je Zeile
-           (Speichern und Zurücksetzen bleiben Knöpfe). Die Tabelle nutzt aber
-           denselben Tabellenstil (.data-table, data-label für die Kartenansicht
-           unter 860 px). -->
+      <!-- Deliberately no ResponsiveTable: the list has over 1,700 rows with one
+           input field each; the slot overhead per cell made mounting about three
+           times slower (now paged, so switching to ResponsiveTable would be
+           possible, but is a separate step). For the same reason there is no row
+           menu per row (save and reset stay buttons). The table does use the same
+           table style (.data-table, data-label for the card view below 860 px). -->
       <div v-else ref="listRef" tabindex="-1" role="region" class="data-table-wrapper table-scroll" :aria-label="t('uiTranslations.cardTitle')">
         <table class="data-table data-table--cards ui-translations-table">
           <colgroup>
@@ -322,7 +328,7 @@ const saveAll = async () => {
                     :id="`override-input-${row.key}`"
                     type="text"
                     :value="draftFor(row)"
-                    @input="setDraft(row.key, $event.target.value)"
+                    @input="setDraft(row.key, ($event.target as HTMLInputElement).value)"
                     :placeholder="t('uiTranslations.overridePlaceholder')"
                     class="form-input override-input"
                   />
@@ -349,11 +355,10 @@ const saveAll = async () => {
 .count-note { font-size: var(--fs-sm); color: var(--text-3); white-space: nowrap; }
 .override-badge { margin-inline-start: var(--sp-2); }
 .ent-mono { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
-/* Die Tabelle war bei 1440 px 1619 px breit (lange Keys ohne
-   Umbruchstelle, min-width am Eingabefeld), Override und Aktionen lagen
-   rechts außerhalb. Feste Spaltenaufteilung mit Umbruch an beliebiger
-   Stelle hält sie in der Breite; auf schmalen Bildschirmen scrollt nur die
-   Tabelle, nicht die ganze Seite. */
+/* At 1440 px the table was 1619 px wide (long keys without a break point,
+   min-width on the input field); override and actions lay off to the right.
+   A fixed column split with breaks anywhere keeps it within the width; on
+   narrow screens only the table scrolls, not the whole page. */
 .table-scroll { overflow-x: auto; max-width: 100%; }
 .ui-translations-table { table-layout: fixed; min-width: 640px; }
 .ui-translations-table td { overflow-wrap: anywhere; }

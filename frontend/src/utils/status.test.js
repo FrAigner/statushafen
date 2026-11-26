@@ -11,7 +11,7 @@ describe('normalizeStatus', () => {
     ['major_outage', 'major'],
     ['major', 'major'],
     ['maintenance', 'maintenance'],
-    // Rohwert des Backends (vorher neutral mit Rohtext).
+    // Raw backend value (previously neutral with the raw text).
     ['under_maintenance', 'maintenance'],
   ])('%s -> %s', (value, level) => {
     expect(normalizeStatus(value)).toBe(level)

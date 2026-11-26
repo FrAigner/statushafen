@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// A: Die Berechtigungs-Matrix im Rollen-Formular lief rechts über die Formularbreite hinaus
-// und verlor die letzte Spalte (D, Löschen). happy-dom rechnet kein Layout, deshalb misst dieser Spec in
-// echtem Chromium: Matrix, Scrollbereich und alle Zellen liegen innerhalb des Formulars, die Seite scrollt
-// nie waagerecht, und bei Platz (Desktop) braucht die Matrix keinen eigenen Scrollbalken. Bei sehr schmalen
-// Fenstern (390 px) darf nur der Matrix-Scrollbereich scrollen. Die API ist gemockt (kein Backend nötig):
+// A: the permission matrix in the role form overflowed the form width on the right
+// and lost the last column (D, delete). happy-dom computes no layout, so this spec measures in
+// real Chromium: matrix, scroll area and all cells lie within the form, the page never scrolls
+// horizontally, and with enough room (desktop) the matrix needs no scrollbar of its own. In very narrow
+// windows (390 px) only the matrix scroll area may scroll. The API is mocked (no backend needed):
 //   cd frontend && E2E_PORT=5225 npx playwright test admin-rechtematrix-breite --reporter=list
 const PORT = process.env.E2E_PORT || '5173';
 const BASE = `http://localhost:${PORT}`;
@@ -26,7 +26,7 @@ async function mockApi(page) {
   });
 }
 
-// Misst alles in einem Rutsch im Browser.
+// Measures everything in one go in the browser.
 const measure = () => {
   const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right }; };
   const fieldset = document.querySelector('fieldset.perm-matrix');
@@ -62,14 +62,14 @@ for (const { width, narrow } of [{ width: 1568, narrow: false }, { width: 1280, 
 
       const m = await page.evaluate(measure);
       expect(m.rows).toBeGreaterThan(10);
-      // Die Seite scrollt nie waagerecht.
+      // The page never scrolls horizontally.
       expect(m.pageScroll).toBeLessThanOrEqual(m.viewport);
-      // Fieldset und Scrollbereich liegen im Formular (1 px Rundung).
+      // Fieldset and scroll area lie within the form (1 px rounding).
       expect(m.fieldset.right).toBeLessThanOrEqual(m.form.right + 1);
       expect(m.fieldset.left).toBeGreaterThanOrEqual(m.form.left - 1);
       expect(m.scroll.right).toBeLessThanOrEqual(m.fieldset.right + 1);
       if (!narrow) {
-        // Mit genug Platz braucht die Matrix keinen Scrollbalken: nichts ist abgeschnitten.
+        // With enough room the matrix needs no scrollbar: nothing is cut off.
         expect(m.scrollOverflow).toBeLessThanOrEqual(0);
         expect(m.lastHead.right).toBeLessThanOrEqual(m.scroll.right + 1);
         for (const c of m.deleteCells) expect(c.right).toBeLessThanOrEqual(m.scroll.right + 1);

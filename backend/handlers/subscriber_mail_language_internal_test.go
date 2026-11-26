@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Reihenfolge gewünschte Sprache -> Seitenstandardsprache -> kein
-// Treffer (eingebauter Standardtext). Das Subscriber-Modell speichert heute keine
-// Sprache; preferred ist die Sprache des Abonnenten (Subscriber.Language).
+// Order: desired language -> page default language -> no
+// match (built-in default text). The Subscriber model currently stores no
+// language; preferred is the subscriber's language (Subscriber.Language).
 func TestSubscriberMailTemplate_Reihenfolge(t *testing.T) {
 	db := testutils.SetupTestDB()
 	require.NoError(t, testutils.EnableTranslation(db))
@@ -20,7 +20,7 @@ func TestSubscriberMailTemplate_Reihenfolge(t *testing.T) {
 	page := models.StatusPage{Name: "p", Slug: "reihenfolge"}
 	require.NoError(t, db.Create(&page).Error)
 	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "de", IsDefault: true}).Error)
-	// die gewünschte Sprache zählt nur, wenn die Seite sie aktiv hat.
+	// the desired language only counts if the page has it active.
 	require.NoError(t, db.Create(&models.Language{Code: "en", Name: "English", IsActive: true}).Error)
 	require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "en"}).Error)
 	kind := NotificationKindIncidentCreated

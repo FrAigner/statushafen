@@ -3,8 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import AdminOverview from './AdminOverview.vue'
-import { axe } from '../../test-support/axe.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
+import { axe } from '../../test-support/axe'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
 
 function overviewFixture() {
   return {
@@ -48,7 +48,7 @@ async function mountOverview(fetchImpl) {
   return { wrapper, router }
 }
 
-// KPI-Karten als { Beschriftung: Wert } (ohne den Screenreader-Zusatz).
+// KPI cards as { label: value } (without the screen reader addition).
 const kpis = (wrapper) => Object.fromEntries(wrapper.findAll('.kpi').map(k => [
   k.find('.kpi__label').text(),
   k.find('.kpi__value').text().replace('Handlungsbedarf', '').trim(),
@@ -190,8 +190,8 @@ describe('AdminOverview', () => {
     expect(wrapper.find('.alert-error').text()).toContain('kaputt')
   })
 
-  // Regression (Stufe 4b): Die View trug Inline-Styles und einen
-  // festen Hex-Wert (#6b4de6) für die Abonnenten-Kennzahl.
+  // Regression (stage 4b): the view had inline styles and a
+  // fixed hex value (#6b4de6) for the subscribers key figure.
   it('hat keine Inline-Styles und keine Hex-Farben im Quelltext', async () => {
     const { wrapper } = await mountOverview()
     expect(wrapper.findAll('[style]')).toHaveLength(0)
@@ -209,7 +209,7 @@ describe('AdminOverview', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Tabelle in einer Karte mit Suche im Kopf.
+  // Direction C: table in a card with search in the header.
   it('zeigt die Tabelle in der Karte „Alle Statusseiten“ und sucht nach Name und Kurzname', async () => {
     const { wrapper } = await mountOverview()
     expect(wrapper.find('section.comp-card h3').text()).toBe('Alle Statusseiten')

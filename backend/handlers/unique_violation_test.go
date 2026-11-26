@@ -14,8 +14,8 @@ type fakeSQLStateErr struct{ state string }
 func (e fakeSQLStateErr) Error() string    { return "fehler " + e.state }
 func (e fakeSQLStateErr) SQLState() string { return e.state }
 
-// isUniqueViolation erkennt Postgres (SQLSTATE 23505, auch
-// eingewickelt), SQLite und gorm.ErrDuplicatedKey, aber keine anderen Fehler.
+// isUniqueViolation detects Postgres (SQLSTATE 23505, also
+// wrapped), SQLite and gorm.ErrDuplicatedKey, but no other errors.
 func TestIsUniqueViolation(t *testing.T) {
 	assert.False(t, isUniqueViolation(nil))
 	assert.False(t, isUniqueViolation(errors.New("connection refused")))

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from './templateScan.js'
+import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from './templateScan'
 
-// Der Scanner hinter den Quelltext-Guards muss selbst stimmen,
-// sonst prüfen die Guards still nichts.
+// The scanner behind the source guards must itself be correct,
+// otherwise the guards silently check nothing.
 
 describe('templateScan', () => {
   it('liest alle .vue-Dateien mit Pfad ab src/', () => {

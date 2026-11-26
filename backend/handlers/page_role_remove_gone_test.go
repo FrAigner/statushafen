@@ -1,11 +1,11 @@
 package handlers_test
 
-// SQLite-Gegenstück zu page_role_remove_postgres_test.go: Wird die
-// Mitgliedschaft zwischen der Prüfung und dem Schreiben entfernt, antwortet der
-// Rollenwechsel mit 404 user_not_found und holt die Zeile nicht zurück. Früher
-// schrieb Save() die Zeile per Upsert zurück (deleted_at = NULL) und antwortete
-// 200. Das Entfernen wird in genau dem Moment eingespielt, in dem der Handler
-// die Benutzerzeile sperrt (FOR UPDATE; SQLite lässt die Klausel weg).
+// SQLite counterpart to page_role_remove_postgres_test.go: If the
+// membership is removed between the check and the write, the
+// role change answers with 404 user_not_found and does not bring the row back. Previously
+// Save() wrote the row back via upsert (deleted_at = NULL) and answered
+// 200. The removal is injected at exactly the moment the handler
+// locks the user row (FOR UPDATE; SQLite omits the clause).
 
 import (
 	"net/http"
@@ -45,9 +45,9 @@ func TestPageUserRoleChange_MemberGoneBeforeWrite(t *testing.T) {
 	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "user_not_found") {
 		t.Fatalf("erwartet 404 user_not_found, war %d %s", w.Code, w.Body.String())
 	}
-	// Die Transaktion rollt zurück und nimmt das eingespielte Entfernen mit; die
-	// Zeile bleibt unverändert (keine neue Rolle). Das "Nicht zurückholen" belegt
-	// der Postgres-Test (page_role_remove_postgres_test.go).
+	// The transaction rolls back and takes the injected removal with it; the
+	// row remains unchanged (no new role). The "do not bring back" is proven
+	// by the Postgres test (page_role_remove_postgres_test.go).
 	var role int64
 	p.db.Unscoped().Model(&models.UserStatusPageRole{}).Select("role_id").Where("user_id = ?", u.ID).Scan(&role)
 	if role != int64(p.viewer.ID) {

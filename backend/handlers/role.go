@@ -11,9 +11,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// roleResponse ergänzt GlobalOnly, damit das Frontend die nicht
-// als Seitenrolle vergebbare Rolle aus den Seitenrollen-Auswahlen ausblendet,
-// ohne den Rollennamen selbst zu kennen. Die Regel bleibt im Backend.
+// roleResponse adds GlobalOnly so that the frontend hides the role that
+// cannot be assigned as a page role from the page role selections,
+// without knowing the role name itself. The rule stays in the backend.
 type roleResponse struct {
 	models.Role
 	GlobalOnly bool `json:"GlobalOnly"`
@@ -47,8 +47,8 @@ func (h *Handler) CreateRoleHandler(c *gin.Context) {
 
 	role := models.Role{
 		Name: req.Name,
-		// der Altwert "<ressource>:write" wird nie mehr gespeichert
-		// (ein noch gecachtes Alt-Frontend schickt ihn), sondern zu CRUD.
+		// the legacy value "<ressource>:write" is never stored anymore
+		// (a still-cached old frontend sends it), but mapped to CRUD.
 		Permissions: permissions.Normalize(req.Permissions),
 	}
 	if err := h.DB.Create(&role).Error; err != nil {
@@ -113,12 +113,12 @@ func (h *Handler) DeleteRoleHandler(c *gin.Context) {
 		return
 	}
 
-	// Soft-Delete löst kein FK-OnDelete aus, die Seitenrollen-
-	// Zuordnungen dieser Rolle explizit entfernen (Hard-Delete, wie
-	// replaceUserPageRoles). Zusammen mit dem Löschen der Rolle in einer Transaktion.
+	// Soft delete triggers no FK OnDelete, so explicitly remove the page-role
+	// assignments of this role (hard delete, like
+	// replaceUserPageRoles). Together with deleting the role in one transaction.
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
-		// Mit der Rolle endet die Mitgliedschaft, die Seiten-SSO-
-		// Verknüpfungen dieser Konten auf den betroffenen Seiten fallen mit weg.
+		// With the role the membership ends; the page SSO
+		// links of these accounts on the affected pages are dropped as well.
 		var members []models.UserStatusPageRole
 		if err := tx.Where("role_id = ?", role.ID).Find(&members).Error; err != nil {
 			return err
@@ -129,8 +129,8 @@ func (h *Handler) DeleteRoleHandler(c *gin.Context) {
 		if err := tx.Unscoped().Where("role_id = ?", role.ID).Delete(&models.UserStatusPageRole{}).Error; err != nil {
 			return err
 		}
-		// Statusseiten, die diese Rolle als Standard-Rolle (Auto-Join)
-		// führen, würden sonst auf eine gelöschte Rolle zeigen.
+		// Status pages that have this role as their default role (auto-join)
+		// would otherwise point to a deleted role.
 		if err := tx.Model(&models.StatusPage{}).Where("default_role_id = ?", role.ID).
 			Update("default_role_id", nil).Error; err != nil {
 			return err

@@ -1,27 +1,30 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C: Listenkarte aller Admin-Seiten. Kartenkopf mit Titel
-  links und Werkzeugen (SearchBox, Filter, SegmentControl) rechts im Slot
-  "tools" (der Baustein setzt den Rahmen .comp-card__tools selbst); darunter
-  bündig die Tabelle bzw. der Leerzustand (Standard-Slot). Die Stile
-  (.comp-card …) stammen aus der Komponentenseite und stehen in style.css.
-  Mit `padded` bekommt der Inhalt Innenabstand (Einstellungs- und
-  Formularseiten); mit `overflowVisible` ragen Flyouts über den Kartenrand
-  (z. B. Auswahlfelder im Karteninhalt). In einem .split steht die Karte mit
-  class="split__main" links neben dem FormPanel. Die Karte ist ein <section>,
-  benannt über den Kartentitel (h3 unter dem Seitentitel h2).
-  Dieser Baustein ersetzt drei parallel entstandene Fassungen (Betrieb,
-  Verwaltung, System).
+  Direction C: list card of all admin pages. Card head with the title
+  on the left and tools (SearchBox, filters, SegmentControl) on the right in the
+  "tools" slot (the component adds the .comp-card__tools wrapper itself); below,
+  flush, the table or the empty state (default slot). The styles
+  (.comp-card …) come from the components page and live in style.css.
+  With `padded` the content gets inner padding (settings and form pages);
+  with `overflowVisible` flyouts may extend beyond the card edge
+  (e.g. select fields in the card content). Inside a .split the card sits with
+  class="split__main" to the left of the FormPanel. The card is a <section>,
+  labelled by the card title (h3 below the page title h2).
+  This component replaces three versions that grew in parallel (operations,
+  administration, system).
 */
 import { useId } from 'vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  title: { type: String, required: true },
-  // Formular- und Einstellungsseiten: Inhalt mit Innenabstand statt bündiger Tabelle.
-  padded: { type: Boolean, default: false },
-  // Karte ohne overflow:hidden, damit Auswahl-Flyouts nicht abgeschnitten werden.
-  overflowVisible: { type: Boolean, default: false },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  title: string
+  // Form and settings pages: content with inner padding instead of a flush table.
+  padded?: boolean
+  // Card without overflow:hidden, so select flyouts are not clipped.
+  overflowVisible?: boolean
+}>(), {
+  padded: false,
+  overflowVisible: false,
 })
 // Stryker restore all
 

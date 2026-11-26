@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// reine Funktionen der Vorfall-Benachrichtigung.
+// pure functions of the incident notification.
 
 func TestExternalIncidentKind_Tabelle(t *testing.T) {
 	const inc, maint = models.ExternalIncidentKindIncident, models.ExternalIncidentKindMaintenance

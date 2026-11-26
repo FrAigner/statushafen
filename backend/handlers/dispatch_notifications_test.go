@@ -18,11 +18,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// setupDispatchFixturesForPage baut das für alle DispatchNotifications-Tests
-// identische Grundgerüst auf (DB, Handler, Component, Incident) für eine vom
-// Aufrufer bereits vorbereitete StatusPage (z.B. mit IsPrivate oder
-// NotificationFromAddress gesetzt) - die Tests unterscheiden sich sonst nur
-// in den angehängten Subscribern.
+// setupDispatchFixturesForPage builds the basic scaffolding, identical for all
+// DispatchNotifications tests (DB, handler, component, incident), for a
+// status page already prepared by the caller (e.g. with IsPrivate or
+// NotificationFromAddress set) - the tests otherwise differ only
+// in the attached subscribers.
 func setupDispatchFixturesForPage(page models.StatusPage) (db *gorm.DB, h *handlers.Handler, comp models.Component, inc models.Incident) {
 	db = testutils.SetupTestDB()
 	h = handlers.NewHandler(db)
@@ -43,9 +43,9 @@ func setupDispatchFixturesForPage(page models.StatusPage) (db *gorm.DB, h *handl
 	return db, h, comp, inc
 }
 
-// setupDispatchFixtures ist der Standardfall von setupDispatchFixturesForPage
-// mit einer schlichten (weder privaten noch mandanten-spezifisch
-// konfigurierten) StatusPage.
+// setupDispatchFixtures is the standard case of setupDispatchFixturesForPage
+// with a plain (neither private nor tenant-
+// specifically configured) StatusPage.
 func setupDispatchFixtures(pageName, slug string) (db *gorm.DB, h *handlers.Handler, comp models.Component, inc models.Incident) {
 	return setupDispatchFixturesForPage(models.StatusPage{Name: pageName, Slug: slug})
 }
@@ -293,9 +293,9 @@ func TestDispatchNotifications_SubscriberEmailContainsUnsubscribeAndAccessLinks(
 
 	db, h, comp, inc := setupDispatchFixturesForPage(models.StatusPage{Name: "Private Sub Page", Slug: "private-sub-page", IsPrivate: true})
 
-	// Seit bekommen Abos privater Seiten nur Mails,
-	// wenn ihr Ersteller die Seite sehen darf. Der Global Admin erhält
-	// zusätzlich die interne Mail, daher nach Empfänger filtern.
+	// Since then, subscriptions of private pages only get mails
+	// if their creator may see the page. The global admin additionally receives
+	// the internal mail, so filter by recipient.
 	creator := models.User{Email: "creator@example.com", IsGlobalAdmin: true}
 	db.Create(&creator)
 	sub := models.Subscriber{StatusPageID: comp.StatusPageID, Channel: "email", Email: "sub@example.com", SubscribedComponentIDs: "all", CreatedByUserID: &creator.ID}
@@ -341,10 +341,10 @@ func TestDispatchNotifications_PublicPageSubscriberLinkHasNoToken(t *testing.T) 
 }
 
 // TestDispatchNotifications_PageNotificationFromAddressIsReplyToOnly:
-// die Adresse einer Statusseite (NotificationFromAddress) wirkt nur als
-// Reply-To. Absenderadresse im From-Header ist die des Betreibers (SMTP_FROM),
-// der Seitenname dient als Anzeigename. Früher ersetzte die Seitenadresse den
-// Absender, womit Seiten-Admins Absender fälschen konnten.
+// the address of a status page (NotificationFromAddress) acts only as
+// Reply-To. The sender address in the From header is the operator's (SMTP_FROM),
+// the page name serves as display name. Previously the page address replaced the
+// sender, which allowed page admins to forge senders.
 func TestDispatchNotifications_PageNotificationFromAddressIsReplyToOnly(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -370,8 +370,8 @@ func TestDispatchNotifications_PageNotificationFromAddressIsReplyToOnly(t *testi
 }
 
 // TestDispatchNotifications_UsesOperatorAddressWhenNoPageAddress:
-// eine Statusseite ohne eigene Adresse sendet mit der Betreiberadresse
-// (SMTP_FROM) und dem Seitennamen als Anzeigenamen, ohne Reply-To.
+// a status page without its own address sends with the operator address
+// (SMTP_FROM) and the page name as display name, without Reply-To.
 func TestDispatchNotifications_UsesOperatorAddressWhenNoPageAddress(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()

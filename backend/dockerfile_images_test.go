@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-// Die Basis-Images im Dockerfile dürfen nicht End-of-Life sein und sind auf
-// eine Version (und Digest) festgelegt. Stand der Lebenszyklen: Alpine 3.21
-// und älter sind ab 2026-11 ohne Sicherheitsupdates, Node 20 ist seit
-// 2026-04 EOL. Beim Anheben der Mindestversionen die Daten bei
-// endoflife.date prüfen.
+// The base images in the Dockerfile must not be end-of-life and are pinned to
+// a version (and digest). Lifecycle status: Alpine 3.21
+// and older are without security updates as of 2026-11, Node 20 has been
+// EOL since 2026-04. When raising the minimum versions, check the data at
+// endoflife.date.
 const (
-	minAlpineMinor = 22 // Alpine 3.22 (Support bis 2027-05)
-	minNodeMajor   = 24 // Node 24 (LTS bis 2028-04); Node 22 endet 2027-04
+	minAlpineMinor = 22 // Alpine 3.22 (support until 2027-05)
+	minNodeMajor   = 24 // Node 24 (LTS until 2028-04); Node 22 ends 2027-04
 )
 
 var fromLine = regexp.MustCompile(`(?im)^FROM\s+(\S+)`)
@@ -49,8 +49,8 @@ func TestDockerfile_BaseImagesNotEndOfLife(t *testing.T) {
 	}
 }
 
-// Das Laufzeit-Image ist zusätzlich per Digest festgelegt, damit ein
-// verschobenes Tag nicht unbemerkt andere Inhalte liefert.
+// The runtime image is additionally pinned by digest so that a
+// moved tag does not silently deliver different contents.
 func TestDockerfile_RuntimeImagePinnedByDigest(t *testing.T) {
 	raw, err := os.ReadFile("../Dockerfile")
 	if err != nil {
@@ -62,8 +62,8 @@ func TestDockerfile_RuntimeImagePinnedByDigest(t *testing.T) {
 	}
 }
 
-// versionPart liest den n-ten Teil (0 = Major) einer Version wie "24-alpine"
-// oder "3.23"; -1, wenn er fehlt oder keine Zahl ist.
+// versionPart reads the n-th part (0 = major) of a version such as "24-alpine"
+// or "3.23"; -1 if it is missing or not a number.
 func versionPart(tag string, n int) int {
 	core := strings.FieldsFunc(tag, func(r rune) bool { return r == '-' })
 	if len(core) == 0 {
@@ -80,9 +80,9 @@ func versionPart(tag string, n int) int {
 	return v
 }
 
-// Image, lokale Entwicklung (frontend/.nvmrc) und CI bauen mit derselben
-// Node-Hauptversion, damit ein Frontend-Build nicht nur in einer der drei
-// Umgebungen geprüft ist.
+// Image, local development (frontend/.nvmrc) and CI build with the same
+// Node major version, so that a frontend build is not only verified in one of the three
+// environments.
 func TestNodeMajorMatchesDockerfileNvmrcAndWorkflows(t *testing.T) {
 	docker, err := os.ReadFile("../Dockerfile")
 	if err != nil {
@@ -125,9 +125,9 @@ func TestNodeMajorMatchesDockerfileNvmrcAndWorkflows(t *testing.T) {
 	}
 }
 
-// Das Build-Image nutzt dieselbe Go-Version wie das Modul (go.mod). Ein älteres
-// Image wäre End-of-Life und könnte das Modul nicht einmal bauen; ein
-// vergessenes Anheben fiele sonst erst beim Image-Build auf.
+// The build image uses the same Go version as the module (go.mod). An older
+// image would be end-of-life and could not even build the module; a
+// forgotten bump would otherwise only be noticed at image build time.
 func TestDockerfile_GoImageMatchesGoMod(t *testing.T) {
 	docker, err := os.ReadFile("../Dockerfile")
 	if err != nil {
@@ -150,9 +150,9 @@ func TestDockerfile_GoImageMatchesGoMod(t *testing.T) {
 	}
 }
 
-// Alle Basis-Images (node, golang, alpine) sind per Digest festgelegt: Ein
-// verschobenes Tag, auch beim Build-Image, würde sonst unbemerkt ein anderes
-// Binary liefern. Den Digest des Index liefert die Registry-API:
+// All base images (node, golang, alpine) are pinned by digest: a
+// moved tag, including on the build image, would otherwise silently deliver a different
+// binary. The index digest is provided by the registry API:
 //
 //	TOKEN=$(curl -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/golang:pull" | jq -r .token)
 //	curl -sI -H "Authorization: Bearer $TOKEN" \
@@ -175,15 +175,15 @@ func TestDockerfile_AllBaseImagesPinnedByDigest(t *testing.T) {
 	}
 }
 
-// Der Container meldet seinen Zustand selbst (/healthz prüft auch die
-// Datenbank). Das Laufzeit-Image hat kein curl; busybox-wget genügt und liegt
-// in Alpine bei.
+// The container reports its own health (/healthz also checks the
+// database). The runtime image has no curl; busybox wget suffices and ships
+// with Alpine.
 func TestDockerfile_HasHealthcheckOnHealthz(t *testing.T) {
 	raw, err := os.ReadFile("../Dockerfile")
 	if err != nil {
 		t.Fatalf("Dockerfile nicht lesbar: %v", err)
 	}
-	// Fortsetzungszeilen ("\" am Zeilenende) zu einer Zeile zusammenfassen.
+	// Join continuation lines ("\" at the end of a line) into one line.
 	raw = []byte(strings.ReplaceAll(string(raw), "\\\n", " "))
 	re := regexp.MustCompile(`(?m)^HEALTHCHECK\s+.*CMD\s+wget\b.*/healthz`)
 	if !re.Match(raw) {
@@ -197,8 +197,8 @@ func TestDockerfile_HasHealthcheckOnHealthz(t *testing.T) {
 	}
 }
 
-// Der Kommentar im Dockerfile behauptet, alle Basis-Images seien festgelegt;
-// das gilt nur, solange der Test oben alle FROM-Zeilen prüft.
+// The comment in the Dockerfile claims that all base images are pinned;
+// that only holds as long as the test above checks all FROM lines.
 func TestDockerfile_CommentMatchesPinning(t *testing.T) {
 	raw, err := os.ReadFile("../Dockerfile")
 	if err != nil {
@@ -209,9 +209,9 @@ func TestDockerfile_CommentMatchesPinning(t *testing.T) {
 	}
 }
 
-// Der Docker-Build-Kontext enthält keine Zugangsdaten und keine Prüfberichte:
-// Was nicht im Kontext liegt, landet weder in Build-Cache noch in Schichten der
-// Builder-Stufen.
+// The Docker build context contains no credentials and no audit reports:
+// What is not in the context ends up neither in the build cache nor in layers of the
+// builder stages.
 func TestDockerignore_ExcludesSecretsAndReports(t *testing.T) {
 	raw, err := os.ReadFile("../.dockerignore")
 	if err != nil {
@@ -226,7 +226,7 @@ func TestDockerignore_ExcludesSecretsAndReports(t *testing.T) {
 			t.Errorf(".dockerignore braucht den Eintrag %q", want)
 		}
 	}
-	// Die Beispiel-Konfiguration bleibt im Kontext (kein Geheimnis, wird gebraucht).
+	// The example configuration stays in the context (not a secret, it is needed).
 	if !lines["!**/.env.example"] {
 		t.Error(".dockerignore muss .env.example ausnehmen")
 	}

@@ -1,6 +1,6 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Profile section "Mit SSO verknüpfen" for page SSO (OIDC) and global providers.
+  Profile section "Link with SSO" for page SSO (OIDC) and global providers.
   GET /api/me/sso returns the own links and the pages the account may still link
   (same rules as OIDCLinkHandler). Linking starts POST /api/auth/oidc/link?page=N
   for a page or POST /api/auth/provider/<id>/link for a global provider from the
@@ -16,13 +16,38 @@ import AppIcon from './AppIcon.vue'
 import { safeIdpRedirect } from '../utils/safeIdpRedirect'
 import { confirmDialog } from '../composables/useConfirm'
 
+/** A linked identity from GET /api/me/sso: page SSO (page_name) or a global provider (provider id). */
+interface SsoIdentity {
+  id: number
+  provider?: string
+  page_name?: string
+  email?: string
+}
+
+/** A page the account may still link. */
+interface LinkablePage {
+  status_page_id: number
+  page_name: string
+}
+
+/** Response of GET /api/me/sso. */
+interface SsoLinksResponse {
+  identities: SsoIdentity[]
+  linkable: LinkablePage[]
+}
+
+interface AuthProvider {
+  id: string
+  name: string
+}
+
 const { t, te } = useI18n()
 const { apiFetch } = useApi()
 const { authConfig, loadAuthConfig } = useAuthConfig()
 const providers = computed(() => authConfig.value?.providers ?? [])
 
-const identities = ref([])
-const linkable = ref([])
+const identities = ref<SsoIdentity[]>([])
+const linkable = ref<LinkablePage[]>([])
 const errorMsg = ref('')
 const statusMsg = ref('')
 
@@ -37,16 +62,16 @@ const visible = computed(() =>
   || errorMsg.value !== '' || statusMsg.value !== ''
 )
 
-const pageName = (entry) => entry.page_name || t('profile.sso.unknownPage')
+const pageName = (entry: SsoIdentity) => entry.page_name || t('profile.sso.unknownPage')
 // Assumption about GET /api/me/sso: a link to a global provider carries its id in
 // `provider`; it is labelled with the provider's name (or the id if unknown).
-const identityName = (entry) => entry.provider
+const identityName = (entry: SsoIdentity) => entry.provider
   ? providers.value.find((p) => p.id === entry.provider)?.name ?? entry.provider
   : pageName(entry)
 
 const load = async () => {
   try {
-    const data = await apiFetch('/api/me/sso')
+    const data: SsoLinksResponse = await apiFetch('/api/me/sso')
     identities.value = data.identities
     linkable.value = data.linkable
   } catch {
@@ -55,22 +80,22 @@ const load = async () => {
 }
 
 // Both link endpoints answer { url }; only a safe authorize URL is followed.
-const followLink = async (endpoint) => {
+const followLink = async (endpoint: string) => {
   errorMsg.value = ''
   try {
-    const { url } = await apiFetch(endpoint, { method: 'POST' })
+    const { url }: { url?: unknown } = await apiFetch(endpoint, { method: 'POST' })
     const target = safeIdpRedirect(url)
     if (!target) throw new Error(t('auth.oidcErrors.unsafe_redirect'))
     window.location.assign(target)
   } catch (err) {
-    errorMsg.value = t('profile.sso.linkError', { message: err.message })
+    errorMsg.value = t('profile.sso.linkError', { message: (err as Error).message })
   }
 }
 
-const startLink = (page) => followLink(`/api/auth/oidc/link?page=${page.status_page_id}`)
-const startProviderLink = (provider) => followLink(`/api/auth/provider/${encodeURIComponent(provider.id)}/link`)
+const startLink = (page: LinkablePage) => followLink(`/api/auth/oidc/link?page=${page.status_page_id}`)
+const startProviderLink = (provider: AuthProvider) => followLink(`/api/auth/provider/${encodeURIComponent(provider.id)}/link`)
 
-const unlink = async (identity) => {
+const unlink = async (identity: SsoIdentity) => {
   if (!(await confirmDialog({ message: t('profile.sso.unlinkConfirm', { page: pageName(identity) }), confirmLabel: t('confirm.unlink') }))) return
   errorMsg.value = ''
   statusMsg.value = ''

@@ -1,34 +1,43 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign 4a: 90-Tage-Verfügbarkeitsbalken. Zeichnet die Tage aus
-  GET /api/public/pages/{slug}/availability (älteste links, heute rechts).
-  - Tage ohne Daten (`no_data`, vor Anlage der Seite) sind neutral grau, nie
-    grün: keine Daten sind kein Betrieb. Die Tagesfarbe ist der schlimmste Status
-    des Tages (eingeschränkt, Teilausfall, Großstörung, Wartung),
-    zusätzlich zur Farbe über die Form unterschieden (Form + Farbe + Text):
-    eingeschränkt diagonal schraffiert, Teilausfall kreuzschraffiert,
-    Großstörung vollflächig, Wartung blau schraffiert.
-  - Der Tooltip nennt Verfügbarkeit in % und die Dauer je Schweregrad.
-  - Eine Prozentzahl erscheint nur bei vorhandenen Daten (`uptimePercent` und
-    je Tag `availability` sind sonst null).
-  - Jeder Tag hat einen Namen für Screenreader (Datum, Status, Prozent); Tage
-    mit Beeinträchtigung oder Wartung sind per Tab erreichbar und zeigen das
-    Label als Tooltip (auch bei Fokus, WCAG 1.4.13: Escape-frei, nur Text).
-  Farben ausschließlich über Tokens (--ok, --deg, --maint, --border-strong).
+  Redesign 4a: 90-day availability bars. Draws the days from
+  GET /api/public/pages/{slug}/availability (oldest on the left, today on the right).
+  - Days without data (`no_data`, before the page was created) are neutral grey,
+    never green: no data is not operation. The day colour is the worst status
+    of the day (degraded, partial outage, major outage, maintenance),
+    distinguished by shape in addition to colour (shape + colour + text):
+    degraded hatched diagonally, partial outage cross-hatched,
+    major outage solid, maintenance hatched blue.
+  - The tooltip gives the availability in % and the duration per severity.
+  - A percentage only appears when there is data (`uptimePercent` and
+    each day's `availability` are null otherwise).
+  - Every day has a name for screen readers (date, status, percent); days
+    with an impairment or maintenance are reachable via Tab and show the
+    label as a tooltip (also on focus, WCAG 1.4.13: no Escape needed, text only).
+  Colours exclusively via tokens (--ok, --deg, --maint, --border-strong).
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toIntlLocale } from '../utils/datetime'
 import { availabilityDayMeta, durationParts, formatAvailability, formatDay } from '../utils/availability'
+import type { AvailabilityDay, AvailabilityImpairment } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  // Name für den zugänglichen Namen, z. B. die Komponente oder „Gesamtstatus“.
-  name: { type: String, required: true },
-  days: { type: Array, required: true }, // [{ date, status, availability, downtime_seconds }]
-  uptimePercent: { type: Number, default: null },
-  // Kompakt (je Komponente): Zahl und Zeitachse klein, ohne Zeitachsenzeile.
-  compact: { type: Boolean, default: false },
+// A day of the response including the duration per severity (worst first).
+interface AvailabilityBarDay extends AvailabilityDay {
+  impairments?: AvailabilityImpairment[] | null
+}
+
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  // Name for the accessible name, e.g. the component or "Overall status".
+  name: string
+  days: AvailabilityBarDay[]
+  uptimePercent?: number | null
+  // Compact (per component): number and time axis small, without the time axis row.
+  compact?: boolean
+}>(), {
+  uptimePercent: null,
+  compact: false,
 })
 // Stryker restore all
 
@@ -37,7 +46,7 @@ const { t, locale } = useI18n()
 const FOCUSABLE = new Set(['deg', 'part', 'major', 'maint'])
 const TIP_EDGE = 20
 
-const fmtDay = (iso) => formatDay(iso, toIntlLocale(locale.value))
+const fmtDay = (iso: string) => formatDay(iso, toIntlLocale(locale.value))
 
 const percentText = computed(() => formatAvailability(props.uptimePercent, toIntlLocale(locale.value)))
 
@@ -45,9 +54,9 @@ const items = computed(() => props.days.map((d, index, all) => {
   const meta = availabilityDayMeta(d.status)
   const percent = formatAvailability(d.availability, toIntlLocale(locale.value))
   const params = { date: fmtDay(d.date), status: t(meta.labelKey), percent }
-  // Der Prozentwert gehört nur dazu, wenn es einen gibt und er etwas aussagt (< 100).
-  const base = percent && d.availability < 100 ? t('availability.dayStatusPercent', params) : t('availability.dayStatus', params)
-  // Dauer je Schweregrad (ungewichtet, vom Backend schlimmster zuerst).
+  // The percentage is only included if there is one and it says something (< 100).
+  const base = percent && d.availability! < 100 ? t('availability.dayStatusPercent', params) : t('availability.dayStatus', params)
+  // Duration per severity (unweighted, worst first from the backend).
   const durations = (Array.isArray(d.impairments) ? d.impairments : [])
     .filter(i => i && i.seconds > 0)
     .map((i) => {
@@ -57,9 +66,9 @@ const items = computed(() => props.days.map((d, index, all) => {
   return {
     date: d.date,
     level: meta.level,
-    // Nur Tage mit Beeinträchtigung/Wartung brauchen einen Tab-Stopp (90 Stopps pro Zeile wären Lärm).
+    // Only days with an impairment/maintenance need a tab stop (90 stops per row would be noise).
     focusable: FOCUSABLE.has(meta.level),
-    // Der Tooltip ist breit: an den Rändern nach innen statt aus dem Fenster ragen.
+    // The tooltip is wide: at the edges it opens inwards instead of sticking out of the window.
     tipEdge: index < TIP_EDGE ? 'start' : (index >= all.length - TIP_EDGE ? 'end' : ''),
     label: durations.length ? t('availability.dayWithDurations', { base, durations: durations.join(', ') }) : base,
   }
@@ -73,7 +82,7 @@ const summary = computed(() => (percentText.value
 <template>
   <div class="avail" :class="{ 'avail--compact': compact }">
     <p v-if="percentText" class="avail__percent">{{ t('availability.uptime', { percent: percentText }) }}</p>
-    <!-- ohne Datenbasis „Keine Daten“ statt einer erfundenen Zahl (nie „0,00 %“). -->
+    <!-- without data "No data" instead of an invented number (never "0.00 %"). -->
     <p v-else class="avail__nodata">{{ t('availability.noData') }}</p>
     <div class="avail__bars" role="group" tabindex="0" :aria-label="summary">
       <span
@@ -106,9 +115,9 @@ const summary = computed(() => (percentText.value
 
 .avail__day { position: relative; flex: 1 1 0; min-inline-size: 0; border-radius: 2px; background: var(--ok); }
 .avail__day--none { background: var(--border-strong); }
-/* Schraffur: Beeinträchtigung/Wartung unterscheiden sich auch ohne Farbwahrnehmung. */
+/* Hatching: degradation/maintenance stay distinguishable without colour perception. */
 .avail__day--deg { background: repeating-linear-gradient(135deg, var(--deg) 0 3px, var(--deg-soft) 3px 5px); }
-/* Teilausfall: Kreuzschraffur; Großstörung: vollflächig (Form unterscheidet die Stufen auch ohne Farbwahrnehmung). */
+/* Partial outage: cross-hatching; major outage: solid (the shape distinguishes the levels without colour perception). */
 .avail__day--part {
   background:
     repeating-linear-gradient(45deg, var(--part) 0 2px, transparent 2px 5px),

@@ -16,8 +16,8 @@ function mountLanguage() {
   return result
 }
 
-// Der Sprachumschalter einer Statusseite bot nur de/en an, weil er
-// die Sprachen der Seite nicht kannte.
+// The language switcher of a status page only offered de/en, because it
+// did not know the page's languages.
 describe('usePublicPageLanguages', () => {
   beforeEach(() => {
     i18n.global.locale.value = 'de'
@@ -110,9 +110,9 @@ describe('usePublicPageLanguages', () => {
   })
 })
 
-// Teil 1: Rückfallkette für Seitensprachen ohne Oberflächentexte:
-// Standardsprache der Seite (falls mit Texten) → Englisch → Deutsch. Vorher fiel
-// vue-i18n immer auf Deutsch zurück.
+// Part 1: fallback chain for page languages without UI texts: the page's
+// default language (if it has texts) -> English -> German. Before, vue-i18n
+// always fell back to German.
 describe('Rückfallkette der Oberflächentexte', () => {
   const page = (defaultCode) => [
     { code: 'de', name: 'Deutsch', is_default: defaultCode === 'de' },

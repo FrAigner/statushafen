@@ -13,16 +13,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Stage 1 von 5 des Mehrsprachigkeits-Features: Admin-CRUD für
-// den globalen Sprachkatalog (Language) sowie Lesen/Schreiben der pro
-// Statusseite aktivierten Sprachen + Default (StatusPageLanguage). Ersetzt
-// die vorherige, implizit auf en/de fixierte Sprachannahme
-// durch einen echten, offen erweiterbaren Katalog.
+// Stage 1 of 5 of the multilingual feature: admin CRUD for
+// the global language catalog (Language) as well as reading/writing the
+// languages activated for a status page + default (StatusPageLanguage). Replaces
+// the previous language assumption implicitly fixed to en/de
+// with a real, openly extensible catalog.
 
-// GetLanguagesHandler liefert den kompletten globalen Sprachkatalog. Bewusst
-// für jeden eingeloggten User lesbar (siehe Kommentar in main.go) - auch ein
-// Seiten-Admin ohne Global-Admin-Rechte muss die verfügbaren Sprachen sehen
-// können, um sie für seine Statusseite zu aktivieren.
+// GetLanguagesHandler returns the complete global language catalog. Deliberately
+// readable for every logged-in user (see comment in main.go) - even a
+// page admin without global admin rights must be able to see the available languages
+// in order to activate them for their status page.
 func (h *Handler) GetLanguagesHandler(c *gin.Context) {
 	var languages []models.Language
 	// Only content languages; legacy catalog rows stay stored but are not offered.
@@ -33,20 +33,20 @@ func (h *Handler) GetLanguagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, languages)
 }
 
-// languageUpsertReq wird für Create UND Update verwendet - Code ist beim
-// Update bewusst nicht gebunden ("required" würde sonst jeden Update-Request
-// ohne mitgeschicktes Code-Feld ablehnen, obwohl UpdateLanguageHandler den
-// Code ohnehin ignoriert (nicht änderbar, siehe Handler-Kommentar)). Die
-// Pflichtprüfung für Code findet stattdessen explizit in
-// CreateLanguageHandler statt.
+// languageUpsertReq is used for create AND update - code is deliberately not
+// bound on update ("required" would otherwise reject every update request
+// without a code field sent along, although UpdateLanguageHandler ignores the
+// code anyway (not changeable, see handler comment)). The
+// mandatory check for code instead happens explicitly in
+// CreateLanguageHandler.
 type languageUpsertReq struct {
 	Code     string `json:"code"`
 	Name     string `json:"name" binding:"required"`
 	IsActive *bool  `json:"is_active"`
 }
 
-// CreateLanguageHandler legt einen neuen Eintrag im globalen Sprachkatalog
-// an - global-admin-only, analog zum Tag-Katalog (siehe handlers/tag.go).
+// CreateLanguageHandler creates a new entry in the global language catalog
+// - global-admin-only, analogous to the tag catalog (see handlers/tag.go).
 func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 	var req languageUpsertReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -59,7 +59,7 @@ func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 		abortInvalidInput(c, codeNameRequired, "name darf nicht leer sein")
 		return
 	}
-	// Format prüfen (vorher nur "nicht leer", Frontend nur maxlength).
+	// Check format (previously only "not empty", frontend only maxlength).
 	if !languageCodeRegex.MatchString(code) {
 		abortInvalidInput(c, codeLanguageCodeInvalid, "code muss ein Sprachcode wie de oder en-us sein")
 		return
@@ -84,9 +84,9 @@ func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
-	// Gelöschte Sprachen bleiben als Soft-Delete-Zeile stehen (Grabstein für
-	// den Seed, FK von StatusPageLanguage, vollständiger Unique-Index auf code). Wird
-	// derselbe Code neu angelegt, lebt diese Zeile mit dem neuen Namen wieder auf.
+	// Deleted languages remain as a soft-deleted row (tombstone for
+	// the seed, FK from StatusPageLanguage, full unique index on code). If
+	// the same code is created again, this row comes back to life with the new name.
 	var tomb models.Language
 	tombErr := h.DB.Unscoped().Where("code = ? AND deleted_at IS NOT NULL", code).First(&tomb).Error
 	if tombErr == nil {
@@ -105,9 +105,9 @@ func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 		return
 	}
 	lang := models.Language{Code: code, Name: name, IsActive: isActive}
-	// GORM ersetzt das Nullwert-false durch default:true; eine inaktiv angelegte
-	// Sprache wird deshalb im selben Schritt ausdrücklich deaktiviert (eine
-	// Transaktion, damit bei Fehlern keine aktive Zeile übrig bleibt).
+	// GORM replaces the zero-value false with default:true; a language created as inactive
+	// is therefore explicitly deactivated in the same step (one
+	// transaction, so that no active row is left behind on errors).
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&lang).Error; err != nil {
 			return err
@@ -129,9 +129,9 @@ func (h *Handler) CreateLanguageHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, lang)
 }
 
-// UpdateLanguageHandler ändert Name/IsActive eines Katalog-Eintrags. Der Code
-// selbst ist bewusst nicht änderbar - er ist der fachliche Schlüssel, über
-// den StatusPageLanguage (und künftig lokalisierter Content) referenziert.
+// UpdateLanguageHandler changes Name/IsActive of a catalog entry. The code
+// itself is deliberately not changeable - it is the domain key through
+// which StatusPageLanguage (and future localized content) is referenced.
 func (h *Handler) UpdateLanguageHandler(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -171,7 +171,7 @@ func (h *Handler) UpdateLanguageHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, lang)
 }
 
-// languageBlocked beendet die Lösch-Transaktion mit einer fachlichen Ablehnung (409).
+// languageBlocked ends the delete transaction with a business-rule rejection (409).
 type languageBlocked struct {
 	code  string
 	error string
@@ -181,24 +181,24 @@ type languageBlocked struct {
 
 func (b *languageBlocked) Error() string { return b.code }
 
-// DeleteLanguageHandler löscht eine Sprache aus dem globalen Katalog
-// (global-admin-only). Regeln, alle in EINER Transaktion geprüft:
-//  1. Standardsprache mindestens einer Statusseite: 409 language_is_default mit den
-//     Seitennamen (pages) und der Anzahl (count). Eine Seite ohne Standardsprache
-//     soll nie entstehen, der Admin stellt die Seite erst um.
-//  2. "In Benutzung" heißt: es gibt noch aktive Mail-Vorlagen (NotificationTemplate.
-//     Language) mit genau diesem Code; sie würden sonst nie mehr versendet bzw. ließen
-//     sich nicht mehr bearbeiten: 409 language_in_use mit count. Nicht dazu zählen die
-//     UI-Sprache der Nutzer (User.PreferredLanguage kennt nur de/en, nicht den Katalog)
-//     und gespeicherte Übersetzungen von Vorfällen/Komponenten/Ankündigungen.
-//  3. Sonst: Zuordnungen StatusPageLanguage (alle nicht Standard, siehe 1) und die
-//     Sprache werden soft-gelöscht. Die Zeile bleibt als Grabstein: der Seed
-//     (seedLanguageCatalog) prüft Unscoped und legt eine bewusst gelöschte Sprache
-//     nicht neu an; CreateLanguageHandler lässt sie bei gleichem Code wieder aufleben.
+// DeleteLanguageHandler deletes a language from the global catalog
+// (global-admin-only). Rules, all checked in ONE transaction:
+//  1. Default language of at least one status page: 409 language_is_default with the
+//     page names (pages) and the count (count). A page without a default language
+//     must never arise; the admin switches the page over first.
+//  2. "In use" means: there are still active mail templates (NotificationTemplate.
+//     Language) with exactly this code; they would otherwise never be sent again or could
+//     no longer be edited: 409 language_in_use with count. Not counted are the
+//     UI language of users (User.PreferredLanguage knows only de/en, not the catalog)
+//     and stored translations of incidents/components/announcements.
+//  3. Otherwise: StatusPageLanguage assignments (all non-default, see 1) and the
+//     language are soft-deleted. The row remains as a tombstone: the seed
+//     (seedLanguageCatalog) checks Unscoped and does not recreate a
+//     deliberately deleted language; CreateLanguageHandler revives it for the same code.
 //
-// Bereits gespeicherte Übersetzungen bleiben in der Datenbank, werden aber nicht mehr
-// ausgeliefert: der öffentliche Pfad lehnt Sprachen ab, die die Seite nicht aktiviert
-// hat (400), und fragt nur Code und Standardsprache der Seite ab.
+// Already stored translations remain in the database but are no longer
+// delivered: the public path rejects languages the page has not activated
+// (400), and only queries the page's code and default language.
 func (h *Handler) DeleteLanguageHandler(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -255,8 +255,8 @@ func (h *Handler) DeleteLanguageHandler(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// GetPageLanguagesHandler liefert die für eine Statusseite aktivierten
-// Sprachen inkl. Default-Markierung.
+// GetPageLanguagesHandler returns the languages activated for a status page
+// languages incl. default marker.
 func (h *Handler) GetPageLanguagesHandler(c *gin.Context) {
 	pageID, ok := parsePageIDParam(c)
 	if !ok {
@@ -271,19 +271,19 @@ func (h *Handler) GetPageLanguagesHandler(c *gin.Context) {
 }
 
 type putPageLanguagesReq struct {
-	// Codes: die vollständige neue Menge aktivierter Sprachcodes
-	// - kein PATCH/Diff, das UI schickt immer den gewünschten Endzustand,
-	// analog zum Muster in UpdateMySubscriptionHandler.
+	// Codes: the complete new set of activated language codes
+	// - no PATCH/diff, the UI always sends the desired end state,
+	// analogous to the pattern in UpdateMySubscriptionHandler.
 	Codes   []string `json:"codes" binding:"required"`
 	Default string   `json:"default" binding:"required"`
 }
 
-// PutPageLanguagesHandler ersetzt die komplette Sprachauswahl
-// einer Statusseite durch die übergebene Menge + Default. Bewusst als
-// Replace statt granularem Add/Remove: verhindert, dass eine Seite
-// zwischenzeitlich ganz ohne Default-Sprache oder mit einem Default
-// dasteht, der nicht in der aktivierten Menge enthalten ist - beides wird
-// hier als atomare Transaktion validiert und durchgesetzt.
+// PutPageLanguagesHandler replaces the complete language selection
+// of a status page with the given set + default. Deliberately a
+// replace instead of granular add/remove: prevents a page
+// from temporarily ending up with no default language at all or with a default
+// that is not in the activated set - both are
+// validated and enforced here as an atomic transaction.
 func (h *Handler) PutPageLanguagesHandler(c *gin.Context) {
 	pageID, ok := parsePageIDParam(c)
 	if !ok {

@@ -16,10 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Folgepunkte aus dem Security-Review. Jeder Test hat
-// eine Gegenprobe: Er war gegen den Stand von develop rot (siehe PR-Text).
+// Follow-up points from the security review. Each test has
+// a control check: It was red against the develop state (see PR text).
 
-// countQueries zählt Leseabfragen je Tabelle, solange der Test läuft.
+// countQueries counts read queries per table while the test runs.
 func countQueries(t *testing.T, db *gorm.DB, tables ...string) map[string]int {
 	t.Helper()
 	counts := map[string]int{}
@@ -35,7 +35,7 @@ func countQueries(t *testing.T, db *gorm.DB, tables ...string) map[string]int {
 	return counts
 }
 
-// failNth lässt die n-te (1-basiert) Leseabfrage auf der Tabelle scheitern.
+// failNth makes the n-th (1-based) read query on the table fail.
 func failNth(t *testing.T, db *gorm.DB, table string, n int) {
 	t.Helper()
 	seen := 0
@@ -45,8 +45,8 @@ func failNth(t *testing.T, db *gorm.DB, table string, n int) {
 	})
 }
 
-// Punkt 1 (Timing-Orakel): Für bekannte und unbekannte Adressen laufen
-// dieselben Abfragen in derselben Anzahl, damit die Laufzeit nichts verrät.
+// Point 1 (timing oracle): For known and unknown addresses the
+// same queries run in the same number, so the runtime reveals nothing.
 func TestPageInvitationNachpruefung_LookupQueriesIdenticalForKnownAndUnknown(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -74,12 +74,12 @@ func TestPageInvitationNachpruefung_LookupQueriesIdenticalForKnownAndUnknown(t *
 	}
 }
 
-// Punkt 1/3: Scheitert die Kontosuche mit einem DB-Fehler, ist das kein
-// "unbekannte Adresse" (sonst entstünde eine Einladung ohne Mail): 500.
+// Point 1/3: If the account lookup fails with a DB error, that is not an
+// "unknown address" (otherwise an invitation without mail would arise): 500.
 func TestPageInvitationNachpruefung_UserLookupDBErrorIs500(t *testing.T) {
 	f := newInvFixture(t)
 	f.account(t, "lookup-err@x.example")
-	// users-Abfragen: 1. Sitzungsprüfung (AuthMiddleware), 2. Anmeldung,
+	// users queries: 1. session check (AuthMiddleware), 2. login,
 	// 3. isEffectiveGlobalAdmin, 4. Kontosuche.
 	failNth(t, f.db, "users", 4)
 	w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "lookup-err@x.example", "role_id": f.viewer.ID})
@@ -89,7 +89,7 @@ func TestPageInvitationNachpruefung_UserLookupDBErrorIs500(t *testing.T) {
 	}
 }
 
-// Punkt 3: Der Betreff mit Umlauten im Seitennamen ist RFC-2047-kodiert.
+// Point 3: The subject with umlauts in the page name is RFC 2047 encoded.
 func TestPageInvitationNachpruefung_MailSubjectEncodedForUmlauts(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -113,8 +113,8 @@ func TestPageInvitationNachpruefung_MailSubjectEncodedForUmlauts(t *testing.T) {
 	}
 }
 
-// H3: Wird das Konto zwischen Vorprüfung und Transaktion zum Global Admin bzw.
-// bekommt eine SSO-Verknüpfung, greift die Ein-Seiten-Grenze in der Transaktion.
+// H3: If the account becomes a global admin or gets an SSO link
+// between pre-check and transaction, the one-page limit applies in the transaction.
 func TestPageInvitationNachpruefung_AcceptRechecksAccountInTransaction(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -147,8 +147,8 @@ func TestPageInvitationNachpruefung_AcceptRechecksAccountInTransaction(t *testin
 	}
 }
 
-// F5: Verliert der Einladende seine Rechte oder wird die Rolle gelöscht,
-// zwischen Vorprüfung und Transaktion, entsteht keine Mitgliedschaft.
+// F5: If the inviter loses their rights or the role is deleted
+// between pre-check and transaction, no membership is created.
 func TestPageInvitationNachpruefung_AcceptRechecksRoleAndInviterInTransaction(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -187,8 +187,8 @@ func TestPageInvitationNachpruefung_AcceptRechecksRoleAndInviterInTransaction(t 
 	}
 }
 
-// O2: Scheitert die Prüfung "nur global vergebbare Rolle" mit einem DB-Fehler,
-// wird gesperrt (500), nicht durchgelassen. Die zweite roles-Abfrage ist sie.
+// O2: If the "only globally assignable role" check fails with a DB error,
+// it is blocked (500), not let through. The second roles query is that one.
 func TestPageInvitationNachpruefung_GlobalOnlyRoleCheckFailsClosed(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -203,7 +203,7 @@ func TestPageInvitationNachpruefung_GlobalOnlyRoleCheckFailsClosed(t *testing.T)
 	t.Run("Einladen als Seitenadmin", func(t *testing.T) {
 		f := newInvFixture(t)
 		f.account(t, "o2b@x.example")
-		// roles-Abfragen: 1. Route, 2. gewählte Rolle, 3. Rechte des Aufrufers (Preload), 4. "nur global".
+		// roles queries: 1. route, 2. chosen role, 3. caller's rights (preload), 4. "global only".
 		failNth(t, f.db, "roles", 4)
 		w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "o2b@x.example", "role_id": f.viewer.ID})
 		requireStatusCode(t, w, http.StatusInternalServerError)
@@ -214,7 +214,7 @@ func TestPageInvitationNachpruefung_GlobalOnlyRoleCheckFailsClosed(t *testing.T)
 	t.Run("Zuweisen als Global Admin", func(t *testing.T) {
 		f := newInvFixture(t)
 		u, _ := f.account(t, "o2c@x.example")
-		// roles-Abfragen: 1. gewählte Rolle, 2. pageRolesAssignable (Global Admin: keine Routenprüfung).
+		// roles queries: 1. chosen role, 2. pageRolesAssignable (global admin: no route check).
 		failNth(t, f.db, "roles", 2)
 		w := idorRequest(t, f.r, "POST", f.usersPath(), f.gaTok, map[string]any{"user_id": u.ID, "role_id": f.viewer.ID})
 		if w.Code == http.StatusOK || w.Code == http.StatusCreated {
@@ -226,22 +226,22 @@ func TestPageInvitationNachpruefung_GlobalOnlyRoleCheckFailsClosed(t *testing.T)
 	})
 }
 
-// H5: Scheitert das Laden der Rollennamen, antwortet die Liste mit 500 statt
-// mit leeren Rollennamen.
+// H5: If loading the role names fails, the list responds with 500 instead of
+// with empty role names.
 func TestPageInvitationNachpruefung_ListRoleNamesErrorIs500(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
 	f := newInvFixture(t)
 	u, _ := f.account(t, "h5@x.example")
 	f.invite(t, srv, u.Email, f.viewer)
-	// Die erste roles-Abfrage gehört der Rechteprüfung der Route, die zweite den Rollennamen.
+	// The first roles query belongs to the route's permission check, the second to the role names.
 	failNth(t, f.db, "roles", 2)
 	w := idorRequest(t, f.r, "GET", f.invPath(), f.ownerTok, nil)
 	requireStatusCode(t, w, http.StatusInternalServerError)
 }
 
-// F6: Eine Einladung mit inzwischen gelöschter Rolle kann der Seitenadmin
-// zurückziehen (vorher 403); ein anderer Lesefehler der Rolle ist ein 500.
+// F6: A page admin can revoke an invitation whose role has since been deleted
+// (previously 403); any other read error of the role is a 500.
 func TestPageInvitationNachpruefung_RevokeWithDeletedOrUnreadableRole(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -262,7 +262,7 @@ func TestPageInvitationNachpruefung_RevokeWithDeletedOrUnreadableRole(t *testing
 		u, _ := f.account(t, "f6b@x.example")
 		f.invite(t, srv, u.Email, f.viewer)
 		inv := f.onlyInvitation(t)
-		// Erste roles-Abfrage: Rechteprüfung der Route; zweite: Rolle der Einladung.
+		// First roles query: route permission check; second: role of the invitation.
 		failNth(t, f.db, "roles", 2)
 		w := idorRequest(t, f.r, "DELETE", f.invPath()+"/"+strconv.Itoa(int(inv.ID)), f.ownerTok, nil)
 		requireStatusCode(t, w, http.StatusInternalServerError)
@@ -272,7 +272,7 @@ func TestPageInvitationNachpruefung_RevokeWithDeletedOrUnreadableRole(t *testing
 	})
 }
 
-// H8: expires_at ist für das Aufräumen indiziert.
+// H8: expires_at is indexed for cleanup.
 func TestPageInvitationNachpruefung_ExpiresAtIndexed(t *testing.T) {
 	db := testutils.SetupTestDB()
 	if !db.Migrator().HasIndex(&models.PageInvitation{}, "ExpiresAt") {
@@ -280,8 +280,8 @@ func TestPageInvitationNachpruefung_ExpiresAtIndexed(t *testing.T) {
 	}
 }
 
-// H4/F7: Der Datenexport nennt nur offene, dem eigenen Konto zugeordnete
-// Einladungen, lädt die Seitennamen mit einer Abfrage und meldet DB-Fehler.
+// H4/F7: The data export lists only open invitations assigned to the own account,
+// loads the page names with one query and reports DB errors.
 func TestPageInvitationNachpruefung_ExportInvitations(t *testing.T) {
 	setup := func(t *testing.T) (*gorm.DB, http.Handler, models.User, string) {
 		db := testutils.SetupTestDB()
@@ -330,7 +330,7 @@ func TestPageInvitationNachpruefung_ExportInvitations(t *testing.T) {
 				t.Errorf("unerwartete Einladung im Export: %q", inv.StatusPageName)
 			}
 		}
-		// Rollen-Preload des Exports (leer) zählt nicht; Seitennamen der Einladungen: eine Abfrage.
+		// Role preload of the export (empty) does not count; page names of the invitations: one query.
 		if queries["status_pages"] > 1 {
 			t.Errorf("N+1: %d Abfragen auf status_pages", queries["status_pages"])
 		}
@@ -355,9 +355,9 @@ func TestPageInvitationNachpruefung_ExportInvitations(t *testing.T) {
 	})
 }
 
-// O2/F5 (Abdeckung): Eine Einladung auf die globale Rolle "Global Admin" ist
-// gegenstandslos, und DB-Fehler bei der erneuten Prüfung in der Annahme-
-// Transaktion enden fail closed mit 500 (Einladung bleibt, keine Mitgliedschaft).
+// O2/F5 (coverage): An invitation to the global role "Global Admin" is
+// moot, and DB errors on the re-check in the accept
+// transaction end fail closed with 500 (invitation stays, no membership).
 func TestPageInvitationNachpruefung_AcceptTransactionFailsClosedAndGlobalAdminRole(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -394,12 +394,12 @@ func TestPageInvitationNachpruefung_AcceptTransactionFailsClosedAndGlobalAdminRo
 	}
 }
 
-// Review-Fund 5: Scheitert die Mitgliedschaftsabfrage der Kontosuche, gilt nicht
-// "kein Mitglied" (fail closed): 500, keine Einladung, keine Mail.
+// Review finding 5: If the membership query of the account lookup fails, it does not count as
+// "not a member" (fail closed): 500, no invitation, no mail.
 func TestPageInvitationNachpruefung_MembershipCountErrorIs500(t *testing.T) {
 	f := newInvFixture(t)
 	f.account(t, "count-err@x.example")
-	// user_status_page_roles-Abfragen: 1. Route, 2. Rechte des Aufrufers, 3. Rolle auf anderer Seite, 4. Mitgliedschaft.
+	// user_status_page_roles queries: 1. route, 2. caller's rights, 3. role on another page, 4. membership.
 	failNth(t, f.db, "user_status_page_roles", 4)
 	w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "count-err@x.example", "role_id": f.viewer.ID})
 	requireStatusCode(t, w, http.StatusInternalServerError)

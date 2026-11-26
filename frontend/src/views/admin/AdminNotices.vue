@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { OnyxButton, OnyxCheckbox } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -29,13 +29,14 @@ import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import ListState from '../../components/ListState.vue'
 import { noticeBadge } from '../../utils/badgeStatus'
+import type { GeneralNotice } from '../../types/api'
 
-// General Notices: seitenweite Ankündigungen, unabhängig von
-// Incidents/Wartungsfenstern. Struktur/Styling analog zu AdminIncidents.vue.
+// General notices: page-wide announcements, independent of incidents/maintenance
+// windows. Structure/styling like AdminIncidents.vue.
 
 const { apiFetch } = useApi()
-// Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
-// Eintrag schreibgeschützt (formReadOnly), ohne Löschen entfällt der Eintrag im Zeilenmenü.
+// Permissions of this tab per action. Without update an existing entry opens
+// read-only (formReadOnly); without delete the row menu entry is gone.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('notices')
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const { activeTenantId } = useTenant()
@@ -43,10 +44,11 @@ const { t, locale } = useI18n()
 const { formEl, errors, focusForm, clearErrors, clearError, validateRequired } = useFormPanel()
 const breadcrumbs = usePageCrumbs(() => t('notices.title'))
 
-const formData       = ref({})
+// Edit form; StartAt/EndAt hold datetime-local input values while editing.
+const formData       = ref<Partial<GeneralNotice>>({})
 
-// Sprachumschalter über Titel und Nachricht (weitere Sprachen der Seite).
-// Übersetzungen folgen dem Recht „Ändern“ des Tabs.
+// Language switcher above title and message (further languages of the page).
+// Translations follow the tab's "update" permission.
 const trans = useFormTranslations({
   apiFetch,
   urls: { list: (id) => `/api/notices/${id}/translations/all`, save: (id, code) => `/api/notices/${id}/translations/${code}` },
@@ -55,17 +57,17 @@ const trans = useFormTranslations({
 })
 const { showSwitcher, onDefaultLang, titleModel, contentModel: messageModel, active: activeLang } = trans
 
-const items          = ref([])
+const items          = ref<GeneralNotice[]>([])
 const isEditing      = ref(false)
-const currentEditId  = ref(null)
+const currentEditId  = ref<number | null>(null)
 const loading        = ref(false)
 const loadFailed     = ref(false)
 const alertMsg       = ref('')
 const alertType      = ref('warning')
 const isSaving       = ref(false)
-const deletingId     = ref(null)
+const deletingId     = ref<number | null>(null)
 
-// Richtung C: Titel des Formulars nennt die Ankündigung, nicht die ID.
+// Direction C: the form title names the notice, not the ID.
 const formTitle = computed(() => currentEditId.value
   ? t('notices.editTitle', { name: formData.value.Title })
   : t('notices.createTitle'))
@@ -73,7 +75,7 @@ const formTitle = computed(() => currentEditId.value
 const levelOptions = computed(() => ['info', 'warning', 'critical']
   .map(value => ({ label: noticeBadge(value, t).label, value })))
 
-// Stufe 4b: ResponsiveTable/dataTable, Stufe als StatusBadge.
+// Stage 4b: ResponsiveTable/dataTable, level as a StatusBadge.
 const columns = computed(() => [
   { key: 'Title', label: t('notices.tableTitle') },
   { key: 'Level', label: t('notices.tableLevel') },
@@ -82,7 +84,7 @@ const columns = computed(() => [
   { key: 'CreatedAt', label: t('notices.tableCreated') },
 ])
 
-/* ── Liste: Suche und Zustandsfilter im Kartenkopf ── */
+/* ── List: search and state filter in the card header ── */
 const { query, filter, rows, searching } = useListQuery(items, {
   textOf: item => `${item.Title} ${item.Message || ''}`,
   predicates: { active: item => item.IsActive, inactive: item => !item.IsActive },
@@ -106,11 +108,11 @@ const loadData = async () => {
     items.value = await apiFetch(`/api/pages/${activeTenantId.value}/notices/all`) ?? []
   } catch (err) {
     loadFailed.value = true
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   } finally {
     loading.value = false
   }
-  await trans.load(activeTenantId.value)
+  await trans.load(activeTenantId.value!)
 }
 
 watch(activeTenantId, (newId) => {
@@ -120,9 +122,9 @@ watch(activeTenantId, (newId) => {
 }, { immediate: true })
 
 /* ── CRUD helpers ── */
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value  = msg
   alertType.value = type
 }
@@ -136,7 +138,7 @@ const openNew = () => {
   focusForm()
 }
 
-const openEdit = (item) => {
+const openEdit = (item: GeneralNotice) => {
   formData.value  = {
     ...item,
     StartAt: toLocalInputValue(item.StartAt),
@@ -162,13 +164,13 @@ const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onStart
 const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadData, onStart: clearAlert, onDeleted: () => showAlert(t('adminFeedback.deleted'), 'success'), onError: (err) => showAlert(t('common.deleteError') + err.message, 'error') })
 
 const saveItem = async () => {
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste.
+  // Required fields: error at the field instead of a server error, focus on the first one.
   const valid = await validateRequired([
     { key: 'Title', value: formData.value.Title, message: t('patterns.fieldRequired', { field: t('notices.fieldTitle') }) },
     { key: 'Message', value: formData.value.Message, message: t('patterns.fieldRequired', { field: t('notices.fieldMessage') }) },
   ])
   if (!valid) {
-    activeLang.value = '' // die Pflichtfelder gehören zur Standardsprache
+    activeLang.value = '' // the required fields belong to the default language
     return
   }
   if (!trans.checkComplete(showAlert)) return
@@ -179,30 +181,30 @@ const saveItem = async () => {
   const payload = { ...formData.value }
   payload.StartAt = formData.value.StartAt ? new Date(formData.value.StartAt).toISOString() : null
   payload.EndAt   = formData.value.EndAt   ? new Date(formData.value.EndAt).toISOString()   : null
-  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved) => {
-    // Neue ID merken, bevor Übersetzungen folgen: scheitert eine, legt ein zweiter Versuch keinen zweiten Eintrag an.
+  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved: { ID?: number } | null) => {
+    // Remember the new ID before translations follow: if one fails, a second attempt does not create a second entry.
     if (isNew && saved?.ID) currentEditId.value = saved.ID
-    if (showSwitcher.value) await trans.saveAll(currentEditId.value)
+    if (showSwitcher.value) await trans.saveAll(currentEditId.value!)
     showAlert(isNew ? t('notices.created') : t('common.changesSaved'), 'success')
     cancelEdit()
   })
 }
 
-const deleteItem = (id, name) =>
+const deleteItem = (id: number, name: string) =>
   deleteAction(`/api/pages/${activeTenantId.value}/notices/${id}`, id, t('notices.confirmDelete', { name }))
 
-const formatDate = (d) => formatDateTimeShort(d, locale.value)
+const formatDate = (d: string | null | undefined) => formatDateTimeShort(d, locale.value)
 
-// Zeilenmenü: „Übersetzungen“ ist ein Link, der Rest meldet seinen key.
-const menuItems = (item) => [
+// Row menu: "Translations" is a link, the rest reports its key.
+const menuItems = (item: GeneralNotice) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   // Only with a second content language (switched off: the page lists its default only).
   ...(trans.multilingual.value ? [{ key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/notices/${item.ID}/translations` }] : []),
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === item.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === item.ID }] : []),
 ]
-const onMenuSelect = (item, key) => {
+const onMenuSelect = (item: GeneralNotice, key: string) => {
   if (key === 'edit') openEdit(item)
-  else deleteItem(item.ID, item.Title) // „Übersetzungen“ ist ein Link und meldet nichts
+  else deleteItem(item.ID, item.Title) // "Translations" is a link and reports nothing
 }
 </script>
 
@@ -221,7 +223,7 @@ const onMenuSelect = (item, key) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Liste und Formular nebeneinander (unter 860 px untereinander). -->
+    <!-- Direction C: list and form side by side (stacked below 860 px). -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard :title="t('notices.cardTitle')" class="split__main">
         <template #tools>
@@ -249,7 +251,7 @@ const onMenuSelect = (item, key) => {
           </template>
           <template #cell-CreatedAt="{ item }"><RelativeTime :value="item.CreatedAt" /></template>
           <template #actions="{ item }">
-            <!-- Übersetzungen nur noch über das Zeilenmenü. -->
+            <!-- Translations only via the row menu now. -->
             <RowMenu v-help="'notices.rowActions'" :label="t('patterns.menuLabel', { name: item.Title })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
           </template>
         </ResponsiveTable>
@@ -280,12 +282,12 @@ const onMenuSelect = (item, key) => {
           </FormField>
 
           <div class="notice-options">
-            <OnyxCheckbox v-model="formData.IsActive" v-help="'notices.active'" :label="t('notices.fieldActive')" />
-            <OnyxCheckbox v-model="formData.Collapsed" v-help="'notices.collapsed'" :label="t('notices.fieldCollapsed')" />
-            <!-- Opt-in-Mailversand. Beim Anlegen (bzw. Erst-Aktivierung
-                 einer inaktiven Notice) wird eine Mail an alle Email-Subscriber
-                 dieser Statusseite geschickt. -->
-            <OnyxCheckbox v-model="formData.NotifySubscribers" v-help="'notices.notifySubscribers'" :label="t('notices.fieldNotifySubscribers')" />
+            <OnyxCheckbox v-model="formData.IsActive" value="IsActive" v-help="'notices.active'" :label="t('notices.fieldActive')" />
+            <OnyxCheckbox v-model="formData.Collapsed" value="Collapsed" v-help="'notices.collapsed'" :label="t('notices.fieldCollapsed')" />
+            <!-- Opt-in mail sending. On creation (or first activation of an
+                 inactive notice) a mail goes to all email subscribers of
+                 this status page. -->
+            <OnyxCheckbox v-model="formData.NotifySubscribers" value="NotifySubscribers" v-help="'notices.notifySubscribers'" :label="t('notices.fieldNotifySubscribers')" />
           </div>
 
           <div class="form-grid">

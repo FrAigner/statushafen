@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
-import { DOC_SOURCES, renderMarkdown } from './index.js'
+import { DOC_SOURCES, renderMarkdown } from './index'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
 

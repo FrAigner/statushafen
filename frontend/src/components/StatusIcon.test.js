@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import StatusIcon from './StatusIcon.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const SHAPES = {
   operational: 'circle-check',

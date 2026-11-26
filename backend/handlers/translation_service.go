@@ -16,22 +16,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Automatische Übersetzung: Der Bearbeiter lässt Titel und
-// Nachricht aus der Standardsprache der Seite in eine weitere Sprache
-// vorschlagen. Das Ergebnis wird nie gespeichert, sondern nur als Entwurf ins
-// Formular geliefert.
+// Automatic translation: the editor has the title and
+// message suggested from the page's default language into another language.
+// The result is never stored, only delivered as a draft into the
+// form.
 //
-// Konfiguration (Systemeinstellungen, nur Global Admin):
-//   - translation.provider: "" (Standard = LibreTranslate aus der Umgebung),
-//     "libretranslate" oder "deepl"
-//   - translation.url: LibreTranslate-Adresse (nur https, öffentlich, SSRF-geprüft)
-//   - translation.api_key: Schlüssel (LibreTranslate optional, DeepL Pflicht)
+// Configuration (system settings, global admin only):
+//   - translation.provider: "" (default = LibreTranslate from the environment),
+//     "libretranslate" or "deepl"
+//   - translation.url: LibreTranslate address (https only, public, SSRF-checked)
+//   - translation.api_key: key (optional for LibreTranslate, required for DeepL)
 //
-// Umgebung des Betreibers: LIBRETRANSLATE_URL / LIBRETRANSLATE_API_KEY. Diese
-// Adresse ist vertrauenswürdig und darf intern sein (Compose-Dienst, http).
+// Operator environment: LIBRETRANSLATE_URL / LIBRETRANSLATE_API_KEY. This
+// address is trusted and may be internal (compose service, http).
 //
-// Der Schlüssel liegt wie OIDCClientSecret in der Datenbank, verlässt den
-// Server aber nie: Antworten melden nur api_key_set.
+// Like OIDCClientSecret, the key lives in the database but never leaves the
+// server: responses only report api_key_set.
 
 const (
 	settingTranslationProvider = "translation.provider"
@@ -44,23 +44,23 @@ const (
 	envLibreTranslateURL = "LIBRETRANSLATE_URL"
 	envLibreTranslateKey = "LIBRETRANSLATE_API_KEY"
 
-	// maxTranslateRunes begrenzt Titel plus Nachricht je Anfrage (Kontingent
-	// des Dienstes schonen, Missbrauch begrenzen).
+	// maxTranslateRunes limits title plus message per request (quota
+	// of the service, limit abuse).
 	maxTranslateRunes = 5000
 )
 
 var errTranslationNotConfigured = errors.New("keine Übersetzung konfiguriert")
 
-// translationConfig ist die wirksame Konfiguration.
+// translationConfig is the effective configuration.
 type translationConfig struct {
-	Provider string // "libretranslate" oder "deepl", leer = nicht konfiguriert
+	Provider string // "libretranslate" or "deepl", empty = not configured
 	URL      string
 	APIKey   string
-	// FromEnv: Adresse stammt aus der Betreiber-Umgebung (vertrauenswürdig).
+	// FromEnv: the address comes from the operator environment (trusted).
 	FromEnv bool
 }
 
-// storedTranslation sind die rohen Werte aus der SystemSetting-Tabelle.
+// storedTranslation are the raw values from the SystemSetting table.
 type storedTranslation struct {
 	Provider, URL, APIKey string
 }
@@ -73,7 +73,7 @@ func (h *Handler) storedTranslation() storedTranslation {
 	}
 }
 
-// getSystemSettingString liest einen Text aus der SystemSetting-Tabelle, leer wenn er fehlt.
+// getSystemSettingString reads a text from the SystemSetting table, empty if it is missing.
 func (h *Handler) getSystemSettingString(key string) string {
 	var setting models.SystemSetting
 	if err := h.DB.Where("key = ?", key).First(&setting).Error; err != nil {
@@ -82,7 +82,7 @@ func (h *Handler) getSystemSettingString(key string) string {
 	return setting.Value
 }
 
-// effectiveTranslationConfig führt gespeicherte Werte und Umgebung zusammen.
+// effectiveTranslationConfig merges stored values and environment.
 func (h *Handler) effectiveTranslationConfig() translationConfig {
 	st := h.storedTranslation()
 	envURL := strings.TrimSpace(os.Getenv(envLibreTranslateURL))
@@ -123,9 +123,9 @@ func (h *Handler) translationTrustedClient() *http.Client {
 	return &http.Client{Timeout: translation.RequestTimeout}
 }
 
-// translationProvider baut den Provider zur wirksamen Konfiguration. Eine aus
-// den Einstellungen stammende Adresse wird erneut geprüft (nur https, Port
-// 443) und läuft über den SSRF-geschützten Client.
+// translationProvider builds the provider for the effective configuration. An address
+// coming from the settings is checked again (https only, port
+// 443) and goes through the SSRF-protected client.
 func (h *Handler) translationProvider() (translation.Provider, string, error) {
 	cfg := h.effectiveTranslationConfig()
 	switch cfg.Provider {
@@ -148,8 +148,8 @@ func (h *Handler) translationProvider() (translation.Provider, string, error) {
 	}
 }
 
-// translationErrorResponse bildet Fehler des Dienstes auf Antwort und Code ab.
-// Geloggt wird nur der bereinigte Fehlertext, nie Adresse oder Schlüssel.
+// translationErrorResponse maps service errors to a response and status code.
+// Only the sanitized error text is logged, never the address or key.
 func translationErrorResponse(c *gin.Context, err error) {
 	slog.Warn("Übersetzung fehlgeschlagen", "error", logging.SanitizeErr(err))
 	switch {
@@ -166,10 +166,10 @@ func translationErrorResponse(c *gin.Context, err error) {
 	}
 }
 
-// TranslateTextHandler übersetzt Titel und/oder Nachricht aus der Standardsprache
-// der Seite in eine weitere Sprache der Seite (POST /pages/:page_id/translate).
-// Die Route verlangt update auf Vorfällen, Wartung oder Ankündigungen; der
-// Handler liest und schreibt keine Datensätze.
+// TranslateTextHandler translates title and/or message from the page's default language
+// into another language of the page (POST /pages/:page_id/translate).
+// The route requires update on incidents, maintenance or notices; the
+// handler neither reads nor writes records.
 func (h *Handler) TranslateTextHandler(c *gin.Context) {
 	id64, ok := parsePageIDParam(c)
 	if !ok {
@@ -185,8 +185,8 @@ func (h *Handler) TranslateTextHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "code": "invalid_request"})
 		return
 	}
-	// Updates haben keinen Titel; es genügt, wenn Titel ODER Nachricht
-	// Text enthält. Ein leerer Titel wird nicht an den Dienst geschickt.
+	// Updates have no title; it is enough if title OR message
+	// contains text. An empty title is not sent to the service.
 	if strings.TrimSpace(req.Title) == "" && strings.TrimSpace(req.Message) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "code": "invalid_request"})
 		return
@@ -208,9 +208,9 @@ func (h *Handler) TranslateTextHandler(c *gin.Context) {
 	title, message, err := translateTitleAndMessage(provider, source, target, req.Title, req.Message)
 	fallback := false
 	if err != nil && name == providerDeepL {
-		// Ersatzdienst: Fällt DeepL aus (Kontingent erschöpft, Schlüssel abgelehnt, nicht erreichbar,
-		// Sprache nicht unterstützt), übersetzt der LibreTranslate-Dienst des Betreibers, sofern
-		// er eingerichtet ist und die Sprache kann. Scheitert auch er, gilt der Fehler von DeepL.
+		// Fallback service: if DeepL fails (quota exhausted, key rejected, unreachable,
+		// language not supported), the operator's LibreTranslate service translates, provided
+		// it is set up and supports the language. If it also fails, DeepL's error applies.
 		if lt := h.envLibreTranslateProvider(); lt != nil {
 			if t2, m2, err2 := translateTitleAndMessage(lt, source, target, req.Title, req.Message); err2 == nil {
 				slog.Info("Übersetzung über Ersatzdienst", "von", name, "zu", providerLibreTranslate, "grund", logging.SanitizeErr(err))
@@ -225,8 +225,8 @@ func (h *Handler) TranslateTextHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"title": title, "message": message, "provider": name, "source_language": source, "fallback": fallback})
 }
 
-// translateTitleAndMessage übersetzt den Titel und, wenn vorhanden, die Nachricht mit einem Anbieter in
-// EINER Anfrage (Stapel), soweit der Anbieter das kann.
+// translateTitleAndMessage translates the title and, if present, the message with one provider in
+// ONE request (batch), as far as the provider supports it.
 func translateTitleAndMessage(provider translation.Provider, source, target, title, message string) (string, string, error) {
 	var texts []string
 	hasTitle, hasMessage := strings.TrimSpace(title) != "", strings.TrimSpace(message) != ""
@@ -250,8 +250,8 @@ func translateTitleAndMessage(provider translation.Provider, source, target, tit
 	return outTitle, outMessage, nil
 }
 
-// envLibreTranslateProvider baut den LibreTranslate-Dienst aus der Betreiber-Umgebung (vertrauenswürdig,
-// darf intern sein) oder liefert nil, wenn LIBRETRANSLATE_URL nicht gesetzt ist.
+// envLibreTranslateProvider builds the LibreTranslate service from the operator environment (trusted,
+// may be internal) or returns nil if LIBRETRANSLATE_URL is not set.
 func (h *Handler) envLibreTranslateProvider() translation.Provider {
 	url := strings.TrimSpace(os.Getenv(envLibreTranslateURL))
 	if url == "" {

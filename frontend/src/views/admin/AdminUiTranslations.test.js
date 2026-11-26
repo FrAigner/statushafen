@@ -7,7 +7,7 @@ import { useTenant } from '../../composables/useTenant'
 import { registerLocale, SUPPORTED_LOCALES } from '../../i18n'
 import { useContentLanguages } from '../../composables/useContentLanguages'
 import AdminUiTranslations from './AdminUiTranslations.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function jsonResponse(body, status = 200) {
@@ -24,16 +24,16 @@ async function mountView(fetchImpl) {
   return wrapper
 }
 
-// Grenzt die 700+ App-weiten Keys auf eine handhabbare, stabile Teilmenge
-// ein - der Namespace-Filter kennt nur Top-Level-Namespaces (z.B. "adminNav"),
-// "adminNav.items.sso" wird zusätzlich über die Freitextsuche eingegrenzt.
+// Narrows the 700+ app-wide keys down to a manageable, stable subset
+// - the namespace filter only knows top-level namespaces (e.g. "adminNav");
+// "adminNav.items.sso" is additionally narrowed via the free-text search.
 async function filterToAdminNavItems(wrapper) {
   await wrapper.find('select[aria-label="Bereich"]').setValue('adminNav')
   await wrapper.find('.comp-search input').setValue('sso')
 }
 
 describe('AdminUiTranslations', () => {
-  // Die aria-labels der Filter waren fest englisch ("Scope", "Language", "Namespace").
+  // The filters' aria-labels were hard-coded English ("Scope", "Language", "Namespace").
   it('übersetzt die aria-labels der Filter-Selects (de und en)', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true, permissions: '' })
     const wrapper = await mountView()
@@ -45,7 +45,7 @@ describe('AdminUiTranslations', () => {
     wrapper.unmount()
   })
 
-  // Die Sprachauswahl zeigte die rohen Codes "de"/"en" statt der Sprachnamen.
+  // The language selection showed the raw codes "de"/"en" instead of the language names.
   it('Sprachauswahl zeigt die Sprachnamen, der Wert bleibt der Code (nur de und en)', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true, permissions: '' })
     const wrapper = await mountView()
@@ -60,8 +60,8 @@ describe('AdminUiTranslations', () => {
     wrapper.unmount()
   })
 
-  // Die Filter-Selects nutzten .form-select (44 px hoch, 100 % breit, eigener Look)
-  // und wirkten neben der Suchleiste fremd; gemeinsames Muster der Admin-Kartenköpfe ist .comp-filter.
+  // The filter selects used .form-select (44 px high, 100 % wide, own look)
+  // and looked foreign next to the search bar; the shared pattern of the admin card headers is .comp-filter.
   it('Filter-Selects im Kartenkopf nutzen das gemeinsame Muster .comp-filter', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true, permissions: '' })
     const wrapper = await mountView()
@@ -155,8 +155,8 @@ describe('AdminUiTranslations', () => {
     expect(row.findAll('.action-btn')).toHaveLength(2)
   })
 
-  // Speichern einer leeren Zeile hat "" als (globalen) Override
-  // abgelegt und den Text für alle Besucher geleert.
+  // Saving an empty row stored "" as a (global) override
+  // and blanked the text for all visitors.
   it('Speichern ist bei leerem oder nur aus Leerzeichen bestehendem Feld gesperrt und sendet kein PUT', async () => {
     setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: '' })
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}))
@@ -181,6 +181,35 @@ describe('AdminUiTranslations', () => {
     await flushPromises()
 
     expect(fetchMock.mock.calls.some(([, opts]) => opts?.method === 'PUT')).toBe(false)
+  })
+
+  it('reports a failed load of the overrides with the server message', async () => {
+    setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: '' })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const wrapper = await mountView(vi.fn().mockResolvedValue(jsonResponse({ error: 'kaputt' }, 500)))
+
+    expect(wrapper.text()).toContain('UI-Texte konnten nicht geladen werden: kaputt')
+  })
+
+  it('reports failed save and reset of a row with the server message', async () => {
+    setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: '' })
+    stubConfirm(true)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const fetchMock = vi.fn(async (url, options = {}) => (options.method
+      ? jsonResponse({ error: 'abgelehnt' }, 500)
+      : jsonResponse({ 'adminNav.items.sso': 'Mein SSO' })))
+    const wrapper = await mountView(fetchMock)
+    await filterToAdminNavItems(wrapper)
+
+    const row = wrapper.find('.override-row')
+    await row.find('.override-input').setValue('Anderes SSO')
+    await row.findAll('.action-btn')[0].trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Speichern fehlgeschlagen: abgelehnt')
+
+    await row.findAll('.action-btn')[1].trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Zurücksetzen fehlgeschlagen: abgelehnt')
   })
 
   it('Zurücksetzen fragt mit Key, Bereich und Sprache nach und löscht bei Abbruch nichts', async () => {
@@ -264,7 +293,7 @@ describe('AdminUiTranslations', () => {
     useTenant().setActiveTenant(null)
     const wrapper = await mountView()
 
-    // Stufe 4d: Titel als h2 (die Topbar trägt die h1), Leerzustand mit Symbol.
+    // Stage 4d: title as h2 (the top bar carries the h1), empty state with an icon.
     expect(wrapper.find('h2.page-head__title').exists()).toBe(true)
     expect(wrapper.find('h1').exists()).toBe(false)
     expect(wrapper.find('.empty-state').exists()).toBe(true)
@@ -287,8 +316,8 @@ describe('AdminUiTranslations', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Brotkrumen (global -> Administration, Seiten-Bereich -> Seitenname),
-  // Karte mit Filtern im Kopf, „Angepasst“-Status mit Symbol und Text.
+  // Direction C: breadcrumbs (global -> administration, page scope -> page name),
+  // card with filters in the header, "Customised" status with icon and text.
   it('zeigt Brotkrumen je Bereich, eine Karte mit Filtern im Kopf und markiert angepasste Texte', async () => {
     setAuthAsPageRole('jwt-1', { is_global_admin: true, permissions: '' })
     useTenant().setActiveTenant('1')
@@ -313,8 +342,8 @@ describe('AdminUiTranslations', () => {
 })
 
 
-// Teil 1: Die Sprachauswahl bot nur de/en an; jetzt alle aktiven Sprachen
-// des Katalogs (Global) bzw. der gewählten Seite, mit Eigenbezeichnung.
+// Part 1: the language selection only offered de/en; now all active languages
+// of the catalog (global) or of the selected page, with their own name.
 describe('AdminUiTranslations: Sprachauswahl mit allen aktiven Sprachen', () => {
   const CATALOG = [
     { Code: 'de', Name: 'Deutsch', IsActive: true },

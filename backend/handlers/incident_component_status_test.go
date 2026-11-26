@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Admin-Übersicht überlagert den Komponentenstatus mit offenen
-// Vorfällen (wie das öffentliche Dashboard), der gespeicherte Status bleibt.
+// The admin overview overlays the component status with open
+// incidents (like the public dashboard); the stored status remains.
 func TestOverview_DerivesStatusFromOpenIncidents(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -49,7 +49,7 @@ func TestOverview_DerivesStatusFromOpenIncidents(t *testing.T) {
 	assert.Contains(t, body, `"status":"degraded_performance"`)
 	assert.Contains(t, body, `"worst_status":"degraded_performance"`)
 
-	// Gelöst: zurück auf den gespeicherten Status.
+	// Resolved: back to the stored status.
 	require.NoError(t, db.Model(&inc).Update("status", "resolved").Error)
 	assert.Contains(t, get(), `"worst_status":"operational"`)
 }

@@ -71,10 +71,10 @@ func TestUserHasTagAccess(t *testing.T) {
 		want         bool
 	}{
 		{"Global Admin darf immer, egal welche Tags", globalAdmin.ID, []models.Tag{usTag}, true},
-		// Tags sperren nicht eigenständig aus - das ist Aufgabe von
-		// RequirePermission/UserStatusPageRole (main.go), die diese Handler-Ebene
-		// nie ohne vorherige Auth erreichen. userHasTagAccess behandelt "keine
-		// Tags beim Aufrufer" konsistent für authentifizierte wie anonyme Caller.
+		// Tags do not lock anyone out on their own - that is the job of
+		// RequirePermission/UserStatusPageRole (main.go), which this handler level
+		// never reaches without prior auth. userHasTagAccess treats "no
+		// tags on the caller" consistently for authenticated and anonymous callers.
 		{"Anonym (userID 0) wird von der Tag-Prüfung NICHT eigenständig abgelehnt", 0, []models.Tag{usTag}, true},
 		{"User ohne Tags darf Ressource ohne Tags verwalten", noTagsUser.ID, nil, true},
 		{"User ohne Tags darf auch Ressource MIT Tags verwalten (Tags sind optional, kein Ausschluss)", noTagsUser.ID, []models.Tag{usTag}, true},
@@ -152,8 +152,8 @@ func TestResolveTagsByIDs(t *testing.T) {
 }
 
 // TestResolveGlobalTagsByIDs covers the User-specific variant:
-// User-Tags sind bewusst seitenübergreifend, ein seitengebundener Tag darf
-// einem User nicht zugewiesen werden können.
+// User tags are deliberately cross-page; a page-bound tag must not
+// be assignable to a user.
 func TestResolveGlobalTagsByIDs(t *testing.T) {
 	h := newTagAccessTestHandler(t)
 
@@ -180,9 +180,9 @@ func TestResolveGlobalTagsByIDs(t *testing.T) {
 	})
 }
 
-// Die Fehlermeldung beim Zuweisen eines Tags nennt weder den Namen eines Tags
-// einer anderen Statusseite noch unterscheidet sie sich von der Antwort auf
-// eine unbekannte ID: Beides wäre ein Orakel über Tags fremder Mandanten.
+// The error message when assigning a tag names neither the name of a tag
+// of another status page nor does it differ from the response to
+// an unknown ID: both would be an oracle about tags of foreign tenants.
 func TestResolveTagsByIDs_FremderTagVerraetNichts(t *testing.T) {
 	h := newTagAccessTestHandler(t)
 
@@ -213,14 +213,14 @@ func TestResolveTagsByIDs_FremderTagVerraetNichts(t *testing.T) {
 		t.Errorf("fremder Tag (%s, %q) und unbekannte ID (%s, %q) sind unterscheidbar", codeForeign, msgForeign, codeUnknown, msgUnknown)
 	}
 
-	// Gegenprobe: der eigene Tag der Seite lässt sich weiterhin zuweisen.
+	// Counter-check: the page's own tag can still be assigned.
 	own := models.Tag{Name: "eigen", StatusPageID: &pageA.ID}
 	h.DB.Create(&own)
 	if tags, err := h.resolveTagsByIDs([]uint{own.ID}, pageA.ID); err != nil || len(tags) != 1 {
 		t.Fatalf("eigener Tag muss gültig bleiben, got tags=%v err=%v", tags, err)
 	}
 
-	// Auch die Variante für Benutzer-Tags nennt den Namen des Tags nicht.
+	// The variant for user tags does not name the tag's name either.
 	_, errBound := h.resolveGlobalTagsByIDs([]uint{foreign.ID})
 	if _, msg := describe(errBound); strings.Contains(msg, foreign.Name) {
 		t.Errorf("Meldung für Benutzer-Tags nennt den Tag-Namen: %q", msg)

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Codes, die nicht über eine Anfrage erreichbar sind.
+// Codes that are not reachable via a request.
 
 func TestCodeForStatus(t *testing.T) {
 	for status, want := range map[int]string{
@@ -37,8 +37,8 @@ func TestSubscriberConflictCode(t *testing.T) {
 	assert.Equal(t, "subscription_exists_webhook", subscriberConflictCode("google_chat"))
 }
 
-// Die Verifikation speichert den Status; scheitert das Speichern,
-// kommt 500 server_error (TXT-Lookup per Fake, kein Netzwerk).
+// The verification saves the status; if saving fails,
+// 500 server_error is returned (TXT lookup via fake, no network).
 func TestVerifyCustomDomain_SpeichernScheitertLiefertCode(t *testing.T) {
 	orig := lookupTXT
 	defer func() { lookupTXT = orig }()
@@ -59,8 +59,8 @@ func TestVerifyCustomDomain_SpeichernScheitertLiefertCode(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), "injizierter Fehler")
 }
 
-// GetMyPagesHandler mit unbrauchbarer Sitzung (userID hat den
-// falschen Typ) antwortet 500 server_error.
+// GetMyPagesHandler with an unusable session (userID has the
+// wrong type) answers 500 server_error.
 func TestGetMyPages_SitzungMitFalschemTypLiefertCode(t *testing.T) {
 	h := NewHandler(testutils.SetupTestDB())
 	r := testutils.SetupRouter()

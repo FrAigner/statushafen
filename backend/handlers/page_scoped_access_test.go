@@ -15,9 +15,9 @@ import (
 )
 
 // GET /api/pages/:page_id/{components,incidents,incidents/:id,notices}
-// prüften nie StatusPage.IsPrivate. Ein Aufrufer ohne Rolle auf einer privaten
-// Seite (oder ganz ohne Login) konnte Components/Incidents/Notices trotzdem
-// lesen, solange er die page_id kannte.
+// never checked StatusPage.IsPrivate. A caller without a role on a private
+// page (or without any login) could still read components/incidents/notices
+// as long as they knew the page_id.
 func TestPageScopedRoutesRespectIsPrivate(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -54,7 +54,7 @@ func TestPageScopedRoutesRespectIsPrivate(t *testing.T) {
 
 	pid := strconv.Itoa(int(privatePage.ID))
 	iid := strconv.Itoa(int(incident.ID))
-	// existiert in keiner Testfixture - deckt den "Status page not found"-Zweig ab.
+	// exists in no test fixture - covers the "Status page not found" branch.
 	const missingPageID = "999999"
 
 	routes := []struct {
@@ -101,12 +101,12 @@ func TestPageScopedRoutesRespectIsPrivate(t *testing.T) {
 	}
 }
 
-// pageIsAccessible nutzt seit dieser Änderung checkPrivatePageAccess statt
-// des Auto-Join-losen userHasRoleOnPrivatePage: der bisher nur der
-// Dashboard-Route (GetPublicDashboardHandler) vorbehaltene
-// Auto-Join per StatusPage.DefaultRoleID soll auch für Deep Links / direkte
-// API-Aufrufe auf dieselben Daten greifen, statt einen berechtigten Nutzer
-// dort mit 403 abzuweisen, nur weil er nicht über das Dashboard eingestiegen ist.
+// pageIsAccessible has used checkPrivatePageAccess since this change instead of
+// the auto-join-less userHasRoleOnPrivatePage: the auto-join via
+// StatusPage.DefaultRoleID, previously reserved for the dashboard route (GetPublicDashboardHandler),
+// should now also apply to deep links / direct
+// API calls on the same data, instead of rejecting an authorized user
+// there with 403 just because they did not enter via the dashboard.
 func TestPageScopedRoutesAutoJoinViaDefaultRole(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

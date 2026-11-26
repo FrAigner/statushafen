@@ -24,8 +24,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Verdrahtung der Selbstüberwachung (Prüfungen aus der Umgebung,
-// Schalter in den Systemeinstellungen).
+// Wiring of the self-monitoring (checks from the environment,
+// switch in the system settings).
 
 func checkSlugsFor(t *testing.T, env map[string]string) []string {
 	t.Helper()
@@ -47,7 +47,7 @@ func TestSelfMonitor_PruefungenAusDerUmgebung(t *testing.T) {
 		checkSlugsFor(t, map[string]string{"SELFMONITOR_BACKUP_JOB": "backup-prod"}))
 }
 
-// Review B: Ein Jobname mit Pfadanteilen registriert keine Backup-Prüfung.
+// Review B: A job name with path components registers no backup check.
 func TestSelfMonitor_BackupJobNameWirdValidiert(t *testing.T) {
 	buf := &bytes.Buffer{}
 	alt := slog.Default()
@@ -64,8 +64,8 @@ func TestSelfMonitor_BackupJobNameWirdValidiert(t *testing.T) {
 
 func TestSelfMonitor_BackupPruefungLiestMetrikOrdner(t *testing.T) {
 	h := handlers.NewHandler(testutils.SetupTestDB())
-	// Standardordner /job-metrics existiert hier nicht (Mount fehlt): Fehlschlag
-	// statt Skip (Betreiber-Entscheidung)
+	// The default folder /job-metrics does not exist here (mount missing): failure
+	// instead of skip (operator decision)
 	m := h.NewSelfMonitor(func(k string) string {
 		if k == "SELFMONITOR_BACKUP_JOB" {
 			return "backup-prod"
@@ -133,8 +133,8 @@ func TestSelfMonitor_StartUndStopp(t *testing.T) {
 	stop()
 }
 
-// altfall legt auf der Systemseite einen geschlossenen Monitor-Vorfall an,
-// dessen Komponente ausgeblendet ist (Altfall).
+// altfall creates a closed monitor incident on the system page
+// whose component is hidden (legacy case).
 func altfall(t *testing.T, db *gorm.DB) models.Incident {
 	t.Helper()
 	page := models.StatusPage{Name: "System", Slug: "system", IsSystem: true}
@@ -150,8 +150,8 @@ func altfall(t *testing.T, db *gorm.DB) models.Incident {
 	return inc
 }
 
-// Der Start bereinigt Altfälle, auch bei ausgeschalteter Überwachung
-// (der Text ist öffentlich, der Schalter ändert daran nichts).
+// Startup cleans up legacy cases, even with monitoring switched off
+// (the text is public, the switch changes nothing about that).
 func TestSelfMonitor_StartNeutralisiertAltfaelle(t *testing.T) {
 	db := testutils.SetupTestDB()
 	inc := altfall(t, db)
@@ -164,8 +164,8 @@ func TestSelfMonitor_StartNeutralisiertAltfaelle(t *testing.T) {
 	assert.NotContains(t, nachher.Message, "API")
 }
 
-// Scheitert der Backfill, startet die Überwachung trotzdem und der
-// Fehler wird geloggt (fail closed: nichts geschrieben, nächster Start wiederholt).
+// If the backfill fails, monitoring starts anyway and the
+// error is logged (fail closed: nothing written, next start repeats).
 func TestSelfMonitor_StartBackfillFehlerBlockiertNichts(t *testing.T) {
 	db := testutils.SetupTestDB()
 	inc := altfall(t, db)
@@ -209,8 +209,8 @@ func TestSettings_SelbstueberwachungSchalter(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "selfmonitor_enabled")
 }
 
-// Jede Prüfung steuert eine Komponente aus dem Funktionsverzeichnis; ein
-// umbenannter Eintrag dort würde die Überwachung sonst still ins Leere laufen lassen.
+// Each check drives one component from the feature directory; a
+// renamed entry there would otherwise let the monitoring silently run into the void.
 func TestSelfMonitor_AlleSlugsStehenImFunktionsverzeichnis(t *testing.T) {
 	known := map[string]bool{}
 	for _, g := range database.SystemCapabilities {
@@ -225,8 +225,8 @@ func TestSelfMonitor_AlleSlugsStehenImFunktionsverzeichnis(t *testing.T) {
 	}
 }
 
-// Ist der Versand per Systemeinstellung abgeschaltet, ist der Mailserver "nicht
-// prüfbar" (kein Ausfall, kein Verbindungsaufbau).
+// If sending is switched off via system setting, the mail server is "not
+// checkable" (no outage, no connection attempt).
 func TestSelfMonitor_MailPruefungRespektiertDenVersandSchalter(t *testing.T) {
 	db := testutils.SetupTestDB()
 	require.NoError(t, db.Create(&models.SystemSetting{Key: "email.enabled", Value: "false"}).Error)
@@ -237,8 +237,8 @@ func TestSelfMonitor_MailPruefungRespektiertDenVersandSchalter(t *testing.T) {
 	assert.True(t, mail.Run(context.Background()).Off)
 }
 
-// Betreiber-Entscheidung: ohne ausdrücklich gesetztes "an" läuft keine
-// Prüfung und nichts wird angefasst (kein Status, kein Vorfall, kein Audit, kein Merker).
+// Operator decision: without an explicitly set "on", no
+// check runs and nothing is touched (no status, no incident, no audit, no marker).
 func TestSelfMonitor_OhneEintragLaeuftNichtsUndNichtsWirdAngefasst(t *testing.T) {
 	db := testutils.SetupTestDB()
 	page := models.StatusPage{Name: "System", Slug: "system", IsSystem: true}
@@ -267,15 +267,15 @@ func TestSelfMonitor_OhneEintragLaeuftNichtsUndNichtsWirdAngefasst(t *testing.T)
 	}
 }
 
-// Fehler (1.11.2026): Die Frontend-Prüfung rief die öffentliche
-// Adresse ab; Cloudflare/Caddy antworteten dem Go-Client mit 401/403 und die
-// Komponente "Frontend" blieb dauerhaft auf Major Outage. Jetzt geht die
-// Prüfung auf den eigenen Port (127.0.0.1:PORT) und ignoriert FRONTEND_URL.
+// Bug (1.11.2026): The frontend check fetched the public
+// address; Cloudflare/Caddy answered the Go client with 401/403 and the
+// component "Frontend" stayed permanently on Major Outage. Now the
+// check goes to the own port (127.0.0.1:PORT) and ignores FRONTEND_URL.
 func TestSelfMonitor_FrontendPruefungGehtIntern_NichtZurOeffentlichenAdresse(t *testing.T) {
 	publicHits := 0
 	public := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		publicHits++
-		w.WriteHeader(http.StatusForbidden) // Cloudflare/Caddy: Zugangssperre
+		w.WriteHeader(http.StatusForbidden) // Cloudflare/Caddy: access block
 	}))
 	defer public.Close()
 	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -302,14 +302,14 @@ func TestSelfMonitor_FrontendPruefungGehtIntern_NichtZurOeffentlichenAdresse(t *
 	require.Equal(t, "feature-plattform-frontend", fe.Slug)
 	assert.Equal(t, "major_outage", fe.FailedStatus)
 
-	// 127.0.0.1 und der Testserver teilen sich den Loopback; Port wie bei /healthz.
+	// 127.0.0.1 and the test server share the loopback; port as for /healthz.
 	res := fe.Run(context.Background())
 	assert.True(t, res.OK, "intern erreichbar: %q", res.Detail)
 	assert.Zero(t, publicHits, "die öffentliche FRONTEND_URL wird nicht abgerufen")
 }
 
-// Der Schalter unterscheidet "nicht gesetzt" (Standard aus) von
-// "ausdrücklich an" und einem Lesefehler (Tabelle weg): der ist ein Fehler, kein "aus".
+// The switch distinguishes "not set" (default off) from
+// "explicitly on" and a read error (table gone): that is an error, not "off".
 func TestSelfMonitor_SchalterLesefehlerIstKeinAus(t *testing.T) {
 	db := testutils.SetupTestDB()
 	m := handlers.NewHandler(db).NewSelfMonitor(func(string) string { return "" })

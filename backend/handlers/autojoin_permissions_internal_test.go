@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Eine Auto-Join-Standardrolle darf nichts verändern (create,
-// update, delete - und den Altwert write) und keine Abonnenten lesen.
+// An auto-join default role must not modify anything (create,
+// update, delete - and the legacy value write) and must not read subscribers.
 func TestRoleSafeAsDefault_VerlangtNurLesen(t *testing.T) {
 	cases := map[string]bool{
 		"components:read,incidents:read,notices:read": true,
@@ -28,8 +28,8 @@ func TestRoleSafeAsDefault_VerlangtNurLesen(t *testing.T) {
 	}
 }
 
-// Auch ein „Seiten-Admin“ im Sinne von „Konto löschen“ ist, wer
-// pages:update hat (früher pages:write); der Altwert zählt weiter.
+// Someone also counts as a "site admin" in the sense of "delete account" if they
+// have pages:update (formerly pages:write); the legacy value still counts.
 func TestPermissionListContains_NutztDasRechtemodell(t *testing.T) {
 	assert.True(t, permissionListContains("pages:update", pagesWritePermission))
 	assert.True(t, permissionListContains("pages:write", pagesWritePermission), "Altwert")

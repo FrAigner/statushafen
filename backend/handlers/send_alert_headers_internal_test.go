@@ -8,10 +8,10 @@ import (
 )
 
 // TestSendAlertEmail_RejectsExtraHeaderWithNewline:
-// die neuen Zusatz-Header (List-Unsubscribe) laufen durch denselben
-// CR/LF-Schutz wie Subject/Body. Beobachtet über den Audit-Eintrag
-// notification.email_failed: gegen einen nicht erreichbaren SMTP-Port wird
-// er nur geschrieben, wenn sendAlertEmail tatsächlich zu senden versucht.
+// the new additional headers (List-Unsubscribe) go through the same
+// CR/LF protection as subject/body. Observed via the audit entry
+// notification.email_failed: against an unreachable SMTP port it
+// is only written if sendAlertEmail actually tries to send.
 func TestSendAlertEmail_RejectsExtraHeaderWithNewline(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -33,8 +33,8 @@ func TestSendAlertEmail_RejectsExtraHeaderWithNewline(t *testing.T) {
 	}
 }
 
-// Fund 10: Zeilenumbrüche im Body werden gefaltet und verwerfen die
-// Mail nicht; Betreff und Absender mit CR/LF bleiben abgelehnt.
+// Finding 10: line breaks in the body are folded and do not discard the
+// mail; subject and sender with CR/LF remain rejected.
 func TestSendAlertEmail_FoldsBodyButRejectsSubjectAndFromNewlines(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

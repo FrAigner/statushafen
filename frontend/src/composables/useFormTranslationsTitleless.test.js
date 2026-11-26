@@ -7,8 +7,8 @@ import { useApi } from './useApi'
 import { useFormTranslations } from './useFormTranslations'
 import FormLanguageSwitch from '../components/FormLanguageSwitch.vue'
 
-// titleRequired=false (Updates haben nur eine Nachricht). Das Verhalten mit
-// Titel decken useFormTranslationsTranslate.test.js und die Ansichts-Tests ab.
+// titleRequired=false (updates only have a message). The behaviour with a
+// title is covered by useFormTranslationsTranslate.test.js and the view tests.
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }]

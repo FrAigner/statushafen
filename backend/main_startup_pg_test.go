@@ -1,13 +1,13 @@
 package main
 
-// Start-Smoke-Test für main() gegen ein echtes Postgres. main()
-// startet seit der Umstellung auch den Abruf externer Statusseiten, der beim Shutdown
-// (nach runServer) sauber beendet werden muss. Bisher lief main() in keinem
-// Test - jede Zeile darin war für das Coverage-Gate unprüfbar. Der Test
-// startet den Server wie in Produktion, wartet auf /healthz und schickt sich
-// selbst SIGTERM; main() muss dann zurückkehren (Graceful Shutdown inkl.
-// Stopp der Hintergrund-Schleife). Wie der Migrationstest nur mit
-// MIGRATION_PG_TEST=1 (lädt Postgres-Binaries, startet nicht als root).
+// Startup smoke test for main() against a real Postgres. Since the changeover,
+// main() also starts polling external status pages, which must be stopped
+// cleanly on shutdown (after runServer). Previously main() ran in no
+// test - every line in it was untestable for the coverage gate. The test
+// starts the server as in production, waits for /healthz and sends itself
+// SIGTERM; main() must then return (graceful shutdown incl.
+// stopping the background loop). Like the migration test only with
+// MIGRATION_PG_TEST=1 (downloads Postgres binaries, does not start as root).
 
 import (
 	"fmt"
@@ -53,7 +53,7 @@ func TestMain_StartetUndFaehrtSauberHerunter(t *testing.T) {
 
 	prevLogger, prevDB := slog.Default(), database.DB
 	t.Cleanup(func() { slog.SetDefault(prevLogger); database.DB = prevDB })
-	t.Chdir(t.TempDir()) // keine lokale .env, kein ./static
+	t.Chdir(t.TempDir()) // no local .env, no ./static
 	httpPort := freeTCPPort(t)
 	t.Setenv("PORT", fmt.Sprint(httpPort))
 	t.Setenv("DB_DSN", fmt.Sprintf("host=localhost port=%d user=postgres password=postgres dbname=statushafen sslmode=disable", pgPort))
@@ -76,8 +76,8 @@ func TestMain_StartetUndFaehrtSauberHerunter(t *testing.T) {
 		_ = resp.Body.Close()
 		return resp.StatusCode == http.StatusOK
 	}, 2*time.Minute, 100*time.Millisecond, "Server kommt nicht hoch")
-	// runServer registriert signal.Notify direkt nach dem Start des Listeners;
-	// kurz warten, damit das SIGTERM sicher dort ankommt.
+	// runServer registers signal.Notify right after the listener starts;
+	// wait briefly so the SIGTERM reliably arrives there.
 	time.Sleep(300 * time.Millisecond)
 	require.NoError(t, syscall.Kill(os.Getpid(), syscall.SIGTERM))
 

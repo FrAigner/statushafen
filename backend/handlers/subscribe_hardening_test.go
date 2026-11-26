@@ -15,9 +15,9 @@ import (
 
 const hardeningChatURL = "https://chat.googleapis.com/v1/spaces/AAAA1234/messages?key=k&token=t"
 
-// Die Antwort auf POST /api/subscribe verrät nicht, ob die Adresse schon aktiv
-// abonniert ist: gleiche Antwort wie für eine neue Adresse, keine Mail, kein
-// neuer Datensatz, der bestehende bleibt unverändert.
+// The response to POST /api/subscribe does not reveal whether the address is already actively
+// subscribed: same response as for a new address, no mail, no
+// new record, the existing one stays unchanged.
 func TestSubscribe_ActiveAddressLooksLikeNewAddress(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -44,8 +44,8 @@ func TestSubscribe_ActiveAddressLooksLikeNewAddress(t *testing.T) {
 	assert.Equal(t, "1,2", after.SubscribedComponentIDs, "bestehendes Abo bleibt unverändert")
 }
 
-// Wer angemeldet mit der eigenen Konto-Adresse abonniert, erfährt weiter, dass
-// das Abo schon besteht: Es ist die eigene Adresse, kein Orakel.
+// A signed-in user who subscribes with their own account address still learns that
+// the subscription already exists: it is their own address, no oracle.
 func TestSubscribe_OwnActiveAddressStillReportsExisting(t *testing.T) {
 	db, r, page := setupDOIRouter(t)
 	user := models.User{Email: "self@example.com"}
@@ -57,7 +57,7 @@ func TestSubscribe_OwnActiveAddressStillReportsExisting(t *testing.T) {
 	assert.Equal(t, "subscription_exists_email", responseField(t, w, "code"))
 }
 
-// Auch ein bereits abonnierter Webhook wird wie ein neuer beantwortet.
+// An already subscribed webhook is also answered like a new one.
 func TestSubscribe_ActiveWebhookLooksLikeNewWebhook(t *testing.T) {
 	db, r, _ := setupDOIRouter(t)
 	post := func() *httptest.ResponseRecorder {
@@ -73,8 +73,8 @@ func TestSubscribe_ActiveWebhookLooksLikeNewWebhook(t *testing.T) {
 	assert.EqualValues(t, 1, n)
 }
 
-// Schreibvarianten desselben Postfachs (Groß-/Kleinschreibung, +tag) zählen als
-// ein Abo und lösen keine weiteren Bestätigungsmails aus.
+// Spelling variants of the same mailbox (case, +tag) count as
+// one subscription and trigger no further confirmation mails.
 func TestSubscribe_MailboxVariantsSendOnlyOneConfirmation(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -94,13 +94,13 @@ func TestSubscribe_MailboxVariantsSendOnlyOneConfirmation(t *testing.T) {
 	db.Model(&models.Subscriber{}).Count(&n)
 	assert.EqualValues(t, 1, n, "Varianten legen keine weiteren Abos an")
 
-	// Gegenprobe: ein anderes Postfach bekommt seine Mail.
+	// Control case: a different mailbox gets its mail.
 	requireStatusCode(t, subscribeEmail(r, "anderer@example.com", nil), http.StatusOK)
 	awaitSMTPMessage(t, srv)
 }
 
-// Das Limit gilt je Postfach über alle Seiten: Höchstens drei Bestätigungsmails
-// in 24 Stunden, die Antwort bleibt gleich.
+// The limit applies per mailbox across all pages: at most three confirmation mails
+// in 24 hours, the response stays the same.
 func TestSubscribe_ConfirmationMailsPerMailboxAreLimitedAcrossPages(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -134,13 +134,13 @@ func TestSubscribe_ConfirmationMailsPerMailboxAreLimitedAcrossPages(t *testing.T
 	db.Model(&models.Subscriber{}).Count(&n)
 	assert.EqualValues(t, 3, n, "über dem Limit entsteht kein weiterer Datensatz")
 
-	// Gegenprobe: ein anderes Postfach ist vom Limit nicht betroffen.
+	// Control case: a different mailbox is not affected by the limit.
 	requireStatusCode(t, subscribe(slugs[4], "anderer@example.com"), http.StatusOK)
 	awaitSMTPMessage(t, srv)
 }
 
-// Sonderzeichen im lokalen Teil wirken nicht als LIKE-Platzhalter: "a_b@" und
-// "a%@" sind nicht dasselbe Postfach wie "axb@".
+// Special characters in the local part do not act as LIKE wildcards: "a_b@" and
+// "a%@" are not the same mailbox as "axb@".
 func TestSubscribe_MailboxMatchTreatsWildcardsLiterally(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -156,8 +156,8 @@ func TestSubscribe_MailboxMatchTreatsWildcardsLiterally(t *testing.T) {
 	assert.EqualValues(t, 3, n)
 }
 
-// Ein abgelaufener Link wird nur erneuert, solange das Postfach sein Limit
-// nicht ausgeschöpft hat.
+// An expired link is renewed only as long as the mailbox has not
+// exhausted its limit.
 func TestSubscribe_ExpiredPendingIsNotResentOverLimit(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -181,7 +181,7 @@ func TestSubscribe_ExpiredPendingIsNotResentOverLimit(t *testing.T) {
 	require.NoError(t, db.First(&after, expired.ID).Error)
 	assert.Equal(t, "alt", after.ConfirmTokenHash, "Token bleibt unverändert, es wurde nichts verschickt")
 
-	// Gegenprobe: ohne die drei anderen gültigen Links wird erneuert.
+	// Control case: without the three other valid links, it is renewed.
 	require.NoError(t, db.Where("confirm_token_hash IN ?", []string{"h0", "h1", "h2"}).Delete(&models.Subscriber{}).Error)
 	requireStatusCode(t, subscribeEmail(r, "viel@example.com", nil), http.StatusOK)
 	awaitSMTPMessage(t, srv)
