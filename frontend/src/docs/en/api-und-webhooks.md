@@ -15,11 +15,13 @@ POST /api/webhooks/components/<component ID>/status
 2. In the "Monitoring webhook" section, click the button to generate a token.
 3. Copy the token right away: it is shown only this once.
 
-There is one token per status page; it applies to all its components. Regenerating invalidates
-the old token immediately, revoking disables the webhook for the page.
-Only a hash of the token is stored, never the plain text: a lost token cannot be shown again, so
-simply generate a new one. Existing tokens stay valid and are converted to the hash automatically
-during the update.
+There is one token per status page; it applies to all its components.
+
+- Regenerating invalidates the old token immediately.
+- Revoking disables the webhook for the page.
+- Only a hash of the token is stored, never the plain text: a lost token cannot be shown again,
+  so simply generate a new one.
+- Existing tokens stay valid and are converted to the hash automatically during the update.
 
 The component ID is shown under **Components** in the "ID" column.
 
@@ -94,11 +96,13 @@ paging, sorted by ID); name (120 characters) and description (500 characters) ar
 
 ### Signing in to the API
 
-You get a login token with `POST /api/login` (email and password); it is valid for two hours. Send
-it in the header `X-Auth-Token: <token>`. The header `Authorization: Bearer <token>` is still
-accepted; if `X-Auth-Token` is set, it takes precedence, even if the token is invalid. The separate
-header is needed because an upstream Basic Auth protection (for example on a staging instance)
-occupies the `Authorization` header.
+You get a login token with `POST /api/login` (email and password); it is valid for two hours.
+
+- Send it in the header `X-Auth-Token: <token>`.
+- The header `Authorization: Bearer <token>` is still accepted; if `X-Auth-Token` is set, it takes
+  precedence, even if the token is invalid.
+- The separate header is needed because an upstream Basic Auth protection (for example on a
+  staging instance) occupies the `Authorization` header.
 
 ```bash
 curl "https://acme.example.com/api/me" -H "X-Auth-Token: <token>"
@@ -113,12 +117,21 @@ same permissions as in the interface apply, see
 ### Lists and limits
 
 The incident list (`GET /api/pages/<id>/incidents`) returns at most 200 entries per call, the newest
-50 without `limit`. Use `offset` to page further back, `state=open|resolved` to filter by status and
-`is_maintenance=any` to include maintenance windows. The dashboard contains all open and the newest
-resolved incidents; `incidents_more: true` shows that older ones exist. Read calls to the dashboard and
-incidents are limited to 120 per minute and IP. For the limit to apply per visitor, `TRUSTED_PROXIES`
-must be set behind a reverse proxy. Write calls that trigger notifications are limited per page and
-user, see [Incidents](/docs/vorfaelle#notifications).
+50 without `limit`. Parameters:
+
+- `offset` pages further back.
+- `state=open|resolved` filters by status.
+- `is_maintenance=any` includes maintenance windows.
+
+The dashboard contains all open and the newest resolved incidents; `incidents_more: true` shows
+that older ones exist.
+
+Limits:
+
+- Read calls to the dashboard and incidents are limited to 120 per minute and IP. For the limit to
+  apply per visitor, `TRUSTED_PROXIES` must be set behind a reverse proxy.
+- Write calls that trigger notifications are limited per page and user, see
+  [Incidents](/docs/vorfaelle#notifications).
 
 ### Error responses
 

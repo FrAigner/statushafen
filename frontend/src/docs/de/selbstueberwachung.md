@@ -16,16 +16,18 @@ Die Prüfungen laufen im Hintergrund, im Minutentakt (E-Mail und Backup alle fü
 | E-Mail-Versand | Der Mailserver nimmt Verbindungen an (es wird nichts versendet) | Teilstörung |
 | Datenbank-Backup | Das letzte nächtliche Backup ist höchstens 36 Stunden alt | Beeinträchtigt |
 
-Ist der E-Mail-Versand in den [Systemeinstellungen](/docs/systemeinstellungen) abgeschaltet,
-wird der Mailserver nicht geprüft. Die Backup-Prüfung gibt es nur, wenn der Betreiber sie
-eingerichtet hat (Umgebungsvariable `SELFMONITOR_BACKUP_JOB`, z. B. `backup-prod`; erlaubt sind
-Kleinbuchstaben, Ziffern und Bindestrich). Fehlt bei gesetztem Job das Metrik-Verzeichnis
-(`SELFMONITOR_METRICS_DIR`, Standard `/job-metrics`, zum Beispiel weil der Mount fehlt), gilt das
-als Fehlschlag: die Komponente wird „Beeinträchtigt“ (nach drei Fehlschlägen im Fünf-Minuten-Takt,
-also rund 15 Minuten nach dem ersten) und hält die Störung weitere 15 Minuten an, entsteht ein
-Vorfall (insgesamt rund 25 bis 30 Minuten ab dem ersten Fehlschlag). Fehlt
-nur die Metrikdatei im vorhandenen Verzeichnis (Umgebung ohne Backup-Timer), wird die Prüfung
-übersprungen und die Komponente nicht als gestört gezeigt.
+- **E-Mail-Versand:** Ist der E-Mail-Versand in den [Systemeinstellungen](/docs/systemeinstellungen)
+  abgeschaltet, wird der Mailserver nicht geprüft.
+- **Backup-Prüfung:** Sie gibt es nur, wenn der Betreiber sie eingerichtet hat (Umgebungsvariable
+  `SELFMONITOR_BACKUP_JOB`, z. B. `backup-prod`; erlaubt sind Kleinbuchstaben, Ziffern und
+  Bindestrich).
+  - **Metrik-Verzeichnis fehlt:** Fehlt bei gesetztem Job das Metrik-Verzeichnis
+    (`SELFMONITOR_METRICS_DIR`, Standard `/job-metrics`, zum Beispiel weil der Mount fehlt), gilt
+    das als Fehlschlag: die Komponente wird „Beeinträchtigt“ (nach drei Fehlschlägen im
+    Fünf-Minuten-Takt, also rund 15 Minuten nach dem ersten) und hält die Störung weitere 15
+    Minuten an, entsteht ein Vorfall (insgesamt rund 25 bis 30 Minuten ab dem ersten Fehlschlag).
+  - **Nur die Metrikdatei fehlt** im vorhandenen Verzeichnis (Umgebung ohne Backup-Timer): Die
+    Prüfung wird übersprungen und die Komponente nicht als gestört gezeigt.
 
 ## Wie der Status entsteht
 
@@ -47,35 +49,52 @@ nur die Metrikdatei im vorhandenen Verzeichnis (Umgebung ohne Backup-Timer), wir
 ## Ein- und ausschalten
 
 Der Schalter **Selbstüberwachung aktiviert** in den [Systemeinstellungen](/docs/systemeinstellungen)
-schaltet die Prüfungen ab, etwa bei geplanten Arbeiten am Server. Ohne Eintrag ist sie **ausgeschaltet**: Sie läuft erst, wenn ein Global Admin den Schalter ausdrücklich einschaltet.
-Beim Abschalten gibt die Überwachung die Störungen frei, die sie selbst gesetzt hat: Die Komponente
-geht zurück auf „in Betrieb“, der automatische Vorfall wird mit dem Hinweis „Automatische Verfolgung
-beendet.“ geschlossen (Audit-Log: „Überwachung abgeschaltet“). Dasselbe gilt für die E-Mail-Prüfung,
-wenn der Mailversand abgeschaltet wird. Vom Admin gesetzte Status ändert sie nicht.
+schaltet die Prüfungen ab, etwa bei geplanten Arbeiten am Server.
+
+- **Standard:** Ohne Eintrag ist sie **ausgeschaltet**: Sie läuft erst, wenn ein Global Admin den
+  Schalter ausdrücklich einschaltet.
+- **Abschalten:** Beim Abschalten gibt die Überwachung die Störungen frei, die sie selbst gesetzt
+  hat: Die Komponente geht zurück auf „in Betrieb“, der automatische Vorfall wird mit dem Hinweis
+  „Automatische Verfolgung beendet.“ geschlossen (Audit-Log: „Überwachung abgeschaltet“).
+- Dasselbe gilt für die **E-Mail-Prüfung**, wenn der Mailversand abgeschaltet wird.
+- Vom Admin gesetzte Status ändert sie nicht.
+
+### Verschieben auf eine andere Seite
 
 Wird eine überwachte Komponente (z. B. per Datenbankeingriff) einer anderen Statusseite zugeordnet,
 beendet die Überwachung ihre Verfolgung (Marker, eigener Vorfall; `selfmonitor.component_released`
-mit dem Hinweis „verschoben“). Steht die Komponente noch auf dem Ausfallstatus, den die Überwachung
-gesetzt hat, geht sie zurück auf „in Betrieb“; jeden anderen Status lässt sie unverändert. Ohne
-offenen Vorfall ist die Komponente nicht eindeutig bekannt: Dann beendet sie nur die Verfolgung
-(Hinweis „nicht mehr auf der Systemseite“) und fasst keine Komponente anderer Seiten an.
+mit dem Hinweis „verschoben“).
+
+- Steht die Komponente noch auf dem Ausfallstatus, den die Überwachung gesetzt hat,
+  geht sie zurück auf „in Betrieb“; jeden anderen Status lässt sie unverändert.
+- Ohne offenen Vorfall ist die Komponente nicht eindeutig bekannt: Dann beendet sie nur die
+  Verfolgung (Hinweis „nicht mehr auf der Systemseite“) und fasst keine Komponente anderer Seiten
+  an.
+
+### Ausgeblendete Komponenten
 
 Öffentlich ausgeblendete Komponenten wertet die Überwachung nicht aus (archiviert oder unsichtbar,
 auch wenn nur die übergeordnete Gruppe archiviert oder ausgeblendet ist; es gilt dieselbe Regel wie
 auf der Statusseite): Sie setzt keinen Status und legt keinen öffentlichen Vorfall „Störung: …“
-an, der eine öffentlich nicht vorhandene Komponente beträfe. Wird eine Komponente während einer
-laufenden Störung archiviert oder ausgeblendet, gibt die Überwachung sie frei (Status zurück auf
-„in Betrieb“, Vorfall mit dem Hinweis „Automatische Verfolgung beendet. Die Komponente wird nicht
-mehr angezeigt.“ geschlossen, Audit-Log „Komponente archiviert oder ausgeblendet“). Weil der
-Vorfall in der öffentlichen Historie bleibt, ersetzt sie dabei Titel und Meldung durch „Störung:
-automatische Überwachung“ bzw. „Die automatische Selbstüberwachung meldete eine Störung.“ (ohne
-Prüfungsnamen und Fehlerdetail) und löscht deren Übersetzungen. Ersetzt wird nur, was die
-Überwachung selbst geschrieben hat und unverändert ist; vom Admin geänderte oder ergänzte Texte
-und Updates des Admins bleiben. Dasselbe gilt, wenn die Komponente während einer Störung gelöscht
-oder auf eine andere Seite verschoben wird. Bereits geschlossene Vorfälle einer Komponente, die
-inzwischen ausgeblendet, gelöscht oder verschoben ist, bereinigt die Überwachung beim Start der
-Anwendung und danach alle 10 Minuten auf dieselbe Weise (auch bei ausgeschalteter Überwachung). Nach dem Wiederherstellen
-läuft die Überwachung normal weiter, mit frischer Entprellung.
+an, der eine öffentlich nicht vorhandene Komponente beträfe.
+
+- **Ausblenden während einer Störung:** Wird eine Komponente während einer laufenden Störung
+  archiviert oder ausgeblendet, gibt die Überwachung sie frei (Status zurück auf „in Betrieb“,
+  Vorfall mit dem Hinweis „Automatische Verfolgung beendet. Die Komponente wird nicht mehr
+  angezeigt.“ geschlossen, Audit-Log „Komponente archiviert oder ausgeblendet“).
+- **Neutrale Texte:** Weil der Vorfall in der öffentlichen Historie bleibt, ersetzt sie dabei
+  Titel und Meldung durch „Störung: automatische Überwachung“ bzw. „Die automatische
+  Selbstüberwachung meldete eine Störung.“ (ohne Prüfungsnamen und Fehlerdetail) und löscht deren
+  Übersetzungen.
+- **Was ersetzt wird:** Ersetzt wird nur, was die Überwachung selbst geschrieben hat und
+  unverändert ist; vom Admin geänderte oder ergänzte Texte und Updates des Admins bleiben.
+- **Löschen oder Verschieben:** Dasselbe gilt, wenn die Komponente während einer Störung gelöscht
+  oder auf eine andere Seite verschoben wird.
+- **Bereits geschlossene Vorfälle** einer Komponente, die inzwischen ausgeblendet, gelöscht oder
+  verschoben ist, bereinigt die Überwachung beim Start der Anwendung und danach alle 10 Minuten auf
+  dieselbe Weise (auch bei ausgeschalteter Überwachung).
+- **Wiederherstellen:** Nach dem Wiederherstellen läuft die Überwachung normal weiter, mit frischer
+  Entprellung.
 
 ## Grenzen
 
@@ -83,7 +102,10 @@ Die Überwachung läuft in der Anwendung selbst. Fällt die gesamte Anwendung od
 kann sie das nicht mehr eintragen; dafür bleibt eine Überwachung von außen nötig.
 
 Die Frontend-Prüfung ruft die eigene Anwendung intern auf (`127.0.0.1`), nicht die öffentliche
-Adresse. Cloudflare, Caddy (Zugangssperre, Bot-Schutz) und das Zertifikat erfasst sie deshalb nicht;
-auch das braucht eine Überwachung von außen. `FRONTEND_URL` dient nur noch als Kennzeichen, dass
-ein Frontend ausgeliefert wird, nie als Prüfziel. Antwortet die Anwendung selbst mit 401 oder 403,
-gilt das weiterhin als Fehler.
+Adresse.
+
+- Cloudflare, Caddy (Zugangssperre, Bot-Schutz) und das Zertifikat erfasst sie deshalb nicht;
+  auch das braucht eine Überwachung von außen.
+- `FRONTEND_URL` dient nur noch als Kennzeichen, dass ein Frontend ausgeliefert wird, nie als
+  Prüfziel.
+- Antwortet die Anwendung selbst mit 401 oder 403, gilt das weiterhin als Fehler.

@@ -15,11 +15,13 @@ POST /api/webhooks/components/<Komponenten-ID>/status
 2. Im Abschnitt „Monitoring-Webhook“ auf „Token erzeugen“ klicken.
 3. Den Token sofort kopieren: Er wird nur dieses eine Mal angezeigt.
 
-Es gibt einen Token je Statusseite, er gilt für alle ihre Komponenten. „Neu erzeugen“ macht den
-alten Token sofort ungültig, „Token widerrufen“ sperrt den Webhook für die Seite.
-Gespeichert wird nur ein Hash des Tokens, nie der Klartext: Ein verlorener Token lässt sich nicht
-wieder anzeigen, dann einfach einen neuen erzeugen. Bestehende Token bleiben gültig und werden
-beim Update automatisch auf den Hash umgestellt.
+Es gibt einen Token je Statusseite, er gilt für alle ihre Komponenten.
+
+- „Neu erzeugen“ macht den alten Token sofort ungültig.
+- „Token widerrufen“ sperrt den Webhook für die Seite.
+- Gespeichert wird nur ein Hash des Tokens, nie der Klartext: Ein verlorener Token lässt sich
+  nicht wieder anzeigen, dann einfach einen neuen erzeugen.
+- Bestehende Token bleiben gültig und werden beim Update automatisch auf den Hash umgestellt.
 
 Die Komponenten-ID steht unter **Komponenten** in der Spalte „ID“.
 
@@ -95,11 +97,13 @@ zum Blättern, nach ID sortiert); Name (120 Zeichen) und Beschreibung (500 Zeich
 
 ### Anmeldung an der API
 
-Ein Login-Token holt man mit `POST /api/login` (E-Mail und Passwort); es gilt zwei Stunden. Man
-schickt es im Header `X-Auth-Token: <token>` mit. Der Header `Authorization: Bearer <token>`
-wird weiter akzeptiert; ist `X-Auth-Token` gesetzt, hat er Vorrang, auch wenn das Token ungültig
-ist. Der eigene Header ist nötig, weil ein vorgeschalteter Basic-Auth-Schutz (z. B. auf einer
-Staging-Instanz) den Header `Authorization` belegt.
+Ein Login-Token holt man mit `POST /api/login` (E-Mail und Passwort); es gilt zwei Stunden.
+
+- Man schickt es im Header `X-Auth-Token: <token>` mit.
+- Der Header `Authorization: Bearer <token>` wird weiter akzeptiert; ist `X-Auth-Token` gesetzt,
+  hat er Vorrang, auch wenn das Token ungültig ist.
+- Der eigene Header ist nötig, weil ein vorgeschalteter Basic-Auth-Schutz (z. B. auf einer
+  Staging-Instanz) den Header `Authorization` belegt.
 
 ```bash
 curl "https://acme.example.com/api/me" -H "X-Auth-Token: <token>"
@@ -114,12 +118,21 @@ Anlegen macht `is_group: true` die neue Komponente zu einer Gruppe.
 ### Listen und Limits
 
 Die Vorfall-Liste (`GET /api/pages/<id>/incidents`) liefert höchstens 200 Einträge je Aufruf, ohne
-`limit` die neuesten 50. Mit `offset` blättert man weiter zurück, `state=open|resolved` filtert nach
-Status und `is_maintenance=any` schließt Wartungen ein. Das Dashboard enthält alle offenen und die
-neuesten behobenen Vorfälle; `incidents_more: true` zeigt, dass es ältere gibt. Lesende Aufrufe von
-Dashboard und Vorfällen sind auf 120 pro Minute und IP begrenzt. Damit das Limit je Besucher gilt, muss
-hinter einem Reverse-Proxy `TRUSTED_PROXIES` gesetzt sein. Schreibende Aufrufe, die Benachrichtigungen
-auslösen, sind je Seite und Nutzer begrenzt, siehe [Vorfälle](/docs/vorfaelle#benachrichtigungen).
+`limit` die neuesten 50. Parameter:
+
+- `offset` blättert weiter zurück.
+- `state=open|resolved` filtert nach Status.
+- `is_maintenance=any` schließt Wartungen ein.
+
+Das Dashboard enthält alle offenen und die neuesten behobenen Vorfälle; `incidents_more: true`
+zeigt, dass es ältere gibt.
+
+Limits:
+
+- Lesende Aufrufe von Dashboard und Vorfällen sind auf 120 pro Minute und IP begrenzt. Damit das
+  Limit je Besucher gilt, muss hinter einem Reverse-Proxy `TRUSTED_PROXIES` gesetzt sein.
+- Schreibende Aufrufe, die Benachrichtigungen auslösen, sind je Seite und Nutzer begrenzt, siehe
+  [Vorfälle](/docs/vorfaelle#benachrichtigungen).
 
 ### Fehlerantworten
 

@@ -12,6 +12,9 @@ Auf der Statusseite öffnet „Jetzt abonnieren“ den Abo-Assistenten:
    „Keine Einschränkung: alle Komponenten“.
 3. Abschicken.
 
+![Erster Schritt des Abo-Assistenten: Auswahl des Kanals E-Mail oder Google Chat, mit den Knöpfen „Abbrechen“ und „Weiter“](/docs-img/de/subscribe-dialog.webp)
+
+
 Benachrichtigt wird, sobald ein Vorfall oder eine Wartung mindestens eine der abonnierten
 Komponenten betrifft. Dazu zählen auch gespiegelte Meldungen
 [externer Quellen](/docs/externe-quellen#gespiegelte-meldungen), die eine gekoppelte Komponente
@@ -44,11 +47,13 @@ dort die Komponenten an oder löschen das Abo. Ohne Auswahl gilt wieder „alle 
 
 Bietet die Seite mehr als eine Sprache an, steht dort auch **Sprache der Benachrichtigungen**:
 „Seitenstandard“ oder eine der Sprachen der Seite. Sie gilt für E-Mails und Google-Chat-Nachrichten.
-Ist die gewählte Sprache bei der Seite später nicht mehr aktiv, geht der Versand in der
-Standardsprache der Seite raus; bis zum nächsten Speichern bleibt die Wahl gespeichert. Das
-Formular zeigt eine nicht mehr aktive Sprache als „Seitenstandard“, und Speichern schreibt dann
-„Seitenstandard“. Auch eine ausdrücklich gewählte Standardsprache wird als „Seitenstandard“
-gespeichert und folgt damit einem späteren Wechsel der Standardsprache der Seite.
+
+- Ist die gewählte Sprache bei der Seite später nicht mehr aktiv, geht der Versand in der
+  Standardsprache der Seite raus; bis zum nächsten Speichern bleibt die Wahl gespeichert.
+- Das Formular zeigt eine nicht mehr aktive Sprache als „Seitenstandard“, und Speichern schreibt
+  dann „Seitenstandard“.
+- Auch eine ausdrücklich gewählte Standardsprache wird als „Seitenstandard“ gespeichert und folgt
+  damit einem späteren Wechsel der Standardsprache der Seite.
 
 ## Abmelden
 
@@ -64,45 +69,72 @@ Abbestellen-Knopf. Statushafen setzt dafür die Header `List-Unsubscribe` und
 
 Für Google Chat trägt man die Webhook-URL eines Chat-Raums ein. Statushafen schickt dorthin eine
 Textnachricht mit Komponente, Tags, Vorfall, Status und Details, auf Deutsch oder Englisch je nach
-Sprache des Abonnenten (jede andere Sprache bekommt Englisch). Die URL wird beim Speichern
-geprüft: Beim öffentlichen Abonnieren sind nur Webhooks von Google Chat erlaubt
-(`https://chat.googleapis.com/v1/spaces/…`, Port 443, ohne Zugangsdaten); jede andere Adresse wird
-mit derselben Meldung abgelehnt. Admins können beim Anlegen im Admin-Bereich auch andere
-`https`-Adressen eintragen, deren Host sich auflösen lässt und die nicht auf interne Adressen
-zeigen. Ankündigungen gehen nur an E-Mail-Abos.
+Sprache des Abonnenten (jede andere Sprache bekommt Englisch). Ankündigungen gehen nur an
+E-Mail-Abos.
+
+### Prüfung der Webhook-URL
+
+Die URL wird beim Speichern geprüft:
+
+- **Öffentliches Abonnieren:** Nur Webhooks von Google Chat sind erlaubt
+  (`https://chat.googleapis.com/v1/spaces/…`, Port 443, ohne Zugangsdaten); jede andere Adresse
+  wird mit derselben Meldung abgelehnt.
+- **Anlegen im Admin-Bereich:** Admins können auch andere `https`-Adressen eintragen, deren Host
+  sich auflösen lässt und die nicht auf interne Adressen zeigen.
+
+### Drosselung und Wiederholungen
 
 Google begrenzt Chat-Webhooks (etwa eine Nachricht pro Sekunde je Chat-Raum, zusätzlich pro
 Projekt) und antwortet bei Überschreitung mit „zu viele Anfragen“ (HTTP 429) oder bei Überlast mit
-503. Statushafen schickt deshalb höchstens eine Nachricht pro Sekunde an dieselbe URL (kurze
-Spitzen bis zu zwei Nachrichten), beachtet den `Retry-After`-Hinweis von Google und wiederholt eine
-Benachrichtigung höchstens zweimal, insgesamt mit höchstens 30 Sekunden Wartezeit. Fehler mit
-falscher URL oder falschem Schlüssel (400, 401, 403, 404) werden nicht wiederholt. **Test senden**
-wartet nie: Drosselt Google gerade, erscheint „Google drosselt gerade – bitte in n Sekunden erneut
-versuchen“; lehnt das Ziel ab, prüfe URL und Schlüssel; ist es nicht erreichbar, versuche es später
-noch einmal. Im Server-Log stehen nur Statuscode, Fehlerklasse und eine Kurzkennung der URL, nie
-die URL selbst.
+503. Statushafen reagiert darauf so:
+
+- Höchstens eine Nachricht pro Sekunde an dieselbe URL (kurze Spitzen bis zu zwei Nachrichten).
+- Der `Retry-After`-Hinweis von Google wird beachtet.
+- Eine Benachrichtigung wird höchstens zweimal wiederholt, insgesamt mit höchstens 30 Sekunden
+  Wartezeit.
+- Fehler mit falscher URL oder falschem Schlüssel (400, 401, 403, 404) werden nicht wiederholt.
+- Im Server-Log stehen nur Statuscode, Fehlerklasse und eine Kurzkennung der URL, nie die URL
+  selbst.
+
+**Test senden** wartet nie:
+
+- Drosselt Google gerade, erscheint „Google drosselt gerade – bitte in n Sekunden erneut
+  versuchen“.
+- Lehnt das Ziel ab, prüfe URL und Schlüssel.
+- Ist es nicht erreichbar, versuche es später noch einmal.
 
 Ausgehende Webhooks an beliebige eigene Systeme gibt es nicht. Für eingehende Statusmeldungen
 aus dem Monitoring siehe [API und Webhooks](/docs/api-und-webhooks).
 
 ## Abonnenten im Admin-Bereich
 
-Unter **Abonnenten** sieht man alle Abos der Seite mit Kanal, Kontakt, Komponenten und Ersteller
-(Recht `subscribers:read`). Bietet die Seite mehrere Sprachen an, legt man dort auch die
-**Sprache der Benachrichtigungen** je Abonnent fest (ohne Angabe: Standardsprache der Seite).
-Als Ersteller erscheint die E-Mail-Adresse des anlegenden Kontos nur, wenn es selbst zum Personal dieser Seite gehört (oder du selbst es angelegt hast); hat ein fremdes Konto die Seite abonniert, zeigt die Liste nur „mit Konto verknüpft“ und keine weiteren Kontodaten.
-Anlegen, Ändern und Löschen brauchen `subscribers:create`, `subscribers:update` bzw. `subscribers:delete`.
+Unter **Abonnenten** sieht man alle Abos der Seite mit Kanal, Kontakt, Komponenten und Ersteller.
+
+- **Rechte:** Lesen braucht `subscribers:read`; Anlegen, Ändern und Löschen brauchen
+  `subscribers:create`, `subscribers:update` bzw. `subscribers:delete`.
+- **Sprache:** Bietet die Seite mehrere Sprachen an, legt man dort auch die **Sprache der
+  Benachrichtigungen** je Abonnent fest (ohne Angabe: Standardsprache der Seite).
+- **Ersteller:** Die E-Mail-Adresse des anlegenden Kontos erscheint nur, wenn es selbst zum
+  Personal dieser Seite gehört (oder du selbst es angelegt hast). Hat ein fremdes Konto die Seite
+  abonniert, zeigt die Liste nur „mit Konto verknüpft“ und keine weiteren Kontodaten.
 
 ### Testnachricht aus dem Formular
 
 Im Formular **Abonnent hinzufügen** bzw. beim Bearbeiten schickt **Testnachricht senden** sofort
 eine kurze Nachricht an das eingetragene Ziel – an die E-Mail-Adresse oder an den
-Google-Chat-Webhook –, auch bevor du speicherst. Es wird dabei nichts gespeichert und kein Abo
-angelegt. Die Nachricht kommt in der Sprache, die gerade oben im Admin-Bereich eingestellt ist
-(Deutsch oder Englisch), nicht in der Benachrichtigungssprache des Abonnenten. Die Schaltfläche
-ist gesperrt, solange keine gültige E-Mail-Adresse bzw. keine https-URL eingetragen ist; der
-Server prüft das Ziel genauso wie beim Anlegen (keine internen Adressen). Das Ergebnis erscheint
-direkt unter der Schaltfläche. Mögliche Fehler: Das Webhook-Ziel lehnt ab oder ist nicht
-erreichbar, die E-Mail ließ sich nicht senden oder der E-Mail-Versand ist in den
-Systemeinstellungen abgeschaltet. Nötig ist `subscribers:create` oder `subscribers:update`; je
-Absender sind höchstens 5 Testnachrichten pro Minute möglich.
+Google-Chat-Webhook –, auch bevor du speicherst. Das Ergebnis erscheint direkt unter der
+Schaltfläche.
+
+- Es wird dabei nichts gespeichert und kein Abo angelegt.
+- Die Nachricht kommt in der Sprache, die gerade oben im Admin-Bereich eingestellt ist (Deutsch
+  oder Englisch), nicht in der Benachrichtigungssprache des Abonnenten.
+- Die Schaltfläche ist gesperrt, solange keine gültige E-Mail-Adresse bzw. keine https-URL
+  eingetragen ist; der Server prüft das Ziel genauso wie beim Anlegen (keine internen Adressen).
+- Nötig ist `subscribers:create` oder `subscribers:update`; je Absender sind höchstens 5
+  Testnachrichten pro Minute möglich.
+
+Mögliche Fehler:
+
+- Das Webhook-Ziel lehnt ab oder ist nicht erreichbar.
+- Die E-Mail ließ sich nicht senden.
+- Der E-Mail-Versand ist in den Systemeinstellungen abgeschaltet.

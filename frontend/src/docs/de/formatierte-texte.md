@@ -8,16 +8,17 @@ Werkzeugleiste, man muss die Zeichen also nicht selbst tippen (siehe [Editor](#e
 
 ## Editor
 
-Über dem Feld stehen Knöpfe für fett, kursiv, Aufzählung, Zitat, Code und Link (nur https). Sie
-setzen die Markdown-Zeichen um den markierten Text oder an die Cursorstelle; ein zweiter Klick auf
-fett, kursiv oder Code nimmt sie wieder zurück. Mit Strg+B (am Mac Cmd+B) und Strg+I lassen sich
-fett und kursiv auch per Tastatur setzen. Nach „Link“ ist die Adresse `https://` markiert und kann
-direkt überschrieben werden.
+Über dem Feld stehen Knöpfe für fett, kursiv, Aufzählung, Zitat, Code und Link (nur https).
 
-„Vorschau“ zeigt den Text genau so, wie ihn die Statusseite darstellt, mit derselben Bereinigung:
-Roh-HTML, Bilder und Überschriften erscheinen auch dort als Text. „Bearbeiten“ führt zurück. Unter
-dem Feld zählt ein Zähler die Zeichen gegen die Grenze von 5.000; ist der Text länger, wird der
-Zähler rot und das Speichern wird abgelehnt.
+- Sie setzen die Markdown-Zeichen um den markierten Text oder an die Cursorstelle; ein zweiter
+  Klick auf fett, kursiv oder Code nimmt sie wieder zurück.
+- Mit Strg+B (am Mac Cmd+B) und Strg+I lassen sich fett und kursiv auch per Tastatur setzen.
+- Nach „Link“ ist die Adresse `https://` markiert und kann direkt überschrieben werden.
+- „Vorschau“ zeigt den Text genau so, wie ihn die Statusseite darstellt, mit derselben
+  Bereinigung: Roh-HTML, Bilder und Überschriften erscheinen auch dort als Text. „Bearbeiten“
+  führt zurück.
+- Unter dem Feld zählt ein Zähler die Zeichen gegen die Grenze von 5.000; ist der Text länger,
+  wird der Zähler rot und das Speichern wird abgelehnt.
 
 ## Schreibweise
 

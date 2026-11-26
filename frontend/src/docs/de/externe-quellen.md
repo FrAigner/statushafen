@@ -4,10 +4,13 @@ Viele Dienste laufen auf Plattformen anderer Anbieter. Mit einer **externen Quel
 Statushafen die Statusseite eines solchen Anbieters aus und berücksichtigt deren Zustand auf der
 eigenen Statusseite: Fällt bei dem Anbieter ein Baustein aus, den eine eigene Komponente nutzt,
 zeigt die Komponente das mit an. Verwaltet wird das unter **Externe Quellen** im Bereich
-**Betrieb**. Ansehen darf man die Seite mit `external_sources:read`, anlegen mit `external_sources:create`,
-ändern, abrufen („Jetzt abrufen“) mit `external_sources:update` und löschen mit
-`external_sources:delete`. „Übernehmen“ legt eigene Komponenten an und braucht deshalb zusätzlich
-`components:create`.
+**Betrieb**. Nötige Rechte:
+
+- **Ansehen:** `external_sources:read`
+- **Anlegen:** `external_sources:create`
+- **Ändern, abrufen („Jetzt abrufen“):** `external_sources:update`
+- **Löschen:** `external_sources:delete`
+- **„Übernehmen“** legt eigene Komponenten an und braucht deshalb zusätzlich `components:create`.
 
 ## Eine Quelle anlegen
 
@@ -24,15 +27,19 @@ Mit „Neue Quelle“ trägt man eine fremde Statusseite ein:
 Unterstützt wird die **Summary-API v2** (`/api/v2/summary.json`). Viele öffentliche Statusseiten
 bieten sie an, darunter Seiten auf Basis von Atlassian Statuspage. Atlassian und Statuspage sind
 Marken der Atlassian Pty Ltd; Statushafen hat keine Verbindung zu Atlassian.
-Private, lokale und interne Adressen lehnt Statushafen ab. Eine neu angelegte Quelle wird beim
-nächsten Takt oder sofort mit „Jetzt abrufen“ im Zeilenmenü zum ersten Mal abgefragt; das Ergebnis
-des Abrufs wird angezeigt. Pro Quelle läuft immer nur ein Abruf gleichzeitig.
+
+- Private, lokale und interne Adressen lehnt Statushafen ab.
+- Eine neu angelegte Quelle wird beim nächsten Takt oder sofort mit „Jetzt abrufen“ im Zeilenmenü
+  zum ersten Mal abgefragt; das Ergebnis des Abrufs wird angezeigt.
+- Pro Quelle läuft immer nur ein Abruf gleichzeitig.
 
 Die Liste zeigt je Quelle den Zustand (Erreichbar, Abruf fehlgeschlagen, Ausfall, Inaktiv, Noch
-nicht abgerufen), den letzten Abruf sowie die Zahl der Bausteine und Kopplungen. Beim **Löschen**
-entfernt Statushafen auch die Bausteine, Kopplungen und gespiegelten Meldungen der Quelle. Eine
-inaktive Quelle wird nicht abgerufen; ihre Kopplungen und gespiegelten Meldungen zählen dann nicht
-mehr, die Daten bleiben aber erhalten.
+nicht abgerufen), den letzten Abruf sowie die Zahl der Bausteine und Kopplungen.
+
+- Beim **Löschen** entfernt Statushafen auch die Bausteine, Kopplungen und gespiegelten Meldungen
+  der Quelle.
+- Eine **inaktive** Quelle wird nicht abgerufen; ihre Kopplungen und gespiegelten Meldungen zählen
+  dann nicht mehr, die Daten bleiben aber erhalten.
 
 ## Bausteine übernehmen
 
@@ -45,16 +52,21 @@ Der schnellste Weg zu gekoppelten Komponenten ist die Karte „Bausteine überne
    („Oberste Ebene“ = ohne Gruppe), und optional Tags vergeben.
 4. „Übernehmen“ klicken.
 
-Für jeden gewählten Baustein entsteht eine eigene Komponente mit dessen Namen, Status
-„Betriebsbereit“ und der Kopplung an den Baustein. Eine ganze externe Gruppe wird als eigene
-Gruppe mit ihren aktuellen Bausteinen angelegt; die Gruppe selbst wird nicht gekoppelt, ihr Status
-ergibt sich aus den Unterkomponenten. Alles geschieht in einem Schritt: Bei einem Fehler wird
-nichts angelegt. Übersprungene Bausteine (bereits gekoppelt, inzwischen verschwunden, Gruppe ohne
-Bausteine) werden danach aufgelistet; ein zweiter Klick legt nichts doppelt an.
+Ergebnis der Übernahme:
 
-Gut zu wissen: Später beim Anbieter hinzukommende Bausteine übernimmt Statushafen nicht
-automatisch, Namensänderungen beim Anbieter werden nicht nachgezogen, und eine Übernahme lässt
-sich nicht rückgängig machen (die Komponenten löscht man einzeln).
+- Für jeden gewählten Baustein entsteht eine eigene Komponente mit dessen Namen, Status
+  „Betriebsbereit“ und der Kopplung an den Baustein.
+- Eine ganze externe Gruppe wird als eigene Gruppe mit ihren aktuellen Bausteinen angelegt; die
+  Gruppe selbst wird nicht gekoppelt, ihr Status ergibt sich aus den Unterkomponenten.
+- Alles geschieht in einem Schritt: Bei einem Fehler wird nichts angelegt.
+- Übersprungene Bausteine (bereits gekoppelt, inzwischen verschwunden, Gruppe ohne Bausteine)
+  werden danach aufgelistet; ein zweiter Klick legt nichts doppelt an.
+
+Gut zu wissen:
+
+- Später beim Anbieter hinzukommende Bausteine übernimmt Statushafen nicht automatisch.
+- Namensänderungen beim Anbieter werden nicht nachgezogen.
+- Eine Übernahme lässt sich nicht rückgängig machen (die Komponenten löscht man einzeln).
 
 ## Bausteine koppeln
 
@@ -100,11 +112,12 @@ Ist die Quelle wieder erreichbar, zählt ihr Status sofort wieder. Ist der E-Mai
 ## Gespiegelte Meldungen
 
 Neben dem Status holt Statushafen auch die **Vorfälle und Wartungen** der Quelle. Gespiegelt werden
-nur Meldungen, die mindestens einen gekoppelten Baustein betreffen. Die Karte „Gespiegelte
-Meldungen“ listet sie mit Art, Stand, betroffenen eigenen Komponenten und Zahl der Updates; Filter
-nach Art (Vorfall, Wartung), Zustand (offen, beendet) und Quelle. Die Texte stammen von der
-Fremdseite und werden nicht übersetzt oder verändert. Beendete Meldungen zeigt die Liste für die
-letzten 30 Tage.
+nur Meldungen, die mindestens einen gekoppelten Baustein betreffen.
+
+- **Karte „Gespiegelte Meldungen“:** listet sie mit Art, Stand, betroffenen eigenen Komponenten
+  und Zahl der Updates; Filter nach Art (Vorfall, Wartung), Zustand (offen, beendet) und Quelle.
+  Beendete Meldungen zeigt die Liste für die letzten 30 Tage.
+- **Texte:** stammen von der Fremdseite und werden nicht übersetzt oder verändert.
 
 - **Öffentlich** erscheinen offene und in den letzten 14 Tagen beendete Meldungen unter „Meldungen
   externer Quellen“, klar als extern gekennzeichnet und mit Link zur Originalseite.

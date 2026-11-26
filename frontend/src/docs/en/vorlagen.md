@@ -24,12 +24,16 @@ everything can be changed freely.
 
 If the status page has further languages, a language switch appears at the top of the form:
 "English (default)" and one entry per further language with its state ("empty", "draft", "done").
-In a further language you can translate the title and message of the template; the default
-language is required, further languages are optional. Everyone with the "update" permission for
-templates sees the switch; everything is saved with one click on "Save". When you "Use template",
-the form also takes over these texts into the languages of the new incident or maintenance window
-(same state as in the template); afterwards they can be changed freely. See also
-[Languages](/docs/sprachen).
+
+- In a further language you can translate the title and message of the template.
+- The default language is required, further languages are optional.
+- Everyone with the "update" permission for templates sees the switch; everything is saved with one
+  click on "Save".
+- When you "Use template", the form also takes over these texts into the languages of the new
+  incident or maintenance window (same state as in the template); afterwards they can be changed
+  freely.
+
+See also [Languages](/docs/sprachen).
 
 An incident does not remember which template it came from. Changing or deleting a template does
 not change existing incidents.

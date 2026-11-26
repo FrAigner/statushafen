@@ -55,12 +55,16 @@ editor lists them under available placeholders; typing `{` suggests placeholders
 
 ## Allowed constructs and limits
 
-Templates may contain placeholders and simple conditions only: `{{if …}}…{{else}}…{{end}}` with the
-functions `eq`, `ne`, `not`, `and` and `or`, for example `{{if eq .Status "resolved"}}…{{end}}`.
-Loops (`range`), sub-templates (`template`, `define`, `block`), variables, `printf` and other
-functions are rejected when saving and in the preview. The subject may be at most 500 characters
-long, the body at most 64 KB, and the rendered result is size- and time-limited. A previously
-saved template that violates these rules is not used; the built-in text is sent instead.
+Templates may contain placeholders and simple conditions only:
+
+- **Allowed:** `{{if …}}…{{else}}…{{end}}` with the functions `eq`, `ne`, `not`, `and` and `or`,
+  for example `{{if eq .Status "resolved"}}…{{end}}`.
+- **Rejected** (when saving and in the preview): loops (`range`), sub-templates (`template`,
+  `define`, `block`), variables, `printf` and other functions.
+- **Limits:** The subject may be at most 500 characters long, the body at most 64 KB, and the
+  rendered result is size- and time-limited.
+- **Old templates:** A previously saved template that violates these rules is not used; the
+  built-in text is sent instead.
 
 The **subscription confirmation** template must contain `{{.ConfirmURL}}` (not only inside a
 condition). Statushafen puts it into a fixed frame with the page name and a note for recipients who
@@ -88,20 +92,28 @@ Body:
 For mirrored reports of [external sources](/docs/externe-quellen#mirrored-reports) there are six
 more events (`external_incident_created`, `external_incident_updated`,
 `external_incident_resolved` and the same three for maintenance with `external_maintenance_…`),
-each for the recipient group "Subscribers" in the page's default language. The editor offers
-them as "External incident: …" and "External maintenance: …" and sets the recipient group to
-"Subscribers". In addition to the placeholders above, `{{.SourceName}}` (name of the source) and `{{.SourceURL}}` (link to the
-original report) are available there. Without a custom template, Statushafen sends a built-in
-text. The outage emails of a source always use the built-in text.
+each for the recipient group "Subscribers" in the page's default language.
+
+- **In the editor:** as "External incident: …" and "External maintenance: …"; the recipient
+  group is set to "Subscribers".
+- **Additional placeholders:** In addition to the placeholders above, `{{.SourceName}}` (name of
+  the source) and `{{.SourceURL}}` (link to the original report) are available there.
+- **Without a custom template**, Statushafen sends a built-in text.
+- The **outage emails** of a source always use the built-in text.
 
 ## Current limitation
 
 When subscribing, the visitor's language is stored as the email language, provided the page has
 enabled it (otherwise the default language of the page applies). All emails to subscribers
-(incidents, maintenance, notices, subscription confirmation, reports from external sources) use
-the subscriber template in that language, falling back to the **default language of the page**; if
-that is missing too, the built-in text is sent (German or English; English for any other
-language). A template in a third language is not used as a substitute. Subscribers change the
+(incidents, maintenance, notices, subscription confirmation, reports from external sources) pick
+their text in this order:
+
+1. the subscriber template in that language,
+2. falling back to the one in the **default language of the page**,
+3. if that is missing too, the built-in text is sent (German or English; English for any other
+   language).
+
+A template in a third language is not used as a substitute. Subscribers change the
 language in the subscription manager, admins in the subscriber form (or through the API:
 `PUT /api/me/subscription`, field `language`).
 
@@ -109,6 +121,10 @@ Internal users get incident emails in their interface language (German or Englis
 is stored): first the staff template in that language, then the English one, otherwise the built-in
 text.
 
-Messages to Google Chat webhooks are fixed texts without a template, in German or English
-depending on the subscriber's language (any other language gets English); the global webhook
-(`GOOGLE_CHAT_WEBHOOK_URL`) stays English. The global webhook is an operator tool for the whole instance: it only receives incidents of public pages, never those of private pages. The message in them is plain text (see [Formatted text](/docs/formatierte-texte)).
+Google Chat webhooks:
+
+- Messages to Google Chat webhooks are fixed texts without a template, in German or English
+  depending on the subscriber's language (any other language gets English).
+- The global webhook (`GOOGLE_CHAT_WEBHOOK_URL`) stays English. It is an operator tool for the
+  whole instance: it only receives incidents of public pages, never those of private pages.
+- The message in them is plain text (see [Formatted text](/docs/formatierte-texte)).

@@ -63,10 +63,12 @@ Register exactly this URL at the provider as an allowed redirect URI:
 Example: `https://status.example.com/api/auth/oidc/callback?page=3`
 
 The backend shows the value as `oidc_acs_url` (`GET /api/admin/pages/<ID>/sso`, even before a
-configuration has been saved; in the admin interface as the field "ACS URL"). It is computed from
-the current `BASE_URL` on every request, exactly as at login. After changing `BASE_URL`, adjust
-the redirect URI at the provider; there is no need to save again. The query parameter `?page=…`
-is part of the URL; most providers compare redirect URIs character by character.
+configuration has been saved; in the admin interface as the field "ACS URL").
+
+- It is computed from the current `BASE_URL` on every request, exactly as at login. After changing
+  `BASE_URL`, adjust the redirect URI at the provider; there is no need to save again.
+- The query parameter `?page=…` is part of the URL; most providers compare redirect URIs character
+  by character.
 
 ## Configuration fields
 
@@ -110,9 +112,11 @@ per minute). It checks the **saved** configuration (so save first) and works eve
    missing from the ID token. On failure it shows the message for the code (see
    [Error cases](#error-cases)).
 
-The test sign-in creates neither a session nor a link and writes no audit entry for a sign-in. If
-discovery URL, client ID or secret are missing, the start answers with 400; if "Allow test login"
-is off, with 403.
+The test sign-in creates neither a session nor a link and writes no audit entry for a sign-in. The
+start answers
+
+- with 400 if discovery URL, client ID or secret are missing,
+- with 403 if "Allow test login" is off.
 
 Afterwards, check the real login with a linked account in a private browser window via the
 status page ("Login" → "Sign in with SSO"). Details on errors are in the backend log
@@ -134,10 +138,14 @@ After that, "Login" → "Sign in with SSO" on the status page is enough.
 
 The profile lists existing links ("linked as <email claim>") and removes them with "Unlink"
 (`GET /api/me/sso`, `DELETE /api/me/sso/<ID>`, own links only). As linkable it only shows pages
-with active OIDC that the rules below allow: without a role on any page, only public, listed
-pages (so the list does not reveal private page names); with a role on exactly one page, only that
-page; with roles on several pages, and for global admins, none. A private page without a role of
-one's own can still be linked via the API.
+with active OIDC that the rules below allow:
+
+- without a role on any page: only public, listed pages (so the list does not reveal private page
+  names),
+- with a role on exactly one page: only that page,
+- with roles on several pages, and for global admins: none.
+
+A private page without a role of one's own can still be linked via the API.
 
 Excluded, both when linking and at every sign-in (403), are:
 
@@ -238,8 +246,8 @@ In all cases: redirect URI `<BASE_URL>/api/auth/oidc/callback?page=<page ID>`, c
   ID); the client ID is the *Application (client) ID*.
 - Tenant-specific issuer: `https://login.microsoftonline.com/<tenant ID>/v2.0`. The multi-tenant
   endpoints (`common`, `organizations`) do not work because their discovery document reports a
-  placeholder issuer (issuer mismatch). Multi-tenant sign-in is therefore not supported
- ; it would need a dedicated issuer check.
+  placeholder issuer (issuer mismatch). Multi-tenant sign-in is therefore not supported;
+  it would need a dedicated issuer check.
 
 ### Google
 
@@ -257,5 +265,8 @@ README, section ["Lokale SSO-Tests mit Mock-OIDC"](../../../README.md#lokale-sso
 
 The key is the variable `OIDC_DEV_INSECURE_ISSUERS`: a comma-separated list of issuers for which
 the https requirement and SSRF protection are lifted (for example
-`http://localhost:8090/statushafen`). It only applies on an exact match (no prefix) and only with
-`APP_ENV` set to `development`, `dev`, `test` or `local`. It must not be set on a server.
+`http://localhost:8090/statushafen`).
+
+- It only applies on an exact match (no prefix).
+- It only applies with `APP_ENV` set to `development`, `dev`, `test` or `local`.
+- It must not be set on a server.

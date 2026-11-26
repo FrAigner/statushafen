@@ -62,10 +62,12 @@ Beim Anbieter genau diese URL als erlaubte Redirect-URI eintragen:
 Beispiel: `https://status.example.com/api/auth/oidc/callback?page=3`
 
 Das Backend zeigt den Wert als `oidc_acs_url` an (`GET /api/admin/pages/<ID>/sso`, auch bevor eine
-Konfiguration gespeichert ist; in der Admin-Oberfläche als Feld „ACS URL“). Er wird bei jedem Abruf
-aus dem aktuellen `BASE_URL` berechnet, genau wie beim Login – nach einer Änderung von `BASE_URL`
-also die Redirect-URI beim Anbieter anpassen, nicht neu speichern. Der Query-Parameter `?page=…` gehört dazu; die meisten Anbieter
-vergleichen Redirect-URIs zeichengenau.
+Konfiguration gespeichert ist; in der Admin-Oberfläche als Feld „ACS URL“).
+
+- Er wird bei jedem Abruf aus dem aktuellen `BASE_URL` berechnet, genau wie beim Login – nach einer
+  Änderung von `BASE_URL` also die Redirect-URI beim Anbieter anpassen, nicht neu speichern.
+- Der Query-Parameter `?page=…` gehört dazu; die meisten Anbieter vergleichen Redirect-URIs
+  zeichengenau.
 
 ## Felder der Konfiguration
 
@@ -109,8 +111,10 @@ vorher speichern – und funktioniert schon, bevor `oidc_enabled` eingeschaltet 
    [Fehlerbilder](#fehlerbilder)).
 
 Die Testanmeldung legt weder eine Sitzung noch eine Verknüpfung an und schreibt keinen
-Audit-Eintrag für eine Anmeldung. Fehlen Discovery-URL, Client-ID oder Secret, antwortet der Start
-mit 400, ist „Test-Login erlauben“ aus, mit 403.
+Audit-Eintrag für eine Anmeldung. Der Start antwortet
+
+- mit 400, wenn Discovery-URL, Client-ID oder Secret fehlen,
+- mit 403, wenn „Test-Login erlauben“ aus ist.
 
 Den echten Login danach mit einem verknüpften Konto in einem privaten Browserfenster über die
 Statusseite („Anmelden“ → „Mit SSO anmelden“) prüfen. Details zu Fehlern stehen im Backend-Log
@@ -134,10 +138,14 @@ Danach genügt auf der Statusseite „Anmelden“ → „Mit SSO anmelden“.
 
 Das Profil listet bestehende Verknüpfungen („verknüpft als <E-Mail-Claim>“) und löst sie mit
 „Verknüpfung lösen“ (`GET /api/me/sso`, `DELETE /api/me/sso/<ID>`, nur eigene Verknüpfungen).
-Als verknüpfbar zeigt es nur Seiten mit aktivem OIDC, die die Regeln unten erlauben: ohne Rolle
-auf einer Seite nur öffentliche, gelistete Seiten (damit die Liste keine privaten Seitennamen
-verrät), mit Rolle auf genau einer Seite nur diese, mit Rollen auf mehreren Seiten und für Global
-Admins keine. Eine private Seite ohne eigene Rolle lässt sich weiterhin per API verknüpfen.
+Als verknüpfbar zeigt es nur Seiten mit aktivem OIDC, die die Regeln unten erlauben:
+
+- ohne Rolle auf einer Seite: nur öffentliche, gelistete Seiten (damit die Liste keine privaten
+  Seitennamen verrät),
+- mit Rolle auf genau einer Seite: nur diese,
+- mit Rollen auf mehreren Seiten und für Global Admins: keine.
+
+Eine private Seite ohne eigene Rolle lässt sich weiterhin per API verknüpfen.
 
 Ausgeschlossen sind, sowohl beim Verknüpfen als auch bei jeder Anmeldung (403):
 
@@ -170,7 +178,7 @@ Weitere Regeln:
 - Eine Anmeldung ohne Verknüpfung endet mit 403 „Diese Anmeldung ist mit keinem Konto verknüpft“.
 - Die Verknüpfung hängt am Issuer. Wechselt der Issuer (anderer Realm, anderer Tenant, Schrägstrich
   am Ende), löscht das Speichern der Konfiguration die OIDC-Verknüpfungen der Seite (Audit-Eintrag
-  `sso.oidc_identities_reset`,; die SSO-Seite warnt vorher. Die Konten
+  `sso.oidc_identities_reset`); die SSO-Seite warnt vorher. Die Konten
   müssen neu verknüpft werden.
 
 ## Fehlerbilder
@@ -249,6 +257,8 @@ Für die Entwicklung gibt es einen Mock-Anbieter im Compose-Profil `sso`. Die Sc
 README, Abschnitt [„Lokale SSO-Tests mit Mock-OIDC“](../../README.md#lokale-sso-tests-mit-mock-oidc).
 
 Kern ist die Variable `OIDC_DEV_INSECURE_ISSUERS`: eine kommagetrennte Liste von Issuern, für die
-https-Pflicht und SSRF-Schutz entfallen (z. B. `http://localhost:8090/statushafen`). Sie greift nur
-bei exakter Übereinstimmung (kein Präfix) und nur mit `APP_ENV` `development`, `dev`, `test` oder `local`. Auf einem Server darf
-sie nicht gesetzt sein.
+https-Pflicht und SSRF-Schutz entfallen (z. B. `http://localhost:8090/statushafen`).
+
+- Sie greift nur bei exakter Übereinstimmung (kein Präfix).
+- Sie greift nur mit `APP_ENV` `development`, `dev`, `test` oder `local`.
+- Auf einem Server darf sie nicht gesetzt sein.
