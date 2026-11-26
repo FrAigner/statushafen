@@ -41,9 +41,9 @@
 
    PublicLayout.vue and AdminLayout.vue set the classes .theme-public and
    .theme-admin on their root element; nothing else changes there.
-   The hex values here are exempt from the ban in src/hexColors.test.js
+   The hex values here are exempt from the ban in src/hexColors.test.ts
    (this is the token file); elsewhere colors should come from tokens.
-   Contrast of all pairs: src/tokenContrast.test.js (WCAG AA, light and dark).
+   Contrast of all pairs: src/tokenContrast.test.ts (WCAG AA, light and dark).
    ============================================================================ */
 
 /* ── 1. Base ────────────────────────────────────────────────────────────── */
@@ -61,7 +61,7 @@
      Here all onyx font tokens get our fonts; :root beats onyx' :where(:root)
      and applies to every onyx component in the app.
      (.theme-admin repeats the lines below because --font-sans changes there.)
-     Do not remove: src/onyxFonts.test.js checks exactly this block. */
+     Do not remove: src/onyxFonts.test.ts checks exactly this block. */
   --onyx-font-family-paragraph: var(--font-sans);
   --onyx-font-family-data:      var(--font-sans);
   --onyx-font-family-h1:        var(--font-sans);
@@ -372,7 +372,7 @@ html[data-theme="dark"] .theme-admin {
      .content-area; everything that should carry the status page's brand color
      uses var(--text-secondary), all other places use --text-2.
      All other old names (--bg-panel, --text-primary, --color-*, …) have been
-     removed; src/designAufraeumen.test.js prevents their return. */
+     removed; src/designAufraeumen.test.ts prevents their return. */
   --text-secondary: var(--text-2);
 
   /* sit-onyx: surfaces, text, borders and radii mapped to our tokens. onyx uses

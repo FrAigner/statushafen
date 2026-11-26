@@ -47,6 +47,7 @@
     "eslint": "^10.15.0",
     "eslint-plugin-vue": "^10.12.1",
     "happy-dom": "^21.0.4",
+    "jiti": "^2.7.0",
     "jsdom": "^31.0.1",
     "prettier": "^3.10.1",
     "typescript": "6.0.3",

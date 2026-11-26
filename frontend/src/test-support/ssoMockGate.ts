@@ -1,4 +1,4 @@
-// Decides for frontend/e2e/sso-oidc.spec.js whether the spec is skipped for lack
+// Decides for frontend/e2e/sso-oidc.spec.ts whether the spec is skipped for lack
 // of a mock OIDC. Locally an E2E run without the service should not turn red;
 // in the nightly job (.github/workflows/e2e-sso-nachts.yml, E2E_REQUIRE_SSO_MOCK=1)
 // a silent skip would instead be a green run without any check.

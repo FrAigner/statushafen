@@ -33,7 +33,7 @@ export const OnyxSelectStub = defineComponent({
     modelValue: {}, options: { type: Array, default: () => [] }, multiple: { type: Boolean, default: false },
     required: { type: Boolean, default: false }, label: {}, placeholder: {},
     // As with the real OnyxSelect, on the operable element instead of the
-    // root <div> (help tooltips, helpCoverage.test.js).
+    // root <div> (help tooltips, helpCoverage.test.ts).
     ariaDescribedby: { type: String, default: undefined },
   },
   emits: ['update:modelValue'],

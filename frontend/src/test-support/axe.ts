@@ -107,3 +107,10 @@ expect.extend({
     }
   },
 })
+
+// Type for the matcher registered above (expect(await axe(wrapper)).toHaveNoViolations()).
+declare module 'vitest' {
+  interface Matchers<R extends void | Promise<void> = void | Promise<void>, T = unknown> {
+    toHaveNoViolations(): R
+  }
+}

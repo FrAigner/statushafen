@@ -82,7 +82,7 @@ Mutation tests run nightly (`.github/workflows/mutation-nachts.yml`): backend wi
   They are checked with `strict` (`frontend/tsconfig.app.json`; tests, e2e and config files in
   `tsconfig.node.json`). Existing JavaScript is migrated step by step and is not type-checked until then
   (`checkJs: false`). `npm run typecheck` (vue-tsc) is part of the checks before a pull request and runs
-  in CI; `src/tsconfigStrict.test.js` guards the configuration.
+  in CI; `src/tsconfigStrict.test.ts` guards the configuration.
 - **New model:** add it to every AutoMigrate list (`backend/database/db.go`, `backend/testutils/setup.go`,
   and local test setups such as `backend/database/db_test.go`).
 - **Partial unique indexes** (soft delete, "exactly one default") cannot be created by GORM
@@ -96,12 +96,12 @@ Mutation tests run nightly (`.github/workflows/mutation-nachts.yml`): backend wi
 - **New feature:** add a help page in German and English (`frontend/src/docs/de` and `/en`), an entry in
   `backend/database/system_capabilities.go` (a test fails otherwise), the route in
   `docs/api/openapi.yaml`, texts in `de.json` and `en.json`, and a translation for new error codes.
-- **New admin route:** also extend the stub router in `frontend/src/layouts/AdminLayout.test.js`.
+- **New admin route:** also extend the stub router in `frontend/src/layouts/AdminLayout.test.ts`.
 - **Admin pages** use the shared building blocks (`PageHeader`, `ListCard`, `FormPanel`, `RowMenu`, ...);
   do not build page-local variants.
-- **Design tokens:** all colors come from `frontend/src/assets/tokens.css`. `src/hexColors.test.js` is a
-  ratchet against new hex colors, `src/tokenContrast.test.js` checks WCAG AA.
-- **German texts** address the reader informally ("du"); tests in `frontend/src/i18n/anrede.test.js` and
+- **Design tokens:** all colors come from `frontend/src/assets/tokens.css`. `src/hexColors.test.ts` is a
+  ratchet against new hex colors, `src/tokenContrast.test.ts` checks WCAG AA.
+- **German texts** address the reader informally ("du"); tests in `frontend/src/i18n/anrede.test.ts` and
   `backend/handlers/anrede_test.go` guard this.
 - **SSO guides** exist in German (`docs/user-guide`, `docs/sso`) and English (`en/`); change both.
 - **Logging:** never log secrets. Use `logging.New`/`logging.Init`, not a raw `slog` handler. New log

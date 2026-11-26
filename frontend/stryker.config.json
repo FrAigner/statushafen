@@ -2,11 +2,11 @@
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "_comment": "Mutation tests. In CI, --mutate is set to the lines changed in the PR (coveragegate mutate-ranges); every surviving mutant fails the run (break: 100).",
   "testRunner": "vitest",
-  "vitest": { "configFile": "vitest.config.js" },
+  "vitest": { "configFile": "vitest.config.ts" },
   "coverageAnalysis": "perTest",
   "mutate": [
     "src/**/*.{js,ts,vue}",
-    "!src/**/*.{test,spec}.{js,ts}",
+    "!src/**/*.{test,spec}.ts",
     "!src/test-support/**"
   ],
   "reporters": ["clear-text", "progress", "json"],

@@ -40,7 +40,7 @@ Without the profile it does not start.
    "username" becomes the `sub` claim (use the same value every time); further claims can be set as
    JSON in the text field, for example `{"name": "Erika"}`.
 
-The Playwright spec `frontend/e2e/sso-oidc.spec.js` runs the whole flow through the user interface
+The Playwright spec `frontend/e2e/sso-oidc.spec.ts` runs the whole flow through the user interface
 (own page and account, linking in the profile, signing in via the status page, checking the session,
 error page for an unlinked identity) and skips itself if the mock is not reachable:
 `cd frontend && npx playwright test sso-oidc` (the backend must be running; other addresses via

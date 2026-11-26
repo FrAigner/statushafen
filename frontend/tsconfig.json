@@ -1,7 +1,7 @@
 // Solution file: lists no files itself. `vue-tsc --build` and editors use the two projects below.
 // - tsconfig.app.json: code that runs in the browser (src/ without tests)
 // - tsconfig.node.json: code that runs in Node (unit tests, e2e, Vite/Vitest/Playwright config)
-// src/tsconfigStrict.test.js guards both (strict, valid keys, which files they cover).
+// src/tsconfigStrict.test.ts guards both (strict, valid keys, which files they cover).
 {
   "files": [],
   "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
