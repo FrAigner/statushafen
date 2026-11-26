@@ -10,7 +10,7 @@
 //     readable). The renderer only outputs links for https:.
 //  2. DOMPurify with a FIXED, tight allowlist (no USE_PROFILES as in
 //     docs/index.ts, which is deliberately broad for the repo's own docs).
-// marked is pinned exactly (package.json "18.1.1", docs.test.js checks that).
+// marked is pinned exactly (package.json "18.1.1", docs.test.ts checks that).
 import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 

@@ -84,7 +84,7 @@ Mutationstests laufen nachts (`.github/workflows/mutation-nachts.yml`): Backend 
   Geprüft wird mit `strict` (`frontend/tsconfig.app.json`; Tests, E2E und Konfigurationsdateien in
   `tsconfig.node.json`). Bestehender JavaScript-Code wird schrittweise migriert und bis dahin nicht
   typgeprüft (`checkJs: false`). `npm run typecheck` (vue-tsc) gehört zu den Prüfungen vor dem Pull
-  Request und läuft in der CI; `src/tsconfigStrict.test.js` wacht über die Konfiguration.
+  Request und läuft in der CI; `src/tsconfigStrict.test.ts` wacht über die Konfiguration.
 - **Neues Model:** in ALLE AutoMigrate-Listen eintragen (`backend/database/db.go`,
   `backend/testutils/setup.go` und lokale Test-Setups wie `backend/database/db_test.go`).
 - **Partielle Unique-Indizes** (Soft-Delete, „genau ein Default“) kann GORM AutoMigrate nicht; lege sie
@@ -99,12 +99,12 @@ Mutationstests laufen nachts (`.github/workflows/mutation-nachts.yml`): Backend 
 - **Neue Funktion:** Hilfeseite auf Deutsch und Englisch (`frontend/src/docs/de` und `/en`), Eintrag in
   `backend/database/system_capabilities.go` (sonst schlägt ein Test an), Route in
   `docs/api/openapi.yaml`, Texte in `de.json` und `en.json` und eine Übersetzung für neue Fehlercodes.
-- **Neue Admin-Route:** auch den Stub-Router in `frontend/src/layouts/AdminLayout.test.js` ergänzen.
+- **Neue Admin-Route:** auch den Stub-Router in `frontend/src/layouts/AdminLayout.test.ts` ergänzen.
 - **Admin-Seiten** nutzen die gemeinsamen Bausteine (`PageHeader`, `ListCard`, `FormPanel`, `RowMenu`,
   …); keine seitenlokalen Varianten bauen.
-- **Design-Tokens:** Alle Farben kommen aus `frontend/src/assets/tokens.css`. `src/hexColors.test.js`
-  ist eine Ratsche gegen neue Hex-Farben, `src/tokenContrast.test.js` prüft WCAG AA.
-- **Deutsche Texte** duzen („du“); Tests in `frontend/src/i18n/anrede.test.js` und
+- **Design-Tokens:** Alle Farben kommen aus `frontend/src/assets/tokens.css`. `src/hexColors.test.ts`
+  ist eine Ratsche gegen neue Hex-Farben, `src/tokenContrast.test.ts` prüft WCAG AA.
+- **Deutsche Texte** duzen („du“); Tests in `frontend/src/i18n/anrede.test.ts` und
   `backend/handlers/anrede_test.go` sichern das ab.
 - **SSO-Anleitungen** gibt es auf Deutsch (`docs/user-guide`, `docs/sso`) und Englisch (`en/`); ändere
   beide.

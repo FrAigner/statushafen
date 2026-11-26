@@ -1,0 +1,906 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
+import { createRouter, createMemoryHistory } from 'vue-router'
+import { createOnyx } from 'sit-onyx'
+import i18n from '../i18n'
+import { useAuth } from '../composables/useAuth'
+import { useTenant } from '../composables/useTenant'
+import { setAuthAsPageRole } from '../test-support/pageRole'
+import { useCurrentPageSlug } from '../composables/useCurrentPageSlug'
+import { useLandingChrome } from '../composables/useLandingChrome'
+import PublicLayout from './PublicLayout.vue'
+import layoutSource from './PublicLayout.vue?raw'
+import { axe } from '../test-support/axe'
+import { asResponse, fetchMock as stubFetch } from '../test-support/fetchStub'
+
+type Locale = typeof i18n.global.locale.value
+
+const Empty = { template: '<div />' }
+
+function makeRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: Empty },
+      { path: '/login', component: Empty },
+      { path: '/admin/components', component: Empty },
+      { path: '/admin/profile', component: Empty },
+      { path: '/docs', component: Empty },
+    ],
+  })
+}
+
+async function mountLayout(mountOptions = {}) {
+  const router = makeRouter()
+  router.push('/')
+  await router.isReady()
+
+  const wrapper = mount(PublicLayout, {
+    global: { plugins: [i18n, router, createOnyx()] },
+    ...mountOptions,
+  })
+  await flushPromises()
+  return { wrapper, router }
+}
+
+describe('PublicLayout', () => {
+  beforeEach(() => {
+    // The layout loads /api/me/pages itself; without a stub the request would go nowhere.
+    globalThis.fetch = stubFetch(async () => ({ ok: true, status: 200, json: async () => [] }))
+    useAuth().logout()
+    useLandingChrome().isLanding.value = false
+    useLandingChrome().ordersEnabled.value = true
+    localStorage.clear()
+    // Tests assert on the German wording of translated menu items;
+    // without a stored preference detectInitialLocale() would otherwise fall back to 'en'
+    // in the test environment (happy-dom navigator.language === 'en-US').
+    i18n.global.locale.value = 'de'
+  })
+
+  // The "public" token layer (Direction A, tokens.css) hangs on this class.
+  it('trägt die Token-Ebene theme-public am Wurzelelement, nicht theme-admin', async () => {
+    const { wrapper } = await mountLayout()
+    expect(wrapper.classes()).toContain('theme-public')
+    expect(wrapper.classes()).not.toContain('theme-admin')
+  })
+
+  // Regression 2026-10-29: the language picker was 28 instead of 44 px high.
+  // The layout's scoped attribute lands on the LanguageSwitcher root, not on
+  // its trigger button, so a plain scoped rule never matches the button.
+  // happy-dom computes no layout, hence: the class on the button and the
+  // :deep() rule with the shared height in the source.
+  it('Sprachauswahl hat die Höhe der übrigen Kopfzeilen-Elemente', async () => {
+    const { wrapper } = await mountLayout()
+
+    const select = wrapper.find('header button.language-switcher')
+    expect(select.classes()).toContain('header-control')
+    const rule = layoutSource.match(/\.app-header :deep\(\.header-control\.language-switcher\) \{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/height: var\(--header-control-size\)/)
+    expect(layoutSource).not.toMatch(/^\.header-control\.language-switcher \{/m)
+  })
+
+  it('Logo und Name führen zur Startseite', async () => {
+    const { wrapper, router } = await mountLayout()
+    await router.push('/login')
+
+    const logo = wrapper.find('a.logo')
+    expect(logo.exists()).toBe(true)
+    expect(logo.attributes('href')).toBe('/')
+
+    await logo.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  // Branding: the header shows the real product name "Statushafen"
+  // instead of the template placeholder "Onyx Status Enterprise".
+  it('zeigt "Statushafen" als Branding im Logo', async () => {
+    const { wrapper } = await mountLayout()
+
+    const logo = wrapper.find('.logo')
+    expect(logo.text()).toBe('Statushafen')
+    expect(wrapper.text()).not.toContain('Onyx Status Enterprise')
+  })
+
+  // The lighthouse icon is an inline SVG with currentColor (no longer a
+  // dark blue PNG that had to be filtered in dark mode).
+  it('zeigt das Leuchtturm-Logo als SVG neben der Wortmarke im Logo', async () => {
+    const { wrapper } = await mountLayout()
+
+    const logo = wrapper.find('.logo')
+    expect(logo.find('svg.logo-mark').exists()).toBe(true)
+    expect(logo.find('img').exists()).toBe(false)
+    expect(layoutSource).not.toContain('/logo.png')
+    expect(logo.text()).toContain('Statushafen')
+  })
+
+  it('zeigt den Admin-Login-Button, wenn niemand eingeloggt ist', async () => {
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.login-button').exists()).toBe(true)
+    expect(wrapper.find('.user-menu-trigger').exists()).toBe(false)
+  })
+
+  // The login button brings the user back to where they came from (here: the landing page).
+  it('navigates to /login with the current route as returnTo', async () => {
+    const { wrapper, router } = await mountLayout()
+
+    await wrapper.find('.login-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/' })
+  })
+
+  it('passes the full path of another public page as returnTo', async () => {
+    const { wrapper, router } = await mountLayout()
+    await router.push('/docs?section=sso#oben')
+    await flushPromises()
+
+    await wrapper.find('.login-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/docs?section=sso#oben' })
+  })
+
+  // The login button used to be an OnyxButton and looked different from
+  // the theme toggle and language picker (other height/radius, serif font).
+  // Now it is a native button with the shared header-control look.
+  it('rendert den Login-Knopf ausgeloggt als nativen header-control-Button, nicht als OnyxButton', async () => {
+    const { wrapper } = await mountLayout()
+
+    const loginButton = wrapper.find('.login-button.header-control')
+    expect(loginButton.exists()).toBe(true)
+    expect(loginButton.element.tagName).toBe('BUTTON')
+    expect(loginButton.classes()).toContain('header-control--text')
+    expect(loginButton.classes()).not.toContain('onyx-button')
+    expect(loginButton.text()).toBe('Anmelden')
+  })
+
+  // Regression guard: the login button shares the same base class header-control
+  // as the theme toggle and language picker, so all three controls look alike.
+  it('gibt dem Login-Knopf dieselbe header-control-Basisklasse wie Theme-Toggle und Sprachauswahl', async () => {
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.login-button').classes()).toContain('header-control')
+    expect(wrapper.find('.theme-toggle').classes()).toContain('header-control')
+    expect(wrapper.find('.language-switcher').classes()).toContain('header-control')
+  })
+
+  // The login page shows the SSO button of the status page currently shown and returns there.
+  it('passes the shown status page as ?page= and the route as returnTo', async () => {
+    useCurrentPageSlug().currentPageSlug.value = 'acme'
+    try {
+      const { wrapper, router } = await mountLayout()
+
+      await wrapper.find('.login-button').trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.path).toBe('/login')
+      expect(router.currentRoute.value.query).toEqual({ returnTo: '/', page: 'acme' })
+    } finally {
+      useCurrentPageSlug().currentPageSlug.value = null
+    }
+  })
+
+  it('zeigt statt des Login-Buttons das Benutzermenü, wenn ein User eingeloggt ist', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.login-button').exists()).toBe(false)
+    expect(wrapper.find('.user-menu-trigger').exists()).toBe(true)
+    expect(wrapper.find('.user-menu-header strong').text()).toBe('user@x.de')
+    expect(wrapper.find('.user-menu-header small').text()).toBe('(Viewer)')
+  })
+
+  // Regression 2026-11-25: the user menu only closed by clicking the person
+  // icon again. It now closes on a click/tap outside and on Escape.
+  describe('Benutzermenü schließt sich von selbst', () => {
+    async function openMenu() {
+      useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+      // Attached, so focus and document listeners behave as in the browser.
+      const { wrapper } = await mountLayout({ attachTo: document.body })
+      const trigger = wrapper.find('.user-menu-trigger')
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      return { wrapper, trigger }
+    }
+    const pointerdown = async (el: Element) => {
+      el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      await flushPromises()
+    }
+
+    it('schließt bei Klick außerhalb von Menü und Icon', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(wrapper.find('.logo').element)
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      wrapper.unmount()
+    })
+
+    it('bleibt bei Klick ins Menü offen', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(wrapper.find('.user-menu-header').element)
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      wrapper.unmount()
+    })
+
+    it('Icon schaltet weiterhin um', async () => {
+      const { wrapper, trigger } = await openMenu()
+      await pointerdown(trigger.element)
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      wrapper.unmount()
+    })
+
+    // Only one header popup at a time: opening the language list closes the
+    // user menu and vice versa (mouse/touch and keyboard focus).
+    it('Sprachauswahl und Benutzermenü schließen sich gegenseitig', async () => {
+      const { wrapper, trigger } = await openMenu()
+      const lang = wrapper.find<HTMLElement>('header button.language-switcher')
+      await pointerdown(lang.element)
+      await lang.trigger('click')
+      expect(lang.attributes('aria-expanded')).toBe('true')
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+
+      await pointerdown(trigger.element)
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(lang.attributes('aria-expanded')).toBe('false')
+
+      lang.element.focus()
+      await flushPromises()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      wrapper.unmount()
+    })
+
+    it('Escape schließt und gibt den Fokus an das Icon zurück', async () => {
+      const { wrapper, trigger } = await openMenu()
+      const item = wrapper.find<HTMLElement>('.user-menu-item').element
+      item.focus()
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      await flushPromises()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+      expect(document.activeElement).toBe(trigger.element)
+      wrapper.unmount()
+    })
+  })
+
+  it('blendet den Dashboard-Menüpunkt nur mit admin_dashboard-Permission ein', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    useAuth().setAuth('jwt-1', { email: 'a@x.de', permissions: '' })
+    const { wrapper: withoutPerm } = await mountLayout()
+    expect(withoutPerm.text()).not.toContain('Dashboard')
+
+    useAuth().logout()
+    setAuthAsPageRole('jwt-2', { email: 'b@x.de', permissions: 'admin_dashboard,components:read' })
+    const { wrapper: withPerm } = await mountLayout()
+    expect(withPerm.text()).toContain('Dashboard')
+  })
+
+  // Status page only: admin_dashboard without any admin right has no effect,
+  // the admin area would send the member straight back to the status page.
+  it('blendet den Dashboard-Menüpunkt mit admin_dashboard, aber ohne Admin-Recht aus', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard' })
+    const { wrapper } = await mountLayout()
+    expect(wrapper.text()).not.toContain('Dashboard')
+  })
+
+  // Members without admin area still manage their account (language, SSO
+  // links, export, deletion) on the profile page.
+  it('bietet angemeldeten Nutzern das Profil im Benutzermenü', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: '' })
+    const { wrapper, router } = await mountLayout()
+    const item = wrapper.findAll('.user-menu-item').find(el => el.text().includes('Profil'))
+    expect(item).toBeTruthy()
+    await item!.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/admin/profile')
+  })
+
+  it('wertet admin_dashboard der globalen Rolle nicht aus, nur das Recht auf der aktiven Seite', async () => {
+    useTenant().setMyPages([])
+    useTenant().setActiveTenant(null)
+    useAuth().setAuth('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
+    const { wrapper } = await mountLayout()
+    expect(wrapper.text()).not.toContain('Dashboard')
+  })
+
+  // The dashboard link must not depend on whether StatusPage.vue
+  // activated a tenant before. On the landing/order page the layout loads
+  // its own pages itself and shows the link as soon as a page
+  // grants admin_dashboard.
+  describe('Dashboard-Link ohne aktiven Tenant', () => {
+    const mockPages = (pages: unknown) => {
+      const fetchMock = stubFetch(async () => ({ ok: true, status: 200, json: async () => pages }))
+      globalThis.fetch = fetchMock
+      return fetchMock
+    }
+    const dashboardItem = (wrapper: VueWrapper) => wrapper.findAll('.user-menu-item').find(el => el.text().includes('Dashboard'))
+
+    beforeEach(() => {
+      useTenant().setMyPages([])
+      useTenant().setActiveTenant(null)
+    })
+
+    it('zeigt den Link, lädt die Seiten selbst und wählt beim Klick die erste passende Seite', async () => {
+      const fetchMock = mockPages([
+        { ID: 4, Permissions: 'components:read' },
+        { ID: 7, Permissions: 'admin_dashboard,components:read' },
+        { ID: 9, Permissions: 'admin_dashboard,components:read' },
+      ])
+      useAuth().setAuth('jwt-1', { email: 'a@x.de', role: 'Viewer' })
+      const { wrapper, router } = await mountLayout()
+
+      expect(fetchMock.mock.calls[0][0]).toContain('/api/me/pages')
+      const item = dashboardItem(wrapper)
+      expect(item).toBeTruthy()
+      await item!.trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('7')
+      expect(router.currentRoute.value.path).toBe('/admin')
+    })
+
+    it('behält einen aktiven Tenant, der admin_dashboard gewährt', async () => {
+      mockPages([
+        { ID: 7, Permissions: 'admin_dashboard,components:read' },
+        { ID: 9, Permissions: 'admin_dashboard,components:read' },
+      ])
+      useTenant().setActiveTenant(9)
+      useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+      const { wrapper } = await mountLayout()
+
+      await dashboardItem(wrapper)!.trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('9')
+    })
+
+    it('zeigt keinen Link, wenn keine Seite admin_dashboard gewährt', async () => {
+      mockPages([{ ID: 4, Permissions: 'components:read' }])
+      useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('zeigt keinen Link, wenn das Laden der Seiten fehlschlägt', async () => {
+      globalThis.fetch = vi.fn(async () => { throw new Error('offline') })
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('zeigt Global Admins den Link auch ohne Seitenrolle', async () => {
+      mockPages([])
+      useAuth().setAuth('jwt-1', { email: 'a@x.de', is_global_admin: true })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeTruthy()
+    })
+
+    it('lädt beim Nutzerwechsel neu und zeigt nicht den Link anhand der Seiten des Vorgängers', async () => {
+      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard,components:read' }])
+      useAuth().setAuth('jwt-a', { email: 'a@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeTruthy()
+
+      useAuth().logout()
+      await flushPromises()
+      fetchMock.mockImplementation(async () => asResponse({ ok: true, status: 200, json: async () => [] }))
+      fetchMock.mockClear()
+      useAuth().setAuth('jwt-b', { email: 'b@x.de' })
+      await flushPromises()
+
+      // Earlier layouts of other tests hang on the same user, hence at least one fetch.
+      expect(fetchMock).toHaveBeenCalled()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+      expect(useTenant().activeTenantId.value).toBeNull()
+    })
+
+    it('Gegenrichtung: Nutzer B mit Recht sieht den Link, obwohl A keines hatte', async () => {
+      const fetchMock = mockPages([{ ID: 4, Permissions: 'components:read' }])
+      useAuth().setAuth('jwt-a', { email: 'a@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+
+      useAuth().logout()
+      fetchMock.mockImplementation(async () => asResponse({ ok: true, status: 200, json: async () => [{ ID: 9, Permissions: 'admin_dashboard,components:read' }] }))
+      useAuth().setAuth('jwt-b', { email: 'b@x.de' })
+      await flushPromises()
+      expect(dashboardItem(wrapper)).toBeTruthy()
+    })
+
+    it('verwirft eine späte Antwort, wenn der Nutzer inzwischen abgemeldet ist', async () => {
+      let resolve!: (value: unknown) => void
+      globalThis.fetch = vi.fn(() => new Promise((r) => { resolve = r })) as unknown as typeof fetch
+      useAuth().setAuth('jwt-a', { email: 'a@x.de' })
+      await mountLayout()
+
+      useAuth().logout()
+      resolve({ ok: true, status: 200, json: async () => [{ ID: 7, Permissions: 'admin_dashboard,components:read' }] })
+      await flushPromises()
+      expect(useTenant().myPages.value).toEqual([])
+    })
+
+    it('off a status page: active tenant X without the right, right on page Y: link shown, click switches to Y', async () => {
+      mockPages([
+        { ID: 1, Permissions: 'components:read' },
+        { ID: 2, Permissions: 'admin_dashboard,components:read' },
+      ])
+      useTenant().setActiveTenant(1)
+      useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+      const { wrapper, router } = await mountLayout()
+
+      await dashboardItem(wrapper)!.trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('2')
+      expect(router.currentRoute.value.path).toBe('/admin')
+    })
+
+    it('lädt und zeigt nichts, solange niemand angemeldet ist', async () => {
+      const fetchMock = mockPages([{ ID: 7, Permissions: 'admin_dashboard,components:read' }])
+      const { wrapper } = await mountLayout()
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(wrapper.text()).not.toContain('Dashboard')
+    })
+  })
+
+  // On a status page the link is decided per page: a role on another page
+  // (or a stale active tenant from the admin area) must not offer the
+  // dashboard of the page being viewed (E2E: login-dropdown.spec.ts).
+  describe('Dashboard link on a status page (per page, not global)', () => {
+    const acme = { ID: 2, Slug: 'acme', Permissions: 'admin_dashboard,components:read' }
+    const techstartViewer = { ID: 3, Slug: 'techstart', Permissions: 'components:read' }
+    const dashboardItem = (wrapper: VueWrapper) => wrapper.findAll('.user-menu-item').find(el => el.text().includes('Dashboard'))
+    const mockPages = (pages: unknown) => {
+      globalThis.fetch = stubFetch(async () => ({ ok: true, status: 200, json: async () => pages }))
+    }
+    const viewPage = (slug: string | null) => { useCurrentPageSlug().currentPageSlug.value = slug }
+
+    beforeEach(() => {
+      useTenant().setMyPages([])
+      useTenant().setActiveTenant(null)
+    })
+    afterEach(() => viewPage(null))
+
+    it('hides the link on a page without a role, even with admin_dashboard on another page', async () => {
+      mockPages([acme])
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de', role: 'Viewer' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('hides the link on a page whose role lacks admin_dashboard', async () => {
+      mockPages([acme, techstartViewer])
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('ignores a stale active tenant that grants admin_dashboard on another page', async () => {
+      mockPages([acme])
+      useTenant().setActiveTenant(2)
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('shows the link on the page that grants admin_dashboard and opens that page', async () => {
+      mockPages([{ ID: 1, Slug: 'system', Permissions: 'admin_dashboard,components:read' }, acme])
+      useTenant().setActiveTenant(1)
+      viewPage('acme')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper, router } = await mountLayout()
+
+      await dashboardItem(wrapper)!.trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('2')
+      expect(router.currentRoute.value.path).toBe('/admin')
+    })
+
+    it('updates the link when switching from a granting page to one without a role', async () => {
+      mockPages([acme])
+      viewPage('acme')
+      useAuth().setAuth('jwt-1', { email: 'viewer@x.de' })
+      const { wrapper } = await mountLayout()
+      expect(dashboardItem(wrapper)).toBeTruthy()
+
+      viewPage('techstart')
+      await flushPromises()
+      expect(dashboardItem(wrapper)).toBeUndefined()
+    })
+
+    it('shows global admins the link on every page and opens the viewed page', async () => {
+      mockPages([acme, { ID: 3, Slug: 'techstart', Permissions: '' }])
+      useTenant().setActiveTenant(2)
+      viewPage('techstart')
+      useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true })
+      const { wrapper } = await mountLayout()
+
+      await dashboardItem(wrapper)!.trigger('click')
+      await flushPromises()
+      expect(String(useTenant().activeTenantId.value)).toBe('3')
+    })
+
+    it('lets a global admin without any known page open /admin without changing the tenant', async () => {
+      mockPages([])
+      useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true })
+      const { wrapper, router } = await mountLayout()
+
+      await dashboardItem(wrapper)!.trigger('click')
+      await flushPromises()
+      expect(useTenant().activeTenantId.value).toBeNull()
+      expect(router.currentRoute.value.path).toBe('/admin')
+    })
+  })
+
+  it('navigiert beim Klick auf Dashboard zu /admin', async () => {
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
+    const { wrapper, router } = await mountLayout()
+
+    const items = wrapper.findAll('.user-menu-item')
+    const dashboardItem = items.find(el => el.text().includes('Dashboard'))
+    await dashboardItem!.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.path).toBe('/admin')
+  })
+
+  // "Manage subscription" jumps to the subscription section of the status page; anywhere else
+  // (landing page, docs, login, order, private page without access) it would do nothing.
+  it('offers "Manage subscription" only while a status page shows its subscription section', async () => {
+    useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+    const { subscriptionsAvailable } = useCurrentPageSlug()
+    subscriptionsAvailable.value = false
+    const { wrapper } = await mountLayout()
+    const hasItem = () => wrapper.findAll('.user-menu-item').some(el => el.text().includes('Abonnement verwalten'))
+    expect(hasItem()).toBe(false)
+    subscriptionsAvailable.value = true
+    await flushPromises()
+    expect(hasItem()).toBe(true)
+    subscriptionsAvailable.value = false
+  })
+
+  it('dispatcht ein statushafen:open-subscription-manager-Event beim Klick auf Abonnement verwalten', async () => {
+    useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+    useCurrentPageSlug().subscriptionsAvailable.value = true
+    const { wrapper } = await mountLayout()
+    const listener = vi.fn()
+    window.addEventListener('statushafen:open-subscription-manager', listener)
+
+    const items = wrapper.findAll('.user-menu-item')
+    const subscriptionItem = items.find(el => el.text().includes('Abonnement verwalten'))
+    await subscriptionItem!.trigger('click')
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    window.removeEventListener('statushafen:open-subscription-manager', listener)
+    useCurrentPageSlug().subscriptionsAvailable.value = false
+  })
+
+  it('meldet den User beim Klick auf Abmelden ab und navigiert auf /', async () => {
+    useAuth().setAuth('jwt-1', { email: 'a@x.de' })
+    const { wrapper, router } = await mountLayout()
+    await router.push('/admin/components')
+    await flushPromises()
+
+    const items = wrapper.findAll('.user-menu-item')
+    const logoutItem = items.find(el => el.classes().includes('user-menu-item--danger'))
+    await logoutItem!.trigger('click')
+    await flushPromises()
+
+    expect(useAuth().isLoggedIn.value).toBe(false)
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it('schaltet das Theme beim Klick auf den Theme-Button um', async () => {
+    const { wrapper } = await mountLayout()
+    const before = document.documentElement.dataset.theme
+
+    await wrapper.find('.theme-toggle').trigger('click')
+    await flushPromises()
+
+    expect(document.documentElement.dataset.theme).not.toBe(before)
+  })
+
+  it('gibt Theme-Knopf, Sprachauswahl und Benutzer-Knopf die gemeinsame Klasse header-control', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.theme-toggle').classes()).toContain('header-control')
+    expect(wrapper.find('.language-switcher').classes()).toContain('header-control')
+    expect(wrapper.find('.user-menu-trigger').classes()).toContain('header-control')
+  })
+
+  it('gibt Theme- und Benutzer-Knopf dieselbe Größenklasse header-control--icon', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.theme-toggle').classes()).toContain('header-control--icon')
+    expect(wrapper.find('.user-menu-trigger').classes()).toContain('header-control--icon')
+    expect(wrapper.find('.language-switcher').classes()).not.toContain('header-control--icon')
+  })
+
+  // The header looked heavier than the template (30-36 px), because the
+  // 44 px target area was also visible. The target area stays 44 px, visible
+  // are 44 - 2 * ring px; the background is limited to the inner area.
+  it('zeichnet Kopfzeilen-Bedienelemente höchstens 36 px hoch, Zielfläche bleibt 44 px', () => {
+    const size = Number(layoutSource.match(/--header-control-size:\s*(\d+)px/)![1])
+    const ring = Number(layoutSource.match(/--header-control-ring:\s*(\d+)px/)![1])
+    expect(size).toBeGreaterThanOrEqual(44)
+    expect(size - 2 * ring).toBeLessThanOrEqual(36)
+    const control = layoutSource.match(/\n\.header-control\s*\{([^}]*)\}/)![1]
+    expect(control).toMatch(/border:\s*var\(--header-control-ring\) solid transparent/)
+    expect(control).toMatch(/background-clip:\s*padding-box/)
+    const select = layoutSource.match(/\.header-control\.language-switcher\) \{([^}]*)\}/)![1]
+    expect(select).toMatch(/border:\s*var\(--header-control-ring\) solid transparent/)
+    const order = layoutSource.match(/\.app-header \.order-button \{([^}]*)\}/)![1]
+    expect(order).toMatch(/min-height:\s*var\(--header-control-size\)/)
+    expect(order).toMatch(/background-clip:\s*padding-box/)
+  })
+
+  it('gibt allen Kopfzeilen-Knöpfen über header-control dieselbe Höhe', () => {
+    expect(layoutSource).toMatch(/--header-control-size:\s*44px/)
+    expect(layoutSource.match(/\.header-control\s*\{([^}]*)\}/)![1]).toContain('height: var(--header-control-size)')
+    expect(layoutSource.match(/\.header-control--icon\s*\{([^}]*)\}/)![1]).toContain('width: var(--header-control-size)')
+  })
+
+  it('setzt keinen Inline-Style am Theme-Knopf', async () => {
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.theme-toggle').attributes('style')).toBeUndefined()
+  })
+
+  it('verwendet die action-btn-Klasse nicht mehr für Kopfzeilen-Knöpfe', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'Viewer' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.theme-toggle').classes()).not.toContain('action-btn')
+    expect(wrapper.find('.user-menu-trigger').classes()).not.toContain('action-btn')
+  })
+
+  it('zeigt die Rolle in Klammern, wenn sie gesetzt ist', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'admin' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('.user-menu-header small').text()).toBe('(admin)')
+  })
+
+  it.each([['leer', ''], ['null', null], ['undefined', undefined]])(
+    'lässt die Rollenzeile weg, wenn die Rolle %s ist',
+    async (_name, role) => {
+      useAuth().setAuth('jwt-1', { email: 'user@x.de', role: role as string | undefined })
+      const { wrapper } = await mountLayout()
+
+      expect(wrapper.find('.user-menu-header strong').text()).toBe('user@x.de')
+      expect(wrapper.find('.user-menu-header small').exists()).toBe(false)
+    },
+  )
+
+  it('setzt die App-Schrift über die Klasse user-menu und das Stylesheet', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de', role: 'admin' })
+    const { wrapper } = await mountLayout()
+    const menu = wrapper.find('ul.user-menu')
+
+    expect(menu.exists()).toBe(true)
+    expect(menu.element.contains(wrapper.find('.user-menu-header strong').element)).toBe(true)
+    expect(menu.element.contains(wrapper.find('.user-menu-header small').element)).toBe(true)
+    expect(layoutSource).toMatch(/\.user-menu\s*\{[^}]*font-family:\s*var\(--font-sans\)/)
+  })
+
+  it('definiert einheitliche Größe und sichtbaren Tastaturfokus für header-control', () => {
+    expect(layoutSource).toMatch(/--header-control-size:\s*(44|40)px/)
+    expect(layoutSource).toMatch(/\.header-control\s*\{[^}]*box-sizing:\s*border-box/)
+    expect(layoutSource).toMatch(/\.header-control:focus-visible\s*\{[^}]*outline/)
+    expect(layoutSource).toMatch(/\.header-control--icon\s*\{[^}]*width:\s*var\(--header-control-size\)/)
+  })
+
+  // Footer with a link to the documentation and copyright.
+  it('zeigt einen Footer mit Link zur Dokumentation, der nach /docs führt', async () => {
+    const { wrapper, router } = await mountLayout()
+
+    const footer = wrapper.find('footer.app-footer')
+    expect(footer.exists()).toBe(true)
+    expect(footer.find('nav').attributes('aria-label')).toBe('Fußzeile')
+    const link = footer.find('.footer-links a')
+    expect(link.text()).toBe('Dokumentation')
+    expect(link.attributes('href')).toBe('/docs')
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/docs')
+  })
+
+  // The admin area is only a login target when chosen explicitly: a quiet footer link.
+  it.each([
+    ['de', 'Verwaltung'],
+    ['en', 'Administration'],
+  ])('offers an admin link in the footer that logs in towards /admin (%s)', async (locale, label) => {
+    i18n.global.locale.value = locale as Locale
+    const { wrapper, router } = await mountLayout()
+
+    const link = wrapper.find('footer .footer-link--admin')
+    expect(link.text()).toBe(label)
+    expect(link.element.closest('header')).toBeNull()
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query).toEqual({ returnTo: '/admin' })
+  })
+
+  it('shows the admin link for signed-in users too (the guard skips the login page)', async () => {
+    useAuth().setAuth('jwt-1', { email: 'user@x.de' })
+    const { wrapper } = await mountLayout()
+
+    expect(wrapper.find('footer .footer-link--admin').exists()).toBe(true)
+  })
+
+  it('zeigt im Footer das Copyright mit dem aktuellen Jahr und übersetzt den Link', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2031-05-01T12:00:00Z'))
+    try {
+      const { wrapper } = await mountLayout()
+      expect(wrapper.find('.footer-copyright').text()).toBe('© 2031 Statushafen')
+
+      i18n.global.locale.value = 'en'
+      await flushPromises()
+      expect(wrapper.find('.footer-links a').text()).toBe('Documentation')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Footer with the same width as the header: it sits in the same
+  // .app-container and uses only tokens for colours (light and dark).
+  it('legt den Footer in den Layout-Container und färbt ihn nur über Tokens', async () => {
+    const { wrapper } = await mountLayout()
+    const container = wrapper.find('.app-container')
+    expect(container.find(':scope > footer.app-footer').exists()).toBe(true)
+    expect(container.find(':scope > header.app-header').exists()).toBe(true)
+    const rule = layoutSource.match(/\.app-footer \{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/border-top: 1px solid var\(--border\)/)
+    expect(rule).toMatch(/color: var\(--text-2\)/)
+    expect(rule).not.toMatch(/#[0-9a-f]{3,6}/i)
+  })
+
+  // Direction A: the full header only applies on the landing page.
+  // The landing page language picker showed the browser arrow and looked foreign next to the theme button and avatar.
+  describe('Sprachauswahl der Kopfzeile: eigener Pfeil', () => {
+    const rule = layoutSource.match(/\.app-header :deep\(\.header-control\.language-switcher\)\s*\{([^}]*)\}/)![1]
+
+    it('schaltet das Browser-Aussehen ab und lässt Platz für den Pfeil', () => {
+      expect(rule).toMatch(/appearance:\s*none/)
+      expect(rule).toMatch(/padding-right:\s*28px/)
+    })
+
+    it('zeichnet den Pfeil als zwei Diagonalen in currentColor, ohne den Hintergrund zu überschreiben', () => {
+      expect(rule.match(/linear-gradient\(/g)).toHaveLength(2)
+      expect(rule).toContain('currentColor')
+      expect(rule).toMatch(/background-color:\s*var\(--surface\)/)
+      expect(rule).not.toMatch(/background:\s/)
+    })
+  })
+
+  describe('Kopfzeile der Startseite', () => {
+    it('Statusseiten und übrige Seiten behalten den schlichten Kopf', async () => {
+      const { wrapper } = await mountLayout()
+      expect(wrapper.find('.app-container').classes()).not.toContain('app-container--landing')
+      expect(wrapper.find('header').classes()).not.toContain('app-header--landing')
+      expect(wrapper.find('.lp-nav').exists()).toBe(false)
+      expect(wrapper.find('.order-button').exists()).toBe(false)
+      expect(wrapper.find('svg.logo-mark').exists()).toBe(true)
+    })
+
+    it('zeigt auf der Startseite Marker, Navigation, Anmelden und Bestell-Knopf, ohne „Preise“', async () => {
+      useLandingChrome().isLanding.value = true
+      const { wrapper } = await mountLayout()
+      expect(wrapper.find('.app-container').classes()).toContain('app-container--landing')
+      expect(wrapper.find('svg.logo-mark').exists()).toBe(true)
+      expect(wrapper.find('img.logo-icon').exists()).toBe(false)
+      const nav = wrapper.find('nav.lp-nav')
+      expect(nav.attributes('aria-label')).toBe('Hauptmenü')
+      expect(nav.findAll('a').map(a => [a.text(), a.attributes('href')])).toEqual([
+        ['Funktionen', '#features'],
+        ['Statusseiten', '#directory'],
+        ['Dokumentation', '/docs'],
+      ])
+      expect(nav.text()).not.toMatch(/Preis/)
+      expect(wrapper.find('.login-button').text()).toBe('Anmelden')
+      const order = wrapper.find('a.order-button')
+      expect(order.text()).toBe('Statusseite bestellen')
+      expect(order.attributes('href')).toBe('/order')
+      // Theme switcher and language picker stay.
+      expect(wrapper.find('.theme-toggle').exists()).toBe(true)
+      expect(wrapper.find('.language-switcher').exists()).toBe(true)
+    })
+
+    // /docs uses the landing header too; the section anchors only exist on the landing page,
+    // so off "/" the links must lead there instead of jumping within the current page.
+    it('points the section links to the landing page when shown off the landing page', async () => {
+      useLandingChrome().isLanding.value = true
+      const { wrapper, router } = await mountLayout()
+      await router.push('/docs')
+      await flushPromises()
+      const nav = wrapper.find('nav.lp-nav')
+      expect(nav.findAll('a').map(a => a.attributes('href'))).toEqual(['/#features', '/#directory', '/docs'])
+      expect(wrapper.find('a.order-button').exists()).toBe(true)
+    })
+
+    it('blendet den Bestell-Knopf der Kopfzeile aus, wenn die Bestellung deaktiviert ist', async () => {
+      useLandingChrome().isLanding.value = true
+      useLandingChrome().ordersEnabled.value = false
+      const { wrapper } = await mountLayout()
+      expect(wrapper.find('.order-button').exists()).toBe(false)
+      expect(wrapper.find('.lp-nav').exists()).toBe(true)
+    })
+
+    it('hat keine axe-Funde', async () => {
+      useLandingChrome().isLanding.value = true
+      const { wrapper } = await mountLayout()
+      expect(await axe(wrapper)).toHaveNoViolations()
+    })
+
+    it('Kopf klebt, ist randlos und bricht mobil um (Quelltext, happy-dom rechnet kein Layout)', () => {
+      const head = layoutSource.match(/\.app-header--landing \{([^}]*)\}/)?.[1] ?? ''
+      expect(head).toMatch(/position:\s*sticky/)
+      expect(head).toMatch(/border-bottom:\s*1px solid var\(--border\)/)
+      expect(head).toMatch(/backdrop-filter/)
+      expect(layoutSource).toMatch(/\.app-container\.app-container--landing \{[^}]*max-width:\s*none/)
+      const inner = layoutSource.match(/\.app-header--landing \.header-inner \{([^}]*)\}/)?.[1] ?? ''
+      expect(inner).toMatch(/max-width:\s*var\(--lp-max\)/)
+      const media = layoutSource.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/g)?.at(-1) ?? ''
+      expect(media).toMatch(/flex-wrap:\s*wrap/)
+      expect(media).toMatch(/\.lp-nav \{[^}]*flex:\s*1 0 100%/)
+    })
+  })
+
+  // The header overflowed sideways by 39 px at 400 px, because the
+  // controls (theme, language, login = 287 px) did not wrap and the
+  // inline style of .nav-actions knew no flex-wrap. happy-dom computes no
+  // layout; the measurement in a real browser is in e2e/public-schmal.spec.ts.
+  describe('schmale Breiten', () => {
+    it('.nav-actions und .app-header brechen um, ohne Inline-Style', async () => {
+      const { wrapper } = await mountLayout()
+      expect(wrapper.find('.nav-actions').attributes('style')).toBeUndefined()
+      const actions = layoutSource.match(/^\.nav-actions \{([^}]*)\}/m)?.[1] ?? ''
+      expect(actions).toMatch(/flex-wrap:\s*wrap/)
+      expect(actions).toMatch(/min-width:\s*0/)
+      expect(actions).toMatch(/gap:\s*15px/)
+      const header = layoutSource.match(/^\.app-header \{([^}]*)\}/m)?.[1] ?? ''
+      expect(header).toMatch(/flex-wrap:\s*wrap/)
+    })
+  })
+
+  // On the login page itself the header button "Anmelden" is superfluous.
+  it('zeigt auf der Anmeldeseite keinen Anmelden-Knopf, auf anderen Seiten schon', async () => {
+    const { wrapper, router } = await mountLayout()
+    expect(wrapper.find('.login-button').exists()).toBe(true)
+    await router.push('/login')
+    await flushPromises()
+    expect(wrapper.find('.login-button').exists()).toBe(false)
+    await router.push('/docs')
+    await flushPromises()
+    expect(wrapper.find('.login-button').exists()).toBe(true)
+  })
+
+  it('hat keine axe-Funde, ausgeloggt und mit Benutzermenü', async () => {
+    const { wrapper: anonymous } = await mountLayout()
+    expect(await axe(anonymous)).toHaveNoViolations()
+    anonymous.unmount()
+
+    setAuthAsPageRole('jwt-1', { email: 'a@x.de', permissions: 'admin_dashboard,components:read' })
+    const { wrapper } = await mountLayout()
+    expect(wrapper.find('.user-menu-item').exists()).toBe(true)
+    expect(await axe(wrapper)).toHaveNoViolations()
+    wrapper.unmount()
+  })
+})

@@ -7,6 +7,7 @@ import { dirname, resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { expect } from 'vitest'
 import type { BaseWrapper } from '@vue/test-utils'
+import { stripHtmlComments } from './sourceText'
 
 /**
  * @param wrapper     mounted VTU wrapper of the view (in the state with data)
@@ -20,14 +21,7 @@ export function expectNoInlineStyles(wrapper: BaseWrapper<Node>, testFileUrl: st
   expect(own.map(el => el.html().slice(0, 120))).toEqual([])
 
   const source = readFileSync(resolve(dirname(fileURLToPath(testFileUrl)), viewFile), 'utf-8')
-  // Template comments are removed until none is left, so that removing one cannot uncover another.
-  let withoutHtmlComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
-  let previous: string
-  do {
-    previous = withoutHtmlComments
-    withoutHtmlComments = withoutHtmlComments.replace(/<!--[\s\S]*?-->/g, '')
-  } while (withoutHtmlComments !== previous)
-  const code = withoutHtmlComments
+  const code = stripHtmlComments(source.replace(/\/\*[\s\S]*?\*\//g, ''))
     .replace(/(^|\s)\/\/.*$/gm, '$1') // JS line comments (they contain reference numbers like #496)
   expect(code).not.toMatch(/\sstyle="/)
   expect(code).not.toMatch(/:style=/)

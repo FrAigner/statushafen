@@ -1,4 +1,4 @@
-# Der Playwright-Spec frontend/e2e/sso-oidc.spec.js (OIDC-Anmeldung je Statusseite)
+# Der Playwright-Spec frontend/e2e/sso-oidc.spec.ts (OIDC-Anmeldung je Statusseite)
 # spielt Verknüpfen und Anmelden gegen den Mock-OIDC-Dienst durch. Lokal braucht er docker compose (Profil
 # "sso", siehe README "Lokale SSO-Tests mit Mock-OIDC"). Deshalb läuft er einmal pro Nacht auf einem
 # GitHub-gehosteten Runner, nicht bei Pull Requests; ein Lauf braucht rund 10 Minuten.
@@ -127,7 +127,7 @@ jobs:
           done
           echo "Backend antwortet nicht unter localhost:8080/healthz" >&2
           exit 1
-      # Das Frontend (Vite-Dev-Server auf 5173, /api an 8080) startet Playwright selbst (playwright.config.js,
+      # Das Frontend (Vite-Dev-Server auf 5173, /api an 8080) startet Playwright selbst (playwright.config.ts,
       # webServer). Kein HTML-Report als Artifact: Der Artifact-Speicher war schon einmal voll (siehe ci.yml).
       - name: Playwright sso-oidc
         run: cd frontend && npx playwright test sso-oidc --reporter=list

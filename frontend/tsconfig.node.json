@@ -1,13 +1,12 @@
 // Code that runs in Node: Vitest unit tests (happy-dom, so the DOM types stay), test helpers,
-// Playwright e2e specs and the Vite/Vitest/Playwright/ESLint configuration. Same compiler options as
-// the app, plus Node types (many tests read source files with node:fs).
+// Playwright e2e specs, the Vite plugin and the Vite/Vitest/Playwright/ESLint configuration. All of it is
+// TypeScript and checked with the same strict options as the app, plus Node types (many tests read
+// source files with node:fs). src/tsconfigStrict.test.ts guards that no JavaScript comes back.
 {
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "types": ["node", "vite/client"],
-    // Tests and configuration files are still JavaScript: compiled along, not checked.
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     // Tests index into mocks and query results all the time (fetch.mock.calls[0][1], findAll('li')[2]).
     // A wrong index already fails the test at runtime, so the check would only add noise there.
     "noUncheckedIndexedAccess": false,

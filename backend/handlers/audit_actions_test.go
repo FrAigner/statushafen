@@ -16,7 +16,7 @@ import (
 
 // Every audit action written in the backend needs a label
 // in de.json AND en.json (auditLog.actions.<group>.<key>), otherwise the
-// list shows the raw key. rohwerte.test.js checks this in the frontend via regex;
+// list shows the raw key. rohwerte.test.ts checks this in the frontend via regex;
 // this test reads via AST (like scanAuditCategories) and also catches calls
 // outside handlers/. Covered are:
 //   - RecordAudit(c, ACTION, ...) / RecordSystemAudit(ACTION, ...)

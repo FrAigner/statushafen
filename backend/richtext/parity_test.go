@@ -46,7 +46,7 @@ func hasMarkup(html string) bool {
 
 // Finding 9: page (frontend) and mail (backend) must format the same text
 // identically or leave it unformatted identically. The frontend checks the same
-// file (richText.test.js).
+// file (richText.test.ts).
 func TestParity_GrenzenUndFaelleWieImFrontend(t *testing.T) {
 	f := loadParity(t)
 	assert.Equal(t, f.Limits.MaxRenderLen, MaxRenderLen)

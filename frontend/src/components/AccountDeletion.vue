@@ -15,7 +15,7 @@ import { ref, computed, inject } from 'vue'
 // In the full test run v8 reports a never-taken branch on this import line
 // that does not exist in the source (mapping of the compiled SFC, same
 // pattern as in AdminSSO.vue); the component is fully tested in
-// AccountDeletion.test.js.
+// AccountDeletion.test.ts.
 /* v8 ignore next */
 import { useI18n } from 'vue-i18n'
 import { routerKey } from 'vue-router'
