@@ -19,6 +19,7 @@
 */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
+import { useDismissable } from '../composables/useDismissable'
 
 // Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
 const props = defineProps({
@@ -118,13 +119,11 @@ function onSelect(item) {
 // Ein Link navigiert selbst; das Menü schließt nur, der Fokus bleibt der Navigation überlassen.
 const onLink = () => closeMenu()
 
-function onDocumentPointerdown(event) {
-  if (!root.value?.contains(event.target)) closeMenu()
-}
+// Click/tap outside closes; Escape is handled in onMenuKeydown (focus returns to the button).
+useDismissable(open, [root], () => closeMenu(), { escape: false })
 const onViewportChange = () => closeMenu()
 
 const listeners = [
-  ['pointerdown', onDocumentPointerdown, true],
   ['scroll', onViewportChange, true],
   ['resize', onViewportChange, false],
 ]

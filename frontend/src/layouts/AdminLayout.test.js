@@ -854,19 +854,23 @@ describe('AdminLayout', () => {
       wrapper.unmount()
     })
 
-    it('schließt beim Klick außerhalb, nicht beim Klick im Panel', async () => {
+    // pointerdown covers mouse and touch; iOS sends no document click for taps
+    // on non-interactive areas.
+    it('schließt beim Klick/Tap außerhalb, nicht beim Klick im Panel', async () => {
       const { wrapper } = await mountWithUser()
+      const pointerdown = el => el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
       await button(wrapper).trigger('click')
 
-      await wrapper.find('.user-menu-info').trigger('click')
+      pointerdown(wrapper.find('.user-menu-info').element)
+      await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(true)
 
-      document.body.click()
+      pointerdown(document.body)
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
 
       // Ein Klick außerhalb bei geschlossenem Menü bleibt folgenlos.
-      document.body.click()
+      pointerdown(document.body)
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
       wrapper.unmount()

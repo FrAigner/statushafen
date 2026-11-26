@@ -17,12 +17,13 @@
   (umsetzung.md). Ein unbekannter Wert wird neutral angezeigt und kann nur
   durch Auswahl ersetzt werden.
 */
-import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 import StatusIcon from './StatusIcon.vue'
 import { STATUS_LEVELS, statusMeta, toRawStatus } from '../utils/status'
 import { isOpenKey, isSelectKey, nextActiveIndex } from '../utils/listbox'
+import { useDismissable } from '../composables/useDismissable'
 
 // Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
 const props = defineProps({
@@ -104,20 +105,15 @@ function onToggle() {
   else openList()
 }
 
-function onDocumentPointerdown(event) {
-  if (!root.value?.contains(event.target)) close()
-}
+// Click/tap outside closes; Escape is handled in onKeydown.
+useDismissable(open, [root], close, { escape: false })
 
 watch(open, async (isOpen) => {
-  const method = isOpen ? 'addEventListener' : 'removeEventListener'
-  document[method]('pointerdown', onDocumentPointerdown, true)
   if (isOpen) {
     await nextTick()
     document.getElementById(optionId(active.value))?.scrollIntoView?.({ block: 'nearest' })
   }
 })
-
-onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerdown, true))
 </script>
 
 <template>
