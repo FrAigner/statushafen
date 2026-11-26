@@ -4,17 +4,18 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import { contrastRatio, parseHex } from './utils/contrast'
 
-// Redesign Stufe 1: Kontrast der Design-Tokens als Unit-Test.
+// Redesign stage 1: contrast of the design tokens as a unit test.
 //
-// Dieser Test liest die FINALEN Werte aus
-// assets/tokens.css (beide Ebenen, hell und dunkel) und prüft dieselben Paare
-// nach WCAG 2.1 AA: Text >= 4,5:1, Symbole/Flächen >= 3:1. Ein zu helles Token
-// fällt so schon in der Unit-Suite auf, nicht erst im e2e-axe (a11y.spec.js).
+// This test reads the FINAL values from
+// assets/tokens.css (both levels, light and dark) and checks the same pairs
+// against WCAG 2.1 AA: text >= 4.5:1, icons/surfaces >= 3:1. A token that is
+// too light thus already fails in the unit suite, not only in the e2e axe run
+// (a11y.spec.js).
 //
-// happy-dom rechnet kein CSS, deshalb wird die Datei geparst und das Kaskaden-
-// Verhalten nachgebaut, das hier zählt: Ein Element der Ebene erbt von :root,
-// seine eigenen Deklarationen (.theme-public/.theme-admin) gewinnen, und
-// html[data-theme="dark"] schlägt die Hell-Werte derselben Stufe.
+// happy-dom computes no CSS, so the file is parsed and the cascade behaviour
+// that matters here is rebuilt: an element of the level inherits from :root,
+// its own declarations (.theme-public/.theme-admin) win, and
+// html[data-theme="dark"] beats the light values of the same stage.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tokensCss = readFileSync(resolve(root, 'src/assets/tokens.css'), 'utf-8')
 
@@ -39,7 +40,7 @@ function collect(blocks, selectors) {
   return merged
 }
 
-// Löst var(--x) rekursiv auf (nur der Wert, keine Fallbacks nötig).
+// Resolves var(--x) recursively (value only, no fallbacks needed).
 function resolveTokens(map) {
   const out = {}
   const resolve1 = (name, seen = []) => {
@@ -51,8 +52,8 @@ function resolveTokens(map) {
   return out
 }
 
-// Endwerte eines Elements der Ebene: erst :root (hell, ggf. dunkel), darüber
-// die eigenen Regeln der Ebene (hell, ggf. dunkel).
+// Final values of an element of the level: first :root (light, dark if applicable),
+// on top the level's own rules (light, dark if applicable).
 function levelTokens(css, level, mode) {
   const blocks = parseBlocks(css)
   const cls = `.theme-${level}`
@@ -67,7 +68,7 @@ const LEVELS = ['public', 'admin']
 const MODES = ['light', 'dark']
 const STATUSES = ['ok', 'deg', 'part', 'major', 'maint']
 
-// Paar-Liste wie generator/check.mjs; Hintergründe als Token-Namen.
+// Pair list as in generator/check.mjs; backgrounds as token names.
 function pairsFor() {
   const pairs = []
   const add = (fg, bg, min) => pairs.push([fg, bg, min])
@@ -77,14 +78,14 @@ function pairsFor() {
   add('on-primary', 'primary', 4.5)
   add('on-primary', 'primary-hover', 4.5)
   add('nav-text', 'nav-bg', 4.5)
-  // Kopfzeile und Bereichs-Reiter des Admin-Layouts (Text auf --top-bg).
+  // Header and section tabs of the admin layout (text on --top-bg).
   add('top-text', 'top-bg', 4.5)
   add('nav-text', 'top-bg', 4.5)
   add('nav-active-text', 'nav-active-bg', 4.5)
   add('primary-text', 'primary-soft', 4.5)
   for (const s of STATUSES) {
     for (const bg of ['surface', 'surface-2', `${s}-soft`, 'bg']) add(`${s}-text`, bg, 4.5)
-    // Beschreibung und Zusammenfassung stehen im Hero auf der Statustönung.
+    // Description and summary sit in the hero on the status tint.
     add('text-2', `${s}-soft`, 4.5)
     add(s, 'surface', 3)
     add(s, 'bg', 3)
@@ -144,10 +145,10 @@ describe('Token-Kontrast', () => {
           expect(tokens['--onyx-radius-md']).toBe('6px')
         })
 
-        // Der Umrissknopf („+ Neue Gruppe“) färbt Text und Rand mit
-        // --onyx-color-text-icons-primary-intense. sit-onyx setzt es auf :root
-        // (Wert der Hell-Skala, light-dark() greift ohne color-scheme nie); ohne eigene
-        // Zeile im Ableitungsblock sah das Admin-Dunkel #4b44d6 auf #10151c (2,4:1).
+        // The outline button ("+ New group") colors text and border with
+        // --onyx-color-text-icons-primary-intense. sit-onyx sets it on :root
+        // (light scale value; light-dark() never applies without color-scheme); without its
+        // own line in the derived block the dark admin showed #4b44d6 on #10151c (2.4:1).
         it('onyx-Primärtext (Umrissknöpfe, Links) folgt --primary-text und erreicht 4,5:1', () => {
           expect(tokens['--onyx-color-text-icons-primary-intense']).toBe(tokens['--primary-text'])
           const fg = parseHex(tokens['--onyx-color-text-icons-primary-intense'])

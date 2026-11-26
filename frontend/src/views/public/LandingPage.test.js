@@ -8,7 +8,7 @@ import de from '../../i18n/locales/de.json'
 import en from '../../i18n/locales/en.json'
 import LandingPage from './LandingPage.vue'
 import landingSource from './LandingPage.vue?raw'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { useLandingChrome } from '../../composables/useLandingChrome'
 
 function pagesFixture() {
@@ -22,9 +22,9 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// LandingPage lädt zusätzlich das Flag /api/public/orders/enabled.
-// Der Standard-Mock liefert die Seiten und ein aktives Flag; einzelne Tests
-// schalten das Flag gezielt ab.
+// LandingPage additionally loads the flag /api/public/orders/enabled.
+// The default mock returns the pages and an active flag; individual tests
+// switch the flag off specifically.
 function routedFetch({ pages = pagesFixture(), enabled = true } = {}) {
   return vi.fn(async (url) => {
     if (String(url).includes('/api/public/orders/enabled')) {
@@ -117,8 +117,8 @@ describe('LandingPage', () => {
     expect(wrapper.find('.lp-cta .btn-primary').attributes('href')).toBe('/order')
   })
 
-  // ist die Self-Service-Bestellung deaktiviert, verschwindet der
-  // Order-CTA (der Directory-Link bleibt).
+  // If self-service ordering is disabled, the
+  // order CTA disappears (the directory link stays).
   it('blendet den Order-CTA aus, wenn die Bestellung deaktiviert ist', async () => {
     const wrapper = await mountLanding(routedFetch({ enabled: false }))
 
@@ -126,7 +126,7 @@ describe('LandingPage', () => {
     expect(wrapper.find('.lp-cta .btn-secondary').exists()).toBe(true)
   })
 
-  // Regressionen vom 2026-10-29 (Startseite „nicht stimmig“).
+  // Regressions of 2026-10-29 (landing page "not coherent").
   it('zeigt keinen Hilfe-Block mit Platzhalter-Adresse', async () => {
     const wrapper = await mountLanding()
 
@@ -147,10 +147,10 @@ describe('LandingPage', () => {
     expect(wrapper.find('#directory').text()).not.toMatch(/partners|customers/i)
   })
 
-  // Die Inhaltsbreite der Startseite ist --lp-max (1160 px, Vorlage
-  // Richtung A), nicht mehr die 960 px des Standard-Containers. Die Raster müssen
-  // in die Inhaltsbreite abzüglich 2 x 24 px Rand passen. happy-dom rechnet kein
-  // Layout, deshalb prüft der Test die CSS-Werte.
+  // The content width of the landing page is --lp-max (1160 px, template
+  // Direction A), no longer the 960 px of the default container. The grids must
+  // fit into the content width minus 2 x 24 px margin. happy-dom computes no
+  // layout, so the test checks the CSS values.
   it('Raster bieten Platz für drei Funktionskarten bzw. mehrere Statusseiten nebeneinander', () => {
     const inhalt = 1160 - 2 * 24
     expect(readFileSync(resolve(__dirname, '../../assets/tokens.css'), 'utf-8')).toMatch(/--lp-max:\s*1160px/)
@@ -174,8 +174,8 @@ describe('LandingPage', () => {
     }
   })
 
-  // Richtung A: Hero zweigeteilt. Gesucht wird über Rollen und
-  // Namen statt über Klassen, damit ein Umbau des Markups die Tests nicht bricht.
+  // Direction A: hero split in two. Elements are found by roles and
+  // names instead of classes, so a rework of the markup does not break the tests.
   describe('Hero (Richtung A)', () => {
     const t = (k, p) => i18n.global.t(k, p)
 
@@ -221,8 +221,8 @@ describe('LandingPage', () => {
       expect(hero.find('h1').text()).toBe('When something goes down, your customers hear it from you first.')
     })
 
-    // Der Titel brach mitten im Wort („ausfäl-lt“): overflow-wrap/hyphens sind verboten;
-    // der Umbruch kommt aus max-width 13ch (längstes Wort kürzer).
+    // The title broke mid-word ("ausfäl-lt"): overflow-wrap/hyphens are forbidden;
+    // the line break comes from max-width 13ch (the longest word is shorter).
     it('trennt den Hero-Titel nie mitten im Wort', () => {
       const title = landingSource.match(/\.lp-title \{([^}]*)\}/)?.[1] ?? ''
       expect(title).not.toMatch(/overflow-wrap|word-break|hyphens/)
@@ -259,9 +259,9 @@ describe('LandingPage', () => {
       expect(card.find('.page-go').text()).toBe('Statusseite öffnen')
     })
 
-    // Der Slug brach neben dem Live-Abzeichen mitten im Wort um
-    // („/status/techstar“ + „t“) und machte die Karte höher. Jetzt eine Zeile mit
-    // Auslassung und vollem Text im title; das Abzeichen schrumpft nicht.
+    // The slug broke mid-word next to the live badge
+    // ("/status/techstar" + "t") and made the card taller. Now one line with
+    // ellipsis and the full text in the title; the badge does not shrink.
     it('Slug der Verzeichniskarte: voller Text als title, eine Zeile mit Auslassung statt Umbruch im Wort', async () => {
       const wrapper = await mountLanding()
       const slug = wrapper.findAll('.page-card')[0].find('.page-slug')
@@ -283,7 +283,7 @@ describe('LandingPage', () => {
       expect(landingSource).toMatch(/\.bar--partial \{[^}]*repeating-linear-gradient[^}]*var\(--part\)/)
     })
 
-    // Kein Testhinweis, kein Preisbezug, keine unbelegte Behauptung.
+    // No test notice, no price reference, no unsupported claim.
     it('enthält keinen Testhinweis, Preisbezug oder die Aussage „DSGVO-konform“', async () => {
       for (const lang of ['de', 'en']) {
         i18n.global.locale.value = lang
@@ -308,7 +308,7 @@ describe('LandingPage', () => {
       }
       expect(mock.find('.mock-banner').text()).toBe(t('landing.mockBanner'))
       expect(mock.find('.mock-banner svg.status-icon--operational').exists()).toBe(true)
-      // Beispieldaten sind fest: je ein Teilausfall bei Website und Zahlungs-Gateway
+      // The sample data is fixed: one partial outage each for website and payment gateway
       const rows = mock.findAll('.mock-row')
       expect(rows[0].findAll('.bar--partial')).toHaveLength(0)
       expect(rows[1].findAll('.bar--partial')).toHaveLength(1)
@@ -329,11 +329,11 @@ describe('LandingPage', () => {
       expect(code).not.toMatch(/--hero-|--beacon|--on-beacon/)
     })
 
-    // Regression: Die Navy-Hero-Tokens aus Richtung B sind entfernt und dürfen
-    // nicht zurückkehren; die Startseite folgt Richtung A.
+    // Regression: the navy hero tokens of Direction B are removed and must
+    // not come back; the landing page follows Direction A.
     it('tokens.css enthält keine Hero-/Beacon-Tokens mehr', () => {
-      // `tokens.css?raw` kam in vitest leer an (der Test war wirkungslos);
-      // deshalb per readFileSync lesen und sicherstellen, dass die Datei nicht leer ist.
+      // `tokens.css?raw` arrived empty in vitest (the test had no effect);
+      // so read it via readFileSync and make sure the file is not empty.
       const tokensSource = readFileSync(resolve(__dirname, '../../assets/tokens.css'), 'utf-8')
       expect(tokensSource).toContain('--primary')
       expect(tokensSource).not.toMatch(/--hero-|--beacon|--on-beacon/)
@@ -344,8 +344,8 @@ describe('LandingPage', () => {
       expect(Number(btn.match(/min-height:\s*(\d+)px/)?.[1])).toBeGreaterThanOrEqual(44)
     })
 
-    // Die Beispielkarte ragte rechts über den Seitenrand, weil 1.1fr/1fr den
-    // min-content der Karte nicht schrumpfen lässt; minmax(0, …) verhindert das.
+    // The sample card stuck out over the right page edge, because 1.1fr/1fr does not
+    // let the min-content of the card shrink; minmax(0, …) prevents that.
     it('lässt die Hero-Spalten schrumpfen (Karte ragt nicht über den Rand)', () => {
       const hero = landingSource.match(/\.lp-hero-in \{([^}]*)\}/)?.[1] ?? ''
       expect(hero).toMatch(/grid-template-columns:\s*minmax\(0,\s*1\.1fr\)\s+minmax\(0,\s*1fr\)/)

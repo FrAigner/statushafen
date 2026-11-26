@@ -3,17 +3,17 @@ import statusPageSource from './StatusPage.vue?raw'
 import treeNodeSource from '../../components/ComponentTreeNode.vue?raw'
 import publicLayoutSource from '../../layouts/PublicLayout.vue?raw'
 
-// Die öffentliche Statusseite scrollte bei 390 px horizontal
-// (scrollWidth 471 statt 390): Status-Badges rechts abgeschnitten, Hinweis und
-// Button der Abo-Karte außerhalb der Karte, Wortmarke ohne Abstand zum
-// Theme-Knopf. happy-dom rechnet kein Layout, deshalb prüft der Test die
-// CSS-Regeln, die das Überlaufen verhindern (im Browser bei 390/1440 px, hell
-// und dunkel, zusätzlich per scrollWidth <= innerWidth gemessen).
+// The public status page scrolled horizontally at 390 px
+// (scrollWidth 471 instead of 390): status badges cut off on the right, hint and
+// button of the subscription card outside the card, wordmark without a gap to the
+// theme button. happy-dom computes no layout, so the test checks the
+// CSS rules that prevent the overflow (in the browser at 390/1440 px, light
+// and dark, additionally measured via scrollWidth <= innerWidth).
 
 const SCHMAL = 390
 
-// Inhalt eines Blocks ab der öffnenden Klammer, verschachtelte Klammern
-// werden mitgezählt (für @media-Blöcke).
+// Content of a block from the opening brace on; nested braces
+// are counted too (for @media blocks).
 function blockAt(source, openIndex) {
   let depth = 0
   for (let i = openIndex; i < source.length; i++) {
@@ -27,7 +27,7 @@ function styleOf(source) {
   return source.slice(source.indexOf('<style'))
 }
 
-// Alle @media (max-width: N px)-Blöcke, die bei 390 px greifen.
+// All @media (max-width: N px) blocks that apply at 390 px.
 function narrowMediaCss(source) {
   const css = styleOf(source)
   let out = ''
@@ -37,7 +37,7 @@ function narrowMediaCss(source) {
   return out
 }
 
-// Deklarationen einer Regel mit genau diesem Selektor (Zeilenanfang).
+// Declarations of a rule with exactly this selector (start of line).
 function rule(css, selector) {
   const esc = selector.replaceAll('.', '\\.').replaceAll(' ', '\\s+')
   const m = css.match(new RegExp(`(^|\\n)\\s*${esc} \\{([^}]*)\\}`))

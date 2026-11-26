@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: Die Bereinigung (DOMPurify) braucht ein vollständiges DOM.
+// jsdom instead of happy-dom: the sanitizing (DOMPurify) needs a complete DOM.
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises, DOMWrapper } from '@vue/test-utils'
@@ -8,8 +8,8 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import StatusPage from './StatusPage.vue'
 
-// Die öffentliche Statusseite zeigt formatierte Nachrichten
-// (eingeschränktes Markdown), bereinigt, in beiden Layouts und im Verlauf.
+// The public status page shows formatted messages
+// (restricted Markdown), sanitized, in both layouts and in the history.
 
 const XSS = '<img src=x onerror="alert(1)"><script>alert(2)</script> [böse](javascript:alert(3)) [gut](https://example.com/a)'
 
@@ -96,10 +96,10 @@ describe('StatusPage zeigt formatierte Texte', () => {
     expect(w.find('.sp-timeline-message strong').text()).toBe('beobachten')
     await w.find('.incident-history-btn').trigger('click')
     await flushPromises()
-    // Der Dialog hängt per Teleport am body.
+    // The dialog hangs on the body via Teleport.
     const rows = new DOMWrapper(document.body).findAll('.tl-msg')
     expect(rows[0].find('strong').text()).toBe('beobachten')
-    // Die Erstmeldung steht ebenfalls formatiert im Verlauf.
+    // The initial report is formatted in the history too.
     expect(rows.some(m => m.find('li').exists())).toBe(true)
   })
 
@@ -108,7 +108,7 @@ describe('StatusPage zeigt formatierte Texte', () => {
     d.incidents[0].Message = XSS
     d.notices[0].Message = XSS
     const w = await mountPage(d)
-    // Als DOM geprüft, nicht als Text: Der maskierte Quelltext ist sichtbar, aber inaktiv.
+    // Checked as DOM, not as text: the escaped source text is visible but inert.
     expect(w.element.querySelectorAll('script, img, [onerror]')).toHaveLength(0)
     expect(w.element.querySelectorAll('a[href^="javascript"]')).toHaveLength(0)
     expect(w.find('.sp-incident-message').text()).toContain('böse (javascript:alert(3))')
@@ -119,13 +119,13 @@ describe('StatusPage zeigt formatierte Texte', () => {
     const w = await mountPage(dashboard('standard'))
     const search = async (text) => {
       await w.find('.search-input').setValue(text)
-      await new Promise(resolve => setTimeout(resolve, 350)) // Entprellung der Suche
+      await new Promise(resolve => setTimeout(resolve, 350)) // search debounce
       await flushPromises()
     }
     await search('fett zweite')
     expect(w.findAll('.sp-incident').some(a => a.text().includes('API down'))).toBe(true)
     await search('**fett**')
-    // Die Markdown-Zeichen selbst gehören nicht zum durchsuchten Text.
+    // The Markdown characters themselves are not part of the searched text.
     expect(w.findAll('.sp-incident').some(a => a.text().includes('API down'))).toBe(false)
   })
 })

@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { clickRowMenuItem } from './rowMenu.js';
+import { clickRowMenuItem } from './rowMenu';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Richtung C: Zeilenaktionen stehen im Zeilenmenü (RowMenu), nicht mehr als Knopfreihe.
+// Direction C: row actions live in the row menu (RowMenu), no longer as a row of buttons.
 async function rowAction(page, rowText, name) {
   await clickRowMenuItem(page, page.locator('tr', { hasText: rowText }).locator('.row-menu__button'), name, { exact: true });
 }
@@ -31,7 +31,7 @@ test.describe('Admin Status Pages Management', () => {
     await page.locator('button', { hasText: '+ Neue Statusseite' }).click();
     
     await page.fill('input[placeholder*="Acme Corp Status"]', pageName);
-    await page.getByLabel(/^Slug/).fill(uniqueSlug); // Slug (Platzhalter ist jetzt ein Hinweistext)
+    await page.getByLabel(/^Slug/).fill(uniqueSlug); // Slug (the placeholder is now a hint text)
     await page.fill('textarea', 'E2E Description');
     await page.locator(SAVE).click();
     
@@ -53,7 +53,7 @@ test.describe('Admin Status Pages Management', () => {
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await rowAction(page, editedName, 'Löschen');
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
@@ -62,11 +62,11 @@ test.describe('Admin Status Pages Management', () => {
     await expect(page.locator('tr', { hasText: editedName })).toHaveCount(0);
   });
 
-  // Regression test für eine unlayered CSS-Regel (.form-group input)
-  // stretchte native Checkboxen auf width:100%, wodurch die "Private Statusseite"-
-  // Checkbox riesig und vom Rest des Formulars losgelöst wirkte. Zusätzlich fehlte
-  // flex-direction:row, wodurch Checkbox und Label untereinander statt nebeneinander
-  // gerendert wurden.
+  // Regression test: an unlayered CSS rule (.form-group input)
+  // stretched native checkboxes to width:100%, which made the "Private Statusseite"
+  // checkbox huge and detached from the rest of the form. In addition
+  // flex-direction:row was missing, so checkbox and label were rendered stacked
+  // instead of side by side.
   test('private-page checkbox stays compact and inline with its label', async ({ page }) => {
     await page.locator('.row-menu__button').first().click();
     await page.getByRole('menuitem', { name: 'Bearbeiten', exact: true }).first().click();
@@ -83,12 +83,12 @@ test.describe('Admin Status Pages Management', () => {
     const checkboxBox = await checkbox.boundingBox();
     const labelBox = await label.boundingBox();
 
-    // Checkbox darf nicht die volle Formularbreite einnehmen (Regression: war ~946px).
+    // The checkbox must not take the full form width (regression: was ~946px).
     expect(checkboxBox.width).toBeLessThan(30);
-    // Checkbox und Label müssen auf derselben Zeile sitzen (Regression: standen
-    // untereinander, weil flex-direction von .form-group auf "column" fiel).
+    // Checkbox and label must sit on the same line (regression: they were stacked
+    // because flex-direction of .form-group fell back to "column").
     expect(Math.abs(checkboxBox.y - labelBox.y)).toBeLessThan(10);
-    // Label direkt rechts neben der Checkbox, nicht horizontal zentriert im Formular.
+    // Label directly to the right of the checkbox, not horizontally centered in the form.
     expect(labelBox.x - checkboxBox.x).toBeLessThan(40);
 
     await checkbox.uncheck();

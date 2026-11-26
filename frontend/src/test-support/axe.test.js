@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { axe, formatViolations } from './axe.js'
+import { axe, formatViolations } from './axe'
 
-// Der Helper selbst muss beide Richtungen zuverlässig melden,
-// sonst wären grüne axe-Tests in den Views wertlos.
+// The helper itself must reliably report both directions,
+// otherwise green axe tests in the views would be worthless.
 describe('axe-Helper', () => {
   afterEach(() => { document.body.innerHTML = '' })
 

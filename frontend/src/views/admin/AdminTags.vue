@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -18,33 +18,40 @@ import EmptyState from '../../components/EmptyState.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import { formatRelative } from '../../utils/relativeTime'
 import { confirmDialog } from '../../composables/useConfirm'
+import type { StatusPage, Tag } from '../../types/api'
+
+/** Edit form; status_page_id is the select's value ('' = global tag). */
+interface TagForm {
+  name?: string
+  status_page_id?: number | string
+}
 
 const { apiFetch } = useApi()
 const { isGlobalAdmin } = useAuth()
 const { t, locale } = useI18n()
 
-const tags = ref([])
-const pages = ref([])
+const tags = ref<Tag[]>([])
+const pages = ref<StatusPage[]>([])
 const scopeFilter = ref('all') // 'all' | 'global' | <status_page_id>
 const query = ref('')
 const isEditing = ref(false)
-const currentEditItem = ref(null)
+const currentEditItem = ref<'new' | number | null>(null)
 const editName = ref('')
-const formData = ref({})
+const formData = ref<TagForm>({})
 const nameError = ref('')
 const alertMsg = ref('')
 const alertType = ref('warning')
-// Meldung mit Art (Erfolg blendet sich selbst aus); clearAlert entfernt die des vorigen Schritts.
+// Message with a type (success dismisses itself); clearAlert removes the one of the previous step.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value = msg
   alertType.value = type
 }
 const isSaving = ref(false)
-const deletingId = ref(null)
+const deletingId = ref<number | null>(null)
 const { formEl, focusForm, focusInvalid } = useFormPanel()
 
-// Richtung C: Titel mit Namen statt ID.
+// Direction C: title with the name instead of the ID.
 const formTitle = computed(() => currentEditItem.value === 'new'
   ? t('tags.createTitle')
   : t('tags.editTitle', { name: editName.value }))
@@ -64,21 +71,21 @@ const columns = computed(() => [
 const loadData = async () => {
   try {
     const [tgs, p] = await Promise.all([
-      apiFetch('/api/tags'),
-      apiFetch('/api/pages'),
+      apiFetch<Tag[] | null>('/api/tags'),
+      apiFetch<StatusPage[] | null>('/api/pages'),
     ])
     tags.value = tgs || []
     pages.value = p || []
   } catch (err) {
-    showAlert(t('common.loadError') + err.message)
+    showAlert(t('common.loadError') + (err as Error).message)
   }
 }
 
 onMounted(loadData)
 
-const pageName = (id) => pages.value.find(p => p.ID === id)?.Name || t('tags.pageFallback', { id })
+const pageName = (id: number | string | null | undefined) => pages.value.find(p => p.ID === id)?.Name || t('tags.pageFallback', { id })
 
-const inScope = (tag) => {
+const inScope = (tag: Tag) => {
   if (scopeFilter.value === 'all') return true
   if (scopeFilter.value === 'global') return !tag.StatusPageID
   return tag.StatusPageID === Number.parseInt(scopeFilter.value)
@@ -90,7 +97,7 @@ const visibleTags = computed(() => {
 })
 const filtering = computed(() => searching.value || scopeFilter.value !== 'all')
 
-const openEdit = (item) => {
+const openEdit = (item: Tag | 'new') => {
   if (item === 'new') {
     formData.value = { name: '', status_page_id: '' }
   } else {
@@ -111,7 +118,7 @@ const cancelEdit = () => {
 }
 
 const saveItem = async () => {
-  // Pflichtfeld Name: Fehler am Feld statt eines Serverfehlers, Fokus aufs Feld.
+  // Required field name: error at the field instead of a server error, focus on the field.
   if (!(formData.value.name || '').trim()) {
     nameError.value = t('tags.nameRequired')
     await focusInvalid()
@@ -122,12 +129,12 @@ const saveItem = async () => {
   isSaving.value = true
   try {
     if (isNew) {
-      const payload = { name: formData.value.name }
-      if (formData.value.status_page_id) payload.status_page_id = parseInt(formData.value.status_page_id)
+      const payload: { name?: string, status_page_id?: number } = { name: formData.value.name }
+      if (formData.value.status_page_id) payload.status_page_id = parseInt(String(formData.value.status_page_id))
       await apiFetch('/api/tags', { method: 'POST', body: JSON.stringify(payload) })
     } else {
-      // Umbenennen: der Scope (global vs. Statusseite) ist bewusst nicht änderbar,
-      // siehe UpdateTagHandler in backend/handlers/tag.go.
+      // Rename: the scope (global vs. status page) is deliberately not changeable,
+      // see UpdateTagHandler in backend/handlers/tag.go.
       await apiFetch(`/api/tags/${currentEditItem.value}`, {
         method: 'PUT',
         body: JSON.stringify({ name: formData.value.name })
@@ -137,28 +144,27 @@ const saveItem = async () => {
     cancelEdit()
     await loadData()
   } catch (err) {
-    showAlert(t('common.saveError') + err.message)
+    showAlert(t('common.saveError') + (err as Error).message)
   } finally {
     isSaving.value = false
   }
 }
 
-const menuItems = (tag) => [
+const menuItems = (tag: Tag) => [
   { key: 'edit', label: t('tags.renameAction'), icon: 'pencil' },
   { key: 'delete', label: deletingId.value === tag.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === tag.ID },
 ]
-const onMenuSelect = (tag, key) => {
+const onMenuSelect = (tag: Tag, key: string) => {
   if (key === 'edit') openEdit(tag)
   else deleteItem(tag)
 }
 
-const deleteItem = async (tag) => {
-  // Offene Frage: ob vor dem Löschen die Anzahl betroffener
-  // Ressourcen/User angezeigt werden soll. Pragmatische Entscheidung (siehe PR-
-  // Beschreibung): einfache Bestätigung ohne exakte Trefferzahl, analog zum
-  // bestehenden Bestätigungsmuster in AdminRoles.vue / AdminStatusPages.vue -
-  // die Zuweisung von Tags (und damit eine sinnvolle Zählung) ist ohnehin erst
-  // Teil.
+const deleteItem = async (tag: Tag) => {
+  // Open question: whether to show the number of affected resources/users
+  // before deleting. Pragmatic decision (see the PR description): a simple
+  // confirmation without an exact count, like the existing confirmation
+  // pattern in AdminRoles.vue / AdminStatusPages.vue - assigning tags (and
+  // hence a meaningful count) only came later anyway.
   if (!(await confirmDialog({ message: t('tags.confirmDelete', { name: tag.Name }) }))) return
   clearAlert()
   deletingId.value = tag.ID
@@ -167,7 +173,7 @@ const deleteItem = async (tag) => {
     showAlert(t('adminFeedback.tagDeleted'), 'success')
     await loadData()
   } catch (err) {
-    showAlert(t('common.deleteError') + err.message)
+    showAlert(t('common.deleteError') + (err as Error).message)
   } finally {
     deletingId.value = null
   }
@@ -186,7 +192,7 @@ const deleteItem = async (tag) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Tabellenkarte links, Formular als Seitenkarte rechts. -->
+    <!-- Direction C: table card on the left, form as a side card on the right. -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('tags.cardTitle')">
         <template #tools>

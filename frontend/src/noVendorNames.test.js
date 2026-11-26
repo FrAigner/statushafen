@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest'
 import de from './i18n/locales/de.json'
 import en from './i18n/locales/en.json'
 
-// In Hilfe und Oberflächentexten stehen keine Anbieternamen als Beispiel. Die Schnittstelle
-// heißt "Summary-API v2". Eine Seite der Hilfe (externe Quellen) darf erklären, dass sie mit
-// Statusseiten auf Basis von Atlassian Statuspage kompatibel ist, und stellt klar, dass das
-// Projekt nicht mit Atlassian verbunden ist. Tests dürfen Anbieternamen nicht als Testdaten nutzen.
+// Help pages and UI texts contain no vendor names as examples. The interface is called
+// "Summary-API v2". One help page (external sources) may explain that it is compatible with
+// status pages based on Atlassian Statuspage, and makes clear that the project is not
+// affiliated with Atlassian. Tests must not use vendor names as test data.
 const docs = import.meta.glob('./docs/**/*.md', { query: '?raw', import: 'default', eager: true })
 const VENDORS = /stackit|instatus/i
 const ATLASSIAN_PAGES = ['./docs/de/externe-quellen.md', './docs/en/externe-quellen.md']

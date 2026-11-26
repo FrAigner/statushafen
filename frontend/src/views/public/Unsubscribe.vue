@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -10,15 +10,15 @@ const route = useRoute()
 const { apiFetch } = useApi()
 const { t } = useI18n()
 
-// Abbestellen erst nach Klick per POST, wie die
-// Double-Opt-in-Seite (SubscribeConfirmPage.vue). Vorher löste schon das
-// Öffnen des Links (GET beim Mounten) das Löschen aus - Link-Scanner und
-// Prefetcher von Mail-Gateways beendeten so Abos ungewollt.
-// status: 'idle' (wartet auf Klick) | 'loading' | 'success' | 'error'
-const status = ref('idle')
-// Stryker disable next-line StringLiteral: wird vor dem Fehlerzustand immer gesetzt
+// Unsubscribe only after a click, via POST, like the
+// double opt-in page (SubscribeConfirmPage.vue). Previously merely opening
+// the link (GET on mount) triggered the deletion - link scanners and
+// prefetchers of mail gateways ended subscriptions unintentionally.
+// status: 'idle' (waiting for a click) | 'loading' | 'success' | 'error'
+const status = ref<'idle' | 'loading' | 'success' | 'error'>('idle')
+// Stryker disable next-line StringLiteral: always set before the error state
 const errorMessage = ref('')
-// Stryker disable next-line StringLiteral: ohne Token-Query bleibt die Seite im Fehlerzustand
+// Stryker disable next-line StringLiteral: without a token query the page stays in the error state
 const token = ref('')
 
 onMounted(() => {
@@ -28,7 +28,7 @@ onMounted(() => {
     errorMessage.value = t('unsubscribe.noTokenError')
     return
   }
-  token.value = queryToken
+  token.value = queryToken as string
 })
 
 async function unsubscribe() {
@@ -41,7 +41,7 @@ async function unsubscribe() {
     status.value = 'success'
   } catch (err) {
     status.value = 'error'
-    errorMessage.value = err.message
+    errorMessage.value = (err as Error).message
   }
 }
 </script>

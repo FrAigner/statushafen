@@ -3,18 +3,18 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
 
-// Redesign Stufe 1: Sperre gegen neue Hex-Farben.
+// Redesign stage 1: ban on new hex colors.
 //
-// Farben gehören in Tokens (assets/tokens.css), nicht in Views, Layouts und
-// Komponenten. Vor Stufe 1 standen dort 170 Hex-Werte (Stufe 4f: 0);
-// sie sollen bis Stufe 4 auf 0 sinken (umsetzung.md). Bis dahin gilt eine
-// Ratsche: Der Test zählt Hex-Farben in src/**/*.vue und src/**/*.css außerhalb
-// der Token-Datei und lässt nur MAX_HEX_COLORS zu.
-//  - Steigt die Zahl, schlägt der Test fehl: stattdessen var(--token) nutzen
-//    (oder, falls es noch kein passendes Token gibt, eines in tokens.css anlegen).
-//  - Sinkt die Zahl, schlägt er ebenfalls fehl und verlangt, die Obergrenze im
-//    selben PR zu senken, damit der Fortschritt nicht wieder verloren geht.
-// Kommentare zählen nicht (dort stehen Verweisnummern wie #472 und Beispiele).
+// Colors belong in tokens (assets/tokens.css), not in views, layouts and
+// components. Before stage 1 there were 170 hex values there (stage 4f: 0);
+// they were to drop to 0 by stage 4 (umsetzung.md). Until then a ratchet
+// applies: the test counts hex colors in src/**/*.vue and src/**/*.css outside
+// the token file and allows only MAX_HEX_COLORS.
+//  - If the number rises, the test fails: use var(--token) instead
+//    (or, if no suitable token exists yet, add one to tokens.css).
+//  - If the number drops, it fails as well and requires lowering the limit in
+//    the same PR so the progress is not lost again.
+// Comments do not count (they contain reference numbers like #472 and examples).
 const MAX_HEX_COLORS = 0
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)))
@@ -33,9 +33,9 @@ function sourceFiles(dir = root) {
   return files
 }
 
-// Entfernt Kommentare, damit nur echter Code gezählt wird: /* … */ (CSS und JS),
-// <!-- … --> (Templates) und ganze // -Zeilen bzw. // nach Leerraum (JS).
-// "http://…" bleibt unberührt, weil vor // ein Doppelpunkt steht.
+// Strips comments so only real code is counted: /* … */ (CSS and JS),
+// <!-- … --> (templates) and whole // lines or // after whitespace (JS).
+// "http://…" is left alone because a colon precedes the //.
 export function stripComments(text) {
   return text
     .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -43,8 +43,8 @@ export function stripComments(text) {
     .replace(/(^|\s)\/\/.*$/gm, '$1')
 }
 
-// #rgb, #rrggbb und #rrggbbaa; nicht mitten in einem Wort, URL-Anker oder
-// HTML-Entität (&#123;).
+// #rgb, #rrggbb and #rrggbbaa; not in the middle of a word, URL anchor or
+// HTML entity (&#123;).
 const HEX = /(?<![\w&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g
 
 export function countHex(text) {

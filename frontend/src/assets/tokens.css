@@ -8,58 +8,60 @@
    padding). */
 @layer app-reset;
 
-/* selbst gehostete Schriften. Nach CSS-Regel darf vor @import nur
-   eine @layer-Anweisung stehen; Vite bündelt den Import. */
+/* Self-hosted fonts. Per CSS rules only an @layer statement may precede
+   @import; Vite bundles the import. */
 @import './fonts.css';
 
 /* =============================================================================
-   Statushafen – EINE Token-Quelle (Redesign Stufe 1)
+   Statushafen – ONE token source (redesign stage 1)
 
-   Vorher gab es zwei konkurrierende Sätze (hier und in style.css) mit gleichen
-   Namen und anderen Werten (--font-sans, --radius-sm, --status-degraded, …);
-   style.css lud später und gewann. Jetzt steht alles hier, style.css enthält
-   nur noch Komponenten-Regeln. Einbinden EINMALIG in main.js vor allen anderen
-   Styles. Die Ebenen heißen a = Leitstand (öffentlich) und c = Lagebild (Admin).
+   Previously there were two competing sets (here and in style.css) with the
+   same names and different values (--font-sans, --radius-sm, --status-degraded,
+   …); style.css loaded later and won. Now everything lives here, style.css only
+   holds component rules. Import ONCE in main.js before all other styles. The
+   levels are a = "Leitstand" (control room, public) and c = "Lagebild"
+   (situation picture, admin).
 
-   Aufbau
-     1. Basis (:root): Schriften, Abstände, Radien, Typo-Skala, Statusformen.
-        Gilt für beide Ebenen und für alles ohne Ebene (z. B. Login).
-     2. Ebene `.theme-public` (Richtung A „Leitstand“): öffentliche Statusseiten
-        und Startseite. Zugleich der Standard auf :root. Die Kundenmarke der
-        Statusseite (--primary/--primary-hover/--text-secondary als Inline-Style
-        auf .content-area, StatusPage.vue) überschreibt diese Ebene.
-     3. Ebene `.theme-admin` (Richtung C „Lagebild“): Admin-Bereich.
-        Jede Ebene hell (Standard) und dunkel (html[data-theme="dark"], setzt
-        useTheme.js) – Reihenfolge wichtig: die Dunkel-Regeln stehen nach den
-        Hell-Regeln und haben höhere Spezifität.
-     4. Abgeleitete Tokens (Marken-Hook --text-secondary, sit-onyx-Variablen) in einem
-        Block für :root UND beide Ebenen. Das ist nötig, weil var() am Element
-        aufgelöst wird, das die Eigenschaft deklariert: stünde ein Alias nur auf
-        :root, bekäme .theme-admin die Werte von :root geerbt statt seine eigenen.
+   Structure
+     1. Base (:root): fonts, spacing, radii, type scale, status shapes.
+        Applies to both levels and to everything without a level (e.g. login).
+     2. Level `.theme-public` (direction A "Leitstand"): public status pages
+        and landing page. Also the default on :root. The customer brand of the
+        status page (--primary/--primary-hover/--text-secondary as inline style
+        on .content-area, StatusPage.vue) overrides this level.
+     3. Level `.theme-admin` (direction C "Lagebild"): admin area.
+        Each level light (default) and dark (html[data-theme="dark"], set by
+        useTheme.js) – order matters: the dark rules come after the light rules
+        and have higher specificity.
+     4. Derived tokens (brand hook --text-secondary, sit-onyx variables) in one
+        block for :root AND both levels. This is needed because var() is
+        resolved on the element that declares the property: if an alias were
+        only on :root, .theme-admin would inherit the :root values instead of
+        its own.
 
-   Die Klassen .theme-public/.theme-admin setzen PublicLayout.vue bzw.
-   AdminLayout.vue am Wurzelelement, sonst ändert sich dort nichts.
-   Die Hex-Werte hier sind von der Sperre in src/hexColors.test.js ausgenommen
-   (dies ist die Token-Datei); anderswo sollen Farben aus Tokens kommen.
-   Kontrast aller Paare: src/tokenContrast.test.js (WCAG AA, hell und dunkel).
+   PublicLayout.vue and AdminLayout.vue set the classes .theme-public and
+   .theme-admin on their root element; nothing else changes there.
+   The hex values here are exempt from the ban in src/hexColors.test.js
+   (this is the token file); elsewhere colors should come from tokens.
+   Contrast of all pairs: src/tokenContrast.test.js (WCAG AA, light and dark).
    ============================================================================ */
 
-/* ── 1. Basis ───────────────────────────────────────────────────────────── */
+/* ── 1. Base ────────────────────────────────────────────────────────────── */
 :root {
-  /* Schriften: Inter für die Oberfläche, IBM Plex Mono für Kennungen/Zahlen.
-     IBM Plex Sans bleibt für die Admin-Ebene (Lagebild) und die Startseite. */
+  /* Fonts: Inter for the UI, IBM Plex Mono for identifiers/numbers.
+     IBM Plex Sans remains for the admin level (Lagebild) and the landing page. */
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
 
-  /* sit-onyx setzt in seinen Komponenten (z. B. .onyx-button)
-     font-family: var(--onyx-font-family-paragraph) OHNE generischen Fallback.
-     Der Wert ist "Source Sans 3 Variable", eine Schrift, die onyx nicht
-     mitliefert und die wir nicht laden (nur Inter/IBM Plex). Der
-     Browser fiel deshalb auf seine Standardschrift zurück, also eine Serife.
-     Hier bekommen alle onyx-Schrift-Tokens unsere Schriften; :root schlägt
-     onyx' :where(:root) und gilt für jede onyx-Komponente der App.
-     (.theme-admin wiederholt die Zeilen unten, weil dort --font-sans wechselt.)
-     Nicht wegräumen: src/onyxFonts.test.js prüft genau diesen Block. */
+  /* In its components (e.g. .onyx-button) sit-onyx sets
+     font-family: var(--onyx-font-family-paragraph) WITHOUT a generic fallback.
+     The value is "Source Sans 3 Variable", a font onyx does not ship and we do
+     not load (only Inter/IBM Plex). The browser therefore fell back to its
+     default font, i.e. a serif.
+     Here all onyx font tokens get our fonts; :root beats onyx' :where(:root)
+     and applies to every onyx component in the app.
+     (.theme-admin repeats the lines below because --font-sans changes there.)
+     Do not remove: src/onyxFonts.test.js checks exactly this block. */
   --onyx-font-family-paragraph: var(--font-sans);
   --onyx-font-family-data:      var(--font-sans);
   --onyx-font-family-h1:        var(--font-sans);
@@ -68,7 +70,7 @@
   --onyx-font-family-h4:        var(--font-sans);
   --onyx-font-family-mono:      var(--font-mono);
 
-  /* Typo-Skala (Richtung A) */
+  /* Type scale (direction A) */
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-base: 14px;
@@ -78,7 +80,7 @@
   --fs-xl: 26px;
   --fs-3xl: clamp(34px, 5.2vw, 54px);
 
-  /* 4-px-Raster */
+  /* 4 px grid */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -87,7 +89,7 @@
   --sp-6: 40px;
   --sp-7: 80px;
 
-  /* Startseite (Richtung A): Inhaltsbreite und grobe Segmentbalken der Beispielkarte */
+  /* Landing page (direction A): content width and coarse segment bars of the sample card */
   --lp-max: 1160px;
   /* Height of the sticky landing header (one row, desktop); sticky elements below it offset by it. */
   --lp-header-height: 64px;
@@ -95,18 +97,18 @@
   --bar-h: 28px;
   --bar-r: 2px;
 
-  /* Responsive Abstände (von ResponsiveTable und style.css genutzt) */
+  /* Responsive spacing (used by ResponsiveTable and style.css) */
   --space-sm: clamp(12px, 3vw, 16px);
   --space-md: clamp(16px, 4vw, 24px);
   --gap-sm: clamp(12px, 3vw, 16px);
 
-  /* Breakpoints (nur Dokumentation: var() geht nicht in @media) */
+  /* Breakpoints (documentation only: var() does not work in @media) */
   --bp-sm: 480px;
   --bp-md: 768px;
   --bp-lg: 900px;
   --bp-xl: 1200px;
 
-  /* Radien 4/6/10 (Richtung A) */
+  /* Radii 4/6/10 (direction A) */
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 10px;
@@ -115,7 +117,7 @@
   --radius-lg: var(--r-lg);
   --radius: var(--r-lg);
 
-  /* Steuerelemente und Layout */
+  /* Controls and layout */
   --ctl-h: 36px;
   --row-h: 52px;
   --row-pad: 13px 16px;
@@ -129,7 +131,7 @@
   }
 }
 
-/* ── 2. Ebene „public“ = Richtung A „Leitstand“ (hell) ──────────────────── */
+/* ── 2. Level "public" = direction A "Leitstand" (light) ─────────────────── */
 :root,
 .theme-public {
   --bg: #f7f7f8;
@@ -178,8 +180,8 @@
   --shadow-pop: 0 12px 32px -8px rgba(20, 20, 30, 0.22), 0 0 0 1px var(--border);
   --overlay: rgb(0 0 0 / 0.55);
 
-  /* sit-onyx-Markenskala (Indigo A); 500/600 = --primary/--primary-hover.
-     Custom Properties sind nicht gelayert, die Ladereihenfolge ist egal. */
+  /* sit-onyx brand scale (indigo A); 500/600 = --primary/--primary-hover.
+     Custom properties are not layered, so load order does not matter. */
   --onyx-color-onyx-100:  #eeedfc;
   --onyx-color-onyx-200:  #dddbfa;
   --onyx-color-onyx-300:  #bcb8f4;
@@ -194,7 +196,7 @@
   --onyx-color-onyx-1200: #0b0a25;
 }
 
-/* ── 2b. Ebene „public“ dunkel ──────────────────────────────────────────── */
+/* ── 2b. Level "public" dark ──────────────────────────────────────────── */
 html[data-theme="dark"],
 html[data-theme="dark"] .theme-public {
   --bg: #0c0c0f;
@@ -243,7 +245,7 @@ html[data-theme="dark"] .theme-public {
   --overlay: rgb(0 0 0 / 0.7);
 }
 
-/* ── 3. Ebene „admin“ = Richtung C „Lagebild“ (hell) ────────────────────── */
+/* ── 3. Level "admin" = direction C "Lagebild" (light) ───────────────────── */
 .theme-admin {
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --onyx-font-family-paragraph: var(--font-sans);
@@ -299,7 +301,7 @@ html[data-theme="dark"] .theme-public {
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.28), 0 0 0 1px var(--border-strong);
   --overlay: rgb(0 0 0 / 0.55);
 
-  /* sit-onyx-Markenskala (Blau C); 500/600 = --primary/--primary-hover. */
+  /* sit-onyx brand scale (blue C); 500/600 = --primary/--primary-hover. */
   --onyx-color-onyx-100:  #e9effa;
   --onyx-color-onyx-200:  #d4dff5;
   --onyx-color-onyx-300:  #aac1ec;
@@ -314,7 +316,7 @@ html[data-theme="dark"] .theme-public {
   --onyx-color-onyx-1200: #051023;
 }
 
-/* ── 3b. Ebene „admin“ dunkel ───────────────────────────────────────────── */
+/* ── 3b. Level "admin" dark ───────────────────────────────────────────── */
 html[data-theme="dark"] .theme-admin {
   --bg: #090c11;
   --surface: #10151c;
@@ -361,24 +363,24 @@ html[data-theme="dark"] .theme-admin {
   --overlay: rgb(0 0 0 / 0.7);
 }
 
-/* ── 4. Abgeleitete Tokens (je Ebene neu aufgelöst, siehe Kopfkommentar) ── */
+/* ── 4. Derived tokens (resolved anew per level, see header comment) ────── */
 :root,
 .theme-public,
 .theme-admin {
-  /* Einziger verbliebener Alias: --text-secondary ist der
-     Einhängepunkt der Kundenmarke. StatusPage.vue überschreibt ihn als
-     Inline-Style auf .content-area; alles, was die Markenfarbe der Statusseite
-     tragen soll, nutzt var(--text-secondary), die übrigen Stellen --text-2.
-     Alle anderen alten Namen (--bg-panel, --text-primary, --color-*, …) sind
-     entfernt, src/designAufraeumen.test.js verhindert ihre Rückkehr. */
+  /* The only remaining alias: --text-secondary is the hook for the
+     customer brand. StatusPage.vue overrides it as an inline style on
+     .content-area; everything that should carry the status page's brand color
+     uses var(--text-secondary), all other places use --text-2.
+     All other old names (--bg-panel, --text-primary, --color-*, …) have been
+     removed; src/designAufraeumen.test.js prevents their return. */
   --text-secondary: var(--text-2);
 
-  /* sit-onyx: Flächen, Text, Rahmen und Radien auf unsere Tokens. onyx nutzt
-     light-dark(); unsere Tokens wechseln schon per data-theme, ein Zweig
-     genügt. Die Markenskala steht oben je Ebene. */
+  /* sit-onyx: surfaces, text, borders and radii mapped to our tokens. onyx uses
+     light-dark(); our tokens already switch via data-theme, so one branch is
+     enough. The brand scale is defined above per level. */
   --onyx-color-primary: var(--primary);
-  /* Text/Rand der Umrissknöpfe und Links; ohne diese Zeile gilt der
-     Hell-Wert von :root (#4b44d6) auch im dunklen Admin (2,4:1 auf --surface). */
+  /* Text/border of outline buttons and links; without this line the light value
+     from :root (#4b44d6) also applies in the dark admin (2.4:1 on --surface). */
   --onyx-color-text-icons-primary-intense: var(--primary-text);
   --onyx-color-danger:  var(--major);
   --onyx-color-success: var(--ok);
@@ -400,11 +402,11 @@ html[data-theme="dark"] .theme-admin {
   --onyx-radius-component-button: var(--r-md);
 }
 
-/* Grundfläche, -farbe und -schrift der Admin-Ebene. Body und :root tragen die
-   Werte der Ebene „public“ (A); das Admin-Wurzelelement (.admin-shell füllt
-   die Seite) zeigt seine eigenen. Die öffentliche Ebene braucht das nicht,
-   weil sie dem :root-Standard entspricht (und .app-container nur 960 px breit
-   ist, eine Fläche darauf würde als Streifen sichtbar). */
+/* Base background, color and font of the admin level. Body and :root carry
+   the values of the "public" level (A); the admin root element (.admin-shell
+   fills the page) shows its own. The public level does not need this because
+   it matches the :root default (and .app-container is only 960 px wide, a
+   background on it would show as a strip). */
 .theme-admin {
   background: var(--bg);
   color: var(--text);

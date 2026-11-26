@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useAuthConfig, resetAuthConfig } from '../../composables/useAuthConfig'
 import LoginView from './LoginView.vue'
 import loginSource from './LoginView.vue?raw'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -270,8 +270,8 @@ describe('LoginView', () => {
     })
   })
 
-  // Branding: Der Login-Titel führt den echten Produktnamen
-  // "Statushafen" statt des Vorlagen-Platzhalters "Status Enterprise CMS".
+  // Branding: the login title carries the real product name
+  // "Statushafen" instead of the template placeholder "Status Enterprise CMS".
   it('zeigt "Statushafen" als Titel', async () => {
     const { wrapper } = await mountLogin()
 
@@ -292,7 +292,7 @@ describe('LoginView', () => {
     expect(wrapper.find('.login-alert.error').attributes('role')).toBe('alert')
   })
 
-  // Fehler aus dem OIDC-Callback kommen als fester Code.
+  // Errors from the OIDC callback arrive as a fixed code.
   it('übersetzt den OIDC-Fehlercode aus ?oidc_error=', async () => {
     const { wrapper } = await mountLogin('?oidc_error=not_linked')
 
@@ -442,8 +442,8 @@ describe('LoginView', () => {
     expect(useAuth().isLoggedIn.value).toBe(false)
   })
 
-  // Falsches Passwort zeigte „Sitzung abgelaufen. Bitte neu einloggen.“,
-  // weil useApi jede 401 als Sitzungsende behandelte.
+  // A wrong password showed "Sitzung abgelaufen. Bitte neu einloggen.",
+  // because useApi treated every 401 as a session end.
   it.each([
     ['de', 'E-Mail oder Passwort ist falsch.'],
     ['en', 'Incorrect email or password.'],
@@ -463,8 +463,8 @@ describe('LoginView', () => {
     expect(alert.attributes('role')).toBe('alert')
   })
 
-  // Ein noch gespeichertes, veraltetes Token darf den Login-Fehlversuch
-  // nicht zum Sitzungsende machen und wird beim Login nicht mitgeschickt.
+  // A still stored, stale token must not turn the failed login attempt
+  // into a session end and is not sent along with the login.
   it('meldet falsche Zugangsdaten auch bei noch gespeichertem Token', async () => {
     useAuth().token.value = 'jwt-alt'
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'Invalid email or password' }, 401))
@@ -477,7 +477,7 @@ describe('LoginView', () => {
     expect(wrapper.find('.login-alert.error').text()).toBe('E-Mail oder Passwort ist falsch.')
   })
 
-  // Eine 401 von Caddys Basic Auth ist kein Passwortfehler der App.
+  // A 401 from Caddy's Basic Auth is not a password error of the app.
   it('zeigt bei einer Basic-Auth-401 nicht „Passwort falsch“', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ...jsonResponse({}, 401),
@@ -606,7 +606,7 @@ describe('LoginView', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Pflichtfelder tragen Stern (Klasse), aria-required und den Hinweis.
+  // Required fields carry an asterisk (class), aria-required and the hint.
   it('kennzeichnet E-Mail und Passwort als Pflichtfelder', async () => {
     const { wrapper } = await mountLogin()
     for (const id of ['login-email', 'login-password']) {

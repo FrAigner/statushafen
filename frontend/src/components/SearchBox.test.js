@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SearchBox from './SearchBox.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 describe('SearchBox', () => {
   it('bindet v-model, setzt aria-label und nimmt das Label als Platzhalter', async () => {

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -9,8 +9,8 @@ const route = useRoute()
 const { t } = useI18n()
 const { apiFetch } = useApi()
 
-// state: 'idle' (wartet auf Klick) | 'confirming' | 'success' | 'error'
-const state = ref('idle')
+// state: 'idle' (waiting for a click) | 'confirming' | 'success' | 'error'
+const state = ref<'idle' | 'confirming' | 'success' | 'error'>('idle')
 const errorMessage = ref('')
 const setPasswordToken = ref('')
 const token = ref('')
@@ -22,23 +22,23 @@ onMounted(() => {
     errorMessage.value = t('order.missingTokenError')
     return
   }
-  token.value = queryToken
+  token.value = queryToken as string
 })
 
-// Bewusst kein Auto-Fire beim Mounten: manche Mail-Gateways prefetchen Links
-// automatisch und würden den Einmal-Token sonst schon vor dem eigentlichen
-// Klick der Nutzerin/des Nutzers verbrauchen.
+// Deliberately no auto-fire on mount: some mail gateways prefetch links
+// automatically and would otherwise use up the one-time token before the
+// user's actual click.
 async function confirm() {
   state.value = 'confirming'
   try {
-    const data = await apiFetch('/api/public/orders/confirm', {
+    const data = await apiFetch<{ set_password_token: string }>('/api/public/orders/confirm', {
       method: 'POST',
       body: JSON.stringify({ token: token.value }),
     })
     setPasswordToken.value = data.set_password_token
     state.value = 'success'
   } catch (err) {
-    errorMessage.value = err.message
+    errorMessage.value = (err as Error).message
     state.value = 'error'
   }
 }

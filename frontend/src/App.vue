@@ -1,20 +1,20 @@
-<script setup>
+<script setup lang="ts">
 // App.vue now only serves as the root container for the vue-router
 import { onBeforeUnmount } from 'vue'
 import { installFormValidationGuard } from './utils/formValidation'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 
-// Alle Formulare tragen `novalidate` (kein nativer Hover-Hinweis
-// „Fülle dieses Feld aus.“ über den Hilfe-Tooltips); der Wächter prüft die
-// Pflichtfelder stattdessen beim Absenden. Hier statt in main.js, damit er
-// mit der App lebt und testbar ist.
+// All forms carry `novalidate` (no native hover hint
+// "Please fill out this field." over the help tooltips); the guard checks the
+// required fields on submit instead. Here rather than in main.ts, so that it
+// lives with the app and is testable.
 const uninstallFormValidationGuard = installFormValidationGuard()
 onBeforeUnmount(uninstallFormValidationGuard)
 </script>
 
 <template>
   <router-view />
-  <!-- einziger Bestätigungsdialog der App (useConfirm) -->
+  <!-- The app's only confirmation dialog (useConfirm) -->
   <ConfirmDialog />
 </template>
 

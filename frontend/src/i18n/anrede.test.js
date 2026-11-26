@@ -3,27 +3,27 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import de from './locales/de.json'
 
-// Rest: Das Projekt duzt. Dieser Wächter findet
-// förmliche Anrede ("Sie", "Ihr...") in de.json, den deutschen Hilfeseiten und
-// der Anleitung unter docs/user-guide.
+// Remainder: the project uses informal address (du). This guard finds
+// formal address ("Sie", "Ihr...") in de.json, the German help pages and
+// the guide under docs/user-guide.
 //
-// Konservative Regel (Pronomen "Sie" = 3. Person Plural/Singular ist mehrdeutig):
-//  1. "Sie" nach einem kleingeschriebenen Wort/Komma ("Stellen Sie" ist über 2.
-//     abgedeckt, "dass Sie", "wenn Sie", "bitten Sie"): mitten im Satz wäre das
-//     Pronomen klein geschrieben, großes "Sie" ist also Anrede.
-//  2. Imperativ/Höflichkeitsform am Satzanfang: Verb auf -en/-et + "Sie"
-//     ("Stellen Sie", "Löschen Sie", "Lesen Sie"). Satzanfang "Sie sind/gelten"
-//     bleibt unbeanstandet (Pronomen für Dinge).
-//  3. Possessiv "Ihr/Ihre/Ihren/Ihrem/Ihrer/Ihres" und "Ihnen" in jeder Position.
-// Berechtigte Treffer (Possessiv für Dinge, z. B. "Ihre Bausteine" einer Quelle)
-// stehen in ERLAUBT als exakter Textausschnitt.
+// Conservative rule (the pronoun "Sie" = 3rd person plural/singular is ambiguous):
+//  1. "Sie" after a lowercase word/comma ("Stellen Sie" is covered by 2.,
+//     "dass Sie", "wenn Sie", "bitten Sie"): mid-sentence the
+//     pronoun would be lowercase, so a capital "Sie" is formal address.
+//  2. Imperative/polite form at the start of a sentence: verb in -en/-et + "Sie"
+//     ("Stellen Sie", "Löschen Sie", "Lesen Sie"). A sentence start "Sie sind/gelten"
+//     is not flagged (pronoun for things).
+//  3. Possessive "Ihr/Ihre/Ihren/Ihrem/Ihrer/Ihres" and "Ihnen" in any position.
+// Legitimate hits (possessive for things, e.g. "Ihre Bausteine" of a source)
+// are listed in ERLAUBT as an exact text excerpt.
 export const ERLAUBT = [
-  'Ihre Bausteine', // Bausteine der Quelle, keine Anrede
-  'Ihr Slug', // Slug der Systemseite
-  'Ihr Status zählt', // Status der externen Quelle
-  'Ihr letzter Status zählt solange nicht für', // dito
-  'Ihre Werte werden', // Werte der Platzhalter
-  'Ihre Felder entsprechen', // Felder der SSO-Seite
+  'Ihre Bausteine', // building blocks of the source, not an address
+  'Ihr Slug', // slug of the system page
+  'Ihr Status zählt', // status of the external source
+  'Ihr letzter Status zählt solange nicht für', // ditto
+  'Ihre Werte werden', // values of the placeholders
+  'Ihre Felder entsprechen', // fields of the SSO page
   'Ihr Slug lässt sich',
 ]
 

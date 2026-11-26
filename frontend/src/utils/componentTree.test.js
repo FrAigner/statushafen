@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { flattenComponentTree, componentOptions, descendantIds, visibleComponents } from './componentTree'
 
-// Baum aus der Komponenten-API, wie ihn der Seed liefert.
+// Tree from the components API as the seed delivers it.
 const tree = [
   {
     ID: 1, Name: 'Core', Children: [
@@ -29,7 +29,7 @@ describe('componentTree', () => {
     expect(opts[2]).toEqual({ label: '  API Gateway (US)', value: '7' })
   })
 
-  // archivierte Komponenten sind in keiner Auswahl wählbar.
+  // Archived components cannot be chosen in any select.
   it('lässt archivierte Komponenten aus den Optionen weg', () => {
     const opts = componentOptions([
       { ID: 1, Name: 'Aktiv' },
@@ -42,9 +42,9 @@ describe('componentTree', () => {
   it('behält archivierte Komponenten, die ausdrücklich gewählt sind (keepIds)', () => {
     const flat = [{ ID: 1, Name: 'Alt', ArchivedAt: 'x' }, { ID: 2, Name: 'Alt2', ArchivedAt: 'x' }]
     expect(componentOptions(flat, [2]).map(o => o.value)).toEqual(['2'])
-    // die Formulare halten IDs als Text ("2"), die Liste als Zahl
+    // the forms hold IDs as text ("2"), the list as a number
     expect(componentOptions(flat, ['2']).map(o => o.value)).toEqual(['2'])
-    // null (z. B. noch nicht gesetzte Auswahl) darf nicht abstürzen
+    // null (e.g. a selection not set yet) must not crash
     expect(componentOptions(flat, null).map(o => o.value)).toEqual([])
   })
 
@@ -53,9 +53,9 @@ describe('componentTree', () => {
   })
 })
 
-// einklappbare Gruppen und Suche in der flachen Liste.
+// Collapsible groups and search in the flat list.
 describe('descendantIds und visibleComponents', () => {
-  const flat = flattenComponentTree(tree) // IDs in Reihenfolge: 1, 4, 7, 5, 2
+  const flat = flattenComponentTree(tree) // IDs in order: 1, 4, 7, 5, 2
   const textOf = c => `${c.Name} ${c.Description || ''}`
 
   it('liefert die Nachfahren eines Eintrags, nicht seine Geschwister', () => {

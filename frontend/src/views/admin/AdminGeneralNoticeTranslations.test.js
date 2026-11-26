@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant as useTenantStatic } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminGeneralNoticeTranslations from './AdminGeneralNoticeTranslations.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function noticeFixture() {
@@ -37,8 +37,8 @@ function makeFetchRouter({ noticeOverride, translationsOverride, catalogOverride
     const method = options.method || 'GET'
     // Switch for translations (system setting); on unless a test turns it off.
     if (url === '/api/public/translation/enabled') return jsonResponse({ enabled: translationEnabled })
-    // Einen Einzel-GET für Ankündigungen gibt es im Backend
-    // nicht, die View sucht die Ankündigung in der Admin-Liste der Seite.
+    // The backend has no single GET for notices;
+    // the view looks the notice up in the page's admin list.
     if (method === 'GET' && url === `/api/pages/${pageId}/notices/all`) {
       return jsonResponse([{ ID: 9, Title: 'Andere' }, noticeOverride ?? noticeFixture()])
     }
@@ -99,13 +99,13 @@ describe('AdminGeneralNoticeTranslations with translation switched off', () => {
 
 describe('AdminGeneralNoticeTranslations', () => {
   beforeEach(() => {
-    // Die Knöpfe hängen jetzt an notices:write auf der aktiven Seite.
+    // The buttons now depend on notices:write on the active page.
     useAuth().setAuth('jwt-1', { permissions: '' })
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'notices:read,notices:write' }])
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -207,8 +207,8 @@ describe('AdminGeneralNoticeTranslations', () => {
     expect(wrapper.text()).toMatch(/Fehler|error/i)
   })
 
-  // Richtung C: Pflichtfelder melden den Fehler am Feld, der Fokus springt
-  // zum ersten Fehlerfeld, und es geht nichts an den Server.
+  // Direction C: required fields report the error at the field, focus jumps
+  // to the first invalid field, and nothing is sent to the server.
   it('meldet fehlende Pflichtfelder am Feld und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountComponent({ fetchImpl: fetchMock, attach: true })
@@ -267,7 +267,7 @@ describe('AdminGeneralNoticeTranslations', () => {
     await newButtons[0].trigger('click')
     await flushPromises()
 
-    // Die Nachricht der Übersetzung ist der Editor.
+    // The translation's message is the editor.
     expect(wrapper.find('.rte textarea').exists()).toBe(true)
     const selects = wrapper.findAll('select')
     const textareas = wrapper.findAll('textarea')
@@ -366,7 +366,7 @@ describe('AdminGeneralNoticeTranslations', () => {
 
     await wrapper.findAll('button').find(b => b.text().includes('Neu')).trigger('click')
     await flushPromises()
-    // 'de' und 'en' sind schon übersetzt, 'fr' ist frei.
+    // 'de' and 'en' are already translated, 'fr' is free.
     await wrapper.find('#lang-select').setValue('fr')
     await wrapper.find('#title-input').setValue('Nouveau titre')
     await wrapper.find('#content-input').setValue('Nouveau message')
@@ -383,8 +383,8 @@ describe('AdminGeneralNoticeTranslations', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Ein Viewer (notices:read) sah „Neue Übersetzung“, „Bestätigen“
-  // und „Löschen“, das Backend lehnt alle drei mit 403 ab.
+  // A viewer (notices:read) saw "New translation", "Confirm"
+  // and "Delete"; the backend rejects all three with 403.
   it('blendet Schreibknöpfe und Aktionen-Spalte ohne notices:write aus', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'notices:read' }])
     const { wrapper } = await mountComponent()
@@ -416,8 +416,8 @@ describe('AdminGeneralNoticeTranslations', () => {
     expect(wrapper.find('.row-menu').exists()).toBe(true)
   })
 
-  // Richtung C: Bestätigen und Löschen stehen im Zeilenmenü; während
-  // sie laufen, zeigt der Eintrag die Laufend-Beschriftung und ist gesperrt.
+  // Direction C: confirm and delete are in the row menu; while they
+  // run, the entry shows the in-progress label and is disabled.
   it('bietet Bestätigen nur für Entwürfe an und zeigt während der Aktion die Laufend-Beschriftung', async () => {
     stubConfirm(true)
     const base = makeFetchRouter()
@@ -438,7 +438,7 @@ describe('AdminGeneralNoticeTranslations', () => {
     vi.unstubAllGlobals()
   })
 
-  // Richtung C: Karte „Übersetzungen“, Brotkrumen mit Seitenname, Formular als Seitenkarte.
+  // Direction C: "Translations" card, breadcrumbs with the page name, form as a side card.
   it('zeigt Brotkrumen mit Seitenname, Listenkarte, Name fett und Formular als Seitenkarte', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Name: 'Acme', Permissions: 'notices:write' }])
     const { wrapper } = await mountComponent()

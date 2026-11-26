@@ -4,9 +4,9 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
 // GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr, GHSA-c6gr-qvv4-5v3f: dompurify <= 3.4.16
-// hat drei XSS-Lücken (SAFE_FOR_TEMPLATES-Bypass über Shadow-DOM, unvollständige
-// Neutralisierung in IN_PLACE-Hooks, fehlendes Lowercasing von attributeName in
-// XHTML-Mode). Gepatcht ab 3.4.17 (npm audit --audit-level=high).
+// has three XSS vulnerabilities (SAFE_FOR_TEMPLATES bypass via shadow DOM, incomplete
+// neutralisation in IN_PLACE hooks, missing lowercasing of attributeName in
+// XHTML mode). Patched as of 3.4.17 (npm audit --audit-level=high).
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MIN_PATCHED_VERSION = [3, 4, 17]
 

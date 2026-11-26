@@ -3,10 +3,10 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// Stufe 4f: Aufräumen nach dem Redesign. Dieser Test hält fest, dass
-// die entfernten toten Klassen, Alias-Tokens und die Komponente AdminPageHead
-// nicht wieder auftauchen. Wer sie braucht, nutzt die Nachfolger (PageHeader
-// mit level=2, StatusBadge, Tokens der Ebenen).
+// Stage 4f: cleanup after the redesign. This test ensures that the removed
+// dead classes, alias tokens and the AdminPageHead component do not come
+// back. Anyone who needs them uses the successors (PageHeader with level=2,
+// StatusBadge, level tokens).
 const root = resolve(dirname(fileURLToPath(import.meta.url)))
 const read = (rel) => readFileSync(resolve(root, rel), 'utf-8')
 const css = [read('style.css'), read('admin.css')].join('\n')
@@ -46,9 +46,9 @@ describe('Design-Aufräumen (Stufe 4f)', () => {
     expect(existsSync(resolve(root, 'components/PageHeader.vue'))).toBe(true)
   })
 
-  // Die alten Alias-Namen sind aus tokens.css entfernt und in allen
-  // Views/Komponenten durch die Ebenen-Tokens ersetzt. Einziger Alias bleibt
-  // --text-secondary, der Einhängepunkt der Kundenmarke (StatusPage.vue).
+  // The old alias names were removed from tokens.css and replaced by the
+  // level tokens in all views/components. The only remaining alias is
+  // --text-secondary, the hook for the customer brand (StatusPage.vue).
   describe('entfernte Alias-Tokens', () => {
     const ALIASE = [
       'bg-app', 'bg-panel', 'bg-subtle', 'bg-hover', 'bg-color', 'panel-bg',
@@ -69,7 +69,7 @@ describe('Design-Aufräumen (Stufe 4f)', () => {
       }
     }
     sammeln(root)
-    // Kommentare dürfen die alten Namen erwähnen (Erklärung in tokens.css).
+    // Comments may mention the old names (explanation in tokens.css).
     const alles = quellen.map((p) => readFileSync(p, 'utf-8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '')
 
     it('findet die Quelldateien (Schutz gegen leere Suche)', () => {

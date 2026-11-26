@@ -1,31 +1,34 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Komponentenseite nach Richtung C: Statusauswahl als Kacheln mit
-  Symbol statt eines Selects („Anfangsstatus“). Status ist Form + Farbe + Text,
-  die Kachel zeigt beides über StatusIcon und den Statustext. Technisch eine
-  Radiogruppe: Pfeiltasten wählen, Tab springt hinein und heraus. Wert ist der
-  Roh-Status des Backends (wie QuickStatus). Die Gruppe (fieldset mit Legende,
-  Pflichtmarker, Hilfe) setzt der Aufrufer.
+  Component page following direction C: status choice as tiles with an icon
+  instead of a select ("initial status"). Status is shape + colour + text,
+  the tile shows both via StatusIcon and the status text. Technically a radio
+  group: arrow keys select, Tab jumps in and out. The value is the backend's
+  raw status (like QuickStatus). The group (fieldset with legend, required
+  marker, help) is provided by the caller.
 */
 import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusIcon from './StatusIcon.vue'
 import { STATUS_LEVELS, statusMeta, toRawStatus } from '../utils/status'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  modelValue: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  modelValue?: string | null
+}>(), {
+  modelValue: null,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [status: string] }>()
 
 const { t } = useI18n()
 const name = `status-tiles-${useId()}`
+// Each of the four levels has a raw value and a label.
 const options = STATUS_LEVELS.map(level => ({
   level,
-  value: toRawStatus(level),
-  labelKey: statusMeta(level).labelKey,
+  value: toRawStatus(level) as string,
+  labelKey: statusMeta(level).labelKey as string,
 }))
 </script>
 

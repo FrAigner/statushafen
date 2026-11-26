@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { availabilityDayMeta, durationParts, formatAvailability, formatDay, parseAvailability } from './availability'
 
-// 4a: Zuordnung der Tagesstatus des 90-Tage-Endpunkts.
+// 4a: mapping of the daily statuses of the 90-day endpoint.
 describe('availabilityDayMeta', () => {
   it.each([
     ['operational', 'ok', 'status.operational'],
@@ -17,7 +17,7 @@ describe('availabilityDayMeta', () => {
   it('behandelt unbekannte und fehlende Werte neutral wie no_data', () => {
     expect(availabilityDayMeta('weird').level).toBe('none')
     expect(availabilityDayMeta(undefined).level).toBe('none')
-    // Prototyp-Schlüssel dürfen keine Statusfarbe liefern
+    // Prototype keys must not yield a status colour
     expect(availabilityDayMeta('constructor').level).toBe('none')
   })
 })
@@ -50,8 +50,8 @@ describe('formatDay', () => {
   })
 })
 
-// Review-Befund 4 (PageLayoutList): 90 Tage × Komponenten dürfen nicht je Tag
-// einen neuen Intl-Formatter bauen.
+// Review finding 4 (PageLayoutList): 90 days × components must not build
+// a new Intl formatter per day.
 describe('Formatter-Cache', () => {
   it('legt je Sprache nur einen Formatter an', () => {
     const dtf = vi.spyOn(Intl, 'DateTimeFormat')
@@ -78,7 +78,7 @@ describe('parseAvailability', () => {
   })
 })
 
-// Dauer je Schweregrad im Tooltip.
+// Duration per severity in the tooltip.
 describe('durationParts', () => {
   it.each([
     [0, 'availability.durationLessThanMinute', {}],

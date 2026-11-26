@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { OnyxButton, OnyxCheckbox } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -9,15 +9,15 @@ import TranslationSettings from '../../components/TranslationSettings.vue'
 import PageHeader from '../../components/PageHeader.vue'
 import ListCard from '../../components/ListCard.vue'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
+import type { SystemSettings } from '../../types/api'
 
-// Systemeinstellungen: Schalter für die Self-Service-Bestellung
-// und für den globalen E-Mail-Versand. Nur für Global Admins -
-// die Route ist mit requiresGlobalAdmin geschützt, zusätzlich blendet die View
-// den Inhalt per isGlobalAdmin aus (analog zu AdminLanguages.vue).
+// System settings: switches for self-service ordering and for global email
+// sending. Global admins only - the route is guarded by requiresGlobalAdmin,
+// and the view additionally hides its content via isGlobalAdmin (like AdminLanguages.vue).
 
-// Ein Eintrag pro Schalter: Feld im API-Vertrag und Präfix der i18n-Keys.
-// Neue Schalter werden nur hier ergänzt (plus i18n), nicht als Kopie im Template.
-const SECTIONS = [
+// One entry per switch: field in the API contract and prefix of the i18n keys.
+// New switches are only added here (plus i18n), not copied into the template.
+const SECTIONS: { field: keyof SystemSettings, i18n: string }[] = [
   { field: 'orders_enabled', i18n: 'orders' },
   { field: 'email_enabled', i18n: 'email' },
   { field: 'selfmonitor_enabled', i18n: 'selfmonitor' },
@@ -28,13 +28,13 @@ const { isGlobalAdmin } = useAuth()
 const { t } = useI18n()
 const breadcrumbs = usePageCrumbs(computed(() => t('systemSettings.title')), { global: true })
 
-const form = ref({ orders_enabled: true, email_enabled: true, selfmonitor_enabled: false })
+const form = ref<SystemSettings>({ orders_enabled: true, email_enabled: true, selfmonitor_enabled: false })
 const alertMsg = ref('')
 const alertType = ref('info')
 const loading = ref(true)
 const isSaving = ref(false)
 
-const showAlert = (msg, type = 'info') => {
+const showAlert = (msg: string, type = 'info') => {
   alertMsg.value = msg
   alertType.value = type
 }
@@ -52,17 +52,17 @@ onMounted(async () => {
     await loadSettings()
     syncForm()
   } catch (err) {
-    showAlert(t('systemSettings.loadError') + err.message, 'error')
+    showAlert(t('systemSettings.loadError') + (err as Error).message, 'error')
   } finally {
     loading.value = false
   }
 })
 
-// save schickt nur geänderte Schalter (der PUT speichert nur
-// gesetzte Felder), damit das Audit-Log keine Scheinänderungen enthält. Ohne
-// Änderung ist nichts zu speichern.
+// save only sends changed switches (the PUT stores only the fields that are
+// set), so the audit log contains no phantom changes. Without a change there
+// is nothing to save.
 const save = async () => {
-  const patch = {}
+  const patch: Partial<SystemSettings> = {}
   for (const { field } of SECTIONS) {
     if (form.value[field] !== settings.value[field]) patch[field] = form.value[field]
   }
@@ -76,7 +76,7 @@ const save = async () => {
     syncForm()
     showAlert(t('systemSettings.saved'), 'success')
   } catch (err) {
-    showAlert(t('systemSettings.saveError') + err.message, 'error')
+    showAlert(t('systemSettings.saveError') + (err as Error).message, 'error')
   } finally {
     isSaving.value = false
   }
@@ -97,12 +97,12 @@ const save = async () => {
     <template v-else>
       <p v-if="loading" role="status" aria-busy="true" class="text-muted">{{ t('common.loading') }}</p>
 
-      <!-- Richtung C: Einstellungen in einer Karte, jeder Schalter ein Abschnitt (h4 unter dem Kartentitel). -->
+      <!-- Direction C: settings in one card, each switch a section (h4 below the card title). -->
       <ListCard v-else :title="t('systemSettings.cardTitle')" padded>
         <section v-for="section in SECTIONS" :id="`setting-${section.field}`" :key="section.field" :data-setting="section.field" class="setting">
           <h4 class="setting__title">{{ t(`systemSettings.${section.i18n}SectionTitle`) }}</h4>
           <p class="setting__text">{{ t(`systemSettings.${section.i18n}SectionDescription`) }}</p>
-          <OnyxCheckbox v-model="form[section.field]" :label="t(`systemSettings.${section.i18n}EnabledLabel`)" />
+          <OnyxCheckbox v-model="form[section.field]" :value="section.field" :label="t(`systemSettings.${section.i18n}EnabledLabel`)" />
         </section>
         <TranslationSettings @message="showAlert" />
         <div class="form-actions adm-actions-spaced">

@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Audit-Log (revisionssicherer Aktivitätsverlauf).
+  Audit log (tamper-proof activity history).
   Route:   { path: 'audit', component: AdminAuditLog }
   Backend: GET /api/admin/audit?page=&limit=&category=&q=   (handlers/audit.go)
-  Zugriff: nur Global-Admin (middleware.RequireGlobalAdmin()).
+  Access:  global admins only (middleware.RequireGlobalAdmin()).
 */
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -17,6 +17,7 @@ import SearchBox from '../../components/SearchBox.vue'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { toIntlLocale } from '../../utils/datetime'
 import { formatRelative } from '../../utils/relativeTime'
+import type { AuditEntry, AuditPage } from '../../types/admin'
 
 const { apiFetch } = useApi()
 const { t, te, locale } = useI18n()
@@ -30,7 +31,7 @@ const columns = computed(() => [
   { key: 'ip', label: t('auditLog.columnIp') },
 ])
 
-const items    = ref([])
+const items    = ref<AuditEntry[]>([])
 const total    = ref(0)
 const page     = ref(1)
 const limit    = 25
@@ -44,42 +45,42 @@ const CATS = computed(() => [
   { id: 'incident', label: t('auditLog.catIncident') },
   { id: 'config',   label: t('auditLog.catConfig') },
   { id: 'user',     label: t('auditLog.catUser') },
-  // Auch die übrigen vom Backend geschriebenen Kategorien
-  // (models.AuditCategories) haben einen Filter-Chip.
+  // The other categories the backend writes (models.AuditCategories)
+  // have a filter chip as well.
   { id: 'subscriber',  label: t('auditLog.catSubscriber') },
   { id: 'notice',      label: t('auditLog.catNotice') },
   { id: 'maintenance', label: t('auditLog.catMaintenance') },
   { id: 'system',      label: t('auditLog.catSystem') },
 ])
-// Stufe 4d: Die Kategoriefarben stehen als Klassen (cat--<id>) im
-// Style-Block auf Tokens, nicht mehr als Inline-Farbe; unbekannte Kategorien
-// bleiben neutral (cat--other).
-// Jede bekannte Kategorie hat einen Chip und eine übersetzte
-// Beschriftung; wirklich unbekannte (neuer Wert im Backend) zeigen den Rohwert.
-const catMeta = (id) => CATS.value.find(c => c.id === id) ?? { id: 'other', label: id }
+// Stage 4d: the category colours are classes (cat--<id>) in the style block
+// based on tokens, no longer inline colours; unknown categories stay neutral
+// (cat--other).
+// Every known category has a chip and a translated label; truly unknown ones
+// (a new value in the backend) show the raw value.
+const catMeta = (id: string) => CATS.value.find(c => c.id === id) ?? { id: 'other', label: id }
 
-// Die Aktion kommt als technischer Schlüssel ("subscriber.deleted")
-// aus dem Backend und wird über auditLog.actions.<Schlüssel> übersetzt;
-// unbekannte (neue) Aktionen zeigen weiter den Rohwert.
-const actionLabel = (action) => (action && te(`auditLog.actions.${action}`) ? t(`auditLog.actions.${action}`) : action)
+// The action arrives from the backend as a technical key ("subscriber.deleted")
+// and is translated via auditLog.actions.<key>; unknown (new) actions keep
+// showing the raw value.
+const actionLabel = (action: string) => (action && te(`auditLog.actions.${action}`) ? t(`auditLog.actions.${action}`) : action)
 
-const initials = (email) => (email || 'SY').replace(/@.*/, '').split(/[.\-_]/).map(s => s[0]).join('').slice(0, 2).toUpperCase()
-const isoTime = (unix) => (unix ? new Date(unix * 1000).toISOString() : undefined)
-const fmtTime = (unix) => unix ? new Date(unix * 1000).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'short', timeStyle: 'short' }) : '—'
+const initials = (email?: string) => (email || 'SY').replace(/@.*/, '').split(/[.\-_]/).map(s => s[0]).join('').slice(0, 2).toUpperCase()
+const isoTime = (unix: number) => (unix ? new Date(unix * 1000).toISOString() : undefined)
+const fmtTime = (unix: number) => unix ? new Date(unix * 1000).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'short', timeStyle: 'short' }) : '—'
 
-let debounce
+let debounce: ReturnType<typeof setTimeout> | undefined
 const load = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    const params = new URLSearchParams({ page: page.value, limit })
+    const params = new URLSearchParams({ page: String(page.value), limit: String(limit) })
     if (activeCat.value) params.set('category', activeCat.value)
     if (search.value)    params.set('q', search.value)
-    const data = await apiFetch(`/api/admin/audit?${params.toString()}`)
+    const data: AuditPage = await apiFetch(`/api/admin/audit?${params.toString()}`)
     items.value = data.items || []
     total.value = data.total || 0
   } catch (err) {
-    errorMsg.value = t('auditLog.loadError') + err.message
+    errorMsg.value = t('auditLog.loadError') + (err as Error).message
   } finally {
     loading.value = false
   }
@@ -88,7 +89,7 @@ onMounted(load)
 watch([activeCat, page], load)
 watch(search, () => { clearTimeout(debounce); debounce = setTimeout(() => { page.value = 1; load() }, 300) })
 
-const toggleCat = (id) => { activeCat.value = activeCat.value === id ? '' : id; page.value = 1 }
+const toggleCat = (id: string) => { activeCat.value = activeCat.value === id ? '' : id; page.value = 1 }
 const totalPages = () => Math.max(1, Math.ceil(total.value / limit))
 </script>
 
@@ -98,7 +99,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / limit))
 
     <div v-if="errorMsg" class="alert alert-error mb-16">{{ errorMsg }}</div>
 
-    <!-- Richtung C: Karte mit Suche und Kategorie-Filter im Kopf. -->
+    <!-- Direction C: card with search and category filter in the header. -->
     <ListCard :title="t('auditLog.cardTitle')">
       <template #tools>
         <SearchBox v-model="search" :label="t('auditLog.searchLabel')" :placeholder="t('auditLog.searchPlaceholder')" />
@@ -113,7 +114,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / limit))
         </div>
       </template>
 
-      <!-- Tabelle (ab 860 px) / Karten (darunter) -->
+      <!-- Table (from 860 px) / cards (below) -->
       <ListState v-if="items.length === 0" :loading="loading" :error="!!errorMsg" :count="0" :empty-text="t('auditLog.empty')" icon="clock" />
       <ResponsiveTable v-else data-table :columns="columns" :items="items" row-key="id">
         <template #cell-created_at="{ item }">
@@ -167,8 +168,8 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / limit))
 .time-cell { display: flex; flex-direction: column; gap: 2px; white-space: nowrap; }
 .time-cell__rel { font-size: var(--fs-xs); color: var(--text-2); }
 
-/* Kategorien: je ein Status-Ton (Text + weiche Fläche) aus den Tokens. Der
-   Text steht immer im Chip bzw. in der Pille, die Farbe ist nur Zusatz. */
+/* Categories: one status tone each (text + soft fill) from the tokens. The
+   text is always in the chip or pill; the colour is only an addition. */
 .cat--auth     { --cat-text: var(--maint-text);   --cat-soft: var(--maint-soft); }
 .cat--incident { --cat-text: var(--major-text);   --cat-soft: var(--major-soft); }
 .cat--config   { --cat-text: var(--primary-text); --cat-soft: var(--primary-soft); }

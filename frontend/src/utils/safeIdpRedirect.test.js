@@ -27,7 +27,7 @@ describe('safeIdpRedirect', () => {
     undefined,
     42,
     { href: 'https://idp.example.com' },
-    { toString: () => 'https://idp.example.com/authorize' }, // würde von new URL() zur Zeichenkette gemacht
+    { toString: () => 'https://idp.example.com/authorize' }, // new URL() would turn it into a string
   ])('lehnt %j ab', (value) => {
     expect(safeIdpRedirect(value)).toBeNull()
   })

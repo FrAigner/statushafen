@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -37,16 +37,27 @@ import StatusBadge from '../../components/StatusBadge.vue'
 import { maintenanceBadge } from '../../utils/badgeStatus'
 import { isResolvedStatus } from '../../utils/incidentStatus'
 import { incidentListUrl, mergeIncidents, ADMIN_PAGE_SIZE } from '../../utils/incidentPaging'
+import type { ComponentTreeNode, FlatComponent } from '../../utils/componentTree'
+import type { IncidentResponse } from '../../types/api'
+import type { IncidentForm } from '../../types/admin'
 
-// Wartungsfenster: nutzt dieselben Backend-Endpunkte wie
-// Incidents (models.Incident mit IsMaintenance=true), aber eigener
-// Admin-Menüpunkt/eigene Liste (?is_maintenance=true), da Status hier
-// automatisch vom Scheduler verwaltet wird statt manuell.
+type ReminderUnit = 'minutes' | 'hours' | 'days'
+
+/** Edit form: the incident form plus the reminder lead time as value and unit. */
+interface MaintenanceForm extends IncidentForm {
+  reminderValue?: number | string
+  reminderUnit?: ReminderUnit
+}
+
+// Maintenance windows: use the same backend endpoints as incidents
+// (models.Incident with IsMaintenance=true), but their own admin menu
+// item/list (?is_maintenance=true), as the status here is managed
+// automatically by the scheduler instead of manually.
 
 const { apiFetch } = useApi()
 const { hasPerm }  = useAuth()
-// Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
-// Eintrag schreibgeschützt (formReadOnly), ohne Löschen entfällt der Eintrag im Zeilenmenü.
+// Permissions of this tab per action. Without update an existing entry opens
+// read-only (formReadOnly); without delete the row menu entry is gone.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('maintenance')
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const { activeTenantId } = useTenant()
@@ -55,10 +66,10 @@ const { t, locale } = useI18n()
 const { formEl, errors, focusForm, clearErrors, clearError, validateRequired } = useFormPanel()
 const breadcrumbs = usePageCrumbs(() => t('maintenance.title'))
 
-const formData       = ref({})
+const formData       = ref<MaintenanceForm>({})
 
-// Sprachumschalter über Titel und Nachricht (weitere Sprachen der Seite).
-// Übersetzungen folgen dem Recht „Ändern“ des Tabs.
+// Language switcher above title and message (further languages of the page).
+// Translations follow the tab's "update" permission.
 const trans = useFormTranslations({
   apiFetch,
   urls: { list: (id) => `/api/incidents/${id}/translations/all`, save: (id, code) => `/api/incidents/${id}/translations/${code}` },
@@ -68,20 +79,20 @@ const trans = useFormTranslations({
 })
 const { showSwitcher, onDefaultLang, titleModel, contentModel: messageModel, active: activeLang } = trans
 
-const items          = ref([])
-const components     = ref([])
+const items          = ref<IncidentResponse[]>([])
+const components     = ref<FlatComponent[]>([])
 const { availableTags, canSelectTags, loadAvailableTags } = useAvailableTags(apiFetch, activeTenantId)
 const isEditing      = ref(false)
-const currentEditId  = ref(null)
+const currentEditId  = ref<number | null>(null)
 const forbidden      = ref(false)
 const loading        = ref(false)
 const loadFailed     = ref(false)
 const alertMsg       = ref('')
 const alertType      = ref('warning')
 const isSaving       = ref(false)
-const deletingId     = ref(null)
+const deletingId     = ref<number | null>(null)
 
-// Richtung C: Titel des Formulars nennt das Wartungsfenster, nicht die ID.
+// Direction C: the form title names the maintenance window, not the ID.
 const formTitle = computed(() => currentEditId.value
   ? t('maintenance.editTitle', { name: formData.value.Title })
   : t('maintenance.createTitle'))
@@ -91,9 +102,9 @@ const reminderUnitOptions = computed(() => [
   { label: t('maintenance.reminderHours'),  value: 'hours' },
   { label: t('maintenance.reminderDays'),     value: 'days' },
 ])
-const unitToMinutes = { minutes: 1, hours: 60, days: 1440 }
+const unitToMinutes: Record<ReminderUnit, number> = { minutes: 1, hours: 60, days: 1440 }
 
-// Stufe 4b: ResponsiveTable/dataTable, Status als StatusBadge.
+// Stage 4b: ResponsiveTable/dataTable, status as a StatusBadge.
 const columns = computed(() => [
   { key: 'Title', label: t('maintenance.tableTitle') },
   { key: 'Components', label: t('maintenance.tableComponents') },
@@ -101,10 +112,10 @@ const columns = computed(() => [
   { key: 'ScheduledStartAt', label: t('maintenance.tableStart') },
   { key: 'ScheduledEndAt', label: t('maintenance.tableEnd') },
 ])
-const componentNames = (item) => (item.Components || []).map(c => c.Name).join(', ') || '—'
+const componentNames = (item: IncidentResponse) => (item.Components || []).map(c => c.Name).join(', ') || '—'
 
-/* ── Liste: Suche und Zustandsfilter im Kartenkopf ── */
-const isUpcoming = (item) => item.Status === 'scheduled' || item.Status === 'in_progress'
+/* ── List: search and state filter in the card header ── */
+const isUpcoming = (item: IncidentResponse) => item.Status === 'scheduled' || item.Status === 'in_progress'
 const { query, filter, rows, searching } = useListQuery(items, {
   textOf: item => `${item.Title} ${item.Message || ''} ${componentNames(item)}`,
   predicates: { upcoming: isUpcoming, resolved: item => isResolvedStatus(item.Status) },
@@ -121,18 +132,18 @@ const subtitle = computed(() => t('maintenance.subtitle', {
 }))
 
 /* ── Data loading ── */
-// Der Server liefert höchstens 200 Einträge je Aufruf; „Weitere laden“ holt die
-// nächsten und hängt sie an (schon vorhandene IDs bleiben).
+// The server returns at most 200 entries per call; "Load more" fetches the
+// next ones and appends them (IDs already present stay).
 const hasMore = ref(false)
 const loadingMore = ref(false)
 const loadMore = async () => {
   loadingMore.value = true
   try {
-    const batch = await apiFetch(incidentListUrl(activeTenantId.value, { maintenance: true, limit: ADMIN_PAGE_SIZE, offset: items.value.length }))
+    const batch: IncidentResponse[] = await apiFetch(incidentListUrl(activeTenantId.value!, { maintenance: true, limit: ADMIN_PAGE_SIZE, offset: items.value.length }))
     items.value = mergeIncidents(items.value, batch)
     hasMore.value = batch.length >= ADMIN_PAGE_SIZE
   } catch (err) {
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   } finally {
     loadingMore.value = false
   }
@@ -144,30 +155,30 @@ const loadData = async () => {
   loading.value = true
   try {
     const [incs, comps] = await Promise.all([
-      apiFetch(incidentListUrl(activeTenantId.value, { maintenance: true, limit: ADMIN_PAGE_SIZE })),
-      apiFetch(`/api/pages/${activeTenantId.value}/components`)
+      apiFetch<IncidentResponse[] | null>(incidentListUrl(activeTenantId.value!, { maintenance: true, limit: ADMIN_PAGE_SIZE })),
+      apiFetch<ComponentTreeNode[]>(`/api/pages/${activeTenantId.value}/components`)
     ])
     items.value      = incs ?? []
     hasMore.value    = (incs ?? []).length >= ADMIN_PAGE_SIZE
-    components.value = flattenComponentTree(comps) // inkl. Unterkomponenten
+    components.value = flattenComponentTree(comps) // including subcomponents
   } catch (err) {
-    // 403 -> Berechtigungsmeldung statt Ladefehler-Alert.
+    // 403 -> permission notice instead of a load error alert.
     if (isForbidden(err)) forbidden.value = true
     else {
       loadFailed.value = true
-      showAlert(t('common.loadError') + err.message, 'error')
+      showAlert(t('common.loadError') + (err as Error).message, 'error')
     }
   } finally {
     loading.value = false
   }
-  // Tags nur für Global Admins (siehe useAvailableTags).
+  // Tags only for global admins (see useAvailableTags).
   await loadAvailableTags()
 
-  // Vorlagen gehören zur incident_templates:read-Berechtigung und werden deshalb
-  // separat geladen (siehe useIncidentTemplates), damit ein 403 hier nicht
-  // das eigentliche Laden der Wartungsfenster-Liste mitreißt.
+  // Templates belong to the incident_templates:read permission and are therefore
+  // loaded separately (see useIncidentTemplates), so that a 403 here does not
+  // drag down loading the maintenance window list itself.
   await loadTemplates(apiFetch, activeTenantId.value, hasPerm)
-  await trans.load(activeTenantId.value)
+  await trans.load(activeTenantId.value!)
 }
 
 watch(activeTenantId, (newId) => {
@@ -177,9 +188,9 @@ watch(activeTenantId, (newId) => {
 }, { immediate: true })
 
 /* ── CRUD helpers ── */
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value  = msg
   alertType.value = type
 }
@@ -203,31 +214,31 @@ const openNew = () => {
   focusForm()
 }
 
-// "Vorlage verwenden": befüllt Titel/Message/Komponenten aus der
-// gewählten Vorlage vor, bleibt danach frei editierbar. Das exakte Datum
-// (ScheduledStartAt/ScheduledEndAt) wird bewusst NICHT aus der Vorlage
-// übernommen, sondern bleibt immer frisch zu setzen.
+// "Use template": prefills title/message/components from the chosen template;
+// stays freely editable afterwards. The exact date (ScheduledStartAt/
+// ScheduledEndAt) is deliberately NOT taken from the template but always has
+// to be set fresh.
 const applyTemplate = async () => {
   const tpl = selectedTemplate()
   if (!tpl) return
   formData.value.Title   = tpl.Title
   formData.value.Message = tpl.Message
   formData.value.ComponentIDs = (tpl.ComponentIDs || '').split(',').filter(Boolean)
-  // Texte der weiteren Sprachen aus der Vorlage mit übernehmen (nur bei Sprachumschalter).
+  // Also take over the texts of the further languages from the template (only with the language switcher).
   if (showSwitcher.value) {
     const rows = await loadTemplateTranslations(apiFetch, activeTenantId.value, tpl.ID)
     if (selectedTemplateId.value === String(tpl.ID)) trans.setFromRows(rows)
   }
 }
 
-const onTemplateChange = (event) => {
-  selectedTemplateId.value = event.target.value
+const onTemplateChange = (event: Event) => {
+  selectedTemplateId.value = (event.target as HTMLSelectElement).value
   applyTemplate()
 }
 
-const openEdit = (item) => {
+const openEdit = (item: IncidentResponse) => {
   let reminderValue = item.ReminderLeadMinutes || 0
-  let reminderUnit = 'minutes'
+  let reminderUnit: ReminderUnit = 'minutes'
   if (reminderValue > 0 && reminderValue % 1440 === 0) { reminderValue /= 1440; reminderUnit = 'days' }
   else if (reminderValue > 0 && reminderValue % 60 === 0) { reminderValue /= 60; reminderUnit = 'hours' }
 
@@ -260,8 +271,8 @@ const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onStart
 const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadData, onStart: clearAlert, onDeleted: () => showAlert(t('adminFeedback.deleted'), 'success'), onError: (err) => showAlert(t('common.deleteError') + err.message, 'error') })
 
 const saveItem = async () => {
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste.
-  const required = (key, value, labelKey) =>
+  // Required fields: error at the field instead of a server error, focus on the first one.
+  const required = (key: string, value: unknown, labelKey: string) =>
     ({ key, value, message: t('patterns.fieldRequired', { field: t(labelKey) }) })
   const valid = await validateRequired([
     required('Title', formData.value.Title, 'maintenance.fieldTitle'),
@@ -271,7 +282,7 @@ const saveItem = async () => {
     required('ComponentIDs', formData.value.ComponentIDs, 'maintenance.fieldComponents'),
   ])
   if (!valid) {
-    activeLang.value = '' // die Pflichtfelder gehören zur Standardsprache
+    activeLang.value = '' // the required fields belong to the default language
     return
   }
   if (!trans.checkComplete(showAlert)) return
@@ -280,14 +291,14 @@ const saveItem = async () => {
     ? `/api/pages/${activeTenantId.value}/incidents`
     : `/api/pages/${activeTenantId.value}/incidents/${currentEditId.value}`
 
-  const payload = { ...formData.value }
-  payload.ComponentIDs = formData.value.ComponentIDs.map(id => parseInt(id))
+  const payload: Record<string, unknown> = { ...formData.value }
+  payload.ComponentIDs = formData.value.ComponentIDs!.map(id => parseInt(id))
   payload.IsMaintenance = true
-  payload.ReminderLeadMinutes = (Number(formData.value.reminderValue) || 0) * unitToMinutes[formData.value.reminderUnit]
+  payload.ReminderLeadMinutes = (Number(formData.value.reminderValue) || 0) * unitToMinutes[formData.value.reminderUnit!]
   payload.ScheduledStartAt = formData.value.ScheduledStartAt ? new Date(formData.value.ScheduledStartAt).toISOString() : null
   payload.ScheduledEndAt   = formData.value.ScheduledEndAt   ? new Date(formData.value.ScheduledEndAt).toISOString()   : null
   if (!isNew) {
-    // Status wird vom Scheduler verwaltet - unverändert mitsenden (required, s. UpdateIncidentHandler).
+    // The status is managed by the scheduler - send it unchanged (required, see UpdateIncidentHandler).
     payload.status = formData.value.Status
     payload.title = formData.value.Title
     payload.message = formData.value.Message
@@ -296,27 +307,27 @@ const saveItem = async () => {
     payload.Message = formData.value.Message
   }
 
-  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved) => {
-    // Neue ID merken, bevor Übersetzungen folgen: scheitert eine, legt ein zweiter Versuch keinen zweiten Eintrag an.
+  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved: { ID?: number } | null) => {
+    // Remember the new ID before translations follow: if one fails, a second attempt does not create a second entry.
     if (isNew && saved?.ID) currentEditId.value = saved.ID
-    if (showSwitcher.value) await trans.saveAll(currentEditId.value)
+    if (showSwitcher.value) await trans.saveAll(currentEditId.value!)
     showAlert(isNew ? t('maintenance.created') : t('common.changesSaved'), 'success')
     cancelEdit()
   })
 }
 
-const deleteItem = (id, name) =>
+const deleteItem = (id: number, name: string) =>
   deleteAction(`/api/pages/${activeTenantId.value}/incidents/${id}`, id, t('maintenance.confirmDelete', { name }))
 
-const formatDate = (d) => formatDateTimeShort(d, locale.value)
+const formatDate = (d: string | null | undefined) => formatDateTimeShort(d, locale.value)
 
-// Zeilenmenü: Bearbeiten nur für geplante Fenster (wie zuvor der Bearbeiten-Knopf).
-const menuItems = (item) => [
-  // Bearbeiten nur für geplante Fenster; wer nicht ändern darf, kann jedes Fenster ansehen.
+// Row menu: edit only for scheduled windows (like the former edit button).
+const menuItems = (item: IncidentResponse) => [
+  // Edit only for scheduled windows; whoever may not update can view every window.
   ...(item.Status === 'scheduled' || !canUpdate.value ? [{ key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' }] : []),
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === item.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === item.ID }] : []),
 ]
-const onMenuSelect = (item, key) => {
+const onMenuSelect = (item: IncidentResponse, key: string) => {
   if (key === 'edit') openEdit(item)
   else deleteItem(item.ID, item.Title)
 }
@@ -339,7 +350,7 @@ const onMenuSelect = (item, key) => {
 
     <ForbiddenNotice v-if="forbidden" />
 
-    <!-- Richtung C: Liste und Formular nebeneinander (unter 860 px untereinander). -->
+    <!-- Direction C: list and form side by side (stacked below 860 px). -->
     <div v-else class="split" :class="{ 'split--open': isEditing }">
       <ListCard :title="t('maintenance.cardTitle')" class="split__main">
         <template #tools>
@@ -357,7 +368,7 @@ const onMenuSelect = (item, key) => {
           <template #cell-Status="{ item }">
             <StatusBadge :status="maintenanceBadge(item.Status, t).status" :label="maintenanceBadge(item.Status, t).label" />
           </template>
-          <!-- Geplante Zeitpunkte bleiben absolut: „vor 3 Tagen“ sagt hier nichts über das Fenster. -->
+          <!-- Scheduled times stay absolute: "3 days ago" says nothing about the window here. -->
           <template #cell-ScheduledStartAt="{ item }"><span class="cell-changed">{{ formatDate(item.ScheduledStartAt) }}</span></template>
           <template #cell-ScheduledEndAt="{ item }"><span class="cell-changed">{{ formatDate(item.ScheduledEndAt) }}</span></template>
           <template #actions="{ item }">
@@ -394,8 +405,8 @@ const onMenuSelect = (item, key) => {
 
           <FormLanguageDone :trans="trans" />
 
-          <!-- Mehrfachauswahl im FormField-Muster (Label-Verknüpfung,
-               Pflichtfeld-Fehler am Feld). -->
+          <!-- Multi-select in the FormField pattern (label association,
+               required-field error at the field). -->
           <FormMultiSelect
             v-model="formData.ComponentIDs"
             :label="t('maintenance.fieldComponents')"
@@ -406,7 +417,7 @@ const onMenuSelect = (item, key) => {
             @update:model-value="clearError('ComponentIDs')"
           />
 
-          <TagField v-if="canSelectTags" v-help="'maintenance.tags'" :label="t('maintenance.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
+          <TagField v-if="canSelectTags" v-help="'maintenance.tags'" :label="t('maintenance.fieldTags')" :tags="availableTags" :selected-ids="formData.TagIDs!" @toggle="toggleTag" />
 
           <div class="form-grid">
             <FormField v-slot="f" required :label="t('maintenance.fieldStart')" help="maintenance.start" :error="errors.ScheduledStartAt || null">

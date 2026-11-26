@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { BRAND_ON_PRIMARY, BRAND_SECONDARY_BACKGROUNDS } from './brandContrast'
 
-// 4a: Die Rechengrundlagen für den Marken-Kontrast müssen den
-// Tokens der Ebene „public“ entsprechen, sonst prüft ensureContrast gegen die
-// falsche Fläche.
+// 4a: the calculation inputs for the brand contrast must match the
+// tokens of the "public" layer, otherwise ensureContrast checks against the
+// wrong surface.
 const css = readFileSync(resolve(__dirname, '../assets/tokens.css'), 'utf-8')
 
 const tokenIn = (block, name) => block.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1].toLowerCase()
@@ -13,9 +13,9 @@ const lightBlock = css.slice(css.indexOf(':root,\n.theme-public {'), css.indexOf
 const darkBlock = css.slice(css.indexOf('html[data-theme="dark"],\nhtml[data-theme="dark"] .theme-public {'), css.indexOf('/* ── 3.'))
 
 describe('brandContrast', () => {
-  // Die Beschreibung (--text-secondary) steht im Hero auf den getönten
-  // Statusflächen (-soft), nicht nur auf --surface; die Markenfarbe wurde nur gegen
-  // --surface geprüft und lag dunkel auf --ok-soft bei 4,32:1.
+  // The description (--text-secondary) sits in the hero on the tinted
+  // status surfaces (-soft), not only on --surface; the brand colour was only checked against
+  // --surface and, when dark, sat on --ok-soft at 4.32:1.
   const expected = (block) => ['--surface', '--surface-2', '--ok-soft', '--deg-soft', '--part-soft', '--major-soft', '--maint-soft']
     .map(name => tokenIn(block, name))
 

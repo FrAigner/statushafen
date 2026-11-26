@@ -107,7 +107,7 @@ Mutation tests run nightly (`.github/workflows/mutation-nachts.yml`): backend wi
 - **Logging:** never log secrets. Use `logging.New`/`logging.Init`, not a raw `slog` handler. New log
   calls with HTTP errors, SQL or user input need a test with a secret as input that checks it does not
   appear in the log buffer. The access log contains only the path, never query string, headers or body.
-- **Formatted texts** are a restricted Markdown subset (`backend/richtext`, `frontend/src/utils/richText.js`);
+- **Formatted texts** are a restricted Markdown subset (`backend/richtext`, `frontend/src/utils/richText.ts`);
   new places that store messages need the same length check (`requireMessageLength`).
 - **Workflows:** only GitHub-hosted runners, every third-party action pinned by commit SHA, explicit
   `permissions` on every job and `persist-credentials: false` on every checkout

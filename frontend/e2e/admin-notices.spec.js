@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe visual.spec.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see visual.spec.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Admin Notices (General Notices)', () => {
@@ -11,15 +11,15 @@ test.describe('Admin Notices (General Notices)', () => {
     await page.locator('button.btn-login').click();
     await expect(page).toHaveURL(/\/admin\/overview/);
 
-    // Auf TechStart umschalten, damit die spätere öffentliche Prüfung unter
-    // techstart.localhost zur selben Statusseite gehört (siehe admin-maintenance.spec.js).
+    // Switch to TechStart so the later public check under
+    // techstart.localhost belongs to the same status page (see admin-maintenance.spec.js).
     await page.goto(`http://techstart.localhost:${PORT}/admin/notices`);
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200),
       page.locator('.tenant-select').selectOption({ label: 'TechStart GmbH' }),
     ]);
-    // Erst weitermachen, wenn der Wechsel komplett durch ist; sonst setzt das Nachladen
-    // der Liste ein schon geöffnetes Formular zurück.
+    // Only continue once the switch is complete; otherwise reloading the list
+    // resets an already opened form.
     await expect(page.getByRole('navigation', { name: 'Brotkrumen' })).toContainText('TechStart GmbH');
     await page.waitForLoadState('networkidle');
   });
@@ -35,15 +35,15 @@ test.describe('Admin Notices (General Notices)', () => {
     const row = page.locator('tr', { hasText: title });
     await expect(row).toBeVisible();
 
-    // Aufräumen
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Clean up
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await row.locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await row.getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
@@ -57,7 +57,7 @@ test.describe('Admin Notices (General Notices)', () => {
     await page.locator('input[placeholder*="Wartungsrichtlinie"]').fill(title);
     await page.locator('textarea').fill('Diese Ankündigung sollte zunächst eingeklappt sein.');
 
-    // "Eingeklappt anzeigen" Checkbox aktivieren
+    // Enable the "Eingeklappt anzeigen" (show collapsed) checkbox
     await page.locator('label', { hasText: 'Eingeklappt anzeigen' }).click();
 
     await page.locator('button', { hasText: 'Speichern' }).click();
@@ -66,33 +66,33 @@ test.describe('Admin Notices (General Notices)', () => {
     await page.goto(`http://techstart.localhost:${PORT}/`);
     await expect(page.locator('h2', { hasText: 'Ankündigungen' })).toBeVisible();
 
-    // Die Notice selbst darf noch nicht sichtbar sein, nur der aufklappbare
-    // Sammel-Header
+    // The notice itself must not be visible yet, only the expandable
+    // summary header
     const toggle = page.locator('.notice-collapsed-toggle');
     await expect(toggle).toBeVisible();
     await expect(page.locator('.notice-card', { hasText: title })).not.toBeVisible();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
-    // Aufklappen
+    // Expand
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const card = page.locator('.notice-card', { hasText: title });
     await expect(card).toBeVisible();
 
-    // Wieder einklappen
+    // Collapse again
     await toggle.click();
     await expect(card).not.toBeVisible();
 
-    // Aufräumen
+    // Clean up
     await page.goto(`http://techstart.localhost:${PORT}/admin/notices`);
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await page.locator('tr', { hasText: title }).locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await page.locator('tr', { hasText: title }).getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);

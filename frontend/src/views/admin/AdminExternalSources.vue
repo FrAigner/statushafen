@@ -1,14 +1,14 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Admin-Seite „Externe Quellen“ (Richtung C, Lagebild).
-  Fremde Statusseiten (Summary-API v2) verwalten, ihre Bausteine und
-  Gruppen mit eigenen Komponenten koppeln und die gespiegelten Vorfälle und
-  Wartungen ansehen. Alles läuft gegen die vorhandene API unter
-  /api/pages/:page_id/external-* (Lesen components:read, Ändern
-  components:write); die Mandantentrennung erledigt das Backend, die Seite
-  lädt nur für die aktive Statusseite und neu beim Mandantenwechsel.
-  Texte der Fremdseite (Titel, Update-Texte, Fehler) werden nur als Text
-  ausgegeben, nie als HTML (siehe white-space-Regel im Style).
+  Admin page "External sources" (direction C, situation overview).
+  Manage external status pages (Summary API v2), link their components and
+  groups with own components, and view the mirrored incidents and
+  maintenances. Everything runs against the existing API under
+  /api/pages/:page_id/external-* (read components:read, update
+  components:write); the backend handles tenant separation, the page only
+  loads for the active status page and reloads on a tenant switch.
+  Texts of the external page (titles, update texts, errors) are only output
+  as text, never as HTML (see the white-space rule in the style).
 */
 import { ref, computed, watch, nextTick } from 'vue'
 import { OnyxButton } from 'sit-onyx'
@@ -38,6 +38,15 @@ import { flattenComponentTree, componentOptions } from '../../utils/componentTre
 import { formatRelative } from '../../utils/relativeTime'
 import { normalizeStatus } from '../../utils/status'
 import { confirmDialog } from '../../composables/useConfirm'
+import type { ComponentTreeNode, FlatComponent } from '../../utils/componentTree'
+import type { ExternalIncident, ExternalIncidentUpdate } from '../../types/api'
+import type { ExternalImportResponse, ExternalLink, ExternalSource, ExternalSourceComponent, ExternalSourceForm } from '../../types/admin'
+
+/** A mirrored incident as the admin list loads it: updates and affected components are always lists. */
+interface AdminExternalIncident extends Omit<ExternalIncident, 'updates' | 'affected_components'> {
+  updates: ExternalIncidentUpdate[]
+  affected_components: { id: number, name: string }[]
+}
 
 const { apiFetch } = useApi()
 const { hasPerm } = useAuth()
@@ -47,14 +56,14 @@ const { availableTags, canSelectTags, loadAvailableTags } = useAvailableTags(api
 
 const DEFAULT_POLL_SECONDS = 120
 const DEFAULT_OUTAGE_MINUTES = 60
-// Obergrenze des Backends pro Übernahme (handlers/external_import.go).
+// Upper limit of the backend per import (handlers/external_import.go).
 const MAX_IMPORT_ITEMS = 200
 
-const sources = ref([])
-const links = ref([])
-const ownComponents = ref([])
-const ownGroups = ref([])
-const incidents = ref([])
+const sources = ref<ExternalSource[]>([])
+const links = ref<ExternalLink[]>([])
+const ownComponents = ref<FlatComponent[]>([])
+const ownGroups = ref<FlatComponent[]>([])
+const incidents = ref<AdminExternalIncident[]>([])
 const loading = ref(true)
 const loadFailed = ref(false)
 const incidentsFailed = ref(false)
@@ -62,27 +71,27 @@ const forbidden = ref(false)
 const alertMsg = ref('')
 const alertType = ref('warning')
 
-// Rechte je Aktion (vorher ein gemeinsames components:write).
-// Fetch ("Jetzt abrufen") ist Ändern; Übernehmen legt eigene Komponenten an und
-// braucht deshalb zusätzlich components:create.
+// Permissions per action (previously one shared components:write).
+// Fetch ("Fetch now") is update; import creates own components and therefore
+// additionally needs components:create.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('external_sources')
 const canImport = computed(() => canCreate.value && hasPerm('components:create'))
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const base = computed(() => `/api/pages/${activeTenantId.value}`)
 
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value = msg
   alertType.value = type
 }
 
-/* ── Seitenkopf ── */
+/* ── Page header ── */
 const breadcrumbs = usePageCrumbs(() => t('externalSources.title'))
 
-/* ── Kennzahlen ── */
+/* ── Key figures ── */
 const outageCount = computed(() => sources.value.filter(s => s.active && s.outage?.active).length)
 const openIncidentCount = computed(() => incidents.value.filter(i => !i.closed).length)
 
-/* ── Laden ── */
+/* ── Loading ── */
 const loadIncidents = async () => {
   incidentsFailed.value = false
   const params = new URLSearchParams({ limit: '100' })
@@ -90,7 +99,7 @@ const loadIncidents = async () => {
   if (filter.value.state) params.set('state', filter.value.state)
   if (filter.value.sourceId) params.set('source_id', filter.value.sourceId)
   try {
-    incidents.value = (await apiFetch(`${base.value}/external-incidents?${params}`)) || []
+    incidents.value = (await apiFetch<AdminExternalIncident[] | null>(`${base.value}/external-incidents?${params}`)) || []
   } catch {
     incidentsFailed.value = true
   }
@@ -101,25 +110,25 @@ const loadData = async () => {
   loadFailed.value = false
   try {
     const [s, l, c] = await Promise.all([
-      apiFetch(`${base.value}/external-sources`),
-      apiFetch(`${base.value}/external-links`),
-      apiFetch(`${base.value}/components`),
+      apiFetch<ExternalSource[] | null>(`${base.value}/external-sources`),
+      apiFetch<ExternalLink[] | null>(`${base.value}/external-links`),
+      apiFetch<ComponentTreeNode[]>(`${base.value}/components`),
     ])
     sources.value = s || []
     links.value = l || []
-    // Reine Gruppen lassen sich nicht koppeln (Backend: 400), nur ihre Kinder.
+    // Pure groups cannot be linked (backend: 400), only their children.
     const flat = flattenComponentTree(c)
     ownComponents.value = flat.filter(x => !x.IsGroup)
-    // Zielgruppen der Übernahme (eingerückt nach Baumtiefe).
+    // Target groups of the import (indented by tree depth).
     ownGroups.value = flat.filter(x => x.IsGroup)
-    // Tags nur für Global Admins (siehe useAvailableTags).
+    // Tags only for global admins (see useAvailableTags).
     await loadAvailableTags()
   } catch (err) {
-    // 403 -> Berechtigungsmeldung statt Ladefehler-Alert.
+    // 403 -> permission notice instead of a load error alert.
     if (isForbidden(err)) forbidden.value = true
     else {
       loadFailed.value = true
-      showAlert(t('common.loadError') + err.message, 'error')
+      showAlert(t('common.loadError') + (err as Error).message, 'error')
     }
   } finally {
     loading.value = false
@@ -127,13 +136,13 @@ const loadData = async () => {
   if (!forbidden.value) await loadIncidents()
 }
 
-/* ── Quellenliste ── */
-const intervalLabel = (seconds) => seconds % 60 === 0
+/* ── Source list ── */
+const intervalLabel = (seconds: number) => seconds % 60 === 0
   ? t('externalSources.everyMinutes', { n: seconds / 60 }, seconds / 60)
   : t('externalSources.everySeconds', { n: seconds }, seconds)
 
-// Zustand einer Quelle als Abzeichen: Form + Farbe + Text (nie nur Farbe).
-const sourceState = (s) => {
+// State of a source as a badge: shape + colour + text (never colour alone).
+const sourceState = (s: ExternalSource) => {
   if (!s.active) return { status: null, label: t('externalSources.stateInactive') }
   if (s.outage?.active) return { status: 'major', label: t('externalSources.stateOutage') }
   if (s.last_fetch_ok === false) return { status: 'degraded', label: t('externalSources.stateError') }
@@ -149,26 +158,26 @@ const sourceColumns = computed(() => [
   { key: 'links', label: t('externalSources.tableLinks'), numeric: true },
 ])
 
-const fetchingId = ref(null)
-const deletingId = ref(null)
+const fetchingId = ref<number | null>(null)
+const deletingId = ref<number | null>(null)
 
-const fetchNow = async (src) => {
+const fetchNow = async (src: ExternalSource) => {
   fetchingId.value = src.ID
   try {
-    const res = await apiFetch(`${base.value}/external-sources/${src.ID}/fetch`, { method: 'POST' })
+    const res: { result: { ok: boolean, error?: string } } = await apiFetch(`${base.value}/external-sources/${src.ID}/fetch`, { method: 'POST' })
     const r = res.result
     if (r.ok) showAlert(t('externalSources.fetchOk', { name: src.name }), 'success')
     else if (r.error === 'fetch_in_progress') showAlert(t('externalSources.fetchBusy', { name: src.name }), 'warning')
     else showAlert(t('externalSources.fetchFailed', { name: src.name, error: r.error }), 'error')
     await loadData()
   } catch (err) {
-    showAlert(t('externalSources.fetchError') + err.message, 'error')
+    showAlert(t('externalSources.fetchError') + (err as Error).message, 'error')
   } finally {
     fetchingId.value = null
   }
 }
 
-const deleteSource = async (src) => {
+const deleteSource = async (src: ExternalSource) => {
   if (!(await confirmDialog({ message: t('externalSources.confirmDelete', { name: src.name }) }))) return
   deletingId.value = src.ID
   try {
@@ -177,29 +186,29 @@ const deleteSource = async (src) => {
     if (String(importSourceId.value) === String(src.ID)) importSourceId.value = ''
     await loadData()
   } catch (err) {
-    showAlert(t('common.deleteError') + err.message, 'error')
+    showAlert(t('common.deleteError') + (err as Error).message, 'error')
   } finally {
     deletingId.value = null
   }
 }
 
-const menuItems = (s) => [
+const menuItems = (s: ExternalSource) => [
   ...(canUpdate.value ? [{ key: 'fetch', label: fetchingId.value === s.ID ? t('externalSources.fetching') : t('externalSources.fetchNow'), icon: 'activity', disabled: fetchingId.value === s.ID }] : []),
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === s.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === s.ID }] : []),
 ]
-const onMenuSelect = (s, key) => {
+const onMenuSelect = (s: ExternalSource, key: string) => {
   if (key === 'fetch') fetchNow(s)
   else if (key === 'edit') openEdit(s)
   else deleteSource(s)
 }
 
-/* ── Formular: Quelle anlegen und bearbeiten ── */
+/* ── Form: create and edit a source ── */
 const isEditing = ref(false)
-const currentEditId = ref(null)
+const currentEditId = ref<number | null>(null)
 const editName = ref('')
-const formData = ref({})
-// Fokus und Pflichtfeld-Fehler aus dem gemeinsamen Baustein.
+const formData = ref<ExternalSourceForm>({})
+// Focus and required-field errors from the shared building block.
 const { formEl, errors, focusForm, clearErrors, clearError, validateRequired } = useFormPanel()
 const isSaving = ref(false)
 
@@ -216,7 +225,7 @@ const openNew = () => {
   focusForm()
 }
 
-const openEdit = (s) => {
+const openEdit = (s: ExternalSource) => {
   formData.value = {
     name: s.name,
     base_url: s.base_url,
@@ -238,8 +247,8 @@ const cancelEdit = () => {
   clearErrors()
 }
 
-// Pflichtfelder prüfen, bevor der Server gefragt wird; die Server-Prüfung
-// (SSRF-Schutz, Wertebereiche) bleibt maßgeblich und wird als Meldung gezeigt.
+// Check the required fields before asking the server; the server check
+// (SSRF protection, value ranges) stays authoritative and is shown as a message.
 const validate = () => validateRequired([
   { key: 'name', value: formData.value.name, message: t('externalSources.nameRequired') },
   { key: 'base_url', value: formData.value.base_url, message: t('externalSources.urlRequired') },
@@ -265,25 +274,25 @@ const saveSource = async () => {
     cancelEdit()
     await loadData()
   } catch (err) {
-    showAlert(t('common.saveError') + err.message, 'error')
+    showAlert(t('common.saveError') + (err as Error).message, 'error')
   } finally {
     isSaving.value = false
   }
 }
 
-/* ── Kopplungen ── */
+/* ── Links ── */
 const linkComponentId = ref('')
 const linkSourceId = ref('')
 const linkExternalId = ref('')
 const linkSearch = ref('')
-const externalComponents = ref([])
+const externalComponents = ref<ExternalSourceComponent[]>([])
 const externalLoading = ref(false)
 const externalFailed = ref(false)
 const isLinking = ref(false)
-const unlinkingId = ref(null)
+const unlinkingId = ref<number | null>(null)
 
-const fetchExternalList = async (sourceId) => {
-  const res = await apiFetch(`${base.value}/external-sources/${sourceId}/components`)
+const fetchExternalList = async (sourceId: string) => {
+  const res: { components?: ExternalSourceComponent[] } | null = await apiFetch(`${base.value}/external-sources/${sourceId}/components`)
   return res?.components || []
 }
 
@@ -303,21 +312,21 @@ const loadExternalComponents = async () => {
 }
 watch(linkSourceId, loadExternalComponents)
 
-// Auswahl: ganze Gruppen zuerst als „Gruppe“ gekennzeichnet, dann die
-// Bausteine mit ihrer Gruppe; die Suche filtert im Namen und im Gruppennamen.
+// Selection: whole groups first, marked as "group", then the components with
+// their group; the search filters by name and group name.
 const externalOptions = computed(() => {
   const needle = linkSearch.value.trim().toLowerCase()
-  const match = (c) => !needle || `${c.name} ${c.group_name}`.toLowerCase().includes(needle)
-  const label = (c) => c.is_group
+  const match = (c: ExternalSourceComponent) => !needle || `${c.name} ${c.group_name}`.toLowerCase().includes(needle)
+  const label = (c: ExternalSourceComponent) => c.is_group
     ? t('externalSources.optionGroup', { name: c.name })
     : (c.group_name ? `${c.group_name} › ${c.name}` : c.name)
   return externalComponents.value.filter(match).map(c => ({ value: String(c.ID), label: label(c) }))
 })
 
-// Hinweis unter einer Bausteinliste. Eine Quelle, die noch nie abgerufen wurde
-// (oder inaktiv ist), hat keine Bausteine - das ist kein Ladefehler, sondern
-// braucht erst einen Abruf bzw. die Aktivierung.
-const listHint = (sourceId, { loading, failed, empty }) => {
+// Hint below a component list. A source that has never been fetched (or is
+// inactive) has no components - that is not a load error but first needs a
+// fetch or activation.
+const listHint = (sourceId: string, { loading, failed, empty }: { loading: boolean, failed: boolean, empty: boolean }) => {
   if (loading) return t('common.loading')
   const src = sources.value.find(x => String(x.ID) === String(sourceId))
   if (src && (failed || empty) && (!src.last_fetch_at || !src.component_count)) {
@@ -330,7 +339,7 @@ const linkListHint = computed(() => listHint(linkSourceId.value, {
 }))
 
 const addLink = async () => {
-  const e = {}
+  const e: { linkComponent?: string, linkExternal?: string } = {}
   if (!linkComponentId.value) e.linkComponent = t('externalSources.linkComponentRequired')
   if (!linkExternalId.value) e.linkExternal = t('externalSources.linkExternalRequired')
   linkErrors.value = e
@@ -345,31 +354,31 @@ const addLink = async () => {
     linkExternalId.value = ''
     await loadData()
   } catch (err) {
-    showAlert(t('common.saveError') + err.message, 'error')
+    showAlert(t('common.saveError') + (err as Error).message, 'error')
   } finally {
     isLinking.value = false
   }
 }
-const linkErrors = ref({})
+const linkErrors = ref<{ linkComponent?: string, linkExternal?: string }>({})
 
-/* ── Bausteine übernehmen ── */
+/* ── Import components ── */
 const importSourceId = ref('')
-const importItems = ref([])
+const importItems = ref<ExternalSourceComponent[]>([])
 const importLoading = ref(false)
 const importFailed = ref(false)
 const importSearch = ref('')
-const importSelected = ref([])
+const importSelected = ref<string[]>([])
 const importTargetId = ref('')
-const importForm = ref({ TagIDs: [] })
+const importForm = ref<{ TagIDs: number[] }>({ TagIDs: [] })
 const toggleImportTag = useTagToggle(importForm)
 const importError = ref('')
 const isImporting = ref(false)
-const importResult = ref(null)
+const importResult = ref<{ created: number, skipped: { id: number, name: string, reason: string }[] } | null>(null)
 
-const isImportLinked = (c) => {
+const isImportLinked = (c: ExternalSourceComponent) => {
   if (c.linked_component_ids?.length) return true
   if (!c.is_group) return false
-  // Eine übernommene Gruppe wird selbst nicht gekoppelt, ihre Mitglieder schon.
+  // An imported group is not linked itself, but its members are.
   const members = importItems.value.filter(m => !m.is_group && m.group_external_id === c.external_id)
   return members.length > 0 && members.every(m => m.linked_component_ids?.length)
 }
@@ -416,7 +425,7 @@ const selectAllImport = () => {
 }
 const clearImport = () => { importSelected.value = [] }
 
-const listEl = ref(null)
+const listEl = ref<HTMLFieldSetElement | null>(null)
 const submitImport = async () => {
   importError.value = ''
   if (!importSourceId.value) {
@@ -433,10 +442,10 @@ const submitImport = async () => {
     importError.value = t('externalSources.importTooMany', { max: MAX_IMPORT_ITEMS })
     return
   }
-  const nameOf = (id) => importItems.value.find(c => c.ID === id)?.name || String(id)
+  const nameOf = (id: number) => importItems.value.find(c => c.ID === id)?.name || String(id)
   isImporting.value = true
   try {
-    const res = await apiFetch(`${base.value}/external-sources/${importSourceId.value}/import`, {
+    const res: ExternalImportResponse | null = await apiFetch(`${base.value}/external-sources/${importSourceId.value}/import`, {
       method: 'POST',
       body: JSON.stringify({
         external_component_ids: importSelected.value.map(Number),
@@ -451,21 +460,21 @@ const submitImport = async () => {
     await loadData()
     await loadImportItems()
   } catch (err) {
-    importError.value = t('externalSources.importError') + err.message
+    importError.value = t('externalSources.importError') + (err as Error).message
   } finally {
     isImporting.value = false
   }
 }
-const importReason = (reason) => t(`externalSources.importReason.${reason}`)
+const importReason = (reason: string) => t(`externalSources.importReason.${reason}`)
 
-const removeLink = async (link) => {
+const removeLink = async (link: ExternalLink) => {
   if (!(await confirmDialog({ message: t('externalSources.confirmUnlink', { component: link.component_name, external: link.external_component_name }), confirmLabel: t('confirm.unlink') }))) return
   unlinkingId.value = link.id
   try {
     await apiFetch(`${base.value}/external-links/${link.id}`, { method: 'DELETE' })
     await loadData()
   } catch (err) {
-    showAlert(t('common.deleteError') + err.message, 'error')
+    showAlert(t('common.deleteError') + (err as Error).message, 'error')
   } finally {
     unlinkingId.value = null
   }
@@ -478,14 +487,14 @@ const linkColumns = computed(() => [
   { key: 'status', label: t('externalSources.tableStatus') },
 ])
 
-// Fremdstatus: bekannte Stufen als Abzeichen, alles andere neutral „unbekannt“;
-// verschwundene Bausteine zählen nicht mehr und werden so gekennzeichnet.
-const externalStatusLabel = (item) => {
+// External status: known levels as a badge, everything else neutral "unknown";
+// vanished components no longer count and are marked as such.
+const externalStatusLabel = (item: ExternalLink) => {
   if (item.vanished) return t('externalSources.statusVanished')
   return normalizeStatus(item.status) ? undefined : t('externalSources.statusUnknown')
 }
 
-/* ── Gespiegelte Meldungen ── */
+/* ── Mirrored reports ── */
 const filter = ref({ kind: '', state: '', sourceId: '' })
 watch(filter, loadIncidents, { deep: true })
 
@@ -497,10 +506,10 @@ const incidentColumns = computed(() => [
   { key: 'updated_at', label: t('externalSources.tableChanged') },
 ])
 const incidentRows = computed(() => incidents.value.map(i => ({ ...i, key: i.id })))
-const kindLabel = (kind) => t(kind === 'maintenance' ? 'externalSources.kindMaintenance' : 'externalSources.kindIncident')
-const incidentStatusLabel = (i) => i.raw_status || i.status
+const kindLabel = (kind: string) => t(kind === 'maintenance' ? 'externalSources.kindMaintenance' : 'externalSources.kindIncident')
+const incidentStatusLabel = (i: AdminExternalIncident) => i.raw_status || i.status
 
-// Laden der Seite beim Mandantenwechsel.
+// Load the page on a tenant switch.
 watch(activeTenantId, (id) => {
   if (!id) return
   loading.value = true
@@ -536,7 +545,7 @@ watch(activeTenantId, (id) => {
       <div class="split" :class="{ 'split--open': isEditing }">
         <div class="split__main ext-stack">
 
-          <!-- Quellen -->
+          <!-- Sources -->
           <ListCard :title="t('externalSources.cardSources')">
             <ResponsiveTable
               v-if="sources.length"
@@ -578,7 +587,7 @@ watch(activeTenantId, (id) => {
             <ListState v-else :loading="loading" :error="loadFailed" :count="sources.length" :empty-text="t('externalSources.empty')" icon="globe" />
           </ListCard>
 
-          <!-- Bausteine übernehmen -->
+          <!-- Import components -->
           <ListCard v-if="canImport && sources.length" :title="t('externalSources.cardImport')">
             <p class="ext-intro">{{ t('externalSources.importIntro') }}</p>
 
@@ -648,7 +657,7 @@ watch(activeTenantId, (id) => {
             </form>
           </ListCard>
 
-          <!-- Kopplungen -->
+          <!-- Links -->
           <ListCard :title="t('externalSources.cardLinks')">
             <p class="ext-intro">{{ t('externalSources.linksIntro') }}</p>
 
@@ -675,8 +684,8 @@ watch(activeTenantId, (id) => {
                 </select>
               </FormField>
               <div class="ext-link-form__actions">
-                <!-- Unsichtbare Beschriftung: setzt den Knopf auf die Höhe der Eingabefelder,
-                     auch wenn ein Feld darunter einen Hinweis zeigt. -->
+                <!-- Invisible label: puts the button at the height of the input fields,
+                     even when a field below shows a hint. -->
                 <span class="form-field__label ext-link-form__spacer" aria-hidden="true">&nbsp;</span>
                 <OnyxButton v-help="'externalSources.linkAdd'" :label="isLinking ? t('common.adding') : t('externalSources.linkButton')" type="submit" :disabled="isLinking" />
               </div>
@@ -708,7 +717,7 @@ watch(activeTenantId, (id) => {
             <ListState v-else :loading="loading" :error="loadFailed" :count="links.length" :empty-text="t('externalSources.linksEmpty')" icon="globe" />
           </ListCard>
 
-          <!-- Gespiegelte Meldungen -->
+          <!-- Mirrored reports -->
           <ListCard :title="t('externalSources.cardIncidents')">
             <p class="ext-intro">{{ t('externalSources.incidentsIntro') }}</p>
             <div class="ext-filters">
@@ -809,7 +818,7 @@ watch(activeTenantId, (id) => {
 .ext-stack { display: flex; flex-direction: column; gap: var(--sp-5); }
 .ext-intro { margin: 0; padding: 0 var(--sp-4) var(--sp-3); color: var(--text-2); font-size: var(--fs-sm); }
 .ext-name { display: flex; flex-direction: column; gap: 2px; min-inline-size: 0; }
-/* Texte der Fremdseite: nur Text, Umbrüche bleiben, lange URLs brechen um. */
+/* Texts of the external page: text only, line breaks stay, long URLs wrap. */
 .ext-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .ext-note { display: block; margin-top: 2px; color: var(--text-2); font-size: var(--fs-xs); }
 .ext-warning { display: inline-flex; align-items: center; gap: 4px; color: var(--deg-text); font-size: var(--fs-xs); }
@@ -822,7 +831,7 @@ watch(activeTenantId, (id) => {
 }
 .ext-link-form__actions { display: flex; flex-direction: column; gap: var(--sp-1); }
 .ext-link-form__spacer { line-height: 1.4; }
-/* Knopf so hoch wie die Eingabefelder (--ctl-h), sonst steht er ein paar Pixel tiefer. */
+/* Button as tall as the input fields (--ctl-h), otherwise it sits a few pixels lower. */
 .ext-link-form__actions :deep(button) { block-size: var(--ctl-h); min-block-size: var(--ctl-h); }
 .ext-filters {
   display: grid;

@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import i18n from '../i18n'
 import QuickStatus from './QuickStatus.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 let wrapper = null
 
@@ -159,7 +159,7 @@ describe('QuickStatus: Öffnen und Schließen', () => {
     await nextTick()
     wrapper.unmount()
     wrapper = null
-    // Darf nach dem Abbau nichts mehr auslösen (keine Fehler).
+    // Must not trigger anything after unmounting (no errors).
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
   })
 })

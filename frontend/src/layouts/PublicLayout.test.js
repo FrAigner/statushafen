@@ -10,7 +10,7 @@ import { useCurrentPageSlug } from '../composables/useCurrentPageSlug'
 import { useLandingChrome } from '../composables/useLandingChrome'
 import PublicLayout from './PublicLayout.vue'
 import layoutSource from './PublicLayout.vue?raw'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const Empty = { template: '<div />' }
 
@@ -42,30 +42,30 @@ async function mountLayout(mountOptions = {}) {
 
 describe('PublicLayout', () => {
   beforeEach(() => {
-    // Das Layout lädt /api/me/pages selbst; ohne Stub ginge die Anfrage ins Leere.
+    // The layout loads /api/me/pages itself; without a stub the request would go nowhere.
     globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => [] }))
     useAuth().logout()
     useLandingChrome().isLanding.value = false
     useLandingChrome().ordersEnabled.value = true
     localStorage.clear()
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Menüpunkte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated menu items;
+    // without a stored preference detectInitialLocale() would otherwise fall back to 'en'
+    // in the test environment (happy-dom navigator.language === 'en-US').
     i18n.global.locale.value = 'de'
   })
 
-  // Die Token-Ebene „public“ (Richtung A, tokens.css) hängt an dieser Klasse.
+  // The "public" token layer (Direction A, tokens.css) hangs on this class.
   it('trägt die Token-Ebene theme-public am Wurzelelement, nicht theme-admin', async () => {
     const { wrapper } = await mountLayout()
     expect(wrapper.classes()).toContain('theme-public')
     expect(wrapper.classes()).not.toContain('theme-admin')
   })
 
-  // Regression 2026-10-29: Die Sprachauswahl war 28 statt 44 px hoch.
+  // Regression 2026-10-29: the language picker was 28 instead of 44 px high.
   // The layout's scoped attribute lands on the LanguageSwitcher root, not on
   // its trigger button, so a plain scoped rule never matches the button.
-  // happy-dom rechnet kein Layout, deshalb: Klasse am Button und die
-  // :deep()-Regel mit der gemeinsamen Höhe im Quelltext.
+  // happy-dom computes no layout, hence: the class on the button and the
+  // :deep() rule with the shared height in the source.
   it('Sprachauswahl hat die Höhe der übrigen Kopfzeilen-Elemente', async () => {
     const { wrapper } = await mountLayout()
 
@@ -89,8 +89,8 @@ describe('PublicLayout', () => {
     expect(router.currentRoute.value.path).toBe('/')
   })
 
-  // Branding: Der Kopf zeigt den echten Produktnamen "Statushafen"
-  // statt des Vorlagen-Platzhalters "Onyx Status Enterprise".
+  // Branding: the header shows the real product name "Statushafen"
+  // instead of the template placeholder "Onyx Status Enterprise".
   it('zeigt "Statushafen" als Branding im Logo', async () => {
     const { wrapper } = await mountLayout()
 
@@ -99,8 +99,8 @@ describe('PublicLayout', () => {
     expect(wrapper.text()).not.toContain('Onyx Status Enterprise')
   })
 
-  // Das Leuchtturm-Icon ist ein Inline-SVG mit currentColor (kein
-  // dunkelblaues PNG mehr, das im Dunkelmodus gefiltert werden musste).
+  // The lighthouse icon is an inline SVG with currentColor (no longer a
+  // dark blue PNG that had to be filtered in dark mode).
   it('zeigt das Leuchtturm-Logo als SVG neben der Wortmarke im Logo', async () => {
     const { wrapper } = await mountLayout()
 
@@ -140,9 +140,9 @@ describe('PublicLayout', () => {
     expect(router.currentRoute.value.query).toEqual({ returnTo: '/docs?section=sso#oben' })
   })
 
-  // Der Login-Knopf war früher ein OnyxButton und wich optisch von
-  // Theme-Toggle und Sprachauswahl ab (andere Höhe/Radius, Serifen-Schrift).
-  // Jetzt ist es ein nativer Button mit der gemeinsamen header-control-Optik.
+  // The login button used to be an OnyxButton and looked different from
+  // the theme toggle and language picker (other height/radius, serif font).
+  // Now it is a native button with the shared header-control look.
   it('rendert den Login-Knopf ausgeloggt als nativen header-control-Button, nicht als OnyxButton', async () => {
     const { wrapper } = await mountLayout()
 
@@ -154,8 +154,8 @@ describe('PublicLayout', () => {
     expect(loginButton.text()).toBe('Anmelden')
   })
 
-  // Regressions-Guard: Der Login-Knopf teilt dieselbe Basisklasse header-control
-  // wie Theme-Toggle und Sprachauswahl, damit alle drei Controls einheitlich aussehen.
+  // Regression guard: the login button shares the same base class header-control
+  // as the theme toggle and language picker, so all three controls look alike.
   it('gibt dem Login-Knopf dieselbe header-control-Basisklasse wie Theme-Toggle und Sprachauswahl', async () => {
     const { wrapper } = await mountLayout()
 
@@ -309,10 +309,10 @@ describe('PublicLayout', () => {
     expect(wrapper.text()).not.toContain('Dashboard')
   })
 
-  // Der Dashboard-Link darf nicht davon abhängen, ob StatusPage.vue
-  // zuvor einen Tenant aktiviert hat. Auf Startseite/Bestellung lädt das Layout
-  // die eigenen Seiten selbst und zeigt den Link, sobald eine Seite
-  // admin_dashboard gewährt.
+  // The dashboard link must not depend on whether StatusPage.vue
+  // activated a tenant before. On the landing/order page the layout loads
+  // its own pages itself and shows the link as soon as a page
+  // grants admin_dashboard.
   describe('Dashboard-Link ohne aktiven Tenant', () => {
     const mockPages = (pages) => {
       const fetchMock = vi.fn(async () => ({ ok: true, status: 200, json: async () => pages }))
@@ -393,7 +393,7 @@ describe('PublicLayout', () => {
       useAuth().setAuth('jwt-b', { email: 'b@x.de' })
       await flushPromises()
 
-      // Frühere Layouts anderer Tests hängen am selben Nutzer, daher mindestens ein Abruf.
+      // Earlier layouts of other tests hang on the same user, hence at least one fetch.
       expect(fetchMock).toHaveBeenCalled()
       expect(dashboardItem(wrapper)).toBeUndefined()
       expect(useTenant().activeTenantId.value).toBeNull()
@@ -608,9 +608,9 @@ describe('PublicLayout', () => {
     expect(wrapper.find('.language-switcher').classes()).not.toContain('header-control--icon')
   })
 
-  // Die Kopfzeile wirkte wuchtiger als die Vorlage (30-36 px), weil die
-  // 44-px-Zielfläche auch sichtbar war. Zielfläche bleibt 44 px, sichtbar
-  // sind 44 - 2 * Ring px; Hintergrund wird auf die Innenfläche begrenzt.
+  // The header looked heavier than the template (30-36 px), because the
+  // 44 px target area was also visible. The target area stays 44 px, visible
+  // are 44 - 2 * ring px; the background is limited to the inner area.
   it('zeichnet Kopfzeilen-Bedienelemente höchstens 36 px hoch, Zielfläche bleibt 44 px', () => {
     const size = Number(layoutSource.match(/--header-control-size:\s*(\d+)px/)[1])
     const ring = Number(layoutSource.match(/--header-control-ring:\s*(\d+)px/)[1])
@@ -682,7 +682,7 @@ describe('PublicLayout', () => {
     expect(layoutSource).toMatch(/\.header-control--icon\s*\{[^}]*width:\s*var\(--header-control-size\)/)
   })
 
-  // Footer mit Link zur Dokumentation und Copyright.
+  // Footer with a link to the documentation and copyright.
   it('zeigt einen Footer mit Link zur Dokumentation, der nach /docs führt', async () => {
     const { wrapper, router } = await mountLayout()
 
@@ -738,8 +738,8 @@ describe('PublicLayout', () => {
     }
   })
 
-  // Footer in derselben Breite wie die Kopfzeile: Er liegt im selben
-  // .app-container und nutzt für Farben nur Tokens (hell und dunkel).
+  // Footer with the same width as the header: it sits in the same
+  // .app-container and uses only tokens for colours (light and dark).
   it('legt den Footer in den Layout-Container und färbt ihn nur über Tokens', async () => {
     const { wrapper } = await mountLayout()
     const container = wrapper.find('.app-container')
@@ -751,8 +751,8 @@ describe('PublicLayout', () => {
     expect(rule).not.toMatch(/#[0-9a-f]{3,6}/i)
   })
 
-  // Richtung A: Die volle Kopfzeile gilt nur auf der Startseite.
-  // Sprachauswahl der Startseite zeigte den Browser-Pfeil und sah neben Theme-Knopf und Avatar fremd aus.
+  // Direction A: the full header only applies on the landing page.
+  // The landing page language picker showed the browser arrow and looked foreign next to the theme button and avatar.
   describe('Sprachauswahl der Kopfzeile: eigener Pfeil', () => {
     const rule = layoutSource.match(/\.app-header :deep\(\.header-control\.language-switcher\)\s*\{([^}]*)\}/)[1]
 
@@ -797,7 +797,7 @@ describe('PublicLayout', () => {
       const order = wrapper.find('a.order-button')
       expect(order.text()).toBe('Statusseite bestellen')
       expect(order.attributes('href')).toBe('/order')
-      // Theme-Umschalter und Sprachauswahl bleiben erhalten.
+      // Theme switcher and language picker stay.
       expect(wrapper.find('.theme-toggle').exists()).toBe(true)
       expect(wrapper.find('.language-switcher').exists()).toBe(true)
     })
@@ -842,10 +842,10 @@ describe('PublicLayout', () => {
     })
   })
 
-  // Die Kopfzeile lief bei 400 px um 39 px seitlich über, weil die
-  // Bedienelemente (Thema, Sprache, Anmelden = 287 px) nicht umbrachen und der
-  // Inline-Style der .nav-actions kein flex-wrap kannte. happy-dom rechnet kein
-  // Layout; die Messung im echten Browser steht in e2e/public-schmal.spec.js.
+  // The header overflowed sideways by 39 px at 400 px, because the
+  // controls (theme, language, login = 287 px) did not wrap and the
+  // inline style of .nav-actions knew no flex-wrap. happy-dom computes no
+  // layout; the measurement in a real browser is in e2e/public-schmal.spec.js.
   describe('schmale Breiten', () => {
     it('.nav-actions und .app-header brechen um, ohne Inline-Style', async () => {
       const { wrapper } = await mountLayout()
@@ -859,7 +859,7 @@ describe('PublicLayout', () => {
     })
   })
 
-  // Auf der Anmeldeseite selbst ist der Kopfzeilen-Knopf „Anmelden“ überflüssig.
+  // On the login page itself the header button "Anmelden" is superfluous.
   it('zeigt auf der Anmeldeseite keinen Anmelden-Knopf, auf anderen Seiten schon', async () => {
     const { wrapper, router } = await mountLayout()
     expect(wrapper.find('.login-button').exists()).toBe(true)

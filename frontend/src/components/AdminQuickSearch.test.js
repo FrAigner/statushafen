@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../i18n'
 import { useTenant } from '../composables/useTenant'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { NAV_GROUPS } from '../utils/adminNav'
 import AdminQuickSearch from './AdminQuickSearch.vue'
 

@@ -1,14 +1,14 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Gemeinsamer Bestätigungsdialog (ersetzt den nativen Browser-Dialog). Einmal in App.vue
-  eingebunden, angesteuert über composables/useConfirm.js.
-  - role="alertdialog" mit aria-labelledby/-describedby, Esc und Klick auf den Hintergrund brechen ab.
-  - Fokus startet auf „Abbrechen“ (Enter bestätigt nie versehentlich eine gefährliche Aktion),
-    Tab bleibt im Dialog, beim Schließen kehrt der Fokus zum auslösenden Element zurück.
-  - Tastatur (Esc, Tab-Falle) hängt am Dokument, solange der Dialog offen ist; auch ein Klick auf den
-    Text (Fokus auf <body>) hebt Esc nicht auf. Die Seite dahinter ist inert, der Body scrollt nicht.
-  - Navigation (Router), Abmeldung und 401 schließen den Dialog mit „abgebrochen“: Die Rückfrage gehörte
-    zur alten Seite, ein späteres Bestätigen darf nichts mehr auslösen.
+  Shared confirmation dialog (replaces the browser's native dialog). Included once in App.vue,
+  driven via composables/useConfirm.ts.
+  - role="alertdialog" with aria-labelledby/-describedby; Esc and a click on the backdrop cancel.
+  - Focus starts on "Cancel" (Enter never confirms a dangerous action by accident),
+    Tab stays inside the dialog, on close focus returns to the triggering element.
+  - Keyboard handling (Esc, Tab trap) is attached to the document while the dialog is open; even a click
+    on the text (focus on <body>) does not break Esc. The page behind is inert, the body does not scroll.
+  - Navigation (router), sign-out and 401 close the dialog as "cancelled": the question belonged
+    to the old page, a later confirmation must not trigger anything.
 */
 import { ref, watch, nextTick, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { routerKey } from 'vue-router'
@@ -20,20 +20,20 @@ const { t } = useI18n()
 const state = useConfirmState()
 const { token } = useAuth()
 const router = inject(routerKey, null)
-const dialogEl = ref(null)
-const cancelBtn = ref(null)
+const dialogEl = ref<HTMLElement | null>(null)
+const cancelBtn = ref<HTMLButtonElement | null>(null)
 
 const title = computed(() => state.title || t('confirm.title'))
 const confirmText = computed(() => state.confirmLabel || (state.danger ? t('common.delete') : t('confirm.confirm')))
 
-function answer(value) {
-  const opener = answerConfirm(value)
+function answer(value: boolean) {
+  const opener = answerConfirm(value) as HTMLElement | null
   if (opener && typeof opener.focus === 'function' && opener.isConnected) {
     nextTick(() => opener.focus())
   }
 }
 
-function onKeydown(e) {
+function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     e.preventDefault()
     answer(false)
@@ -46,18 +46,18 @@ function onKeydown(e) {
   const inside = dialogEl.value.contains(document.activeElement)
   if (!inside) {
     e.preventDefault()
-    ;(e.shiftKey ? last : first).focus()
+    ;(e.shiftKey ? last : first)!.focus()
   } else if (e.shiftKey && document.activeElement === first) {
     e.preventDefault()
-    last.focus()
+    last!.focus()
   } else if (!e.shiftKey && document.activeElement === last) {
     e.preventDefault()
-    first.focus()
+    first!.focus()
   }
 }
 
 let previousOverflow = ''
-function lock(on) {
+function lock(on: boolean) {
   const app = document.getElementById('app')
   if (on) {
     document.addEventListener('keydown', onKeydown, true)
@@ -71,7 +71,7 @@ function lock(on) {
   }
 }
 
-// flush 'sync': die Seite ist wieder bedienbar, bevor answer() den Fokus zurückgibt.
+// flush 'sync': the page is usable again before answer() returns the focus.
 watch(() => state.open, (open) => lock(open), { flush: 'sync' })
 watch(() => state.open, async (open) => {
   if (!open) return
@@ -79,7 +79,7 @@ watch(() => state.open, async (open) => {
   cancelBtn.value?.focus()
 })
 
-let removeHook = null
+let removeHook: (() => void) | null | undefined = null
 onMounted(() => {
   removeHook = router?.afterEach(() => { if (state.open) answer(false) })
 })

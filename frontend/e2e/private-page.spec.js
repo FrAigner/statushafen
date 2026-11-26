@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Private Status Page', () => {
@@ -27,9 +27,8 @@ test.describe('Private Status Page', () => {
     await page.locator('label', { hasText: 'Private Statusseite (Login erforderlich)' }).click();
     // Default Role is "Zugriff verweigert" (null) by default.
     
-    // Kein force-Klick: das Ankreuzen von "Privat" blendet ein Rollen-Dropdown
-    // ein und verschiebt den Button; ein forcierter Klick übersprang bisher das
-    // nötige Scrollen und traf daneben.
+    // No force click: ticking "Privat" reveals a role dropdown and moves the
+    // button; a forced click used to skip the necessary scrolling and miss.
     const saveBtn = page.locator('aside.form-panel button[type="submit"]');
     await saveBtn.scrollIntoViewIfNeeded();
     await saveBtn.click();
@@ -46,7 +45,7 @@ test.describe('Private Status Page', () => {
 
     // 3. Logout
     await page.goto(`http://techstart.localhost:${PORT}/admin/components`);
-    // Abmelden steht im Benutzermenü der Kopfzeile.
+    // Sign-out is in the header's user menu.
     await page.getByRole('button', { name: /Benutzermenü/ }).click();
     await page.getByRole('button', { name: 'Abmelden' }).click();
     await expect(page).toHaveURL(`http://techstart.localhost:${PORT}/`);
@@ -54,8 +53,8 @@ test.describe('Private Status Page', () => {
     // 4. Try to access the private page's dashboard unauthenticated
     await page.goto(`http://${uniqueSlug}.localhost:${PORT}/`);
     
-    // Eine private Seite antwortet ohne Berechtigung wie eine fehlende Seite (404);
-    // die Oberfläche zeigt "Statusseite nicht verfügbar" mit Weg zum Login.
+    // Without permission a private page answers like a missing page (404);
+    // the UI shows "Statusseite nicht verfügbar" with a way to the login.
     await expect(page.locator('h2')).toContainText('Statusseite nicht verfügbar');
     await expect(page.locator('text=Diese Statusseite gibt es nicht oder ist privat')).toBeVisible();
 

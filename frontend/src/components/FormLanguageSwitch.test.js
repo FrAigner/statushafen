@@ -8,8 +8,8 @@ import i18n from '../i18n'
 import { onyxFormStubs } from '../test-support/onyxStubs'
 import FormLanguageSwitch from './FormLanguageSwitch.vue'
 
-// Eine Seite mit 31 Sprachen ließ den Reiter-Umschalter aus dem Formular laufen (Bild vom 31.10.).
-// Bis 3 Einträge bleibt es ein Umschalter, darüber eine Auswahlliste.
+// A page with 31 languages made the tab switcher run out of the form (screenshot from 31 Oct).
+// Up to 3 entries it stays a switcher, above that a select list.
 
 function fakeTrans(extraCount) {
   const options = [{ value: '', label: 'Deutsch (Standard)' }]

@@ -1,25 +1,27 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Statusanzeige aus Symbol (Form) + Farbe +
-  Text. Ersetzt .badge-*, .ent-pill/.ent-dot und Inline-Farben.
-  - variant "soft": getönte Fläche (--*-soft) mit Text in --*-text (Tabellen,
-    Karten); "plain": ohne Fläche (Fließtext, Statuszeilen).
-  - size "sm" (Standard) oder "md".
-  - Wortlaut aus status.* (i18n), „Beeinträchtigt“ bleibt. Ein Slot oder
-    `label` ersetzt den Text (z. B. ein längerer Satz); die Form bleibt.
-  - Unbekannte Status zeigen neutral den Rohwert, nie eine Statusfarbe.
+  Redesign stage 3: status display made of icon (shape) + colour + text.
+  Replaces .badge-*, .ent-pill/.ent-dot and inline colours.
+  - variant "soft": tinted area (--*-soft) with text in --*-text (tables,
+    cards); "plain": without an area (running text, status lines).
+  - size "sm" (default) or "md".
+  - Wording from status.* (i18n), "Beeinträchtigt" stays. A slot or `label`
+    replaces the text (e.g. a longer sentence); the shape stays.
+  - Unknown statuses show the raw value neutrally, never a status colour.
 */
 import { computed } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusIcon from './StatusIcon.vue'
 import { statusMeta } from '../utils/status'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+// Runtime declaration (not type-based) to keep the validators.
 const props = defineProps({
-  status: { type: String, default: null },
-  variant: { type: String, default: 'soft', validator: v => ['soft', 'plain'].includes(v) },
-  size: { type: String, default: 'sm', validator: v => ['sm', 'md'].includes(v) },
-  label: { type: String, default: null },
+  status: { type: String as PropType<string | null>, default: null },
+  variant: { type: String as PropType<'soft' | 'plain'>, default: 'soft', validator: (v: string) => ['soft', 'plain'].includes(v) },
+  size: { type: String as PropType<'sm' | 'md'>, default: 'sm', validator: (v: string) => ['sm', 'md'].includes(v) },
+  label: { type: String as PropType<string | null>, default: null },
 })
 // Stryker restore all
 

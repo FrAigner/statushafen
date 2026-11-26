@@ -5,10 +5,10 @@ import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import { useTenant } from '../composables/useTenant'
 import { setAuthAsPageRole } from '../test-support/pageRole'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import AdminNotificationBell from './AdminNotificationBell.vue'
 
-// Nachrichtenglocke der Admin-Kopfzeile.
+// Notification bell of the admin top bar.
 
 const note = (over = {}) => ({
   id: 1, severity: 'error', kind: 'external_source_outage',
@@ -274,6 +274,16 @@ describe('AdminNotificationBell', () => {
     w.unmount()
   })
 
+  it('übersetzt bekannte Schlüssel auch ohne Parameter', async () => {
+    useAuth().setAuth('t', { email: 'a@x.de', is_global_admin: true })
+    server.items = [note({ id: 8, title_key: 'adminNotifications.external_source_recovered.title', params: undefined })]
+    const w = await mountBell()
+    await w.find('.notif-button').trigger('click')
+    await flushPromises()
+    expect(w.find('.notif-item-title').text()).toBe('Externe Quelle wieder erreichbar')
+    w.unmount()
+  })
+
   it('zeigt englische Texte in der englischen Oberfläche', async () => {
     useAuth().setAuth('t', { email: 'a@x.de', is_global_admin: true })
     i18n.global.locale.value = 'en'
@@ -315,7 +325,7 @@ describe('AdminNotificationBell', () => {
       const counts = () => server.calls.filter(c => c.includes('unread-count')).length
       const start = counts()
       await vi.advanceTimersByTimeAsync(60_000)
-      expect(counts()).toBe(start + 2) // Seite + systemweit
+      expect(counts()).toBe(start + 2) // page + system-wide
       Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
       document.dispatchEvent(new Event('visibilitychange'))
       await vi.advanceTimersByTimeAsync(180_000)
@@ -323,7 +333,7 @@ describe('AdminNotificationBell', () => {
       Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
       document.dispatchEvent(new Event('visibilitychange'))
       await vi.advanceTimersByTimeAsync(0)
-      expect(counts()).toBe(start + 4) // sofort beim Sichtbarwerden
+      expect(counts()).toBe(start + 4) // immediately on becoming visible
       await vi.advanceTimersByTimeAsync(60_000)
       expect(counts()).toBe(start + 6)
       w.unmount()
@@ -385,7 +395,7 @@ describe('AdminNotificationBell', () => {
       await w.find('.notif-button').trigger('click')
       useTenant().setActiveTenant(2)
       await flushPromises()
-      // neue Seite antwortet zuerst, die alte erst danach
+      // the new page answers first, the old one only afterwards
       Object.keys(pending).filter(u => u.includes('/pages/2/')).forEach(u => pending[u]())
       await flushPromises()
       Object.keys(pending).filter(u => u.includes('/pages/1/')).forEach(u => pending[u]())

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { fieldByLabel, hasLabel, chooseQuickStatus } from './fields.js'
+import { fieldByLabel, hasLabel, chooseQuickStatus } from './fields'
 
 describe('test-support/fields', () => {
   const wrapper = mount({ template: '<div><label for="a">Name</label><input id="a"></div>' })

@@ -8,7 +8,7 @@ test.describe('Authentication & Login', () => {
     // Check page title / header
     await expect(page.locator('.login-title')).toContainText('Statushafen');
 
-    // Login mit dem geseedeten Admin-Testnutzer über das reguläre Formular
+    // Log in with the seeded admin test user via the regular form
     await page.fill('input[type="email"]', 'admin@statushafen.local');
     await page.fill('input[type="password"]', 'admin123');
     await page.click('button.btn-login');

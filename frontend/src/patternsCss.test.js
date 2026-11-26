@@ -3,15 +3,15 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// Redesign Stufe 3: Schutz für die CSS-Anteile der Bausteine.
-// happy-dom rechnet kein CSS; geprüft wird deshalb der Quelltext (Muster wie
-// style.test.js). Das Aussehen selbst prüft dieser Test nicht.
+// Redesign stage 3: guard for the CSS parts of the building blocks.
+// happy-dom computes no CSS, so the source is checked (same pattern as
+// style.test.js). This test does not check the appearance itself.
 const src = dirname(fileURLToPath(import.meta.url))
 const read = file => readFileSync(resolve(src, file), 'utf-8')
 const styleCss = read('style.css')
 const adminCss = read('admin.css')
 
-// Regelkörper zu einem exakten Selektor (erstes Vorkommen), ohne Kommentare.
+// Rule body for an exact selector (first occurrence), without comments.
 function rule(css, selector) {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -21,8 +21,8 @@ function rule(css, selector) {
 
 describe('Tabellenstil', () => {
   it('Regression: admin.css überschreibt .data-table nicht mehr (zweite, ältere Definition)', () => {
-    // Vorher stand der Tabellenstil doppelt in style.css und admin.css; admin.css
-    // lud später und gewann, ein neuer Stil in style.css blieb wirkungslos.
+    // Previously the table style was duplicated in style.css and admin.css; admin.css
+    // loaded later and won, so a new style in style.css had no effect.
     expect(adminCss).not.toMatch(/\.data-table/)
   })
 
@@ -69,9 +69,9 @@ describe('Buttons', () => {
 
 describe('style.css: Selektoren', () => {
   it('Regression: kein Selektor endet mit Komma vor einer Leerzeile oder einem Kommentar', () => {
-    // Ein übrig gebliebener Selektor (`[data-theme="dark"] .action-btn.danger:hover,`)
-    // hing vor `.alert-close` und gab dem Hover-Zustand deren Regeln
-    // (float: right, Hintergrund none, …).
+    // A leftover selector (`[data-theme="dark"] .action-btn.danger:hover,`)
+    // hung in front of `.alert-close` and gave the hover state its rules
+    // (float: right, background none, …).
     expect(styleCss.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/,\s*\n\s*\n/)
     expect(styleCss).not.toMatch(/,\s*\n\s*\/\*/)
   })
@@ -80,7 +80,7 @@ describe('style.css: Selektoren', () => {
 describe('Bausteine nutzen nur Tokens', () => {
   const components = ['StatusIcon', 'StatusBadge', 'EmptyState', 'PageHeader', 'KpiCard', 'FormField', 'QuickStatus', 'HelpTooltipLayer']
   it.each(components)('%s.vue enthält keine Hex- oder rgb-Farben', (name) => {
-    // Kommentare (/* */ und //-Zeilen mit Verweisnummern wie #472) zählen nicht.
+    // Comments (/* */ and // lines with reference numbers like #472) do not count.
     const text = read(`components/${name}.vue`)
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '')

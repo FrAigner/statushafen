@@ -4,10 +4,10 @@ import i18n from '../i18n'
 import HelpTooltipsToggle from './HelpTooltipsToggle.vue'
 import { useAuth } from '../composables/useAuth'
 import { helpTooltipsEnabled, useHelpTooltips } from '../composables/useHelpTooltips'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
-// Schalter „Hilfe-Tooltips anzeigen“, Default an, wirkt sofort,
-// gespeichert per PATCH /api/me.
+// "Show help tooltips" switch: on by default, takes effect immediately,
+// saved via PATCH /api/me.
 
 let wrapper = null
 
@@ -52,7 +52,7 @@ describe('HelpTooltipsToggle / useHelpTooltips', () => {
     mountToggle()
 
     await checkbox().setValue(false)
-    // Noch vor der Server-Antwort wirksam.
+    // Takes effect before the server responds.
     expect(helpTooltipsEnabled.value).toBe(false)
     expect(useAuth().currentUser.value).toMatchObject({ email: 'a@b.de', help_tooltips: false })
     expect(global.fetch).toHaveBeenCalledWith('/api/me', expect.objectContaining({

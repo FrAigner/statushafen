@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
 import AdminMonitoring from './AdminMonitoring.vue'
-import { ERROR_RATE_DEGRADED, ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds.js'
-import { axe } from '../../test-support/axe.js'
+import { ERROR_RATE_DEGRADED, ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds'
+import { axe } from '../../test-support/axe'
 
 function monitoringFixture() {
   return {
@@ -66,7 +66,7 @@ describe('AdminMonitoring', () => {
     expect(wrapper.findAll('.kpi__value').map(el => el.text())).toContain('1.50s')
   })
 
-  // Link kam fest verdrahtet auf „statushafen-staging“, auch in Prod.
+  // The link was hard-wired to "statushafen-staging", even in prod.
   it('zeigt den Grafana-Link mit der vom Backend gelieferten URL', async () => {
     const url = 'https://g.example/d/abc?var-env=statushafen-prod'
     const wrapper = await mountMonitoring(vi.fn().mockResolvedValue(jsonResponse({
@@ -124,8 +124,8 @@ describe('AdminMonitoring', () => {
     expect(wrapper.find('tbody tr').exists()).toBe(false)
   })
 
-  // Stufe 4d: h2 statt h1 (die Topbar trägt die h1); Kennzahlen als
-  // KpiCard ohne Inline-Farben, Alarm nur bei Handlungsbedarf (Text für Screenreader).
+  // Stage 4d: h2 instead of h1 (the top bar carries the h1); key figures as
+  // KpiCard without inline colours, alarm only when action is needed (text for screen readers).
   it('rendert den Titel als h2 ohne h1 und ohne Inline-Styles', async () => {
     const wrapper = await mountMonitoring()
 
@@ -178,7 +178,7 @@ describe('AdminMonitoring', () => {
     expect(rows[2].text()).toContain('0.0%')
   })
 
-  // Regression: schon jede Quote > 0 zeigte gelb. Schwellen: gelb ab 5 %, rot ab 10 %.
+  // Regression: any rate > 0 already showed yellow. Thresholds: yellow from 5 %, red from 10 %.
   it.each([
     [0, null],
     [0.001, null],
@@ -234,6 +234,16 @@ describe('AdminMonitoring', () => {
     expect(wrapper.find('.kpi--alert').exists()).toBe(false)
   })
 
+  it('zeigt einen Strich als Requests/Minute, wenn der Wert fehlt', async () => {
+    const wrapper = await mountMonitoring(vi.fn().mockResolvedValue(jsonResponse({
+      ...monitoringFixture(),
+      totals: { ...monitoringFixture().totals, requests_per_minute: null },
+    })))
+
+    const kachel = wrapper.findAll('.kpi').find(el => el.text().includes(i18n.global.t('monitoring.kpiRequestsPerMinute')))
+    expect(kachel.find('.kpi__value').text()).toBe('–')
+  })
+
   it('zeigt den Ladezustand, solange die Daten fehlen', async () => {
     const wrapper = await mountMonitoring(vi.fn(() => new Promise(() => {})))
 
@@ -252,7 +262,7 @@ describe('AdminMonitoring', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Brotkrumen und die Endpunkt-Tabelle in einer Listenkarte.
+  // Direction C: breadcrumbs and the endpoint table in a list card.
   it('zeigt Brotkrumen und die Endpunkt-Tabelle in einer Karte mit Titel', async () => {
     const wrapper = await mountMonitoring()
 
@@ -269,7 +279,7 @@ describe('AdminMonitoring', () => {
     expect(wrapper.find('table').exists()).toBe(false)
   })
 
-  // ungenutzte Routen (0 Requests) werden gezeigt, mit "–" statt Nullwerten, und lassen sich ausblenden.
+  // unused routes (0 requests) are shown with "–" instead of zero values and can be hidden.
   describe('ungenutzte Endpunkte', () => {
     const withUnused = () => ({
       ...monitoringFixture(),
@@ -292,7 +302,7 @@ describe('AdminMonitoring', () => {
       expect(unused.text()).not.toContain('0ms')
       expect(unused.text()).toContain('–')
       expect(unused.find('.status-badge').exists()).toBe(false)
-      // genutzte Zeile bleibt unverändert
+      // the used row stays unchanged
       const used = bodyRows(wrapper).find(r => r.text().includes('/api/pages'))
       expect(used.text()).toContain('15.0%')
     })

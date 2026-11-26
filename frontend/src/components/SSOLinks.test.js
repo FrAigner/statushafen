@@ -8,8 +8,8 @@ import SSOLinks from './SSOLinks.vue'
 import { useAutoDismissAlerts, ALERT_AUTO_DISMISS_MS } from '../composables/useAutoDismissAlerts'
 import { stubConfirm } from '../test-support/confirm'
 
-// Profilbereich „Mit SSO verknüpfen“ (POST /api/auth/oidc/link)
-// samt Anzeige und Lösen bestehender Verknüpfungen (GET/DELETE /api/me/sso).
+// Profile section "Link with SSO" (POST /api/auth/oidc/link)
+// including listing and removing existing links (GET/DELETE /api/me/sso).
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -306,7 +306,7 @@ describe('SSOLinks', () => {
     expect(window.location.assign).toHaveBeenCalledWith('https://idp.example/authorize')
   })
 
-  // Review: Die automatische Ausblendung klickt auf das Schließen-Kreuz; ohne Kreuz blieb die Meldung stehen.
+  // Review: the automatic dismissal clicks the close cross; without the cross the message stayed.
   it('lässt die Erfolgsmeldung nach der Frist im Admin-Inhaltsbereich tatsächlich verschwinden und hat ein Schließen-Kreuz', async () => {
     const fetchImpl = makeFetch({
       'GET /api/me/sso': () => jsonResponse(LIST),

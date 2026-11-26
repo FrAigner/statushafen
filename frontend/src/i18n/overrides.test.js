@@ -54,7 +54,7 @@ describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () =>
   })
 
   afterEach(async () => {
-    // Layer zurücksetzen, damit Tests einander nicht beeinflussen.
+    // Reset the layers so that tests do not influence each other.
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({}))
     await applyGlobalOverrides('de')
     clearPageOverrides('de')
@@ -67,7 +67,7 @@ describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () =>
     await applyGlobalOverrides('de')
 
     expect(i18n.global.t('adminNav.items.sso')).toBe('Mein SSO')
-    // Unberührter Key bleibt beim Bundle-Default.
+    // An untouched key keeps the bundle default.
     expect(i18n.global.t('common.save')).not.toBe('')
   })
 
@@ -98,6 +98,39 @@ describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () =>
     expect(i18n.global.t('adminNav.items.sso')).toBe('Seiten-Text')
 
     clearPageOverrides('de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Globaler Text')
+  })
+
+  it('verwirft globale Overrides bei einer Fehlerantwort und behält den Bundle-Default', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ 'adminNav.items.sso': 'Fehler' }) })
+
+    await applyGlobalOverrides('de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe(originalNavSso)
+  })
+
+  it('lässt die Nachrichten unverändert, wenn es für die Sprache keine Texte gibt', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Unbekannt' }))
+    const before = i18n.global.getLocaleMessage('qq')
+
+    await expect(applyGlobalOverrides('qq')).resolves.toBeUndefined()
+
+    expect(i18n.global.getLocaleMessage('qq')).toEqual(before)
+    expect(i18n.global.t('adminNav.items.sso')).toBe(originalNavSso)
+  })
+
+  it('fällt bei einem Fehler der Seiten-Overrides auf die globale Ebene zurück, statt zu werfen', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Seiten-Text' }))
+    await applyPageOverrides(1, 'de')
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn().mockRejectedValue(new Error('Netzwerkfehler'))
+
+    await expect(applyPageOverrides(1, 'de')).resolves.toBeUndefined()
 
     expect(i18n.global.t('adminNav.items.sso')).toBe('Globaler Text')
   })

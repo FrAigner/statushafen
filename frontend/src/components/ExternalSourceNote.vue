@@ -1,17 +1,17 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Teil D: Kennzeichnung „extern“ an einer Komponente, die mit einer
-  externen Statusseite gekoppelt ist.
-  - Marke mit Text („extern“) und Symbol, nie nur Farbe. Die Marke ist ein Link
-    auf die Quellseite, wenn die Adresse http(s) ist (sonst reiner Text).
-  - Der Link öffnet in neuem Tab (target=_blank, rel mit noopener noreferrer
-    nofollow); das steht als Symbol und für Screenreader im Namen.
-  - Darunter steht als Text (nicht nur als Tooltip), welche externe Komponente
-    den Status liefert; bei einer gekoppelten Gruppe die schlechteste Komponente
-    („worst“). Das title-Attribut wiederholt es als Tooltip.
-  - Ist die Quelle ausgefallen (source_outage), zählt ihr Status nicht mehr
-   ; dann steht der Hinweis „Daten veraltet“ statt eines Status.
-  Farben nur über Tokens.
+  Part D: "external" marker on a component that is linked to an
+  external status page.
+  - Marker with text ("external") and icon, never colour alone. The marker is a
+    link to the source page if the address is http(s) (plain text otherwise).
+  - The link opens in a new tab (target=_blank, rel with noopener noreferrer
+    nofollow); this is shown as an icon and included in the name for screen readers.
+  - Below it, as text (not only as a tooltip), it says which external component
+    supplies the status; for a linked group the worst component
+    ("worst"). The title attribute repeats it as a tooltip.
+  - If the source is down (source_outage), its status no longer counts;
+    then the note "data outdated" appears instead of a status.
+  Colours only via tokens.
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -19,25 +19,28 @@ import AppIcon from './AppIcon.vue'
 import StatusBadge from './StatusBadge.vue'
 import { safeHttpUrl } from '../utils/externalStatus'
 import { statusMeta } from '../utils/status'
+import type { ExternalComponentRef } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  // Gekoppelte externe Komponenten (external_sources der Dashboard-Antwort).
-  sources: { type: Array, required: true },
-  // Name der eigenen Komponente für den Listennamen.
-  name: { type: String, default: '' },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  // Linked external components (external_sources of the dashboard response).
+  sources: ExternalComponentRef[]
+  // Name of the own component for the list name.
+  name?: string
+}>(), {
+  name: '',
 })
 // Stryker restore all
 
 const { t } = useI18n()
 
-const statusText = (status) => {
+const statusText = (status: string) => {
   const key = statusMeta(status).labelKey
   return key ? t(key) : t('external.unknownStatus')
 }
 
 const items = computed(() => props.sources.map((r) => {
-  // Bei einer Gruppe bestimmt die schlechteste Komponente den Status.
+  // For a group the worst component determines the status.
   const shown = r.is_group && r.worst ? r.worst : { name: r.name, status: r.status }
   const known = statusMeta(shown.status).level !== null
   const title = r.is_group && r.worst
@@ -50,7 +53,7 @@ const items = computed(() => props.sources.map((r) => {
     isGroup: !!r.is_group,
     name: r.name,
     shown,
-    // Nur zeigen, was wir kennen: ein „unknown“ bekommt keine Statusfarbe.
+    // Only show what we know: an "unknown" gets no status colour.
     badgeStatus: known ? shown.status : null,
     outdated: !!r.source_outage,
     title,

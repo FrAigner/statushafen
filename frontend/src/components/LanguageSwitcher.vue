@@ -1,11 +1,11 @@
-<script>
+<script lang="ts">
 // Attributes of the parent (e.g. class="header-control") belong on the trigger
 // button, not on the wrapper, the list or the error message.
 // Plain script block: defineOptions() is hoisted out of setup() and does not
 // cope with the local helper variables of the Stryker instrumentation.
 export default { inheritAttrs: false }
 </script>
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useLanguage } from '../composables/useLanguage'
@@ -26,10 +26,10 @@ const { languageOptions, selectedLocale, setLanguage, saveError } = useLanguage(
 
 const uid = useId()
 const listId = `language-list-${uid}`
-const optionId = (index) => `language-option-${uid}-${index}`
+const optionId = (index: number) => `language-option-${uid}-${index}`
 
-const root = ref(null)
-const button = ref(null)
+const root = ref<HTMLElement | null>(null)
+const button = ref<HTMLButtonElement | null>(null)
 const open = ref(false)
 const active = ref(0)
 
@@ -50,10 +50,10 @@ function close() {
 // handled in onKeydown, focus stays on the button anyway.
 useDismissable(open, [root], close, { escape: false })
 
-function choose(index) {
+function choose(index: number) {
   close()
-  button.value.focus()
-  setLanguage(languageOptions.value[index].code)
+  button.value!.focus()
+  setLanguage(languageOptions.value[index]!.code)
 }
 
 function onToggle() {
@@ -61,7 +61,7 @@ function onToggle() {
   else openList()
 }
 
-function onKeydown(event) {
+function onKeydown(event: KeyboardEvent) {
   if (!open.value) {
     if (!isOpenKey(event.key)) return
     event.preventDefault()

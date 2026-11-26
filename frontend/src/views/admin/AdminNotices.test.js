@@ -5,10 +5,10 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminNotices from './AdminNotices.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
+import { clickMenuItem } from '../../test-support/rowMenu'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
 import { stubConfirm } from '../../test-support/confirm'
 
 function noticesFixture() {
@@ -58,9 +58,9 @@ describe('AdminNotices', () => {
     useTenant().setMyPages([])
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -93,7 +93,7 @@ describe('AdminNotices', () => {
     const expectedStart = new Date('2026-08-01T10:00:00Z').toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
     const expectedCreated = new Date('2026-07-30T09:00:00Z').toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })
     expect(row.text()).toContain(expectedStart)
-    // Erstellt steht relativ („vor …“), der genaue Zeitpunkt im title.
+    // Created is shown relatively ("… ago"), the exact time in the title.
     expect(row.find('time').attributes('title')).toBe(expectedCreated)
   })
 
@@ -111,9 +111,9 @@ describe('AdminNotices', () => {
     expect(wrapper.find('.alert-error').exists()).toBe(true)
   })
 
-  // Laden -> Fehlerfall -> Speichern/Löschen werden ausdrücklich und mit
-  // flushPromises abgewartet, damit die Coverage nicht von zufällig noch laufender
-  // asynchroner Arbeit anderer Tests abhängt.
+  // Loading -> error case -> saving/deleting are awaited explicitly and with
+  // flushPromises, so that coverage does not depend on asynchronous work of
+  // other tests that happens to still be running.
   it('legt eine neue Ankündigung per POST an und lädt die Liste neu', async () => {
     const fetchMock = makeFetchImpl()
     const { wrapper } = await mountAdminNotices({ fetchImpl: fetchMock })
@@ -129,7 +129,7 @@ describe('AdminNotices', () => {
     expect(JSON.parse(post[1].body)).toMatchObject({ Level: 'info', StartAt: null, EndAt: null })
     expect(wrapper.find('.alert-success').exists()).toBe(true)
     expect(wrapper.find('.form-panel').exists()).toBe(false)
-    // Liste einmal beim Öffnen, einmal nach dem Speichern (Sprachabfragen für den Umschalter zählen nicht)
+    // The list once on opening, once after saving (language requests for the switcher do not count)
     expect(fetchMock.mock.calls.filter(([u, o]) => !o?.method && u.endsWith('/notices/all')).length).toBe(2)
   })
 
@@ -255,8 +255,8 @@ describe('AdminNotices', () => {
     expect(fieldByLabel(wrapper, 'Stufe').findAll('option').map(o => o.text())).toEqual(['Info', 'Warnung', 'Kritisch'])
   })
 
-  // Die Nachricht wird formatiert dargestellt, das Feld ist der
-  // Editor; der Platzhalter sagte vorher „Markdown wird nicht dargestellt“.
+  // The message is rendered formatted, the field is the
+  // editor; the placeholder used to say "Markdown is not rendered".
   it.each([
     ['de', 'Werkzeugleiste'],
     ['en', 'toolbar'],

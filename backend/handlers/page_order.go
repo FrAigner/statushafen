@@ -481,7 +481,7 @@ func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
 
 // pageOrderConfirmSubject: fixed German subject, analogous to the other
 // transactional emails (no language selection - the app is de-first, see
-// i18n default in frontend/src/i18n/index.js).
+// i18n default in frontend/src/i18n/index.ts).
 const pageOrderConfirmSubject = "Bitte bestätige deine Statushafen-Bestellung"
 
 // rawPageOrderConfirmEmailTemplate is the readably formatted HTML body of the

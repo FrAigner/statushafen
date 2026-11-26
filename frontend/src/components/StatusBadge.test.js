@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import StatusBadge from './StatusBadge.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const mountBadge = (props = {}, slots = {}) => mount(StatusBadge, { props, slots, global: { plugins: [i18n] } })
 

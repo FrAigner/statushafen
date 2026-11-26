@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SegmentControl from './SegmentControl.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const options = [{ value: 'all', label: 'Alle' }, { value: 'open', label: 'Offen' }]
 

@@ -3,12 +3,12 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// GHSA-q8mj-m7cp-5q26 und GHSA-x5fp-wj9c-mxmx: qs 6.11.1-6.15.1 bzw.
-// 6.14.2-6.15.3 hat zwei DoS-Lücken (qs.stringify-Crash, array-limit-Bypass).
-// qs ist keine direkte Dependency, sondern kommt über
-// @stryker-mutator/core -> typed-rest-client@~2.3.0 -> qs@6.15.1 (verwundbar).
-// typed-rest-client selbst bumpt das nicht; gefixt per "overrides" in
-// package.json auf die gepatchte Version.
+// GHSA-q8mj-m7cp-5q26 and GHSA-x5fp-wj9c-mxmx: qs 6.11.1-6.15.1 and
+// 6.14.2-6.15.3 respectively have two DoS vulnerabilities (qs.stringify crash,
+// array limit bypass). qs is not a direct dependency but comes via
+// @stryker-mutator/core -> typed-rest-client@~2.3.0 -> qs@6.15.1 (vulnerable).
+// typed-rest-client itself does not bump it; fixed via "overrides" in
+// package.json to the patched version.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const MIN_PATCHED_VERSION = [6, 16, 0]
 

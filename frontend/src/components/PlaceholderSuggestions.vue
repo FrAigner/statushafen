@@ -1,31 +1,30 @@
-<script setup>
+<script setup lang="ts" generic="T extends { key: string, desc: string }">
 import { ref, watch, nextTick } from 'vue'
 
-// Vorschlagsliste der Platzhalter-Autovervollständigung
-// (ARIA-Listbox). Den Zustand (offen, aktiver Eintrag, Filter) hält
-// usePlaceholderInsert; die Komponente zeigt nur an und meldet Klicks.
-// mousedown.prevent hält den Fokus im Textfeld, sonst würde dessen Blur die
-// Liste schließen, bevor der Klick ankommt.
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  id: { type: String, required: true },
-  label: { type: String, required: true },
-  items: { type: Array, required: true },
-  open: { type: Boolean, required: true },
-  activeIndex: { type: Number, required: true },
-  optionId: { type: Function, required: true },
-})
+// Suggestion list of the placeholder autocompletion (ARIA listbox). The state
+// (open, active entry, filter) is held by usePlaceholderInsert; the component
+// only renders and reports clicks. mousedown.prevent keeps the focus in the
+// text field, otherwise its blur would close the list before the click arrives.
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps<{
+  id: string
+  label: string
+  items: T[]
+  open: boolean
+  activeIndex: number
+  optionId: (index: number) => string
+}>()
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['select'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ select: [item: T] }>()
 
-const listbox = ref(null)
+const listbox = ref<HTMLUListElement | null>(null)
 
-// Bei Pfeiltasten in einer langen Liste den aktiven Eintrag sichtbar halten.
+// Keep the active entry visible when using the arrow keys in a long list.
 watch(() => [props.open, props.activeIndex], async () => {
   if (!props.open) return
   await nextTick()
-  listbox.value.children[props.activeIndex].scrollIntoView({ block: 'nearest' })
+  listbox.value!.children[props.activeIndex]!.scrollIntoView({ block: 'nearest' })
 })
 </script>
 
@@ -36,7 +35,7 @@ watch(() => [props.open, props.activeIndex], async () => {
       :id="optionId(index)"
       :key="item.key"
       role="option"
-      :aria-selected="String(index === activeIndex)"
+      :aria-selected="index === activeIndex ? 'true' : 'false'"
       class="placeholder-suggestions__option"
       :class="{ 'is-active': index === activeIndex }"
       @mousedown.prevent

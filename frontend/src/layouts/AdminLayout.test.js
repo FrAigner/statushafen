@@ -8,13 +8,13 @@ import { setAuthAsPageRole } from '../test-support/pageRole'
 import { useTenant } from '../composables/useTenant'
 import AppIcon from '../components/AppIcon.vue'
 import AdminLayout from './AdminLayout.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { NAV_GROUPS } from '../utils/adminNav'
 
 const Empty = { template: '<div />' }
 
-// Seite, die ihr Laden meldet; so lässt sich prüfen, dass AdminLayout sie ohne
-// Leserecht gar nicht erst aufbaut (keine API-Aufrufe der Seite).
+// A page that reports its loading; this way we can check that AdminLayout does not
+// even build it without read permission (no API calls of the page).
 let probeMounted = 0
 const Probe = {
   setup() {
@@ -23,16 +23,16 @@ const Probe = {
   },
 }
 
-// Alle 'to'-Ziele aus AdminLayout.vue's navGroups müssen im Test-Router
-// auflösbar sein, sonst warnt vue-router bei jedem <router-link> lautstark
-// "No match found for location" (kein Fehler, aber unnötiger Test-Output-Lärm).
+// All 'to' targets of AdminLayout.vue's navGroups must be resolvable in the test router,
+// otherwise vue-router warns loudly on every <router-link>
+// "No match found for location" (not an error, but needless test output noise).
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: Empty },
       { path: '/status/:slug', component: Empty },
-      // wie router/index.js: Startseite (meta.home) und Tabs mit meta.permission.
+      // Like router/index.js: start page (meta.home) and tabs with meta.permission.
       { path: '/admin', component: Empty, meta: { home: true } },
       ...NAV_GROUPS.flatMap(g => g.items).filter(i => i.resource && i.to !== '/admin/overview' && i.to !== '/admin/components')
         .map(i => ({ path: i.to, component: Probe, meta: { permission: `${i.resource}:read`, ...(i.globalOnly ? { globalOnly: true } : {}) } })),
@@ -47,19 +47,19 @@ function makeRouter() {
   })
 }
 
-// Rechte kommen aus der Rolle der aktiven Seite; das Layout lädt sie
-// selbst von /api/me/pages, der Mock liefert deshalb dieselben Seiten zurück.
+// Permissions come from the role of the active page; the layout loads them
+// itself from /api/me/pages, so the mock returns the same pages.
 const pagesNow = () => JSON.parse(JSON.stringify(useTenant().myPages.value))
 function asPageRole(token, user) {
   setAuthAsPageRole(token, user)
   global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => pagesNow() })
 }
 
-// useTenant/useAuth halten modulglobalen Zustand. Ein nicht abgebautes Layout
-// reagiert auf JEDE spätere Änderung (activeTenantId, myPages, Route) mit Watchern und
-// Netzwerkaufrufen. Bei ~80 Tests häuften sich so bis zu 80 lebende Layouts an; die Tests
-// wurden pro Durchlauf langsamer (bis über 13 s) und liefen im Gesamtlauf in den Timeout.
-// Darum merkt sich dieser Helfer jede Instanz und baut sie nach jedem Test ab.
+// useTenant/useAuth hold module-global state. A layout that is not torn down
+// reacts to EVERY later change (activeTenantId, myPages, route) with watchers and
+// network calls. With ~80 tests up to 80 live layouts piled up; the tests
+// got slower per run (up to over 13 s) and ran into the timeout in the full run.
+// So this helper remembers every instance and tears it down after each test.
 const mounted = []
 function track(wrapper) {
   const unmount = wrapper.unmount.bind(wrapper)
@@ -76,7 +76,7 @@ async function mountLayout({ initialPath = '/admin/components', attach = false }
 
   const wrapper = track(mount(AdminLayout, {
     global: { plugins: [i18n, router] },
-    // Fokus-Tests brauchen ein echtes Dokument (document.activeElement).
+    // Focus tests need a real document (document.activeElement).
     ...(attach ? { attachTo: document.body } : {}),
   }))
   await flushPromises()
@@ -93,9 +93,9 @@ describe('AdminLayout', () => {
     useTenant().setActiveTenant(null)
     useTenant().setMyPages([])
     localStorage.clear()
-    // Tests assertieren auf den deutschen Wortlaut der übersetzten Nav-Labels;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of the translated nav labels;
+    // without a stored preference detectInitialLocale() would otherwise fall back to 'en'
+    // in the test environment (happy-dom navigator.language === 'en-US').
     i18n.global.locale.value = 'de'
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -105,14 +105,14 @@ describe('AdminLayout', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
-  // Ein abgebautes Layout darf auf den modulglobalen Zustand nicht mehr
-  // reagieren; ein liegengebliebenes lädt bei jedem Mandantenwechsel Ausfälle nach und
-  // machte die späten Tests der Datei so langsam, dass sie in den Timeout liefen.
+  // A torn-down layout must no longer react to the module-global state;
+  // a leftover one reloads outages on every tenant switch and
+  // made the late tests of the file so slow that they ran into the timeout.
   it('reagiert nach dem Abbauen nicht mehr auf den globalen Mandantenwechsel', async () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true })
     const { wrapper } = await mountLayout()
     wrapper.unmount()
-    wrapper.unmount() // zweites Abbauen (Tests bauen selbst ab, afterEach nochmals) ist harmlos
+    wrapper.unmount() // unmounting twice (tests unmount themselves, afterEach again) is harmless
     global.fetch.mockClear()
 
     useTenant().setActiveTenant(42)
@@ -121,7 +121,7 @@ describe('AdminLayout', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  // Glocke zwischen Theme-Knopf und Sprachwähler, nur mit passendem Recht.
+  // Bell between the theme button and the language picker, only with the matching permission.
   it('zeigt die Nachrichtenglocke zwischen Theme-Knopf und Sprachwähler, Betrachtern nicht', async () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
     const { wrapper } = await mountLayout()
@@ -135,7 +135,7 @@ describe('AdminLayout', () => {
     viewer.wrapper.unmount()
   })
 
-  // Die Token-Ebene „admin“ (Richtung C, tokens.css) hängt an dieser Klasse.
+  // The "admin" token layer (Direction C, tokens.css) hangs on this class.
   it('trägt die Token-Ebene theme-admin am Wurzelelement, nicht theme-public', async () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
     const { wrapper } = await mountLayout()
@@ -165,9 +165,9 @@ describe('AdminLayout', () => {
     expect(labels).not.toContain('Komponenten')
     expect(labels).not.toContain('Vorfälle')
     expect(labels).not.toContain('Wartungsfenster')
-    // Vorlagen haben ein eigenes Leserecht (incident_templates:read)
+    // Templates have their own read permission (incident_templates:read)
     expect(labels).not.toContain('Vorlagen')
-    // Einträge ohne perm/adminOnly bleiben sichtbar
+    // Entries without perm/adminOnly stay visible
     expect(labels).toContain('Dokumentation')
   })
 
@@ -183,7 +183,7 @@ describe('AdminLayout', () => {
 
   it('verlinkt Komponenten, Vorfälle und Wartungsfenster mit Icon', async () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
-    // Startpfad abseits der drei Ziele, damit ein leeres `to` (relativ zur aktuellen Route) auffällt.
+    // Start path away from the three targets, so an empty `to` (relative to the current route) stands out.
     const { wrapper } = await mountLayout({ initialPath: '/admin/tags' })
 
     for (const [href, label, icon] of [['/admin/components', 'Komponenten', 'grid'], ['/admin/incidents', 'Vorfälle', 'alert-triangle'], ['/admin/maintenance', 'Wartungsfenster', 'clock']]) {
@@ -194,8 +194,8 @@ describe('AdminLayout', () => {
     }
   })
 
-  // Das Backend erlaubt die SSO-Konfiguration mit sso:read auf
-  // der Seite; der Menüpunkt war trotzdem nur für Global Admins sichtbar.
+  // The backend allows the SSO configuration with sso:read on
+  // the page; the menu item was nevertheless only visible to global admins.
   it('zeigt SSO mit sso:read auf der aktiven Seite, ohne Berechtigung nicht', async () => {
     asPageRole('jwt-1', { email: 'user@x.de', is_global_admin: false, permissions: 'view' })
     useTenant().setMyPages([{ ID: 3, Name: 'Seite', Permissions: 'sso:read' }])
@@ -220,11 +220,11 @@ describe('AdminLayout', () => {
     expect(labels).not.toContain('Wartungsfenster')
   })
 
-  // Navigation je Seed-Rolle (Rechte wie database.SeedData), die
-  // Rolle hängt wie in echt an der aktiven Statusseite (/api/me/pages).
+  // Navigation per seed role (permissions like database.SeedData); the
+  // role hangs, as in reality, on the active status page (/api/me/pages).
   describe('Navigation je Rolle', () => {
     const ROLE_PERMS = {
-      // die Standardrollen als Create/Read/Update/Delete je Tab (wie database.SeedData).
+      // The default roles as create/read/update/delete per tab (like database.SeedData).
       Viewer: 'components:read,external_sources:read,incidents:read,maintenance:read,notices:read',
       Editor: 'components:read,external_sources:read,incidents:create,incidents:read,incidents:update,incidents:delete,'
         + 'maintenance:create,maintenance:read,maintenance:update,maintenance:delete,'
@@ -260,7 +260,7 @@ describe('AdminLayout', () => {
     ])('%s sieht genau die lesbaren Bereiche', async (role, expected, groups) => {
       const { wrapper } = await mountAsPageRole(role)
       expect(navLabels(wrapper)).toEqual(expected)
-      // Bereiche ohne sichtbaren Eintrag (Inhalte, Verwaltung) haben keinen Reiter, keine leeren <li>
+      // Areas without a visible entry (content, management) have no tab, no empty <li>
       expect(groupLabels(wrapper)).toEqual(groups)
       expect(wrapper.findAll('.area-items li').length).toBe(expected.length)
     })
@@ -318,9 +318,9 @@ describe('AdminLayout', () => {
     expect(useTenant().activeTenantId.value).toBe(5)
   })
 
-  // Nach einem Seiten-SSO-Login liefert /api/me/pages nur die
-  // SSO-Seite. Eine aus einer früheren Sitzung gespeicherte andere Seite
-  // (localStorage) darf dann nicht aktiv bleiben.
+  // After a page SSO login /api/me/pages returns only the
+  // SSO page. Another page stored from an earlier session
+  // (localStorage) must then not stay active.
   it('ersetzt einen gespeicherten Tenant, der nicht in der Seitenliste steht, durch die erste Seite', async () => {
     useAuth().setAuth('jwt-1', { email: 'v@x.de' })
     useTenant().setActiveTenant('9')
@@ -515,9 +515,9 @@ describe('AdminLayout', () => {
     })
   })
 
-  // Link zur Dokumentation im Bereich System, für alle Angemeldeten.
-  // Schalter „Hilfe-Tooltips anzeigen“ im Benutzermenü der Kopfzeile,
-  // wirkt sofort und wird am Benutzer gespeichert.
+  // Link to the documentation in the system area, for everyone signed in.
+  // Switch "show help tooltips" in the header's user menu,
+  // takes effect immediately and is stored on the user.
   it('zeigt den Hilfe-Tooltips-Schalter im Benutzermenü und speichert ihn', async () => {
     useAuth().setAuth('jwt', { email: 'a@b.de', is_global_admin: true })
     const { wrapper } = await mountLayout()
@@ -560,8 +560,8 @@ describe('AdminLayout', () => {
     wrapper.unmount()
   })
 
-  // Redesign Stufe 2: Bereichs-Reiter statt Seitenleiste.
-  // Ausfall-Banner für dauerhaft ausgefallene externe Quellen.
+  // Redesign stage 2: area tabs instead of a sidebar.
+  // Outage banner for permanently failed external sources.
   describe('Ausfall-Banner externer Quellen', () => {
     const outage = { source_id: 3, source_name: 'Example Cloud', base_url: 'https://status.example.com', since: '2026-10-29T11:10:00Z', last_error: 'HTTP 503' }
     function mockOutages(items, status = 200) {
@@ -742,9 +742,9 @@ describe('AdminLayout', () => {
       const header = wrapper.find('header.admin-topbar')
       expect(header.find('h1.topbar-brand .brand-name').text()).toBe('Statushafen')
       expect(header.find('h1.topbar-brand .brand-sub').text()).toBe('Admin')
-      // Logo statt blauem Punkt: dekoratives Bild (leeres alt), der Name steht im Text
+      // Logo instead of a blue dot: decorative image (empty alt), the name is in the text
       const logo = header.find('h1.topbar-brand img.brand-logo')
-      // Vite bindet kleine Dateien aus public/ im Test als data:-URL ein, im Build bleibt es /favicon.svg
+      // In tests Vite inlines small files from public/ as a data: URL, in the build it stays /favicon.svg
       expect(logo.attributes('src')).toMatch(/favicon\.svg$|^data:image\/svg\+xml/)
       expect(logo.attributes('alt')).toBe('')
       expect(header.find('.brand-dot').exists()).toBe(false)
@@ -869,7 +869,7 @@ describe('AdminLayout', () => {
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
 
-      // Ein Klick außerhalb bei geschlossenem Menü bleibt folgenlos.
+      // A click outside while the menu is closed has no effect.
       pointerdown(document.body)
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
@@ -884,7 +884,7 @@ describe('AdminLayout', () => {
 
       await panel.find('.user-menu-link').trigger('focusout', { relatedTarget: panel.findAll('.user-menu-link')[1].element })
       expect(wrapper.find('.user-menu-panel').exists()).toBe(true)
-      // Fokus ins Nichts (relatedTarget null, z. B. Fensterwechsel) schließt nicht
+      // Focus into nothing (relatedTarget null, e.g. a window switch) does not close
       await panel.find('.user-menu-link').trigger('focusout', { relatedTarget: null })
       expect(wrapper.find('.user-menu-panel').exists()).toBe(true)
 
@@ -1062,7 +1062,7 @@ describe('AdminLayout', () => {
       wrapper.unmount()
     })
   })
-  // Zugriffsprüfung je Tab (route.meta.permission) im Layout.
+  // Access check per tab (route.meta.permission) in the layout.
   describe('Zugriff auf Tabs', () => {
     const asRole = (perms, extra = {}) => {
       const pages = [{ ID: 7, Name: 'Acme', RoleName: 'Rolle', Permissions: perms }]
@@ -1108,7 +1108,7 @@ describe('AdminLayout', () => {
       const wrapper = mount(AdminLayout, { global: { plugins: [i18n, router] } })
       await flushPromises()
 
-      // Rollen laden noch: weder Seite noch „Keine Berechtigung“, ein Ladehinweis.
+      // Roles still loading: neither the page nor "no permission", but a loading hint.
       expect(probeMounted).toBe(0)
       expect(wrapper.find('h2').exists()).toBe(false)
       expect(wrapper.find('main [role="status"]').text()).toBe('Rechte werden geladen …')

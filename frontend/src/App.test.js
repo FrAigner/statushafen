@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils'
 import App from './App.vue'
 import i18n from './i18n'
 
-// Die App installiert den Submit-Wächter für novalidate-Formulare
-// (utils/formValidation.js) und entfernt ihn beim Aushängen wieder.
+// The app installs the submit guard for novalidate forms
+// (utils/formValidation.js) and removes it again on unmount.
 
 describe('App', () => {
   afterEach(() => {

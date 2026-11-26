@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -10,6 +10,11 @@ const router = useRouter()
 const { t } = useI18n()
 const { loginWithToken } = useAuth()
 const { apiFetch } = useApi()
+
+interface SsoExchangeResponse {
+  token: string
+  return_to?: string
+}
 
 onMounted(async () => {
   const params = new URLSearchParams(window.location.search)
@@ -23,7 +28,7 @@ onMounted(async () => {
   try {
     // The backend redeems the code only with the browser binding cookie set at
     // the login start (login CSRF); send it also to an API on another origin.
-    const result = await apiFetch('/api/auth/sso-exchange', {
+    const result = await apiFetch<SsoExchangeResponse>('/api/auth/sso-exchange', {
       method: 'POST',
       body: JSON.stringify({ code }),
       credentials: 'include'

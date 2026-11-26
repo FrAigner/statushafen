@@ -1,50 +1,62 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Zeilenmenü („…“) für Tabellenzeilen, ersetzt die Reihe
-  aus Übersetzungen/Bearbeiten/Löschen. Nach dem ARIA-Muster „Menu Button“.
+  Row menu ("…") for table rows, replaces the row of
+  translations/edit/delete. Follows the ARIA "Menu Button" pattern.
 
-  Eintrag: { key, label, icon?, to?, danger?, disabled? }. Mit `to` ist der
-  Eintrag ein Link (router-link), sonst ein Button; `select` meldet dessen key.
+  Entry: { key, label, icon?, to?, danger?, disabled? }. With `to` the entry
+  is a link (router-link), otherwise a button; `select` reports its key.
 
-  Tastatur
-  - Knopf: Enter/Leertaste/Pfeil unten öffnet und fokussiert den ersten
-    Eintrag, Pfeil oben den letzten.
-  - Menü: Pfeile bewegen (mit Umbruch), Home/End, Enter/Leertaste wählen,
-    Escape schließt und setzt den Fokus auf den Knopf zurück, Tab schließt.
-  - Klick außerhalb, Scrollen und Größenänderung schließen.
+  Keyboard
+  - Button: Enter/Space/Arrow down opens and focuses the first entry,
+    Arrow up the last one.
+  - Menu: arrows move (wrapping around), Home/End, Enter/Space select,
+    Escape closes and returns focus to the button, Tab closes.
+  - Clicking outside, scrolling and resizing close it.
 
-  Das Menü ist `position: fixed` (aus dem Knopf berechnet), weil die Tabelle
-  mit overflow arbeitet und das Menü der letzten Zeile sonst abgeschnitten
-  würde. Zielgröße 44 px (Knopf und Einträge).
+  The menu is `position: fixed` (computed from the button), because the
+  table uses overflow and the menu of the last row would be clipped
+  otherwise. Target size 44 px (button and entries).
 */
 import { nextTick, onBeforeUnmount, ref, useId, watch } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 import { useDismissable } from '../composables/useDismissable'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  label: { type: String, required: true },
-  items: { type: Array, required: true },
-  disabled: { type: Boolean, default: false },
+interface MenuItem {
+  key: string
+  label: string
+  icon?: string
+  to?: RouteLocationRaw
+  danger?: boolean
+  disabled?: boolean
+}
+
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  label: string
+  items: MenuItem[]
+  disabled?: boolean
+}>(), {
+  disabled: false,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['select'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ select: [key: string] }>()
 
 const uid = useId()
 const menuId = `row-menu-${uid}`
-const root = ref(null)
-const button = ref(null)
-const menu = ref(null)
+const root = ref<HTMLElement | null>(null)
+const button = ref<HTMLButtonElement | null>(null)
+const menu = ref<HTMLElement | null>(null)
 const open = ref(false)
-const position = ref({})
+const position = ref<Record<string, string>>({})
 
-const entries = () => [...menu.value.querySelectorAll('[role="menuitem"]:not([aria-disabled="true"])')]
+const entries = () => [...menu.value!.querySelectorAll<HTMLElement>('[role="menuitem"]:not([aria-disabled="true"])')]
 
 function place() {
-  const rect = button.value.getBoundingClientRect()
-  const height = menu.value.offsetHeight
-  // Nach unten, außer es passt dort nicht hin und oben ist Platz.
+  const rect = button.value!.getBoundingClientRect()
+  const height = menu.value!.offsetHeight
+  // Downwards, unless it does not fit there and there is room above.
   const flip = height > 0 && rect.bottom + height + 8 > window.innerHeight && rect.top > height + 8
   position.value = {
     insetInlineEnd: `${Math.max(window.innerWidth - rect.right, 8)}px`,
@@ -52,9 +64,9 @@ function place() {
   }
 }
 
-// Ein deaktivierter Knopf ist weder anklickbar noch fokussierbar; eine eigene
-// Sperre hier wäre toter Code.
-async function openMenu(which = 'first') {
+// A disabled button is neither clickable nor focusable; a separate guard
+// here would be dead code.
+async function openMenu(which: 'first' | 'last' = 'first') {
   open.value = true
   await nextTick()
   place()
@@ -68,7 +80,7 @@ function closeMenu(restoreFocus = false) {
   if (restoreFocus) button.value?.focus()
 }
 
-function onButtonKeydown(event) {
+function onButtonKeydown(event: KeyboardEvent) {
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
     openMenu(event.key === 'ArrowUp' ? 'last' : 'first')
@@ -80,16 +92,16 @@ function onToggle() {
   else openMenu()
 }
 
-function onMenuKeydown(event) {
+function onMenuKeydown(event: KeyboardEvent) {
   const list = entries()
-  const index = list.indexOf(document.activeElement)
+  const index = list.indexOf(document.activeElement as HTMLElement)
   const last = list.length - 1
-  const target = {
+  const target = ({
     ArrowDown: index >= last ? 0 : index + 1,
     ArrowUp: index <= 0 ? last : index - 1,
     Home: 0,
     End: last,
-  }[event.key]
+  } as Record<string, number | undefined>)[event.key]
   if (target !== undefined) {
     event.preventDefault()
     list[target]?.focus()
@@ -104,30 +116,31 @@ function onMenuKeydown(event) {
     closeMenu()
     return
   }
-  // Leertaste löst bei Links nichts aus; wie Enter behandeln.
+  // Space does nothing on links; treat it like Enter.
   if (event.key === ' ') {
     event.preventDefault()
-    document.activeElement?.click()
+    const active = document.activeElement as HTMLElement | null
+    active?.click()
   }
 }
 
-function onSelect(item) {
+function onSelect(item: MenuItem) {
   closeMenu(true)
   emit('select', item.key)
 }
 
-// Ein Link navigiert selbst; das Menü schließt nur, der Fokus bleibt der Navigation überlassen.
+// A link navigates by itself; the menu only closes, focus is left to the navigation.
 const onLink = () => closeMenu()
 
 // Click/tap outside closes; Escape is handled in onMenuKeydown (focus returns to the button).
 useDismissable(open, [root], () => closeMenu(), { escape: false })
 const onViewportChange = () => closeMenu()
 
-const listeners = [
+const listeners: [event: 'scroll' | 'resize', handler: () => void, capture: boolean][] = [
   ['scroll', onViewportChange, true],
   ['resize', onViewportChange, false],
 ]
-const eventTarget = event => (event === 'resize' ? window : document)
+const eventTarget = (event: 'scroll' | 'resize'): EventTarget => (event === 'resize' ? window : document)
 
 watch(open, (isOpen) => {
   for (const [event, handler, capture] of listeners) {

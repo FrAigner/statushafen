@@ -8,9 +8,9 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { componentTreeFixture } from '../../test-support/componentTree'
 import AdminIncidents from './AdminIncidents.vue'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 
-// Sprachumschalter im Vorfall-Formular.
+// Language switcher in the incident form.
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }]
@@ -106,7 +106,7 @@ describe('AdminIncidents: Sprachumschalter', () => {
     await fieldByLabel(wrapper, 'Titel').setValue('English title')
     await tab('Deutsch').trigger('click')
     expect(fieldByLabel(wrapper, 'Titel').element.value).toBe('Deutsch-Titel')
-    expect(tab('English').text()).toBe('🇬🇧 English · leer') // nur Titel: noch nicht ausgefüllt
+    expect(tab('English').text()).toBe('🇬🇧 English · leer') // title only: not filled in yet
   })
 
   it('speichert Vorfall und Übersetzung: erst POST, dann PUT je Sprache mit der neuen ID, Entwurf ohne Haken', async () => {
@@ -122,7 +122,7 @@ describe('AdminIncidents: Sprachumschalter', () => {
     await flushPromises()
 
     const puts = calls(fetchMock, 'PUT', /\/translations\//)
-    expect(puts).toHaveLength(1) // Französisch bleibt leer und wird nicht gespeichert
+    expect(puts).toHaveLength(1) // French stays empty and is not saved
     expect(puts[0][0]).toBe('/api/incidents/99/translations/en')
     expect(JSON.parse(puts[0][1].body)).toEqual({ title: 'API down', message: 'API is not responding', status: 'draft' })
     expect(wrapper.find('.alert-success').exists()).toBe(true)

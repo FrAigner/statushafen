@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import OrderSetPasswordPage from './OrderSetPasswordPage.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -96,7 +96,7 @@ describe('OrderSetPasswordPage', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Mindestlänge im Formular (minlength + Hinweis) und vor dem Senden.
+  // Minimum length in the form (minlength + hint) and before sending.
   it('zeigt Hinweis und minlength und sendet ein zu kurzes Passwort nicht ab', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ slug: 'acme' }, 200))
     const { wrapper } = await mountSetPasswordPage({ fetchImpl: fetchMock })
@@ -116,7 +116,7 @@ describe('OrderSetPasswordPage', () => {
   it('sendet ein zu langes Passwort (mehr als 72 Byte) nicht ab', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ slug: 'acme' }, 200))
     const { wrapper } = await mountSetPasswordPage({ fetchImpl: fetchMock })
-    // 40 Umlaute sind 80 Byte, aber nur 40 Zeichen.
+    // 40 umlauts are 80 bytes, but only 40 characters.
     const long = 'ä'.repeat(40)
     await wrapper.find('#order-password').setValue(long)
     await wrapper.find('#order-password-confirm').setValue(long)
@@ -153,7 +153,7 @@ describe('OrderSetPasswordPage', () => {
     expect(wrapper.find('.order-setpw-form-error').text()).toContain('mindestens 8 Zeichen lang sein')
   })
 
-  // Pflichtfelder tragen Stern (Klasse), aria-required und den Hinweis.
+  // Required fields carry an asterisk (class), aria-required and the hint.
   it('kennzeichnet Pflichtfelder mit Stern, aria-required und Hinweis', async () => {
     const { wrapper } = await mountSetPasswordPage()
     expect(wrapper.find('label[for="order-password"]').classes()).toContain('onyx-required-marker')

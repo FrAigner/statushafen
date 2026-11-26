@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { vueSources, templatePart, startTags } from '../../test-support/templateScan.js'
+import { vueSources, templatePart, startTags } from '../../test-support/templateScan'
 
-// Redesign Stufe 4d, Verwaltung/System: Schutz gegen den Rückfall in
-// Inline-Styles und in eine zweite h1.
+// Redesign stage 4d, administration/system: protection against falling back to
+// inline styles and to a second h1.
 //
-// - Die Verwaltungs-Views haben keine Inline-Styles mehr (style="…" und
-//   :style="…"). Layout, Abstände und Farben stehen in Klassen und Tokens;
-//   Farben für Kategorien/Status kommen aus Klassen, nicht aus Hex im Template.
-// - Die Admin-Topbar trägt die h1 (Marke). Die Seitentitel dieser Views sind
-//   h2 (PageHeader :level="2"); ein <h1> im Template würde die Überschriftenfolge
-//   brechen.
+// - The administration views no longer have inline styles (style="…" and
+//   :style="…"). Layout, spacing and colours are in classes and tokens;
+//   colours for categories/status come from classes, not from hex in the template.
+// - The admin top bar carries the h1 (brand). The page titles of these views are
+//   h2 (PageHeader :level="2"); an <h1> in the template would break the heading
+//   order.
 const VIEWS = [
   'views/admin/AdminStatusPages.vue',
   'views/admin/AdminUsers.vue',

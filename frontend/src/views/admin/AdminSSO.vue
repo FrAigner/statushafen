@@ -1,8 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-// v8 meldet im vollen Testlauf die Getter-Zeile dieses Imports als nicht
-// ausgeführt (Lazy-Loading-Test lädt die View ohne Rendern; gleiches Bild in
-// AdminLanguages, AdminUsers u. a.), obwohl AdminSSO.test.js sie rendert.
+// In the full test run v8 reports the getter line of this import as not
+// executed (the lazy-loading test loads the view without rendering; same in
+// AdminLanguages, AdminUsers and others), although AdminSSO.test.js renders it.
 /* v8 ignore next */
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -17,16 +17,17 @@ import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import FormField from '../../components/FormField.vue'
 import { confirmDialog } from '../../composables/useConfirm'
 import { safeIdpRedirect } from '../../utils/safeIdpRedirect'
+import type { SsoConfig, SsoForm } from '../../types/admin'
 
-// OIDC-Konfiguration der aktiven Statusseite. Die Seite kommt wie
-// in den übrigen Admin-Views aus useTenant (Auswahl im AdminLayout), nicht aus
-// der Route; Requests laufen über apiFetch (Auth-Header, 403-Erkennung) an
-// /api/admin/pages/:page_id/sso mit den oidc_*-Feldern des Backends.
+// OIDC configuration of the active status page. As in the other admin views
+// the page comes from useTenant (selection in AdminLayout), not from the
+// route; requests go through apiFetch (auth header, 403 detection) to
+// /api/admin/pages/:page_id/sso with the backend's oidc_* fields.
 //
-// Das Rollen-Mapping aus einem Claim (oidc_attribute_role) ist
-// bewusst nicht im Formular: Den IdP einer Seite kontrolliert deren Admin, eine
-// Rolle aus seinem Claim wäre eine Rechteausweitung an der Rollenverwaltung
-// vorbei. Neu ist die Testanmeldung (test_login_enabled).
+// Role mapping from a claim (oidc_attribute_role) is deliberately not in the
+// form: a page's IdP is controlled by that page's admin, and a role from its
+// claim would be a privilege escalation that bypasses role management. New is
+// the test login (test_login_enabled).
 //
 // SAML is gone; page SSO is OIDC only. If an older backend still sends saml_*
 // fields, applyConfig only takes over the keys of emptyForm.
@@ -35,10 +36,10 @@ const { t, te } = useI18n()
 const breadcrumbs = usePageCrumbs(computed(() => t('admin.sso.title')))
 const { apiFetch } = useApi()
 const { activeTenantId } = useTenant()
-// Rechte der Ressource sso. Ohne Ändern sind die Felder gesperrt, ohne Löschen entfällt der Knopf.
+// Permissions of the sso resource. Without update the fields are locked, without delete the button is gone.
 const { canUpdate, canDelete } = useResourcePerms('sso')
 
-const emptyForm = () => ({
+const emptyForm = (): SsoForm => ({
   oidc_enabled: false,
   oidc_discovery_url: '',
   oidc_client_id: '',
@@ -54,11 +55,11 @@ const acsUrl = ref('')
 // Last loaded issuer. If it changes on save, the backend deletes the page's
 // links; the page warns beforehand.
 const loadedIssuer = ref('')
-const oidcIssuerOf = (url) => url.trim().replace(/\/\.well-known\/openid-configuration$/, '')
+const oidcIssuerOf = (url: string) => url.trim().replace(/\/\.well-known\/openid-configuration$/, '')
 const identityResetWarning = computed(() =>
   loadedIssuer.value !== '' && loadedIssuer.value !== oidcIssuerOf(form.value.oidc_discovery_url))
-// GET liefert das Secret nie aus, nur ob eins gespeichert ist. Ein leeres Feld
-// behält dann beim Speichern das gespeicherte (Backend).
+// GET never returns the secret, only whether one is stored. An empty field
+// then keeps the stored one on save (backend).
 const secretSet = ref(false)
 const loading = ref(false)
 const loadFailed = ref(false)
@@ -69,10 +70,9 @@ const alertType = ref('success')
 
 const ssoUrl = () => `/api/admin/pages/${activeTenantId.value}/sso`
 
-// Ergebnis der Testanmeldung, das der OIDC-Callback als
-// ?oidc_test=<ok|code>&missing=email,name zurückgibt. Nur bekannte Codes und
-// Claim-Schlüssel werden angezeigt, fehlende Claims unter ihrem konfigurierten
-// Namen.
+// Result of the test login, which the OIDC callback returns as
+// ?oidc_test=<ok|code>&missing=email,name. Only known codes and claim keys
+// are shown, missing claims under their configured name.
 const testParams = new URLSearchParams(window.location.search)
 const testCode = ref(testParams.get('oidc_test'))
 const testMissing = (testParams.get('missing') || '').split(',').filter((k) => k === 'email' || k === 'name')
@@ -84,41 +84,41 @@ const testResult = computed(() => {
   }
   const okMsg = t('admin.sso.testOk')
   if (testMissing.length === 0) return { type: 'success', msg: okMsg }
-  const claims = testMissing.map((k) => form.value[`oidc_attribute_${k}`] || k).join(', ')
+  const claims = testMissing.map((k) => form.value[`oidc_attribute_${k}` as keyof SsoForm] || k).join(', ')
   return { type: 'warning', msg: `${okMsg} ${t('admin.sso.testMissingClaims', { claims })}` }
 })
 
 const startTest = async () => {
   try {
-    const { url } = await apiFetch(`${ssoUrl()}/test`, { method: 'POST' })
+    const { url }: { url: string } = await apiFetch(`${ssoUrl()}/test`, { method: 'POST' })
     const target = safeIdpRedirect(url)
     if (!target) throw new Error(t('auth.oidcErrors.unsafe_redirect'))
     window.location.assign(target)
   } catch (err) {
     if (isForbidden(err)) forbidden.value = true
-    else showAlert(t('admin.sso.testStartError', { message: err.message }), 'error')
+    else showAlert(t('admin.sso.testStartError', { message: (err as Error).message }), 'error')
   }
 }
 
-const showAlert = (msg, type) => {
+const showAlert = (msg: string, type: string) => {
   alertMsg.value = msg
   alertType.value = type
 }
 
-// GET und PUT liefern alle Formularfelder (auch ohne gespeicherte Config).
-// Das Secret-Feld startet immer leer.
-const applyConfig = (cfg) => {
-  form.value = Object.fromEntries(Object.keys(emptyForm()).map((k) => [k, cfg[k]]))
+// GET and PUT return all form fields (even without a stored config).
+// The secret field always starts empty.
+const applyConfig = (cfg: SsoConfig) => {
+  form.value = Object.fromEntries(Object.keys(emptyForm()).map((k) => [k, cfg[k as keyof SsoForm]])) as unknown as SsoForm
   form.value.oidc_client_secret = ''
   acsUrl.value = cfg.oidc_acs_url
   secretSet.value = cfg.oidc_client_secret_set
   loadedIssuer.value = oidcIssuerOf(cfg.oidc_discovery_url)
 }
 
-// 403 -> Berechtigungsmeldung statt Fehler-Alert.
-const handleError = (err, prefix) => {
+// 403 -> permission notice instead of an error alert.
+const handleError = (err: unknown, prefix: string) => {
   if (isForbidden(err)) forbidden.value = true
-  else showAlert(prefix + err.message, 'error')
+  else showAlert(prefix + (err as Error).message, 'error')
 }
 
 const loadConfig = async () => {
@@ -153,7 +153,7 @@ const saveConfig = async () => {
 }
 
 const deleteConfig = async () => {
-  // URL vor dem Dialog bilden, damit ein Seitenwechsel währenddessen nicht die falsche Seite trifft.
+  // Build the URL before the dialog so that a page switch meanwhile does not hit the wrong page.
   const url = ssoUrl()
   if (!(await confirmDialog({ message: t('admin.sso.deleteConfirm') }))) return
   try {
@@ -185,7 +185,7 @@ const deleteConfig = async () => {
     <div v-else-if="loading" class="text-muted" role="status" aria-busy="true">{{ t('common.loading') }}</div>
     <div v-else-if="loadFailed" class="alert alert-error" role="alert">{{ t('admin.sso.loadError') }}</div>
 
-    <!-- Richtung C: je Verfahren eine Karte mit Titel, ein gemeinsames Formular. -->
+    <!-- Direction C: one card with a title per method, one shared form. -->
     <form novalidate v-else class="sso-form edit-form" @submit.prevent="saveConfig">
       <p v-if="!canUpdate" class="form-lock-hint" role="status">{{ t('common.readOnlyForm') }}</p>
       <fieldset class="form-lock" :disabled="!canUpdate">

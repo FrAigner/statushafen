@@ -1,39 +1,40 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Konto löschen (DSGVO Art. 17) - eigener Baustein statt
-  Code direkt in ProfileView.vue, damit parallele Arbeiten an der Profilseite
-  nur eine Zeile Einbindung teilen.
+  Delete account (GDPR Art. 17) - a separate component instead of
+  code directly in ProfileView.vue, so parallel work on the profile page
+  only shares one line of inclusion.
 
-  Ablauf: Der Bestätigungsdialog verlangt die E-Mail-Adresse (alle Konten) und
-  das Passwort (Konten mit Passwort, bei SSO-Konten leer lassen). Ist der
-  Nutzer einziger Admin von Statusseiten, antwortet DELETE /api/me mit 409 und
-  der Liste dieser Seiten; der Dialog nennt sie und verlangt eine zweite,
-  ausdrückliche Bestätigung, bevor er sie per confirm_delete_page_ids
-  mitlöschen lässt.
+  Flow: the confirmation dialog asks for the email address (all accounts) and
+  the password (accounts with a password; leave empty for SSO accounts). If the
+  user is the sole admin of status pages, DELETE /api/me answers 409 with
+  the list of those pages; the dialog names them and asks for a second,
+  explicit confirmation before it lets them be deleted along with the account
+  via confirm_delete_page_ids.
 */
 import { ref, computed, inject } from 'vue'
-// v8 meldet im vollen Testlauf an dieser Importzeile einen nie durchlaufenen
-// Zweig, den es im Quelltext nicht gibt (Zuordnung des SFC-Compilats, gleiches
-// Muster wie in AdminSSO.vue); die Komponente ist in AccountDeletion.test.js
-// vollständig getestet.
+// In the full test run v8 reports a never-taken branch on this import line
+// that does not exist in the source (mapping of the compiled SFC, same
+// pattern as in AdminSSO.vue); the component is fully tested in
+// AccountDeletion.test.js.
 /* v8 ignore next */
 import { useI18n } from 'vue-i18n'
 import { routerKey } from 'vue-router'
 import { useApi, isForbidden } from '../composables/useApi'
 import { useAuth } from '../composables/useAuth'
 import AppIcon from './AppIcon.vue'
+import type { ApiError, SoleAdminPage } from '../types/api'
 
 const { t } = useI18n()
 const { apiFetch } = useApi()
 const { logout } = useAuth()
-// inject mit Default statt useRouter(): ohne Router (z. B. im Profil-Test)
-// keine Vue-Warnung, das Abmelden funktioniert trotzdem.
+// inject with a default instead of useRouter(): without a router (e.g. in the
+// profile test) there is no Vue warning, and signing out still works.
 const router = inject(routerKey, null)
 
 const dialogOpen = ref(false)
 const confirmEmail = ref('')
 const password = ref('')
-const affectedPages = ref([])
+const affectedPages = ref<SoleAdminPage[]>([])
 const pagesAcknowledged = ref(false)
 const errorMsg = ref('')
 const isDeleting = ref(false)
@@ -59,19 +60,20 @@ const closeDialog = () => {
 
 // Sessions that may not act on the account (custom domain, page SSO) get the
 // server's translated reason instead of "confirmation invalid".
-const SESSION_CODES = ['custom_domain_session', 'page_sso_session']
+const SESSION_CODES: (string | undefined)[] = ['custom_domain_session', 'page_sso_session']
 
-const errorMessageFor = (err) => {
-  if (SESSION_CODES.includes(err.data?.code)) return t(`api.errors.${err.data.code}`)
+const errorMessageFor = (err: ApiError) => {
+  const code = err.data?.code
+  if (SESSION_CODES.includes(code)) return t(`api.errors.${code}`)
   if (isForbidden(err)) return t('accountDeletion.confirmationInvalid')
-  if (err.data?.code === 'last_global_admin') return t('accountDeletion.lastGlobalAdmin')
+  if (code === 'last_global_admin') return t('accountDeletion.lastGlobalAdmin')
   return t('accountDeletion.error')
 }
 
 const submit = async () => {
   isDeleting.value = true
   errorMsg.value = ''
-  const body = { confirm_email: confirmEmail.value, password: password.value }
+  const body: { confirm_email: string, password: string, confirm_delete_page_ids?: number[] } = { confirm_email: confirmEmail.value, password: password.value }
   if (affectedPages.value.length > 0) {
     body.confirm_delete_page_ids = affectedPages.value.map((p) => p.id)
   }
@@ -79,11 +81,13 @@ const submit = async () => {
     await apiFetch('/api/me', { method: 'DELETE', body: JSON.stringify(body) })
     logout()
     router?.push('/login')
-  } catch (err) {
+  } catch (caught) {
+    const err = caught as ApiError
     if (err.data?.code === 'sole_admin_pages') {
-      // Zweite Stufe: Seiten nennen und erneut ausdrücklich bestätigen lassen,
-      // auch wenn sich die Liste seit der ersten Bestätigung geändert hat.
-      affectedPages.value = err.data.pages
+      // Second step: name the pages and ask for explicit confirmation again,
+      // even if the list changed since the first confirmation.
+      // ApiErrorBody types `pages` as string[]; for this code the backend sends objects.
+      affectedPages.value = err.data.pages as unknown as SoleAdminPage[]
       pagesAcknowledged.value = false
     } else {
       errorMsg.value = errorMessageFor(err)

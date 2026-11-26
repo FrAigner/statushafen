@@ -8,11 +8,11 @@ import AdminIncidentTranslations from './AdminIncidentTranslations.vue'
 import AdminComponentTranslations from './AdminComponentTranslations.vue'
 import AdminGeneralNoticeTranslations from './AdminGeneralNoticeTranslations.vue'
 
-// Die Admin-Übersetzungsseiten luden ihre Tabelle über die
-// öffentliche Route, die nur bestätigte Übersetzungen liefert. Ein frisch
-// angelegter Entwurf verschwand nach dem Speichern, "Bestätigen" erschien
-// nie. Der Fake-Server hier verhält sich wie das Backend: die öffentliche
-// Route filtert auf `confirmed`, nur `/translations/all` liefert Entwürfe.
+// The admin translation pages loaded their table via the
+// public route, which only returns confirmed translations. A freshly
+// created draft disappeared after saving, "Confirm" never
+// appeared. The fake server here behaves like the backend: the public
+// route filters on `confirmed`, only `/translations/all` returns drafts.
 
 const views = [
   {
@@ -36,8 +36,8 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// fakeBackend hält die Übersetzungen als Zustand und bildet die
-// Status-Filterung der echten Routen nach.
+// fakeBackend holds the translations as state and mimics the
+// status filtering of the real routes.
 function fakeBackend(view) {
   const rows = [{ ID: 1, LanguageCode: 'de', Title: 'Bestätigt', [view.contentKey]: 'x', Status: 'confirmed' }]
   const collection = `/api/${view.segment}/1/translations`
@@ -51,8 +51,8 @@ function fakeBackend(view) {
       return jsonResponse([{ ID: 1, Code: 'de', Name: 'Deutsch' }, { ID: 2, Code: 'fr', Name: 'Français' }])
     }
     if (method === 'GET' && url === collection) return jsonResponse(rows.filter(r => r.Status === 'confirmed'))
-    // Kopie wie nach dem JSON-Parsen: dieselbe Array-Instanz erneut zu liefern würde
-    // Vues Änderungserkennung (und die Tabelle in ResponsiveTable) umgehen.
+    // A copy as after JSON parsing: returning the same array instance again would
+    // bypass Vue's change detection (and the table in ResponsiveTable).
     if (method === 'GET' && url === `${collection}/all`) return jsonResponse(rows.map(r => ({ ...r })))
     if (method === 'POST' && url === collection) {
       const body = JSON.parse(options.body)
@@ -69,8 +69,8 @@ function fakeBackend(view) {
   })
 }
 
-// Bestätigen ist bei Komponenten und Ankündigungen ein Eintrag im Zeilenmenü (Richtung C),
-// bei Vorfällen noch ein Zeilenknopf.
+// Confirm is a row menu entry for components and notices (direction C),
+// still a row button for incidents.
 const confirmButtons = (wrapper) => wrapper.findAll('button').filter(b => b.text().includes('Bestätigen'))
 
 describe('Admin-Übersetzungen: Entwürfe bleiben sichtbar', () => {
@@ -78,7 +78,7 @@ describe('Admin-Übersetzungen: Entwürfe bleiben sichtbar', () => {
 
   beforeEach(() => {
     i18n.global.locale.value = 'de'
-    // Neu/Bestätigen hängen an *:write auf der aktiven Seite.
+    // New/confirm depend on *:write on the active page.
     useAuth().setAuth('jwt-1', { permissions: '' })
     useTenant().setMyPages([{ ID: 1, Permissions: 'incidents:write,components:write,notices:write' }])
     useTenant().setActiveTenant('1')
@@ -108,7 +108,7 @@ describe('Admin-Übersetzungen: Entwürfe bleiben sichtbar', () => {
 
     const draftRow = wrapper.findAll('tbody tr').find(r => r.text().includes('Entwurf FR'))
     expect(draftRow, 'Entwurf fehlt nach dem Speichern').toBeTruthy()
-    // der Status steht als Badge mit Text in der UI-Sprache (Vorfall) bzw. als Rohwert.
+    // the status is a badge with text in the UI language (incident) or the raw value.
     expect(draftRow.text()).toMatch(/draft|Entwurf/)
     expect(confirmButtons(wrapper)).toHaveLength(1)
 

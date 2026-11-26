@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import AdminRoles from './AdminRoles.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function rolesFixture() {
@@ -32,7 +32,7 @@ function makeFetchRouter({ loadOk = true, writeOk = true } = {}) {
 
 let activeWrapper = null
 
-// Zeilenaktionen stehen im Zeilenmenü (RowMenu), die Einträge sind auch geschlossen im DOM.
+// Row actions are in the row menu (RowMenu); the entries are in the DOM even when it is closed.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 
 async function mountAdminRoles({ fetchImpl, isGlobalAdmin = true } = {}) {
@@ -64,12 +64,12 @@ describe('AdminRoles', () => {
 
     const row = wrapper.find('tbody tr')
     expect(row.text()).toContain('Viewer')
-    // kompakte Zusammenfassung statt einer Pille je Recht.
+    // compact summary instead of one pill per permission.
     expect(row.findAll('.tag-pill').map(p => p.text())).toEqual(['Komponenten: R', 'Vorfälle: R'])
   })
 
-  // Die Rechte-Liste läuft auch bei vielen Rechten nicht über: höchstens
-  // drei Einträge plus „+n“, die Zelle trägt die vollständige Aufzählung.
+  // The permission list does not overflow even with many permissions: at most
+  // three entries plus "+n"; the cell carries the full list.
   it('kürzt die Rechte-Liste einer Rolle mit vielen Rechten auf wenige Einträge', async () => {
     const all = ['components', 'incidents', 'maintenance', 'notices', 'subscribers', 'sso', 'languages']
       .flatMap(r => ['create', 'read', 'update', 'delete'].map(a => `${r}:${a}`)).join(',')
@@ -113,7 +113,7 @@ describe('AdminRoles', () => {
     await wrapper.find('form.edit-form').trigger('submit.prevent')
     await flushPromises()
 
-    // Ändern setzt Lesen mit.
+    // Update implies read.
     expect(fetchMock).toHaveBeenCalledWith('/api/roles', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ Name: 'Editor', Permissions: 'incidents:update,incidents:read' }),
@@ -132,8 +132,8 @@ describe('AdminRoles', () => {
     expect(wrapper.find('input[value="incidents:update"]').element.checked).toBe(false)
   })
 
-  // Eine Rolle im Altformat (nicht migrierte Datenbank oder Alt-Server) lädt im
-  // Editor als CRUD; Speichern schreibt nie mehr ":write".
+  // A role in the legacy format (unmigrated database or old server) loads in the
+  // editor as CRUD; saving never writes ":write" again.
   it('lädt eine Alt-Rolle mit :write als create/read/update/delete und speichert sie ohne :write', async () => {
     const fetchMock = vi.fn(async (url, options = {}) => (options.method === 'PUT'
       ? jsonResponse({})
@@ -152,8 +152,8 @@ describe('AdminRoles', () => {
     expect(put[1].body).not.toContain(':write')
   })
 
-  // Die Matrix muss in die Formularbreite passen: sie steht in der Formularkarte, ihr
-  // Scrollbereich begrenzt sich selbst (siehe PermissionMatrix.test.js für die CSS-Regeln).
+  // The matrix must fit into the form width: it sits in the form card, and its
+  // scroll area limits itself (see PermissionMatrix.test.js for the CSS rules).
   it('zeigt die Matrix innerhalb der Formularkarte mit allen vier Aktionsspalten', async () => {
     const { wrapper } = await mountAdminRoles()
     await menuItem(wrapper.find('tbody tr'), 'Bearbeiten').trigger('click')
@@ -244,8 +244,8 @@ describe('AdminRoles', () => {
 
     const put = fetchMock.mock.calls.find(([, o]) => o?.method === 'PUT')
     const saved = JSON.parse(put[1].body).Permissions.split(',')
-    // Zeile „Ankündigungen“ vollständig, Spalte „Lesen“ für alle Seiten-Tabs, Sonderrecht,
-    // globale Tabs bleiben gesperrt (kein users:read).
+    // Row "Notices" complete, column "Read" for all page tabs, special permission;
+    // global tabs stay locked (no users:read).
     expect(saved).toEqual(expect.arrayContaining(['notices:create', 'notices:read', 'notices:update', 'notices:delete', 'admin_dashboard', 'components:read', 'incidents:read', 'sso:read', 'subscribers:read']))
     expect(saved.some(p => p.startsWith('users:') || p.startsWith('roles:'))).toBe(false)
     expect(saved.some(p => p.endsWith(':write'))).toBe(false)
@@ -270,8 +270,8 @@ describe('AdminRoles', () => {
     expect(wrapper.find('.alert-warning').text()).toContain('Löschen fehlgeschlagen')
   })
 
-  // Richtung C: Kartenkopf, Untertitel mit Zählung, Suche,
-  // Formular als Seitenkarte mit Namen im Titel, Fehler am Feld.
+  // Direction C: card header, subtitle with a count, search,
+  // form as a side card with the name in the title, error at the field.
   it('zeigt Kartenkopf und Untertitel mit Zählung', async () => {
     const { wrapper } = await mountAdminRoles()
     expect(wrapper.find('.comp-card__title').text()).toBe('Alle Rollen')
@@ -297,7 +297,7 @@ describe('AdminRoles', () => {
     expect(wrapper.find('aside.form-panel').exists()).toBe(false)
   })
 
-  // Regression: ein leerer Rollenname ging bisher als Serveranfrage raus.
+  // Regression: an empty role name used to go out as a server request.
   it('meldet einen leeren Rollennamen am Feld und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountAdminRoles({ fetchImpl: fetchMock })
@@ -323,8 +323,8 @@ describe('AdminRoles', () => {
     expect(rows[1].findAll('.tag-pill')).toHaveLength(0)
   })
 
-  // Stufe 4d: Seitentitel ist eine h2 (die Admin-Topbar trägt die h1),
-  // die leere Liste zeigt den Leerzustand statt einer leeren Tabelle.
+  // Stage 4d: the page title is an h2 (the admin top bar carries the h1);
+  // the empty list shows the empty state instead of an empty table.
   it('rendert den Titel als h2 ohne h1 und zeigt bei leerer Liste den Leerzustand', async () => {
     const { wrapper } = await mountAdminRoles({
       fetchImpl: vi.fn(async () => jsonResponse([])),

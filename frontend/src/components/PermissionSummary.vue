@@ -1,31 +1,38 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RESOURCES, ACTIONS, grantsAdminArea } from '../utils/permissions'
 import { NAV_GROUPS } from '../utils/adminNav'
+import type { NavItem } from '../utils/adminNav'
+
+type ResourceItem = NavItem & { resource: string }
+const hasResource = (item: NavItem): item is ResourceItem => Boolean(item.resource)
 import { summarizePermissions } from '../utils/permissionMatrix'
 
-// Rechte einer Rolle kompakt für die Rollenliste, z. B.
-// „Komponenten: CRUD“ statt vieler einzelner Rechte-Pillen. Es erscheinen die
-// ersten `max` Ressourcen, der Rest steht als „+n“; die vollständige Aufzählung
-// steht im Tooltip und für Screenreader im Text (die sichtbaren Kürzel sind
-// aria-hidden, „CRUD“ allein sagt Screenreadern nichts). Sind alle Tabs
-// vollständig vergeben, steht „Alle Rechte“. Die Chips brechen um und kürzen zu
-// lange Namen, die Zelle läuft nie über.
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  permissions: { type: String, default: '' },
-  max: { type: Number, default: 3 },
+// Compact permissions of a role for the role list, e.g. "Components: CRUD"
+// instead of many single permission pills. The first `max` resources appear,
+// the rest shows as "+n"; the full listing is in the tooltip and, for screen
+// readers, in the text (the visible abbreviations are aria-hidden, "CRUD" alone
+// tells screen readers nothing). If every tab is fully granted, it says
+// "All permissions". The chips wrap and truncate overly long names, the cell
+// never overflows.
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  permissions?: string
+  max?: number
+}>(), {
+  permissions: '',
+  max: 3,
 })
 // Stryker restore all
 const { t, te } = useI18n()
 
 const labelKeys = Object.fromEntries(
-  NAV_GROUPS.flatMap(g => g.items).filter(i => i.resource).map(i => [i.resource, i.labelKey]))
-const resourceKeys = NAV_GROUPS.flatMap(g => g.items).filter(i => i.resource).map(i => i.resource)
+  NAV_GROUPS.flatMap(g => g.items).filter(hasResource).map(i => [i.resource, i.labelKey]))
+const resourceKeys = NAV_GROUPS.flatMap(g => g.items).filter(hasResource).map(i => i.resource)
 
-const label = (resource) => t(`adminNav.items.${labelKeys[resource]}`)
-const specialLabel = (key) => (te(`roles.matrix.labels.${key}`) ? t(`roles.matrix.labels.${key}`) : key)
+const label = (resource: string) => t(`adminNav.items.${labelKeys[resource]}`)
+const specialLabel = (key: string) => (te(`roles.matrix.labels.${key}`) ? t(`roles.matrix.labels.${key}`) : key)
 
 const summary = computed(() => summarizePermissions(props.permissions, resourceKeys))
 // Without an admin right the role is "status page only"; admin_dashboard has
@@ -35,7 +42,7 @@ const pageOnly = computed(() => !grantsAdminArea(props.permissions))
 const everything = computed(() => summary.value.rows.length === RESOURCES.length
   && summary.value.rows.every(r => r.actions.length === ACTIONS.length))
 
-// Alle Einträge als Chips: Ressource mit Kürzeln, dann Sonderrechte.
+// All entries as chips: resource with abbreviations, then special permissions.
 const chips = computed(() => [
   ...summary.value.rows.map(r => ({ key: r.resource, text: `${label(r.resource)}: ${r.letters}` })),
   ...summary.value.special.map(p => ({ key: p, text: specialLabel(p) })),

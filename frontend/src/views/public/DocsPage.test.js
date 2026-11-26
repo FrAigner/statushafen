@@ -1,5 +1,5 @@
-// DocsPage rendert Markdown per v-html und verlässt sich dabei auf DOMPurify;
-// happy-dom ist dafür zu unvollständig, deshalb jsdom.
+// DocsPage renders Markdown via v-html and relies on DOMPurify for it;
+// happy-dom is too incomplete for that, hence jsdom.
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -7,7 +7,7 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import DocsPage from './DocsPage.vue'
 import { SECTION_IDS, DOC_SOURCES, extractTitle } from '../../docs'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { useLandingChrome } from '../../composables/useLandingChrome'
 import docsSource from './DocsPage.vue?raw'
 
@@ -237,7 +237,7 @@ describe('DocsPage', () => {
     expect(router.currentRoute.value.path).toBe('/docs/abonnements')
     expect(wrapper.find('.docs-title').text()).toBe('Abonnements')
 
-    // auch bei einer Navigation innerhalb der bereits offenen Doku
+    // also on a navigation within the already open docs
     await router.push('/docs#faq')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/docs/faq')
@@ -263,9 +263,9 @@ describe('DocsPage', () => {
     await flushPromises()
     expect(router.currentRoute.value.fullPath).toBe('/docs/faq#wie-beende-ich-ein-abo')
 
-    // Externe Links lässt die Seite in Ruhe. Der Listener am Dokument merkt
-    // sich das und verhindert erst danach die (in jsdom nicht unterstützte)
-    // Navigation.
+    // The page leaves external links alone. The listener on the document notes
+    // that and only afterwards prevents the navigation (not supported
+    // in jsdom).
     let preventedByPage
     const spy = (e) => { preventedByPage = e.defaultPrevented; e.preventDefault() }
     document.addEventListener('click', spy)
@@ -406,9 +406,9 @@ describe('DocsPage', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Jeder Abschnitt hat genau eine h1 (der Titel) und darunter
-  // nur h2/h3 in lückenloser Reihenfolge; Tabellen und Listen dürfen axe nicht
-  // verletzen. Geprüft für alle Abschnitte in beiden Sprachen.
+  // Every section has exactly one h1 (the title) and below it
+  // only h2/h3 in a gapless order; tables and lists must not
+  // violate axe. Checked for all sections in both languages.
   it.each(['de', 'en'])('hat in allen Abschnitten (%s) eine h1 und keine axe-Funde', async (loc) => {
     i18n.global.locale.value = loc
     for (const id of SECTION_IDS) {

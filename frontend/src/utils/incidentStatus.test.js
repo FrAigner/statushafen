@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { RESOLVED_INCIDENT_STATUSES, isResolvedStatus, isUpcomingMaintenance, incidentStatusMeta } from './incidentStatus'
 
-// 4a: Vorfall-Status -> Form/Farbe und Text der Statusseite.
+// 4a: incident status -> shape/colour and text of the status page.
 describe('incidentStatusMeta', () => {
   it.each([
     ['investigating', 'major', 'incidentDetail.statusInvestigating'],
@@ -25,11 +25,11 @@ describe('incidentStatusMeta', () => {
   })
 })
 
-// die zentrale Regel „welcher Vorfall-Status gilt als behoben“.
+// The central rule "which incident status counts as resolved".
 describe('incidentStatus', () => {
   it.each([
     ['resolved', true],
-    ['completed', false], // Altwert, seit der Umstellung migriert
+    ['completed', false], // legacy value, migrated since the switch
     ['investigating', false],
     ['identified', false],
     ['monitoring', false],

@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Admin Incident Detail (Timeline & Post-Mortem)', () => {
   let incidentTitle;
 
   test.beforeEach(async ({ page }) => {
-    // Eindeutig pro Testlauf (nicht nur pro Datei), sonst sammeln sich bei
-    // wiederholten Suite-Läufen gleichnamige Incidents an und der spätere
-    // Link-Klick per Titel wird mehrdeutig (strict mode violation).
+    // Unique per test run (not just per file), otherwise repeated suite runs
+    // pile up incidents with the same name and the later link click by
+    // title becomes ambiguous (strict mode violation).
     incidentTitle = `E2E Detail Incident ${Date.now()}-${Math.floor(Math.random() * 100000)}`;
     await page.goto(`http://techstart.localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('admin@statushafen.local');
@@ -17,7 +17,7 @@ test.describe('Admin Incident Detail (Timeline & Post-Mortem)', () => {
     await page.locator('button.btn-login').click();
     await expect(page).toHaveURL(/\/admin\/overview/);
 
-    // Incident anlegen, um von der Liste zum Detail zu navigieren
+    // Create an incident to navigate from the list to the detail page
     await page.goto(`http://techstart.localhost:${PORT}/admin/incidents`);
     await page.locator('button', { hasText: '+ Neuer Vorfall' }).click();
     await page.locator('input[placeholder*="API-Ausfall"]').fill(incidentTitle);
@@ -41,7 +41,7 @@ test.describe('Admin Incident Detail (Timeline & Post-Mortem)', () => {
     await page.locator('textarea[placeholder="Was ist der aktuelle Stand?"]').fill('Root Cause wurde identifiziert, Fix in Arbeit.');
     await page.locator('button', { hasText: 'Update hinzufügen' }).click();
 
-    // Timeline-Eintrag erscheint, "Noch keine Updates" verschwindet
+    // Timeline entry appears, "Noch keine Updates" disappears
     await expect(page.locator('text=Noch keine Updates.')).not.toBeVisible();
     await expect(page.locator('.tl-msg')).toContainText('Root Cause wurde identifiziert');
     await expect(page.locator('.timeline .st-badge').first()).toContainText('Identifiziert');

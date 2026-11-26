@@ -1,13 +1,13 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Login-Button auf der öffentlichen Statusseite umbenannt
-// ("Admin Login" -> "Login") und durch ein User-Icon mit Dropdown-Menü
-// ersetzt, sobald jemand eingeloggt ist. Das Menü zeigt "Abonnement verwalten"
-// und "Abmelden" immer, "Dashboard" jedoch nur, wenn der Nutzer für die GERADE
-// ANGEZEIGTE Statusseite (nicht global) Admin-/Dashboard-Rechte hat.
+// Login button on the public status page renamed ("Admin Login" -> "Login")
+// and replaced by a user icon with a dropdown menu once someone is logged in.
+// The menu always shows "Abonnement verwalten" and "Abmelden", but "Dashboard"
+// only if the user has admin/dashboard rights for the status page CURRENTLY
+// SHOWN (not globally).
 test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
   test('zeigt "Anmelden" statt "Admin Login", solange niemand eingeloggt ist', async ({ page }) => {
     await page.goto(`http://acme.localhost:${PORT}/`);
@@ -49,16 +49,16 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
     await expect(page.locator('.user-menu-item', { hasText: 'Dashboard' })).toBeVisible();
     await expect(page.locator('.user-menu-item', { hasText: 'Abmelden' })).toBeVisible();
 
-    // Logout aus dem Dropdown nutzt die bestehende Logout-Logik aus useAuth.
+    // Logout from the dropdown uses the existing logout logic from useAuth.
     await page.locator('.user-menu-item', { hasText: 'Abmelden' }).click();
     await expect(page).toHaveURL(`http://acme.localhost:${PORT}/`);
     await expect(page.getByRole('button', { name: 'Anmelden', exact: true })).toBeVisible();
   });
 
-  // Seed-User "viewer" ist laut SeedData() global nur "Viewer", auf
-  // "Acme Corp Status" jedoch explizit als "Page Admin" (inkl. der neuen
-  // "admin_dashboard"-Berechtigung) eingetragen. Passender Fixture, um zu
-  // prüfen, dass "Dashboard" seitenbezogen und nicht global entschieden wird.
+  // According to SeedData() the seed user "viewer" is only "Viewer" globally, but
+  // explicitly registered as "Page Admin" on "Acme Corp Status" (incl. the new
+  // "admin_dashboard" permission). A suitable fixture to check that
+  // "Dashboard" is decided per page and not globally.
   test('Seiten-Admin sieht "Dashboard" nur auf der Statusseite, für die er Rechte hat', async ({ page }) => {
     await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('viewer@statushafen.local');
@@ -66,13 +66,13 @@ test.describe('Header Login/User-Dropdown (öffentliche Statusseite)', () => {
     await page.locator('button.btn-login').click();
     await expect(page).toHaveURL(/\/admin\/components/);
 
-    // Auf "Acme Corp" (page1) ist "viewer" Page Admin -> Dashboard sichtbar.
+    // On "Acme Corp" (page1) "viewer" is Page Admin -> Dashboard visible.
     await page.goto(`http://localhost:${PORT}/status/acme`);
     await page.getByRole('button', { name: 'Benutzermenü öffnen' }).click();
     await expect(page.locator('.user-menu-item', { hasText: 'Dashboard' })).toBeVisible();
 
-    // Auf "TechStart GmbH" (page2) hat "viewer" keine Rolle -> kein Dashboard,
-    // obwohl es sich um denselben eingeloggten Nutzer (gleiches JWT) handelt.
+    // On "TechStart GmbH" (page2) "viewer" has no role -> no Dashboard,
+    // even though it is the same logged-in user (same JWT).
     await page.goto(`http://localhost:${PORT}/status/techstart`);
     await page.getByRole('button', { name: 'Benutzermenü öffnen' }).click();
     await expect(page.locator('.user-menu-item', { hasText: 'Abonnement verwalten' })).toBeVisible();

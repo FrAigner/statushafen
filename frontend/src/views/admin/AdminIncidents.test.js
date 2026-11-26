@@ -9,10 +9,10 @@ import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { withArchivedComponent, componentTreeFixture, expectedTreeOptionLabels, multiSelectOptionLabels } from '../../test-support/componentTree'
 import { toLocalInputValue } from '../../utils/datetime'
 import AdminIncidents from './AdminIncidents.vue'
-import { axe } from '../../test-support/axe.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
-import { clickMenuItem, menuItem } from '../../test-support/rowMenu.js'
+import { axe } from '../../test-support/axe'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
+import { clickMenuItem, menuItem } from '../../test-support/rowMenu'
 import { stubConfirm } from '../../test-support/confirm'
 
 function incidentsFixture() {
@@ -24,7 +24,7 @@ function incidentsFixture() {
   ]
 }
 function componentsFixture() {
-  // Baum mit Unterkomponente statt nur oberster Ebene.
+  // Tree with a subcomponent instead of only the top level.
   return componentTreeFixture()
 }
 function tagsFixture() {
@@ -47,9 +47,9 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// Routet den gemockten fetch anhand von Methode + URL auf die jeweilige
-// Fixture, damit ein einziger Mock für Promise.all(incidents, components)
-// plus die separaten Tags-/Templates-Requests reicht.
+// Routes the mocked fetch by method + URL to the matching fixture,
+// so that a single mock covers Promise.all(incidents, components)
+// plus the separate tags/templates requests.
 function makeFetchRouter({
   incidentsOk = true, componentsOk = true, tagsOk = true, templatesOk = true,
   writeOk = true, writeStatus, writeResponse, incidentsFixtureOverride, pageTags = pageTagsFixture(), languages,
@@ -68,7 +68,7 @@ function makeFetchRouter({
     if (method === 'GET' && /\/components$/.test(url)) {
       return componentsOk ? jsonResponse(componentsFixture()) : jsonResponse({ error: 'kaputt' }, 500)
     }
-    // Seiten-Endpunkt für Seiten-Rollen (globale + seiteneigene Tags).
+    // Page endpoint for page roles (global + page-owned tags).
     if (method === 'GET' && /\/api\/pages\/\d+\/tags$/.test(url)) return jsonResponse(pageTags)
     if (method === 'GET' && /\/api\/tags/.test(url)) {
       return tagsOk ? jsonResponse(tagsFixture()) : jsonResponse({}, 403)
@@ -114,7 +114,7 @@ async function mountAdminIncidents({ fetchImpl, tenantId = '1' } = {}) {
   return { wrapper, router }
 }
 
-// Rechte je Tab statt incidents:write.
+// Permissions per tab instead of incidents:write.
 const INCIDENT_PERMS = 'incidents:create,incidents:update,incidents:delete,incident_templates:read'
 
 describe('AdminIncidents', () => {
@@ -124,9 +124,9 @@ describe('AdminIncidents', () => {
     useTenant().setMyPages([])
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -136,7 +136,7 @@ describe('AdminIncidents', () => {
     vi.restoreAllMocks()
   })
 
-  // vorher bot die Auswahl nur die oberste Ebene an.
+  // previously the selection only offered the top level.
   it('bietet in der Komponenten-Auswahl auch Unterkomponenten eingerückt an', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const { wrapper } = await mountAdminIncidents()
@@ -145,7 +145,7 @@ describe('AdminIncidents', () => {
     expect(multiSelectOptionLabels(wrapper)).toEqual(expectedTreeOptionLabels)
   })
 
-  // eine inzwischen archivierte Komponente eines bestehenden Vorfalls bleibt in der Auswahl sichtbar.
+  // a meanwhile archived component of an existing incident stays visible in the selection.
   it('zeigt beim Bearbeiten eine archivierte, gewählte Komponente weiter in der Auswahl', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const items = [{ ...incidentsFixture()[0], Components: [{ ID: 13, Name: 'Altsystem' }] }]
@@ -156,7 +156,7 @@ describe('AdminIncidents', () => {
     expect(multiSelectOptionLabels(wrapper)).not.toContain('Altsystem')
   })
 
-  // Das Nachrichtenfeld ist der Editor (Werkzeugleiste, Vorschau, Zähler), das Label führt weiter zum Feld.
+  // The message field is the editor (toolbar, preview, counter); the label still leads to the field.
   it('Nachrichtenfeld ist der RichTextEditor und sendet den Markdown-Text', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const { wrapper } = await mountAdminIncidents()
@@ -224,7 +224,7 @@ describe('AdminIncidents', () => {
       await flushPromises()
 
       expect(wrapper.findAll('tbody tr')).toHaveLength(400)
-      expect(wrapper.find('[data-test="load-more"]').exists()).toBe(true) // genau 200 geholt: es kann mehr geben
+      expect(wrapper.find('[data-test="load-more"]').exists()).toBe(true) // exactly 200 fetched: there may be more
       expect(wrapper.find('[data-test="load-more"]').attributes('disabled')).toBeUndefined()
     })
 
@@ -329,7 +329,7 @@ describe('AdminIncidents', () => {
     await wrapper.find('button').trigger('click')
 
     expect(wrapper.find('.edit-form').exists()).toBe(true)
-    expect(wrapper.find('.edit-status-hint').exists()).toBe(false) // Status-Select statt Hint bei neuem Incident
+    expect(wrapper.find('.edit-status-hint').exists()).toBe(false) // status select instead of the hint for a new incident
   })
 
   it('übernimmt Titel/Message/Status/Komponenten aus einer gewählten Vorlage', async () => {
@@ -351,7 +351,7 @@ describe('AdminIncidents', () => {
     await clickMenuItem(wrapper, 'Bearbeiten')
 
     expect(fieldByLabel(wrapper, 'Titel').element.value).toBe('API down')
-    // Beim Bearbeiten wird der Status-Select durch den Verlaufs-Hinweis ersetzt
+    // When editing, the status select is replaced by the history hint
     expect(wrapper.find('.edit-status-hint').exists()).toBe(true)
     expect(wrapper.find('.edit-status-hint a').attributes('href')).toBe('/admin/incidents/1/1')
   })
@@ -471,7 +471,7 @@ describe('AdminIncidents', () => {
     expect(put.ComponentIDs).toEqual([10])
   })
 
-  // Schweregrad im Formular, Default Beeinträchtigt, beim Bearbeiten änderbar.
+  // Severity in the form, default degraded, changeable when editing.
   it('sendet den gewählten Schweregrad beim Anlegen (Default degraded_performance)', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const fetchMock = makeFetchRouter()
@@ -631,9 +631,9 @@ describe('AdminIncidents', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // /api/tags ist global-admin-only. Seiten-Rollen laden die
-  // Tags über /api/pages/:id/tags und sehen nur seiteneigene Tags; gibt es keine,
-  // fehlt das Feld ganz (statt „Keine Tags vorhanden. Unter ‚Tags‘ anlegen.“).
+  // /api/tags is global-admin-only. Page roles load the
+  // tags via /api/pages/:id/tags and only see page-owned tags; if there are none,
+  // the field is missing entirely (instead of "No tags available. Create them under 'Tags'.").
   it('zeigt Editoren nur seiteneigene Tags, blendet das Feld ohne sie aus und zeigt es Global Admins', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     const editorFetch = makeFetchRouter()
@@ -675,7 +675,7 @@ describe('AdminIncidents', () => {
     expect(wrapper.find('.comp-card h3').text()).toBe('Alle Vorfälle')
   })
 
-  // Richtung C: Seitenkopf, Kartenkopf mit Suche, Zeilenmenü, relative Zeit.
+  // Direction C: page header, card header with search, row menu, relative time.
   describe('Richtung C', () => {
     const manyIncidents = () => [
       { ID: 1, Title: 'API down', Message: 'API antwortet nicht', Status: 'investigating', Components: [{ ID: 10, Name: 'API' }], Tags: [], CreatedAt: '2026-07-01T10:00:00Z' },
@@ -750,7 +750,7 @@ describe('AdminIncidents', () => {
       await flushPromises()
 
       expect(wrapper.find('.split').classes()).toContain('split--open')
-      expect(wrapper.find('table').exists()).toBe(true) // Liste bleibt neben dem Formular
+      expect(wrapper.find('table').exists()).toBe(true) // the list stays next to the form
       expect(wrapper.find('.form-panel h3').text()).toBe('Vorfall „API down“ bearbeiten')
       expect(wrapper.find('.form-panel__hint').text()).toBe('Felder mit * sind Pflichtfelder.')
       await wrapper.find('.form-panel__close').trigger('click')
@@ -776,8 +776,8 @@ describe('AdminIncidents', () => {
       expect(fieldByLabel(wrapper, 'Titel').attributes('aria-invalid')).toBeUndefined()
     })
 
-    // Regression: Die Komponenten-Auswahl (Pflicht) wurde nur vom Server
-    // geprüft; jetzt steht der Fehler am Feld, der Label-Bezug zeigt aufs Feld.
+    // Regression: the component selection (required) was only checked by the
+    // server; now the error is at the field, and the label reference points to the field.
     it('Komponenten-Pflichtfeld: Fehler am Feld ohne Request, verschwindet bei Auswahl', async () => {
       setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
       const fetchMock = makeFetchRouter()
@@ -899,7 +899,7 @@ describe('AdminIncidents', () => {
     expectNoInlineStyles(wrapper, import.meta.url, 'AdminIncidents.vue')
   })
 
-  // Ohne Recht zum Ändern öffnet „Ansehen“ das Formular gesperrt, ohne Speichern.
+  // Without update permission "View" opens the form locked, without saving.
   it('öffnet das Formular ohne Änderungsrecht gesperrt und ohne Speichern-Knopf', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'incidents:read' })
     const { wrapper } = await mountAdminIncidents({ fetchImpl: makeFetchRouter() })
@@ -909,7 +909,7 @@ describe('AdminIncidents', () => {
     expect(wrapper.find('.form-lock-hint').text()).toContain('Nur Lesezugriff')
     expect(wrapper.findAll('button[type="submit"]')).toHaveLength(0)
   })
-  // Löschen blieb ohne Rückmeldung, eine ältere Meldung stand weiter da.
+  // Deleting gave no feedback; an older message stayed in place.
   it('meldet das Löschen als Erfolg und entfernt die ältere Meldung', async () => {
     setAuthAsPageRole('jwt-1', { permissions: INCIDENT_PERMS })
     stubConfirm(true)

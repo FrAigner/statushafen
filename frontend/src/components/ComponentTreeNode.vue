@@ -1,39 +1,43 @@
-<script setup>
-// Redesign 4a: Status je Zeile über StatusBadge (Form + Farbe +
-// Text) statt Farbpunkt und .badge-*-Klassen; die Einrückung kommt aus
-// Klassen statt aus einem Inline-Style; Gruppen lassen sich per Tastatur
-// auf- und zuklappen (Schaltfläche mit aria-expanded).
+<script setup lang="ts">
+// Redesign 4a: status per row via StatusBadge (shape + colour +
+// text) instead of a colour dot and .badge-* classes; the indent comes from
+// classes instead of an inline style; groups can be expanded and collapsed
+// with the keyboard (button with aria-expanded).
 import { ref } from 'vue'
 import AppIcon from './AppIcon.vue'
 import StatusBadge from './StatusBadge.vue'
 import ExternalSourceNote from './ExternalSourceNote.vue'
 import { visibleExternalSources } from '../utils/externalStatus'
+import type { Component, ExternalComponentRef, Tag } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  node: { type: Object, required: true },
-  depth: { type: Number, default: 0 }
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  node: Component
+  depth?: number
+}>(), {
+  depth: 0
 })
 // Stryker restore all
 
-// Automatisch aufgeklappt wenn Status ≠ operational
+// Expanded automatically if the status is not operational
 const isOpen = ref(props.node.Status !== 'operational')
 
-// gekoppelte externe Quellen (Kennzeichnung „extern“ mit Link).
-const externalSources = visibleExternalSources(props.node)
+// Linked external sources ("external" marker with a link).
+// Component.external_sources is typed loosely (ExternalStatusRef); the dashboard sends the full link.
+const externalSources = visibleExternalSources(props.node) as ExternalComponentRef[]
 
 const hasChildren = props.node.Children && props.node.Children.length > 0
 
-// Ersatz für das frühere node.Country: reservierten globalen Tag
-// ausblenden, da er - wie zuvor "global" - keine zusätzliche Information für
-// Besucher trägt.
-const nonGlobalTagNames = (tags) =>
+// Replacement for the former node.Country: hide the reserved global tag,
+// because - like "global" before - it carries no additional information for
+// visitors.
+const nonGlobalTagNames = (tags: Tag[] | undefined) =>
   (tags || []).filter(t => !(t.StatusPageID == null && t.Name?.toLowerCase() === 'global'))
     .map(t => t.Name).join(', ')
 
-// Einrückung als Klasse (tree-d0 … tree-d5) statt Inline-Style; tiefer
-// verschachtelte Ebenen teilen sich die letzte Stufe, damit die Zeile auf
-// schmalen Bildschirmen nicht verschwindet.
+// Indent as a class (tree-d0 … tree-d5) instead of an inline style; deeper
+// nested levels share the last step, so the row does not disappear on
+// narrow screens.
 const MAX_INDENT_LEVEL = 5
 const indentClass = `tree-d${Math.min(props.depth, MAX_INDENT_LEVEL)}`
 
@@ -42,7 +46,7 @@ const toggle = () => { isOpen.value = !isOpen.value }
 
 <template>
   <div class="tree-node">
-    <!-- Knoten-Zeile -->
+    <!-- Node row -->
     <div
       class="tree-row"
       :class="[indentClass, { 'tree-row--group': hasChildren }, `tree-row--${node.Status}`]"
@@ -73,12 +77,12 @@ const toggle = () => { isOpen.value = !isOpen.value }
       <StatusBadge class="tree-status" :status="node.Status" />
     </div>
 
-    <!-- Kennzeichnung externer Quellen unter der Zeile -->
+    <!-- Marker for external sources below the row -->
     <div v-if="externalSources.length > 0" class="tree-ext" :class="[indentClass, `tree-row--${node.Status}`]">
       <ExternalSourceNote :sources="externalSources" :name="node.Name" />
     </div>
 
-    <!-- Kinder (kollabierbar) -->
+    <!-- Children (collapsible) -->
     <Transition name="tree-slide">
       <div v-if="hasChildren && isOpen" class="tree-children">
         <ComponentTreeNode
@@ -115,15 +119,15 @@ const toggle = () => { isOpen.value = !isOpen.value }
 }
 .tree-row--group:hover { background: var(--sunken); }
 
-/* Dezente Status-Tönung der Zeile; die Information selbst trägt das Badge. */
+/* Subtle status tint of the row; the badge carries the information itself. */
 .tree-row--degraded_performance { background: var(--deg-soft); }
 .tree-row--partial_outage { background: var(--part-soft); }
 .tree-row--major_outage { background: var(--major-soft); }
 
-/* Zeile mit externer Quelle: die Trennlinie kommt erst unter der Quellenzeile. */
+/* Row with an external source: the divider only comes below the source line. */
 .tree-row:has(+ .tree-ext) { border-bottom: 0; padding-block-end: var(--sp-1); }
 
-/* Externe Quellen: eingerückt unter den Namen (24 px Schaltfläche + Abstand). */
+/* External sources: indented below the name (24 px button + gap). */
 .tree-ext {
   --indent: 0;
   padding-block: 0 var(--sp-3);
@@ -180,14 +184,14 @@ const toggle = () => { isOpen.value = !isOpen.value }
 .meta-tag { flex-shrink: 0; }
 .tree-status { flex-shrink: 0; }
 
-/* Bei schmaler Ansicht (390 px) passte die einzeilige Zeile nicht:
-   .tree-name ist nowrap und schrumpft nicht, das Badge ebenfalls, also lief die
-   Zeile rechts aus dem Bild (Seite scrollte horizontal). Statt den Namen
-   abzuschneiden, bricht die Zeile hier um: Name (bricht selbst um) in Zeile 1,
-   Beschreibung darunter, Tag und Badge in der letzten Zeile. Der Spacer
-   erzwingt mit flex-basis 100 % den Zeilenumbruch; der Einzug unter den Namen
-   (24 px Schaltfläche + 12 px Abstand) setzt Beschreibung und Badge unter den
-   Namen statt unter den Pfeil. Auf breiten Bildschirmen bleibt alles einzeilig. */
+/* In a narrow view (390 px) the single-line row did not fit:
+   .tree-name is nowrap and does not shrink, neither does the badge, so the
+   row ran off the right edge (the page scrolled horizontally). Instead of
+   truncating the name, the row wraps here: name (wraps itself) on line 1,
+   description below, tag and badge on the last line. The spacer forces the
+   line break with flex-basis 100 %; the indent below the name (24 px button +
+   12 px gap) puts description and badge below the name instead of below the
+   arrow. On wide screens everything stays on one line. */
 @media (max-width: 600px) {
   .tree-row { flex-wrap: wrap; row-gap: 0; }
 
@@ -214,8 +218,8 @@ const toggle = () => { isOpen.value = !isOpen.value }
   .tree-row .tree-status { margin-block-start: var(--sp-2); }
 }
 
-/* Auf-/Zuklappen. Alle Übergänge ≤ 200 ms; unter prefers-reduced-motion
-   (style.css) aus. */
+/* Expand/collapse. All transitions ≤ 200 ms; off under prefers-reduced-motion
+   (style.css). */
 .tree-slide-enter-active,
 .tree-slide-leave-active {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);

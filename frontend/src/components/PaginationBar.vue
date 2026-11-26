@@ -1,30 +1,31 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Wiederverwendbare Paginierung für lange Admin-Listen (clientseitig).
-  Der Baustein hält KEINEN Listenzustand: Seite und Seitengröße kommen per
-  v-model, damit ungespeicherte Eingaben im Elternzustand bleiben und nicht
-  in der DOM-Zeile. Die Bereichsangabe „Zeilen x–y von z“ steht in einer
-  aria-live-Region (höflich), damit Screenreader den Seitenwechsel hören.
-  Nach einer Bedienung per Knopf/Seitengröße meldet `navigate`, dass der
-  Elternteil den Fokus in die Liste setzen soll (sonst bleibt der Fokus auf
-  einem inzwischen deaktivierten Knopf hängen).
+  Reusable pagination for long admin lists (client side).
+  The component holds NO list state: page and page size come via v-model, so
+  unsaved input stays in the parent state and not in the DOM row. The range
+  "Rows x–y of z" sits in an aria-live region (polite), so screen readers
+  announce the page change. After an interaction via button or page size,
+  `navigate` tells the parent to move focus into the list (otherwise focus
+  stays stuck on a button that has meanwhile been disabled).
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  total: { type: Number, required: true },
-  pageSizes: { type: Array, default: () => [25, 50, 100] },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  total: number
+  pageSizes?: number[]
+}>(), {
+  pageSizes: () => [25, 50, 100],
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['navigate'])
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const page = defineModel('page', { type: Number, default: 1 })
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const pageSize = defineModel('pageSize', { type: Number, default: 50 })
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ navigate: [] }>()
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const page = defineModel<number>('page', { default: 1 })
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const pageSize = defineModel<number>('pageSize', { default: 50 })
 
 const { t } = useI18n()
 
@@ -33,12 +34,12 @@ const current = computed(() => Math.min(Math.max(1, page.value), totalPages.valu
 const from = computed(() => (props.total === 0 ? 0 : (current.value - 1) * pageSize.value + 1))
 const to = computed(() => Math.min(props.total, current.value * pageSize.value))
 
-const go = (target) => {
+const go = (target: number) => {
   page.value = target
   emit('navigate')
 }
-const changeSize = (event) => {
-  pageSize.value = Number(event.target.value)
+const changeSize = (event: Event) => {
+  pageSize.value = Number((event.target as HTMLSelectElement).value)
   page.value = 1
   emit('navigate')
 }

@@ -8,7 +8,7 @@ import {
   usePlaceholderInsert,
 } from './usePlaceholderInsert'
 
-// Platzhalter einfügen und Autovervollständigung bei `{`.
+// Inserting placeholders and autocompletion on `{`.
 
 const list = [
   { name: 'Title' },
@@ -80,7 +80,7 @@ describe('filterPlaceholders', () => {
   })
 })
 
-// Minimales Feld-Double: value, Auswahl, focus/setSelectionRange.
+// Minimal field double: value, selection, focus/setSelectionRange.
 function fakeElement(value = '', start = value.length, end = start) {
   return {
     value,
@@ -105,7 +105,7 @@ function setup({ subjectValue = '', bodyValue = '' } = {}) {
     defaultField: 'body',
     idPrefix: 'tpl',
   })
-  // Simuliert Tippen: Wert und Cursor setzen, dann input-Event.
+  // Simulates typing: set value and cursor, then an input event.
   const type = (field, value, cursor = value.length) => {
     els[field].value = value
     models[field].value = value
@@ -206,11 +206,11 @@ describe('usePlaceholderInsert', () => {
     key('body', 'ArrowDown')
     expect(api.activeIndex.value).toBe(1)
 
-    // keyup/Klick ohne Cursorwechsel lässt die Auswahl stehen.
+    // keyup/click without a cursor change keeps the active entry.
     api.onCaretMove('body', { target: els.body })
     expect(api.activeIndex.value).toBe(1)
 
-    // Neues Präfix setzt den aktiven Eintrag zurück.
+    // A new prefix resets the active entry.
     type('body', '{{.S')
     expect(api.activeIndex.value).toBe(0)
   })

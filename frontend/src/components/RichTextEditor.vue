@@ -1,15 +1,16 @@
-<script setup>
-// Editor für formatierte Texte (Nachrichten/Beschreibungen).
-// Gespeichert wird weiterhin der Markdown-String (eingeschränktes Markdown,
-// utils/richText.js); der Baustein ist ein natives <textarea> mit schlanker
-// Werkzeugleiste (fett, kursiv, Liste, Zitat, Code, Link), Vorschau über
-// RichText.vue (dieselbe Bereinigung wie die Statusseite) und Zeichenzähler
-// gegen RICH_TEXT_MAX_LENGTH. Attribute (id, required, aria-*, placeholder,
-// class, @input …) landen am <textarea>, damit FormField-Slot-Props wie bei
-// einem normalen Textfeld funktionieren. Absichtlich ohne maxlength: Ein
-// zu langer Text (Altdaten, Einfügen) wird nicht stillschweigend gekürzt,
-// sondern der Zähler schlägt an.
+<script setup lang="ts">
+// Editor for formatted texts (messages/descriptions).
+// What is stored is still the Markdown string (restricted Markdown,
+// utils/richText.ts); the component is a native <textarea> with a slim
+// toolbar (bold, italic, list, quote, code, link), a preview via RichText.vue
+// (the same sanitizing as the status page) and a character counter against
+// RICH_TEXT_MAX_LENGTH. Attributes (id, required, aria-*, placeholder, class,
+// @input …) land on the <textarea>, so FormField slot props work as with a
+// normal text field. Deliberately without maxlength: an overly long text
+// (legacy data, pasting) is not silently truncated, the counter flags it
+// instead.
 import { computed, nextTick, ref, useAttrs, useId, watch } from 'vue'
+import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import RichText from './RichText.vue'
 import { RICH_TEXT_MAX_LENGTH } from '../utils/richText'
@@ -17,43 +18,47 @@ import { applyFormat, minimalReplace } from '../utils/richTextEditing'
 
 defineOptions({ inheritAttrs: false })
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
+/** Toolbar actions, as understood by applyFormat. */
+type FormatKind = 'bold' | 'italic' | 'list' | 'quote' | 'code' | 'link'
+
+// Runtime declaration: `ariaInvalid` must keep `type: null` (any value, no boolean casting).
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
 const props = defineProps({
   modelValue: { type: String, default: '' },
   maxLength: { type: Number, default: RICH_TEXT_MAX_LENGTH },
   readonly: { type: Boolean, default: false },
   rows: { type: Number, default: 6 },
-  // Fehlerzustand des Formulars (FormField-Slot-Prop). Als Prop, damit der Editor beim Fehler
-  // aus der Vorschau zurückschaltet und das Feld fokussierbar ist.
-  ariaInvalid: { type: null, default: undefined },
+  // Error state of the form (FormField slot prop). A prop, so that the editor switches back from
+  // the preview on an error and the field is focusable.
+  ariaInvalid: { type: null as unknown as PropType<boolean | 'true' | 'false' | undefined>, default: undefined },
 })
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 // Stryker restore all
 
 const { t, locale } = useI18n()
 const attrs = useAttrs()
 const uid = useId()
-const area = ref(null)
+const area = ref<HTMLTextAreaElement | null>(null)
 const preview = ref(false)
 const counterId = `rte-count-${uid}`
 const previewId = `rte-preview-${uid}`
 
-// Zeichen wie das Backend zählen (Runen), nicht UTF-16-Einheiten.
+// Count characters like the backend (runes), not UTF-16 units.
 const length = computed(() => Array.from(props.modelValue ?? '').length)
 const over = computed(() => length.value > props.maxLength)
-// Zahlen nach UI-Sprache, nicht nach Locale des Browsers/Prozesses.
-const fmt = (n) => n.toLocaleString(locale.value)
+// Numbers by UI language, not by the locale of the browser/process.
+const fmt = (n: number) => n.toLocaleString(locale.value)
 const counterText = computed(() => t('richTextEditor.counter', { count: fmt(length.value), max: fmt(props.maxLength) }))
 const tooLongText = computed(() => t('richTextEditor.tooLong', { max: fmt(props.maxLength) }))
-// Der Fehlerzustand kommt nur vom Formular; ein zu langer Text meldet sich über den Zähler
-// (sonst würde focusInvalid ein früheres, nur zu langes Feld statt des fehlerhaften wählen).
+// The error state comes only from the form; an overly long text reports via the counter
+// (otherwise focusInvalid would pick an earlier, merely too long field instead of the invalid one).
 watch(() => props.ariaInvalid, (v) => { if (v) preview.value = false }, { flush: 'pre' })
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
 const mod = computed(() => (isMac ? '⌘' : t('richTextEditor.modKey')))
 const describedby = computed(() => [attrs['aria-describedby'], counterId].filter(Boolean).join(' '))
 
-const tools = [
+const tools: { kind: FormatKind, glyph: string, key?: string }[] = [
   { kind: 'bold', glyph: 'B', key: 'b' },
   { kind: 'italic', glyph: 'I', key: 'i' },
   { kind: 'list', glyph: '•' },
@@ -62,18 +67,18 @@ const tools = [
   { kind: 'link', glyph: '↗' },
 ]
 
-function onInput(e) {
-  emit('update:modelValue', e.target.value)
+function onInput(e: Event) {
+  emit('update:modelValue', (e.target as HTMLTextAreaElement).value)
 }
 
-async function format(kind) {
+async function format(kind: FormatKind) {
   const el = area.value
   if (!el || props.readonly) return
-  // Das Feld normalisiert Zeilenumbrüche auf \n; Auswahl und Text müssen vom selben String stammen.
+  // The field normalizes line breaks to \n; selection and text must come from the same string.
   const before = el.value
   const res = applyFormat(before, el.selectionStart, el.selectionEnd, kind, t(`richTextEditor.placeholder.${kind}`))
   el.focus()
-  // execCommand hält die Undo-Historie (Strg+Z) des Feldes; es löst das input-Ereignis selbst aus.
+  // execCommand keeps the field's undo history (Ctrl+Z); it fires the input event itself.
   const rep = minimalReplace(before, res.value)
   el.setSelectionRange(rep.start, rep.end)
   const done = typeof document.execCommand === 'function' && document.execCommand('insertText', false, rep.text)
@@ -82,7 +87,7 @@ async function format(kind) {
   el.setSelectionRange(res.start, res.end)
 }
 
-function onKeydown(e) {
+function onKeydown(e: KeyboardEvent) {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return
   const tool = tools.find((x) => x.key === e.key.toLowerCase())
   if (!tool) return
@@ -139,7 +144,7 @@ function onKeydown(e) {
     </div>
 
     <p :id="counterId" class="rte__counter" :class="{ 'rte__counter--over': over }">{{ counterText }}</p>
-    <!-- Die Warnung steht in einer höflichen Live-Region und ändert sich nur beim Überschreiten, nicht bei jedem Tastendruck. -->
+    <!-- The warning sits in a polite live region and only changes when the limit is crossed, not on every keystroke. -->
     <p class="rte__counter rte__counter--over rte__warn" role="status" aria-live="polite">{{ over ? tooLongText : '' }}</p>
   </div>
 </template>
@@ -164,7 +169,7 @@ function onKeydown(e) {
   min-block-size: 5rem; padding: var(--sp-2, 0.5rem) var(--sp-3, 0.75rem);
   border: 1px dashed var(--border-strong, var(--border)); border-radius: var(--r-sm, 4px); background: var(--sunken, var(--surface));
 }
-/* hidden statt v-show: kein style-Attribut im DOM (Inline-Style-Schutz); überstimmt display-Regeln der Felder */
+/* hidden instead of v-show: no style attribute in the DOM (inline style protection); overrides the fields' display rules */
 .rte [hidden] { display: none !important; }
 .rte__empty { margin: 0; color: var(--text-2); }
 .rte__counter { margin: 0; font-size: var(--fs-xs); color: var(--text-2); text-align: end; }

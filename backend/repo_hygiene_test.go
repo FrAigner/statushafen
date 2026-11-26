@@ -39,7 +39,7 @@ var (
 		"frontend/src/hexColors.test.js":              true,
 		"frontend/src/patternsCss.test.js":            true,
 		"frontend/src/publicDesign4a.test.js":         true,
-		"frontend/src/test-support/noInlineStyles.js": true,
+		"frontend/src/test-support/noInlineStyles.ts": true,
 		"backend/sql_concat_guard_test.go":            true,
 		"backend/repo_hygiene_test.go":                true,
 	}

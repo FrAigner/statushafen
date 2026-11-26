@@ -17,7 +17,7 @@ describe('toLocalInputValue', () => {
   })
 
   it('paddet einstellige Monats-/Tages-/Zeitanteile mit führender Null', () => {
-    // Lokale Zeit statt UTC konstruieren, damit der Test zeitzonenunabhängig ist.
+    // Construct local time instead of UTC, so that the test is time zone independent.
     const d = new Date(2026, 0, 5, 3, 4)
     expect(toLocalInputValue(d.toISOString())).toBe('2026-01-05T03:04')
   })

@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: DOMPurify braucht ein vollständiges DOM (siehe docs.test.js).
+// jsdom instead of happy-dom: DOMPurify needs a complete DOM (see docs.test.js).
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { Marked } from 'marked'
@@ -11,16 +11,16 @@ import {
   resetRichTextBudget,
 } from './richText'
 
-// Das Render-Budget (richTextBudget.test.js) gilt je Seitenaufruf; jeder Test
-// beginnt mit vollem Budget, damit die Reihenfolge der Fälle keine Rolle spielt.
+// The render budget (richTextBudget.test.js) applies per page view; every test
+// starts with a full budget, so that the order of the cases does not matter.
 beforeEach(() => resetRichTextBudget())
 
-// XSS-Matrix und Formatierung der Anzeige formatierter Texte.
+// XSS matrix and formatting of the display of formatted texts.
 
 const ALLOWED = new Set(['P', 'BR', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'A', 'CODE', 'BLOCKQUOTE'])
 
-// Prüft ein Renderergebnis unabhängig vom Renderer: nur erlaubte Tags, nur der
-// Link trägt Attribute (href https, target, rel), keine Zeilenumbrüche.
+// Checks a render result independently of the renderer: only allowed tags, only the
+// link carries attributes (href https, target, rel), no line breaks.
 function unsafeFindings(html) {
   const problems = []
   if (/[\r\n]/.test(html)) problems.push('Zeilenumbruch im Ergebnis')
@@ -28,7 +28,7 @@ function unsafeFindings(html) {
   for (const el of doc.body.querySelectorAll('*')) {
     if (!ALLOWED.has(el.tagName)) problems.push(`Tag ${el.tagName}`)
     for (const attr of el.attributes) {
-      // <ol start="N"> nur mit reiner Zahl.
+      // <ol start="N"> only with a plain number.
       if (el.tagName === 'OL' && attr.name === 'start' && /^\d{1,9}$/.test(attr.value)) continue
       const ok = el.tagName === 'A' && (
         (attr.name === 'href' && /^https:\/\//.test(attr.value))
@@ -95,9 +95,9 @@ describe('renderRichText: XSS-Matrix', () => {
   }
 })
 
-// Gegenprobe: Der Prüfer muss bei einem Renderer ohne Whitelist anschlagen, sonst
-// könnte die Matrix leer laufen. Drei „alte Stände“: marked allein, marked + das
-// weite Profil aus docs/index.js und ungefiltertes HTML.
+// Cross-check: the checker must fire for a renderer without an allowlist, otherwise
+// the matrix could run empty. Three "old states": marked alone, marked + the
+// broad profile from docs/index.ts and unfiltered HTML.
 describe('Gegenprobe: Renderer ohne enge Whitelist fällt durch', () => {
   const plainMarked = new Marked({ gfm: true, breaks: true })
   const naive = [
@@ -170,7 +170,7 @@ describe('renderRichText: Formatierung', () => {
   })
 })
 
-// Altdaten: reiner Text bleibt lesbar, einfache Zeilenumbrüche bleiben erhalten.
+// Legacy data: plain text stays readable, single line breaks are kept.
 describe('renderRichText: Altdaten', () => {
   const cases = [
     ['Wir untersuchen das Problem.\nBitte um Geduld.', 'Wir untersuchen das Problem.<br>Bitte um Geduld.'],
@@ -242,8 +242,8 @@ describe('isHttpsUrl', () => {
   })
 })
 
-// Die Doku-Seite behält ihr weites Profil (Repo-eigene Inhalte); der Hook für
-// target/rel darf dort nicht hängen bleiben (eigene DOMPurify-Instanz).
+// The docs page keeps its broad profile (the repo's own content); the hook for
+// target/rel must not stick there (own DOMPurify instance).
 describe('Isolation von DOMPurify', () => {
   it('der Link-Hook wirkt nicht auf das globale DOMPurify', () => {
     renderRichText('[x](https://example.com)')
@@ -264,14 +264,25 @@ describe('plainTextToHtml', () => {
   })
 })
 
-// Fail-closed: Findet DOMPurify kein DOM (isSupported false), gibt sanitize() seine
-// Eingabe ungeprüft zurück. Dann liefert renderRichText nur maskierten Klartext.
+// Fail-closed: if DOMPurify finds no DOM (isSupported false), sanitize() returns its
+// input unchecked. renderRichText then returns only escaped plain text.
 describe('renderRichText ohne unterstütztes DOMPurify', () => {
   it('liefert maskierten Klartext statt ungeprüftem HTML', async () => {
     vi.resetModules()
     vi.doMock('dompurify', () => ({ default: () => ({ isSupported: false, addHook() {}, sanitize: (x) => x }) }))
     const mod = await import('./richText')
     expect(mod.renderRichText('**x** <script>alert(1)</script>')).toBe('<p>**x** &lt;script&gt;alert(1)&lt;/script&gt;</p>')
+    vi.doUnmock('dompurify')
+    vi.resetModules()
+  })
+})
+
+describe('renderRichText bei einem Fehler des Sanitizers', () => {
+  it('liefert maskierten Klartext statt zu werfen', async () => {
+    vi.resetModules()
+    vi.doMock('dompurify', () => ({ default: () => ({ isSupported: true, addHook() {}, sanitize: () => { throw new RangeError('Maximum call stack size exceeded') } }) }))
+    const mod = await import('./richText')
+    expect(mod.renderRichText('**x** <b>y</b>')).toBe('<p>**x** &lt;b&gt;y&lt;/b&gt;</p>')
     vi.doUnmock('dompurify')
     vi.resetModules()
   })
@@ -288,8 +299,8 @@ describe('markdownToPlainText mit unvollständigem DOM', () => {
   })
 })
 
-// Fund aus dem Review: Tief verschachtelte Zitate ließen marked mit
-// RangeError (Aufrufstapel) scheitern; der Fehler leerte die öffentliche Seite.
+// Review finding: deeply nested quotes made marked fail with a
+// RangeError (call stack); the error emptied the public page.
 describe('renderRichText: Render-Fehler', () => {
   it('tief verschachtelte Zitate werfen nicht, der Text bleibt sichtbar und maskiert', () => {
     const input = `${'>'.repeat(5000)} <script>alert(1)</script>`
@@ -301,9 +312,9 @@ describe('renderRichText: Render-Fehler', () => {
   })
 })
 
-// pathologische Eingaben machten marked quadratisch langsam
-// (5.000 Zeichen `*a_` rund 0,4 s, 15.000 Zeichen bis 9 s). Zu lange Texte bzw.
-// Absätze erscheinen deshalb vollständig als maskierter Klartext.
+// Pathological input made marked quadratically slow
+// (5,000 characters `*a_` about 0.4 s, 15,000 characters up to 9 s). Texts or
+// paragraphs that are too long therefore appear completely as escaped plain text.
 describe('Leistung bei pathologischen Eingaben', () => {
   const PATHOLOGICAL = {
     '*a_ wiederholt': '*a_'.repeat(Math.ceil(15000 / 3)),
@@ -313,7 +324,7 @@ describe('Leistung bei pathologischen Eingaben', () => {
     'Zitate >': '>'.repeat(15000),
     '5.000 Zeichen *a_': '*a_'.repeat(1667),
   }
-  const LIMIT_MS = 3000 // großzügig; ein Block bis 5.000 Zeichen kostet in marked bis ca. 0,4 s
+  const LIMIT_MS = 3000 // generous; a block of up to 5,000 characters costs up to about 0.4 s in marked
 
   for (const [name, input] of Object.entries(PATHOLOGICAL)) {
     it(`${name}: Render und Klartext bleiben unter ${LIMIT_MS} ms`, () => {
@@ -354,7 +365,7 @@ describe('Leistung bei pathologischen Eingaben', () => {
   })
 })
 
-// Fund 9: dieselben Grenzen und Fälle wie im Backend (Mail).
+// Finding 9: the same limits and cases as in the backend (mail).
 describe('Gleiche Grenzen wie das Backend', () => {
   const hasMarkup = (html) => /<(ul|ol|li|strong|em|code|blockquote|a)[\s>]/.test(html)
 
@@ -378,7 +389,7 @@ describe('Gleiche Grenzen wie das Backend', () => {
   })
 })
 
-// Fund 11: einzeilige ```...``` ist Inline-Code, nichts fällt weg.
+// Finding 11: single-line ```...``` is inline code, nothing is dropped.
 describe('Dreifache Backticks in einer Zeile', () => {
   it('zeigt Inline-Code und behält die folgenden Zeilen (wie die Mail)', () => {
     const html = renderRichText('```npm install```\nDanach **fett**')
@@ -388,7 +399,7 @@ describe('Dreifache Backticks in einer Zeile', () => {
   })
 })
 
-// Fund 12: Nummer des Listenanfangs bleibt erhalten.
+// Finding 12: the number at the start of the list is kept.
 describe('Nummerierte Liste beginnt bei ihrer Nummer', () => {
   it('<ol start> bleibt, Klartext zählt ab dieser Nummer', () => {
     expect(renderRichText('3. Schritt\n4. Weiter')).toContain('<ol start="3">')
@@ -400,14 +411,14 @@ describe('Nummerierte Liste beginnt bei ihrer Nummer', () => {
   })
 
   it('start ist nur als Zahl auf <ol> erlaubt', () => {
-    // Rohes HTML erscheint als Text; die Whitelist lässt start nie auf anderen Tags durch.
+    // Raw HTML appears as text; the allowlist never lets start through on other tags.
     expect(unsafeFindings(renderRichText('<ol start="javascript:alert(1)"><li>x</li></ol>'))).toEqual([])
     expect(unsafeFindings(renderRichText('<p start="3">x</p>'))).toEqual([])
   })
 })
 
-// Auch wenn marked (Fehler/Update) ein unerwartetes start-Attribut
-// ausgäbe, lässt der Sanitizer es nur als Zahl auf <ol> durch.
+// Even if marked (bug/update) emitted an unexpected start attribute,
+// the sanitizer only lets it through as a number on <ol>.
 describe('Sanitizer-Whitelist für start', () => {
   async function renderWith(markedHtml) {
     vi.resetModules()
@@ -476,18 +487,18 @@ describe('Zwischenspeicher', () => {
     const { mod, calls } = await loadCounting()
     for (let i = 0; i <= mod.RICH_TEXT_CACHE_SIZE; i++) mod.renderRichText(`text ${i}`)
     const before = calls.n
-    mod.renderRichText(`text ${mod.RICH_TEXT_CACHE_SIZE}`) // jüngster: noch drin
+    mod.renderRichText(`text ${mod.RICH_TEXT_CACHE_SIZE}`) // newest: still in
     expect(calls.n).toBe(before)
-    mod.renderRichText('text 0') // ältester: verdrängt
+    mod.renderRichText('text 0') // oldest: evicted
     expect(calls.n).toBe(before + 1)
   })
 
-  // Fund 13: LRU statt FIFO - ein Treffer hält den Eintrag im Speicher.
+  // Finding 13: LRU instead of FIFO - a hit keeps the entry in memory.
   it('ein gelesener Eintrag wird nicht als nächster verdrängt (LRU)', async () => {
     const { mod, calls } = await loadCounting()
     for (let i = 0; i < mod.RICH_TEXT_CACHE_SIZE; i++) mod.renderRichText(`text ${i}`)
-    mod.renderRichText('text 0') // Treffer: jetzt jüngster
-    mod.renderRichText('neu') // verdrängt text 1, nicht text 0
+    mod.renderRichText('text 0') // hit: now the newest
+    mod.renderRichText('neu') // evicts text 1, not text 0
     const before = calls.n
     mod.renderRichText('text 0')
     expect(calls.n).toBe(before)

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import LocalizedComponent from './LocalizedComponent.vue'
 import { mountLocalizedComponent, setupLocalizedComponentTest } from '../test-support/localizedComponentTestUtils'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 vi.mock('../composables/useApi', () => ({
   useApi: () => ({

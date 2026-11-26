@@ -6,11 +6,11 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 import AdminIncidentDetail from './AdminIncidentDetail.vue'
 
-// Sprachumschalter im Formular „Update posten“ und Editor „Übersetzungen“
-// an einem Zeitleisten-Eintrag. Ein Update hat nur eine Nachricht (kein Titel).
+// Language switcher in the "Post update" form and the "Translations" editor
+// on a timeline entry. An update only has a message (no title).
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }]
@@ -81,7 +81,7 @@ describe('AdminIncidentDetail: Update-Übersetzungen', () => {
     expect(wrapper.find('[data-test="update-translations-open"]').exists()).toBe(false)
     wrapper.unmount()
 
-    await mountView(router(), 'incidents:create') // darf posten, aber nicht übersetzen
+    await mountView(router(), 'incidents:create') // may post, but not translate
     expect(form().exists()).toBe(true)
     expect(wrapper.find('[data-test="lang-switch"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="update-translations-open"]').exists()).toBe(false)
@@ -110,11 +110,11 @@ describe('AdminIncidentDetail: Update-Übersetzungen', () => {
     const post = calls(fetchMock, 'POST', /\/updates$/)
     expect(JSON.parse(post[0][1].body)).toEqual({ status: 'investigating', message: 'Ursache gefunden' })
     const puts = calls(fetchMock, 'PUT', /\/translations\//)
-    expect(puts).toHaveLength(1) // Französisch bleibt leer
+    expect(puts).toHaveLength(1) // French stays empty
     expect(puts[0][0]).toBe('/api/pages/1/incidents/1/updates/8/translations/en')
     expect(JSON.parse(puts[0][1].body)).toEqual({ message: 'Cause found', status: 'confirmed' })
     expect(form().find('.alert-error').exists()).toBe(false)
-    // Formular ist nach dem Neuladen zurückgesetzt (Standardsprache, leere Nachricht).
+    // The form is reset after reloading (default language, empty message).
     expect(tab(form(), 'English').text()).toBe('🇬🇧 English · leer')
     expect(fieldByLabel(wrapper, 'Update-Nachricht').element.value).toBe('')
   })
@@ -158,7 +158,7 @@ describe('AdminIncidentDetail: Update-Übersetzungen', () => {
     await mountView(fetchMock)
     await tab(form(), 'English').trigger('click')
     const btn = () => wrapper.find('[data-test="lang-translate"]')
-    expect(btn().attributes('disabled')).toBeDefined() // ohne Nachricht in der Standardsprache
+    expect(btn().attributes('disabled')).toBeDefined() // without a message in the default language
     expect(wrapper.text()).toContain('zuerst die Nachricht in der Standardsprache')
     await tab(form(), 'Deutsch').trigger('click')
     await fieldByLabel(wrapper, 'Update-Nachricht').setValue('Wir untersuchen')

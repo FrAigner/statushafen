@@ -4,8 +4,8 @@ import { useAuth } from './useAuth'
 import { useTenant } from './useTenant'
 import i18n, { LANGUAGE_STORAGE_KEY, SUPPORTED_LOCALES, registerLocale } from '../i18n'
 
-// Baut ein unsigniertes JWT (Header/Payload reichen, loginWithToken prüft die
-// Signatur nicht) mit dem gegebenen Payload - analog zum echten Backend-Token.
+// Builds an unsigned JWT (header/payload are enough, loginWithToken does not
+// check the signature) with the given payload, like the real backend token.
 function makeJwt(payload) {
   const base64url = (obj) =>
     btoa(JSON.stringify(obj)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
@@ -95,7 +95,7 @@ describe('useAuth', () => {
       expect(hasPerm('view')).toBe(false)
     })
 
-    // wie das Backend zählt nur die Rolle auf der aktiven Seite.
+    // like the backend, only the role on the active page counts.
     it('prüft gegen die Rechte der aktiven Statusseite, nicht gegen die globale Rolle', () => {
       const { setAuth, hasPerm } = useAuth()
       const { setMyPages, setActiveTenant } = useTenant()
@@ -140,7 +140,7 @@ describe('useAuth', () => {
       expect(hasPerm('components:write')).toBe(false)
     })
 
-    // je Tab Create/Read/Update/Delete.
+    // create/read/update/delete per tab.
     it('lässt create, update und delete das read-Recht einschließen, aber nicht einander', () => {
       const { setAuth, hasPerm } = useAuth()
       const { setMyPages, setActiveTenant } = useTenant()
@@ -229,7 +229,7 @@ describe('useAuth', () => {
       loginWithToken(makeJwt({ email: 'sso@example.com', hide_help_tooltips: true }))
       expect(currentUser.value.help_tooltips).toBe(false)
 
-      // Claim fehlt (omitempty bei Default): Tooltips an.
+      // Claim missing (omitempty for the default): tooltips on.
       loginWithToken(makeJwt({ email: 'sso@example.com' }))
       expect(currentUser.value.help_tooltips).toBe(true)
     })
@@ -270,7 +270,7 @@ describe('useAuth', () => {
   })
 })
 
-// Teil 1: Eine nachladbare Profil-Sprache wird erst nach dem Laden ihrer Texte aktiv.
+// Part 1: a lazily loadable profile language only becomes active once its texts are loaded.
 describe('useAuth: nachladbare Profil-Sprache', () => {
   it('aktiviert die Sprache erst, wenn ihre Texte geladen sind', async () => {
     localStorage.clear()

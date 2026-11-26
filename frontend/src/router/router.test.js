@@ -3,12 +3,12 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
 
-// Mock die useAuth composable
+// Mock the useAuth composable
 vi.mock('../composables/useAuth', () => ({
   useAuth: vi.fn()
 }))
 
-// Importiere den Router nach den Mocks
+// Import the router after the mocks
 import router from './index'
 
 describe('Router Navigation Guards', () => {
@@ -71,7 +71,7 @@ describe('Router Navigation Guards', () => {
   })
 
   describe('Global-Admin-Check', () => {
-    // nicht mehr umleiten, die Route nennt ihr Recht; AdminLayout zeigt „Keine Berechtigung“.
+    // no longer redirect; the route names its permission; AdminLayout shows "no permission".
     it('leitet bei globalen Tabs nicht um, sondern nennt das nötige Recht (meta.permission)', async () => {
       mockIsLoggedIn.value = true
       mockIsGlobalAdmin.value = false
@@ -175,7 +175,7 @@ describe('Router Navigation Guards', () => {
   })
 
   describe('Route-Redirects', () => {
-    // /admin ist die Startseite (meta.home); AdminLayout führt zum ersten lesbaren Tab.
+    // /admin is the start page (meta.home); AdminLayout leads to the first readable tab.
     it('markiert /admin als Startseite statt fest nach /admin/overview umzuleiten', async () => {
       mockIsLoggedIn.value = true
       mockIsGlobalAdmin.value = true
@@ -214,7 +214,7 @@ describe('Router Navigation Guards', () => {
       expect(router.currentRoute.value.path).toBe('/unsubscribe')
     })
 
-    // Die Doku ist ohne Login erreichbar, auch einzelne Abschnitte.
+    // The docs are reachable without login, individual sections too.
     it('erlaubt die Doku-Seite und ihre Abschnitte öffentlich', async () => {
       await router.push('/docs')
       expect(router.currentRoute.value.path).toBe('/docs')
@@ -234,15 +234,15 @@ describe('Router Navigation Guards', () => {
       expect(router.currentRoute.value.meta.docsBase).toBe('/admin/docs')
     })
 
-    // Bestätigungslink des Double-Opt-in, ohne Login erreichbar.
+    // Double opt-in confirmation link, reachable without login.
     it('erlaubt den Abo-Bestätigungslink öffentlich', async () => {
       await router.push('/subscribe/confirm?token=abc')
 
       expect(router.currentRoute.value.path).toBe('/subscribe/confirm')
     })
 
-    // Einladungslink; die Seite selbst verlangt dann die Anmeldung
-    // (mit Rücksprung), der Router leitet nicht vorher auf /login um.
+    // Invitation link; the page itself then requires sign-in
+    // (with return), the router does not redirect to /login beforehand.
     it('erlaubt den Einladungslink ohne Login', async () => {
       await router.push('/invitation?token=abc')
 
@@ -258,8 +258,8 @@ describe('Router Navigation Guards', () => {
       expect(router.currentRoute.value.path).toBe('/admin/profile')
     })
 
-    // Seiten-Admins (pages:write) konfigurieren das SSO ihrer Seite;
-    // fehlt die Berechtigung, zeigt die View das 403 des Backends.
+    // Page admins (pages:write) configure the SSO of their page;
+    // without the permission, the view shows the backend's 403.
     it('erlaubt die SSO-Konfiguration für angemeldete User ohne Global-Admin', async () => {
       mockIsLoggedIn.value = true
       mockIsGlobalAdmin.value = false
@@ -278,8 +278,8 @@ describe('Router Navigation Guards', () => {
       expect(router.currentRoute.value.path).toBe('/admin/languages')
     })
 
-    // Ohne props: true kam die ID aus dem Pfad nicht als Prop
-    // in der View an, sie lud `/api/pages/:id/incidents/undefined`.
+    // Without props: true the ID from the path did not arrive as a prop
+    // in the view, and it loaded `/api/pages/:id/incidents/undefined`.
     it.each([
       ['/admin/incidents/4/translations', 'incidentId', '4'],
       ['/admin/components/23/translations', 'componentId', '23'],

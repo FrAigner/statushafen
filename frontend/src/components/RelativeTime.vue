@@ -1,17 +1,19 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C, Betriebsseiten: Zeitangabe relativ („vor 3 Tagen“),
-  der genaue Zeitpunkt steht im title und im datetime-Attribut. Ohne Wert
-  erscheint ein Strich. Wortlaut und Einheiten: utils/relativeTime.js.
+  Direction C, operations pages: relative time ("3 days ago"); the exact
+  point in time is in the title and the datetime attribute. Without a value a
+  dash appears. Wording and units: utils/relativeTime.ts.
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatRelative } from '../utils/relativeTime'
 import { formatDateTimeShort } from '../utils/datetime'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  value: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  value?: string | null
+}>(), {
+  value: null,
 })
 // Stryker restore all
 const { locale } = useI18n()

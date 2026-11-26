@@ -6,10 +6,10 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// Stage 1 von 5 der Mehrsprachigkeit: Composable-Tests für den
-// globalen Sprachkatalog + die pro Statusseite aktivierten Sprachen. Analog
-// zu den anderen Composable-Tests wird global.fetch gestubbt, da useApi
-// direkt darauf statt auf axios o.ä. aufbaut.
+// Stage 1 of 5 of multilingualism: composable tests for the global language
+// catalog + the languages activated per status page. Like the other
+// composable tests, global.fetch is stubbed, since useApi builds directly on
+// it rather than on axios or the like.
 describe('useContentLanguages', () => {
   beforeEach(() => {
     useAuth().logout()

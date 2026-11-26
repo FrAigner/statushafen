@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { clickRowMenuItem } from './rowMenu.js';
+import { clickRowMenuItem } from './rowMenu';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Zeilenaktionen stehen im Zeilenmenü („…“), Eintrag per Rolle wählen.
+// Row actions live in the row menu ("…"); pick the entry by role.
 async function rowAction(page, row, name) {
   await clickRowMenuItem(page, row.getByRole('button', { name: /^Aktionen für/ }), name);
 }
@@ -42,8 +42,8 @@ test.describe('Admin Users Management', () => {
     // 2. Edit User
     await rowAction(page, page.locator('tr', { hasText: uniqueEmail }), 'Bearbeiten');
     
-    // Länder-Eingabe gibt es nicht mehr (Tags sind Checkboxen), die Rolle je Statusseite
-    // steht als Auswahl "Rolle für <Seite>" im Formular.
+    // The country input no longer exists (tags are checkboxes); the role per status page
+    // is a "Rolle für <Seite>" select in the form.
     await page.getByLabel('Rolle für TechStart GmbH').selectOption({ index: 1 });
     await page.locator('button', { hasText: 'Speichern' }).click();
 
@@ -55,7 +55,7 @@ test.describe('Admin Users Management', () => {
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await rowAction(page, page.locator('tr', { hasText: uniqueEmail }), 'Löschen');
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -14,18 +14,18 @@ import {
   resolveSection,
 } from '../../docs'
 
-// Doku-Seite. Ein Abschnitt je Unterseite (/docs/<abschnitt>),
-// Überschriften darin per Anker erreichbar (/docs/vorfaelle#status-ablauf).
-// Inhalte und Titel kommen ausschließlich aus src/docs/<sprache>/*.md.
+// Docs page. One section per subpage (/docs/<section>),
+// headings in it reachable via anchors (/docs/vorfaelle#status-ablauf).
+// Content and titles come exclusively from src/docs/<language>/*.md.
 const route = useRoute()
 const router = useRouter()
 const { t, locale } = useI18n()
 
 // Public docs live below /docs; inside the admin area (route meta.docsBase) every docs link
 // stays below that base so the admin frame is kept.
-const docsBase = route.meta.docsBase || '/docs'
+const docsBase = (route.meta.docsBase as string | undefined) || '/docs'
 const embedded = docsBase !== '/docs'
-const docsPath = (id) => `${docsBase}/${id}`
+const docsPath = (id: string) => `${docsBase}/${id}`
 
 const sections = computed(() => SECTION_IDS.map(id => {
   const resolved = resolveSection(id, locale.value)
@@ -36,21 +36,21 @@ const sections = computed(() => SECTION_IDS.map(id => {
   }
 }))
 
-const currentId = computed(() => route.params.section || SECTION_IDS[0])
+const currentId = computed(() => (route.params.section || SECTION_IDS[0]) as string)
 const current = computed(() => resolveSection(currentId.value, locale.value))
 const title = computed(() => extractTitle(current.value?.markdown))
 const rendered = computed(() => renderMarkdown(stripTitle(current.value?.markdown)))
 const currentIndex = computed(() => SECTION_IDS.indexOf(currentId.value))
 const prev = computed(() => currentIndex.value > 0 ? sections.value[currentIndex.value - 1] : null)
 const next = computed(() => {
-  // Der Pager erscheint nur bei einem gefundenen Abschnitt, der Index ist dann >= 0.
+  // The pager only appears for a found section, the index is then >= 0.
   const i = currentIndex.value
   return i < SECTION_IDS.length - 1 ? sections.value[i + 1] : null
 })
 
 const query = ref('')
 const filteredSections = computed(() => {
-  // Gleiche Normalisierung wie für den Text (z. B. "X-Webhook-Token").
+  // Same normalization as for the text (e.g. "X-Webhook-Token").
   const q = plainText(query.value).trim()
   if (!q) return sections.value
   return sections.value.filter(s => plainText(s.title).includes(q) || s.text.includes(q))
@@ -65,8 +65,8 @@ const scrollToHash = async () => {
   document.getElementById(id)?.scrollIntoView({ block: 'start' })
 }
 
-// /docs#vorfaelle (Abschnitt als Anker auf der Startseite der Doku) leitet auf
-// die Unterseite /docs/vorfaelle um, damit beide Schreibweisen funktionieren.
+// /docs#vorfaelle (section as an anchor on the docs start page) redirects to
+// the subpage /docs/vorfaelle, so that both notations work.
 const redirectSectionHash = () => {
   const id = route.hash.slice(1)
   if (!route.params.section && SECTION_IDS.includes(id)) {
@@ -91,11 +91,11 @@ if (!embedded) {
 // Inside the admin frame the sticky admin top bar covers the top of the window, so anchored
 // headings are offset by its height (it changes with the window width). The sticky sidebar is not:
 // it sticks inside the admin content area, which already starts below the top bar.
-const topbarHeight = ref(null)
+const topbarHeight = ref<number | null>(null)
 const docsStyle = computed(() => (topbarHeight.value === null ? undefined : { '--docs-anchor-offset': `${topbarHeight.value}px` }))
-let topbarObserver
+let topbarObserver: ResizeObserver | undefined
 const watchTopbar = () => {
-  const bar = document.querySelector('.admin-topbar')
+  const bar = document.querySelector<HTMLElement>('.admin-topbar')
   if (!bar) return
   topbarHeight.value = bar.offsetHeight
   if (typeof ResizeObserver === 'undefined') return
@@ -115,12 +115,12 @@ watch(() => route.fullPath, () => {
   if (!redirectSectionHash()) scrollToHash()
 })
 
-// Links im gerenderten Markdown, die innerhalb der App bleiben (/docs/...,
-// #anker), über den Router öffnen statt die Seite neu zu laden.
-const onContentClick = (event) => {
-  const link = event.target.closest('a[href]')
+// Open links in the rendered Markdown that stay inside the app (/docs/...,
+// #anchor) via the router instead of reloading the page.
+const onContentClick = (event: MouseEvent) => {
+  const link = (event.target as Element).closest('a[href]')
   if (!link) return
-  const href = link.getAttribute('href')
+  const href = link.getAttribute('href') as string
   if (href.startsWith('#')) {
     event.preventDefault()
     router.push({ path: route.path, hash: href })
@@ -131,11 +131,11 @@ const onContentClick = (event) => {
   }
 }
 
-// Fokus auf den Inhalt, damit Tastatur- und Screenreader-Nutzer oben weiterlesen.
-const contentEl = ref(null)
+// Focus the content, so keyboard and screen reader users continue reading at the top.
+const contentEl = ref<HTMLElement | null>(null)
 const backToTop = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' })
-  contentEl.value.focus()
+  contentEl.value!.focus()
 }
 </script>
 
@@ -197,7 +197,7 @@ const backToTop = () => {
           </ul>
         </nav>
 
-        <!-- eslint-disable-next-line vue/no-v-html -- Markdown aus dem Repo, durch DOMPurify bereinigt (src/docs/index.js) -->
+        <!-- eslint-disable-next-line vue/no-v-html -- Markdown from the repo, sanitized by DOMPurify (src/docs/index.js) -->
         <div class="docs-markdown" @click="onContentClick" v-html="rendered.html" />
 
         <nav class="docs-pager" :aria-label="t('docs.pagerLabel')">
@@ -342,8 +342,8 @@ const backToTop = () => {
   font-size: 0.875rem;
 }
 
-/* Inhaltsverzeichnis als Kasten über dem Text statt seitlich umflossen:
-   Tabellen behalten so die volle Breite. */
+/* Table of contents as a box above the text instead of floated beside it:
+   tables keep the full width that way. */
 .docs-toc {
   margin: 0 0 20px;
   padding: 12px 14px;
@@ -526,8 +526,8 @@ const backToTop = () => {
   outline-offset: 2px;
 }
 
-/* Schmal: Navigation als aufklappbarer Bereich über dem Inhalt,
-   Inhaltsverzeichnis nicht mehr seitlich umflossen. */
+/* Narrow: navigation as a collapsible area above the content,
+   table of contents no longer floated beside it. */
 @media (max-width: 767px) {
   .docs {
     grid-template-columns: minmax(0, 1fr);

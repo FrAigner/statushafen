@@ -1,20 +1,20 @@
 import { describe, it, expect } from 'vitest'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import { safeReturnTo } from './safeReturnTo.js'
+import { safeReturnTo } from './safeReturnTo'
 
-// returnTo kommt aus der Query und ist damit Angreifer-Eingabe.
+// returnTo comes from the query and is therefore attacker input.
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [
     { path: '/admin', component: { template: '<div/>' } },
     { path: '/admin/incidents', component: { template: '<div/>' } },
     { path: '/invitation', component: { template: '<div/>' } },
-    { path: '/:slug', component: { template: '<div/>' } }, // wie die öffentliche Statusseite
+    { path: '/:slug', component: { template: '<div/>' } }, // like the public status page
   ],
 })
 const FALLBACK = '/admin'
 
-// Die Angriffsmuster; jedes muss auf den Fallback fallen.
+// The attack patterns; each must fall back to the fallback.
 const ANGRIFFE = {
   'absolute URL https': 'https://angreifer.example/phish',
   'absolute URL http': 'http://angreifer.example',
@@ -79,8 +79,8 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo('/gibt/es/nicht', router, FALLBACK)).toBe(FALLBACK)
   })
 
-  // Die Stringprüfung darf sich nicht auf den Router-Abgleich verlassen: eine Catch-all-Route
-  // würde jede Adresse als "bekannte Route" durchwinken.
+  // The string check must not rely on the router match: a catch-all route
+  // would wave every address through as a "known route".
   it('weist //host und /%2F/host auch bei einer Catch-all-Route allein per Stringprüfung ab', () => {
     const offen = createRouter({
       history: createMemoryHistory(),
@@ -111,9 +111,9 @@ describe('safeReturnTo', () => {
     expect(safeReturnTo(ok + 'a', router, FALLBACK)).toBe(FALLBACK)
   })
 
-  // Gegenprobe: Die Matrix muss nachweislich anschlagen. Ein ungefiltertes Durchreichen
-  // (reine Testfunktion) darf sie NICHT bestehen, safeReturnTo schon; eine leere Matrix
-  // wäre trivial "bestanden" und wird deshalb ausgeschlossen.
+  // Cross-check: the matrix must demonstrably fire. Unfiltered pass-through
+  // (a plain test function) must NOT pass it, safeReturnTo must; an empty matrix
+  // would trivially "pass" and is therefore excluded.
   const matrixBesteht = (pruefer) =>
     Object.values(ANGRIFFE).every((wert) => pruefer(wert, router, FALLBACK) === FALLBACK)
 

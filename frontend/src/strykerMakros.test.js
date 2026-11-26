@@ -1,8 +1,8 @@
-// Nachtlauf-Fehler 2026-10-29 (Mutationstests nachts): Stryker instrumentierte `defineProps({...})` in
-// OidcLoginButton.vue; der Vue-Compiler hebt die Makros aus dem Setup und lehnt Verweise auf die lokalen
-// stryMutAct-Hilfen ab ("defineProps() ... cannot reference locally declared variables"). Der Dry-Run
-// scheiterte, der ganze Frontend-Mutationstest war rot. Jede geänderte Makro-Zeile löst das aus, deshalb muss
-// JEDES Makro in einer .vue-Datei von einem "Stryker disable"-Kommentar umgeben sein.
+// Nightly run failure 2026-10-29 (nightly mutation tests): Stryker instrumented `defineProps({...})` in
+// OidcLoginButton.vue; the Vue compiler hoists the macros out of setup and rejects references to the local
+// stryMutAct helpers ("defineProps() ... cannot reference locally declared variables"). The dry run
+// failed and the whole frontend mutation test was red. Any mutated macro line triggers this, so EVERY
+// macro in a .vue file must be surrounded by a "Stryker disable" comment.
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ function vueDateien(dir) {
   })
 }
 
-// Liefert die Makro-Zeilen, vor denen (über den Kommentarblock hinweg) kein "Stryker disable" steht.
+// Returns the macro lines not preceded (across the comment block) by a "Stryker disable".
 function ungeschuetzteMakros(quelltext) {
   const zeilen = quelltext.split('\n')
   const fehler = []

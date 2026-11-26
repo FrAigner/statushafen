@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe visual.spec.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see visual.spec.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Admin Maintenance Windows', () => {
@@ -11,17 +11,17 @@ test.describe('Admin Maintenance Windows', () => {
     await page.locator('button.btn-login').click();
     await expect(page).toHaveURL(/\/admin\/overview/);
 
-    // Der Tenant-Switcher im Admin-Bereich ist unabhängig vom Hostnamen und
-    // wählt standardmäßig die erste Statusseite (Acme) - explizit auf
-    // TechStart umschalten, damit die spätere öffentliche Prüfung unter
-    // techstart.localhost zur selben Statusseite gehört.
+    // The tenant switcher in the admin area is independent of the hostname and
+    // selects the first status page (Acme) by default - switch to TechStart
+    // explicitly so the later public check under techstart.localhost
+    // belongs to the same status page.
     await page.goto(`http://techstart.localhost:${PORT}/admin/maintenance`);
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.status() === 200),
       page.locator('.tenant-select').selectOption({ label: 'TechStart GmbH' }),
     ]);
-    // Erst weitermachen, wenn der Wechsel komplett durch ist; sonst setzt das Nachladen
-    // der Liste ein schon geöffnetes Formular zurück.
+    // Only continue once the switch is complete; otherwise reloading the list
+    // resets an already opened form.
     await expect(page.getByRole('navigation', { name: 'Brotkrumen' })).toContainText('TechStart GmbH');
     await page.waitForLoadState('networkidle');
   });
@@ -56,15 +56,15 @@ test.describe('Admin Maintenance Windows', () => {
     await expect(row).toBeVisible();
     await expect(row).toContainText('Geplant');
 
-    // Aufräumen
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Clean up
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await row.locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await row.getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
@@ -102,16 +102,16 @@ test.describe('Admin Maintenance Windows', () => {
     await expect(card).toBeVisible();
     await expect(card).toContainText('Geplant');
 
-    // Aufräumen
+    // Clean up
     await page.goto(`http://techstart.localhost:${PORT}/admin/maintenance`);
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await page.locator('tr', { hasText: title }).locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await page.locator('tr', { hasText: title }).getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);

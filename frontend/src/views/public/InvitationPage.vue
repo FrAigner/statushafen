@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -6,37 +6,38 @@ import { useApi } from '../../composables/useApi'
 import { useAuth } from '../../composables/useAuth'
 import { readInvitationToken, storeInvitationToken, clearInvitationToken } from '../../utils/invitationToken'
 import AppIcon from '../../components/AppIcon.vue'
+import type { ApiError } from '../../types/api'
 import '../../assets/entry.css'
 
-// Einladung auf eine Statusseite annehmen oder ablehnen. Der Link
-// aus der Einladungsmail führt hierher (/invitation#token=...). Mitglied wird
-// das Konto erst mit dem Klick auf „Annehmen“, angemeldet mit der eingeladenen
-// Adresse. Wie bei der Abo-Bestätigung kein automatischer Aufruf beim Laden,
-// der den Token verbraucht (die Vorschau verbraucht ihn nicht).
+// Accept or decline an invitation to a status page. The link
+// in the invitation mail leads here (/invitation#token=...). The account only
+// becomes a member with the click on "Accept", signed in with the invited
+// address. As with the subscription confirmation there is no automatic call on load
+// that uses up the token (the preview does not use it up).
 
-// Token im URL-Fragment statt in der Query. Ein Fragment geht nie an
-// den Server und nie im Referer hinaus (Caddy-/Cloudflare-/Proxy-Logs sehen ihn
-// nicht); Browser-Verlauf und Adresszeile bekommen ihn nur bis zum Lesen.
-// Reihenfolge: Fragment (neue Mails), alte Query (Übergang), sessionStorage
-// (Neuladen/Login-Rückkehr im selben Tab).
+// Token in the URL fragment instead of the query. A fragment never goes to
+// the server and never out in the Referer (Caddy/Cloudflare/proxy logs do not
+// see it); browser history and address bar only get it until it is read.
+// Order: fragment (new mails), old query (transition), sessionStorage
+// (reload/login return in the same tab).
 //
-// Reload-Entscheidung (konservativ): Sobald der Token gelesen ist, ersetzt die
-// Seite die Adresse durch /invitation (ohne Query, ohne Fragment). Damit
-// Neuladen und die Rückkehr vom Login nicht am fehlenden Token scheitern, liegt
-// er bis zum Abschluss in sessionStorage (nur dieser Tab, weg beim Schließen,
-// nie localStorage, nie in einer URL). Nach Annehmen, Ablehnen oder einem endgültigen Fehler wird
-// er gelöscht. Ohne sessionStorage (blockiert) klickt man den Mail-Link erneut.
+// Reload decision (conservative): as soon as the token is read, the page
+// replaces the address with /invitation (no query, no fragment). So that
+// reloading and returning from the login do not fail on the missing token, it is
+// kept in sessionStorage until completion (only this tab, gone on close,
+// never localStorage, never in a URL). After accepting, declining or a final error it
+// is deleted. Without sessionStorage (blocked) the user clicks the mail link again.
 //
-// Übergangszeit: Der Query-Fallback (?token=) dient nur den vor der Umstellung
-// verschickten Mails. Einladungen gelten 7 Tage
-// (pageInvitationTTL in backend/handlers/page_invitation.go): Der Fallback kann
-// entfernt werden nach 2026-11-11 (Stand 2026-11-04 + 7 Tage), gerechnet ab
-// dem Deployment-Datum, falls es später liegt.
-// Speicherzugriff geteilt mit useAuth.logout (utils/invitationToken.js).
+// Transition period: the query fallback (?token=) only serves mails sent before
+// the switch. Invitations are valid for 7 days
+// (pageInvitationTTL in backend/handlers/page_invitation.go): the fallback can
+// be removed after 2026-11-11 (as of 2026-11-04 + 7 days), counted from
+// the deployment date if that is later.
+// Storage access shared with useAuth.logout (utils/invitationToken.js).
 
-// Endgültige Fehler: Der Token taugt nie wieder, dann wird er vergessen. Bei
-// allen anderen (500, Netzwerk, Kontokonflikt, Limit) bleibt er, damit Neuladen
-// nach der schon bereinigten Adresse weiter funktioniert.
+// Final errors: the token will never work again, so it is forgotten. For
+// all others (500, network, account conflict, limit) it stays, so that reloading
+// after the already cleaned address keeps working.
 const FINAL_ERROR_CODES = ['invitation_not_found', 'invitation_expired', 'invitation_already_member']
 
 const route = useRoute()
@@ -45,44 +46,50 @@ const { t } = useI18n()
 const { apiFetch } = useApi()
 const { isLoggedIn } = useAuth()
 
+/** Response of POST /api/invitations/preview. */
+interface InvitationPreview {
+  page_name?: string
+  role_name?: string
+}
+
 // state: 'login' | 'loading' | 'ready' | 'busy' | 'accepted' | 'declined' | 'error'
-const state = ref('loading')
-// Stryker disable next-line StringLiteral: wird vor jeder Anzeige gesetzt
+const state = ref<'login' | 'loading' | 'ready' | 'busy' | 'accepted' | 'declined' | 'error'>('loading')
+// Stryker disable next-line StringLiteral: set before every display
 const errorMessage = ref('')
-const invitation = ref(null)
-// Stryker disable next-line StringLiteral: ohne Token-Query bleibt die Seite im Fehlerzustand
+const invitation = ref<InvitationPreview | null>(null)
+// Stryker disable next-line StringLiteral: without a token query the page stays in the error state
 const token = ref('')
 
-// Der Token steht weder in returnTo noch sonst in der Login-Adresse; nach dem Login
-// liest die Seite ihn aus sessionStorage (Open-Redirect-Schutz: nur interner Pfad).
+// The token is neither in returnTo nor anywhere else in the login address; after the login
+// the page reads it from sessionStorage (open redirect protection: internal path only).
 const loginLink = computed(() => '/login?returnTo=' + encodeURIComponent('/invitation'))
 
-function fail(err) {
-  if (FINAL_ERROR_CODES.includes(err.data?.code)) clearInvitationToken()
+function fail(err: ApiError) {
+  if (FINAL_ERROR_CODES.includes(err.data?.code as string)) clearInvitationToken()
   errorMessage.value = err.message
-  // Stryker disable next-line StringLiteral: jeder unbekannte Zustand fällt in den v-else-Zweig (Fehleranzeige)
+  // Stryker disable next-line StringLiteral: every unknown state falls into the v-else branch (error display)
   state.value = 'error'
 }
 
-async function post(path) {
-  return apiFetch(path, { method: 'POST', body: JSON.stringify({ token: token.value }) })
+async function post<T = unknown>(path: string) {
+  return apiFetch<T>(path, { method: 'POST', body: JSON.stringify({ token: token.value }) })
 }
 
 onMounted(async () => {
-  // Zustand VOR dem await festhalten: erst lesen, dann Adresse bereinigen.
+  // Capture the state BEFORE the await: read first, then clean the address.
   const hashToken = new URLSearchParams(route.hash.slice(1)).get('token')
   const urlToken = hashToken || route.query.token
   const found = urlToken ? String(urlToken) : readInvitationToken()
   if (!found) {
     errorMessage.value = t('invitation.noTokenError')
-    // Stryker disable next-line StringLiteral: jeder unbekannte Zustand fällt in den v-else-Zweig (Fehleranzeige)
+    // Stryker disable next-line StringLiteral: every unknown state falls into the v-else branch (error display)
     state.value = 'error'
     return
   }
   token.value = found
   if (urlToken) {
     storeInvitationToken(found)
-    // Stryker disable next-line ObjectLiteral: replace({}) löst in vue-router 4 auf den aktuellen Pfad ohne Query/Fragment auf, gleiche Wirkung
+    // Stryker disable next-line ObjectLiteral: in vue-router 4 replace({}) resolves to the current path without query/fragment, same effect
     await router.replace({ path: route.path })
   }
   if (!isLoggedIn.value) {
@@ -90,21 +97,21 @@ onMounted(async () => {
     return
   }
   try {
-    invitation.value = await post('/api/invitations/preview')
+    invitation.value = await post<InvitationPreview>('/api/invitations/preview')
     state.value = 'ready'
   } catch (err) {
-    fail(err)
+    fail(err as ApiError)
   }
 })
 
-async function respond(action) {
+async function respond(action: 'accept' | 'decline') {
   state.value = 'busy'
   try {
     await post(`/api/invitations/${action}`)
     clearInvitationToken()
     state.value = action === 'accept' ? 'accepted' : 'declined'
   } catch (err) {
-    fail(err)
+    fail(err as ApiError)
   }
 }
 </script>

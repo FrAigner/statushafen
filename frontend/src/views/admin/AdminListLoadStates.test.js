@@ -11,10 +11,10 @@ import AdminIncidents from './AdminIncidents.vue'
 import AdminMaintenance from './AdminMaintenance.vue'
 import AdminSubscribers from './AdminSubscribers.vue'
 
-// Admin-Listen zeigen vor der ersten Antwort einen Ladezustand
-// (nie den Leerzustand), nach leerer Antwort den Leerzustand und bei einem
-// Ladefehler einen Fehlerzustand. Ein erneutes Laden lässt vorhandene Zeilen
-// stehen.
+// Admin lists show a loading state before the first response
+// (never the empty state), the empty state after an empty response and an
+// error state on a load error. Reloading leaves existing rows
+// in place.
 
 const VIEWS = [
   {
@@ -45,8 +45,8 @@ const VIEWS = [
 
 const jsonResponse = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 
-// Der Listen-Request wird von der Antwort-Funktion `respond` gesteuert,
-// alle übrigen GETs liefern leere Listen.
+// The list request is controlled by the response function `respond`,
+// all other GETs return empty lists.
 function makeFetch(view, respond) {
   return vi.fn(async (url, options = {}) => {
     if ((options.method || 'GET') === 'GET' && view.isList(url)) return respond()
@@ -73,7 +73,7 @@ describe.each(VIEWS)('$name: Lade-/Leer-/Fehlerzustand', (view) => {
     useTenant().setActiveTenant(null)
     useTenant().setMyPages([])
     localStorage.clear()
-    useContentLanguages().catalog.value = [] // modulweiter Zustand
+    useContentLanguages().catalog.value = [] // module-wide state
     vi.spyOn(console, 'error').mockImplementation(() => {})
     i18n.global.locale.value = 'de'
   })
@@ -94,7 +94,7 @@ describe.each(VIEWS)('$name: Lade-/Leer-/Fehlerzustand', (view) => {
   })
 
   it('zeigt schon im ersten Render Ladezustand, weder Leer- noch Fehlerzustand', () => {
-    // Ohne flushPromises: onMounted hat das Laden gestartet, das Re-Rendern steht noch aus.
+    // Without flushPromises: onMounted has started loading, the re-render is still pending.
     const wrapper = mountView(view, () => new Promise(() => {}))
 
     expect(wrapper.find('[role="status"][aria-busy="true"]').exists()).toBe(true)
@@ -139,7 +139,7 @@ describe.each(VIEWS)('$name: Lade-/Leer-/Fehlerzustand', (view) => {
     await flushPromises()
     expect(wrapper.text()).toContain(view.rowText)
 
-    // Neuer Mandant löst ein erneutes Laden aus (Antwort bleibt offen).
+    // A new tenant triggers another load (the response stays open).
     useTenant().setActiveTenant('2')
     await flushPromises()
 
@@ -169,8 +169,8 @@ describe.each(VIEWS)('$name: Lade-/Leer-/Fehlerzustand', (view) => {
   })
 })
 
-// Ohne Statusseite (activeTenantId = null) wird nie
-// geladen, also darf auch kein Ladeindikator stehen bleiben.
+// Without a status page (activeTenantId = null) nothing is ever
+// loaded, so no loading indicator may remain either.
 describe.each(VIEWS.filter((v) => v.emptyKey))('$name: Konto ohne Statusseite', (view) => {
   beforeEach(() => {
     useAuth().logout()

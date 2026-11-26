@@ -1,17 +1,17 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Mandanten-Übersicht (Kern-Screen der Enterprise-App), nur für Global Admins.
+  Tenant overview (core screen of the enterprise app), global admins only.
   Route: { path: 'overview', component: AdminOverview }  in router/index.js
   Backend: GET /api/admin/overview  (handlers/overview.go, RequireGlobalAdmin)
 
-  Redesign Stufe 4b: PageHeader (Seitentitel = h1), KpiCard
-  (nur „Offene Vorfälle“ > 0 ist rot), Tabelle über ResponsiveTable/dataTable,
-  StatusBadge statt Inline-Farben, ListState/EmptyState für Lade-/Leerfall.
+  Redesign stage 4b: PageHeader (page title = h1), KpiCard
+  (only "Open incidents" > 0 is red), table via ResponsiveTable/dataTable,
+  StatusBadge instead of inline colours, ListState/EmptyState for loading/empty.
 
-  Richtung C: Die Tabelle steht in einer Karte „Alle Statusseiten“
-  mit Suche im Kartenkopf (ListCard/SearchBox), wie die übrigen Admin-Listen.
-  Die Übersicht ist mandantenübergreifend und hat deshalb keine Brotkrumen
-  mit Seitenname; Aktionen je Zeile gibt es nicht (kein Zeilenmenü).
+  Direction C: the table sits in an "All status pages" card with a search in
+  the card header (ListCard/SearchBox), like the other admin lists. The
+  overview spans all tenants and therefore has no breadcrumbs with a page
+  name; there are no per-row actions (no row menu).
 */
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -26,40 +26,41 @@ import ListCard from '../../components/ListCard.vue'
 import SearchBox from '../../components/SearchBox.vue'
 import EmptyState from '../../components/EmptyState.vue'
 import { useListQuery } from '../../composables/useListQuery'
+import type { OverviewPage, OverviewResponse } from '../../types/admin'
 // Help tooltip on the search box (the only control on this page).
 import { vHelp } from '../../directives/vHelp'
 
 const { apiFetch } = useApi()
 const { t } = useI18n()
 
-const pages   = ref([])
-const totals  = ref({ total_pages: 0, total_open_incidents: 0, total_subscribers: 0, worst_status: 'operational' })
+const pages   = ref<OverviewPage[]>([])
+const totals  = ref<Omit<OverviewResponse, 'pages'>>({ total_pages: 0, total_open_incidents: 0, total_subscribers: 0, worst_status: 'operational' })
 const loading = ref(true)
 const errorMsg = ref('')
 
-// Suche im Kartenkopf: Name und Kurzname der Statusseite.
+// Search in the card header: name and slug of the status page.
 const { query, rows, searching } = useListQuery(pages, { textOf: p => `${p.name} ${p.slug}` })
 
-const initials = (name) => name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+const initials = (name: string) => name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
 const loadData = async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    const data = await apiFetch('/api/admin/overview')
+    const data: OverviewResponse = await apiFetch('/api/admin/overview')
     pages.value  = data.pages
     totals.value = data
   } catch (err) {
-    errorMsg.value = t('overview.loadError') + err.message
+    errorMsg.value = t('overview.loadError') + (err as Error).message
   } finally {
     loading.value = false
   }
 }
 onMounted(loadData)
 
-function fmt(n) { return n >= 1000 ? (n / 1000).toFixed(1).replace('.', ',') + 'k' : String(n) }
+function fmt(n: number) { return n >= 1000 ? (n / 1000).toFixed(1).replace('.', ',') + 'k' : String(n) }
 
-// Gesamtstatus als Text (ein unbekannter Wert zählt wie bisher als „Betriebsbereit“).
+// Overall status as text (an unknown value counts as "Operational", as before).
 const overallLabel = computed(() => t(statusMeta(totals.value.worst_status).labelKey ?? 'status.operational'))
 const openIncidents = computed(() => totals.value.total_open_incidents ?? 0)
 
@@ -78,7 +79,7 @@ const columns = computed(() => [
 
     <div v-if="errorMsg" class="alert alert-error mb-16">{{ errorMsg }}</div>
 
-    <!-- KPI-Zeile: nur „Offene Vorfälle“ > 0 schlägt Alarm -->
+    <!-- KPI row: only "Open incidents" > 0 raises the alarm -->
     <div class="kpi-grid">
       <KpiCard :label="t('overview.kpiActivePages')" :value="String(totals.total_pages ?? 0)" />
       <KpiCard :label="t('overview.kpiOpenIncidents')" :value="String(openIncidents)" :alert="openIncidents > 0" />
@@ -86,7 +87,7 @@ const columns = computed(() => [
       <KpiCard :label="t('overview.kpiOverallStatus')" :value="overallLabel" />
     </div>
 
-    <!-- Tabelle: Status je Mandant -->
+    <!-- Table: status per tenant -->
     <ListCard :title="t('overview.cardTitle')">
       <template #tools>
         <SearchBox v-model="query" v-help="'overview.search'" :label="t('overview.searchLabel')" :placeholder="t('overview.searchPlaceholder')" />
@@ -121,12 +122,12 @@ const columns = computed(() => [
   margin-bottom: var(--sp-5);
 }
 
-/* Smartphone: 2 Spalten */
+/* Smartphone: 2 columns */
 @media (min-width: 480px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Desktop: 4 Spalten */
+/* Desktop: 4 columns */
 @media (min-width: 1200px) {
   .kpi-grid { grid-template-columns: repeat(4, 1fr); }
 }
@@ -137,7 +138,7 @@ const columns = computed(() => [
 .avatar {
   width: 32px; height: 32px; border-radius: var(--r-md); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: var(--fs-xs); font-weight: 700; color: var(--primary-text); /* dunkel heller */
+  font-size: var(--fs-xs); font-weight: 700; color: var(--primary-text); /* lighter in dark mode */
   background: var(--primary-soft);
 }
 .row-title { font-weight: 600; }

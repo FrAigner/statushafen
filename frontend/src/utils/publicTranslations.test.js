@@ -3,7 +3,7 @@ import {
   parsePublicTranslations, fetchPublicTranslations, fetchPublicUpdateTranslations, localizeUpdates, localizeTree, localizeIncidents, localizeNotices,
 } from './publicTranslations'
 
-// Anwenden und Abrufen der gebündelten Statusseiten-Übersetzungen.
+// Applying and fetching the bundled status page translations.
 
 const valid = { language: 'en', components: { 1: { title: 'A', text: 'a' } }, incidents: {}, notices: {} }
 
@@ -167,7 +167,7 @@ describe('localizeNotices', () => {
   })
 })
 
-// Update-Texte eines Vorfalls.
+// Update texts of an incident.
 describe('fetchPublicUpdateTranslations', () => {
   const ok = { language: 'en', default_language: 'de', updates: { 7: 'Seven' } }
   it('baut die URL mit Vorfall, Sprache und Token und liefert die Map', async () => {

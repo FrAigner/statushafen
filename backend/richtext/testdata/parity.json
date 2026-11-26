@@ -1,5 +1,5 @@
 {
-  "_comment": "gemeinsame Fälle für backend/richtext und frontend/src/utils/richText.js. Text = prefix + unit * count. formatted=true: beide Renderer geben Markup aus, false: beide geben den Text unformatiert aus (Limit für Gesamtlänge/Block). MaxRenderLen/MaxBlockLen müssen in beiden Renderern gleich sein.",
+  "_comment": "gemeinsame Fälle für backend/richtext und frontend/src/utils/richText.ts. Text = prefix + unit * count. formatted=true: beide Renderer geben Markup aus, false: beide geben den Text unformatiert aus (Limit für Gesamtlänge/Block). MaxRenderLen/MaxBlockLen müssen in beiden Renderern gleich sein.",
   "limits": { "maxRenderLen": 8000, "maxBlockLen": 5000 },
   "cases": [
     { "name": "Liste ohne Leerzeile bis zur erlaubten Länge", "unit": "- Punkt\n", "count": 600, "formatted": true },

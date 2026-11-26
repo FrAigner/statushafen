@@ -1,27 +1,30 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C: Formular als Seitenkarte rechts neben der Listenkarte
-  (Kind von .split.split--open, oben bündig, klebt beim Scrollen; unter 860 px
-  liegt sie unter der Liste, siehe style.css). Kopf: Titel mit Namen statt ID,
-  Pflichtfeld-Hinweis, Schließen-Knopf ×. Der Inhalt (meist ein
-  <form class="edit-form">) kommt per Slot; `close` meldet das Schließen
-  (wie „Abbrechen“). `hint` ersetzt den Standard-Hinweis, `showRequiredHint`
-  false blendet ihn für Formulare ganz ohne Pflichtfelder aus.
-  Dieser Baustein ersetzt drei parallel entstandene Fassungen (Betrieb,
-  Verwaltung, System).
+  Direction C: form as a side card to the right of the list card
+  (child of .split.split--open, top-aligned, sticky while scrolling; below 860 px
+  it sits below the list, see style.css). Head: title with the name instead of
+  the ID, required-field hint, close button ×. The content (usually a
+  <form class="edit-form">) comes via the slot; `close` reports closing
+  (like "Cancel"). `hint` replaces the default hint, `showRequiredHint`
+  false hides it for forms without any required fields.
+  This component replaces three versions that grew in parallel (operations,
+  administration, system).
 */
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  title: { type: String, required: true },
-  hint: { type: String, default: null },
-  showRequiredHint: { type: Boolean, default: true },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  title: string
+  hint?: string | null
+  showRequiredHint?: boolean
+}>(), {
+  hint: null,
+  showRequiredHint: true,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['close'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 </script>
@@ -42,9 +45,9 @@ const { t } = useI18n()
 </template>
 
 <style scoped>
-/* Der Titel im Kopf trägt keine Trennlinie: ".edit-card h3" (admin.css, später
-   geladen) setzte sonst eine Linie und Abstände unter den Titel. Scoped schlägt
-   das per Spezifität, unabhängig von der Ladereihenfolge. */
+/* The title in the head has no divider: ".edit-card h3" (admin.css, loaded
+   later) would otherwise add a line and spacing below the title. The scoped rule
+   wins by specificity, independent of load order. */
 .form-panel__head h3 {
   margin: 0;
   padding: 0;

@@ -5,6 +5,9 @@
   "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "types": ["node", "vite/client"],
+    // Tests and configuration files are still JavaScript: compiled along, not checked.
+    "allowJs": true,
+    "checkJs": false,
     // Tests index into mocks and query results all the time (fetch.mock.calls[0][1], findAll('li')[2]).
     // A wrong index already fails the test at runtime, so the check would only add noise there.
     "noUncheckedIndexedAccess": false,

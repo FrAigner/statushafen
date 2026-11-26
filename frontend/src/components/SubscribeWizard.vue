@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppIcon from './AppIcon.vue'
@@ -6,42 +6,48 @@ import EmptyState from './EmptyState.vue'
 import FormField from './FormField.vue'
 import { useAuth } from '../composables/useAuth'
 import { safeFetch, readJson } from '../composables/useApi'
+import type { ApiErrorBody, Component } from '../types/api'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  components: { type: Array, default: () => [] },
-  slug: { type: String, required: true }
+type Channel = '' | 'email' | 'google_chat'
+type FieldErrors = { channel: string, email: string, webhook: string }
+
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  components?: Component[]
+  slug: string
+}>(), {
+  components: () => [],
 })
 // Stryker restore all
 
 const { t, te, locale } = useI18n()
 const { token, currentUser } = useAuth()
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['close', 'subscribed'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ close: [], subscribed: [] }>()
 
 // Wizard State
-const step = ref(1) // 1 = Kanal, 2 = Komponenten, 3 = Bestätigung
-const channel = ref('') // 'email' | 'google_chat'
-// eingeloggte Nutzer müssen ihre Konto-Adresse nicht neu
-// eintippen, können sie aber weiterhin ändern (z.B. um eine andere Adresse
-// zu abonnieren). Ausgeloggt bleibt das Feld wie bisher leer.
+const step = ref(1) // 1 = channel, 2 = components, 3 = confirmation
+const channel = ref<Channel>('')
+// Signed-in users need not type their account address again, but can still
+// change it (e.g. to subscribe a different address). Signed out, the field
+// stays empty as before.
 const email = ref(currentUser.value?.email ?? '')
 const webhookURL = ref('')
 const componentSearch = ref('')
 const activeTag = ref('all')
-const selectedComponentIDs = ref([])
+const selectedComponentIDs = ref<number[]>([])
 const isLoading = ref(false)
 const errorMsg = ref('')
-// Der Serverfehler beim Abonnieren steht als Alert; er bekommt den Fokus,
-// damit Screenreader- und Tastaturnutzer ihn bemerken.
-const errorEl = ref(null)
-// Stryker disable next-line BooleanLiteral: wird vor Schritt 3 immer aus der Antwort gesetzt
+// The server error when subscribing is shown as an alert; it gets the focus,
+// so screen reader and keyboard users notice it.
+const errorEl = ref<HTMLElement | null>(null)
+// Stryker disable next-line BooleanLiteral: always set from the response before step 3
 const pending = ref(false)
 
-// Alle Komponenten flach (Baum aufgelöst) für die Auswahl
+// All components flat (tree resolved) for the selection
 const flatComponents = computed(() => {
-  const flatten = (nodes) => {
-    let result = []
+  const flatten = (nodes: Component[]) => {
+    let result: Component[] = []
     for (const n of nodes) {
       if (n.Status !== 'group' && (!n.Children || n.Children.length === 0)) {
         result.push(n)
@@ -55,11 +61,11 @@ const flatComponents = computed(() => {
   return flatten(props.components)
 })
 
-// Ersatz für das frühere c.Country: Komponenten können jetzt
-// mehrere Tags tragen statt eines einzelnen Country-Strings, daher Set über
-// alle Tag-Namen statt über einen einzelnen Wert pro Komponente.
+// Replacement for the former c.Country: components can now carry several
+// tags instead of a single country string, hence a set over all tag names
+// instead of a single value per component.
 const availableCountries = computed(() => {
-  const names = new Set()
+  const names = new Set<string>()
   flatComponents.value.forEach(c => (c.Tags || []).forEach(t => names.add(t.Name)))
   return [...names].sort()
 })
@@ -80,22 +86,22 @@ const isAllSelected = computed(() =>
 
 const toggleAll = () => {
   if (isAllSelected.value) {
-    // Gefilterte abwählen
+    // Deselect the filtered ones
     const ids = new Set(filteredComponents.value.map(c => c.ID))
     selectedComponentIDs.value = selectedComponentIDs.value.filter(id => !ids.has(id))
   } else {
-    // Alle gefilterten hinzufügen
+    // Add all filtered ones
     const newIds = filteredComponents.value.map(c => c.ID)
     selectedComponentIDs.value = [...new Set([...selectedComponentIDs.value, ...newIds])]
   }
 }
 
-// „Weiter“ bleibt immer bedienbar; ein deaktivierter Knopf ohne
-// Begründung ließ offen, was fehlt. Stattdessen prüft validateStep1 beim Klick
-// und nennt den Fehler am Feld (Muster FormField: role="alert", aria-invalid,
-// aria-describedby) und setzt den Fokus aufs erste fehlerhafte Feld.
+// "Next" always stays operable; a disabled button without a reason left open
+// what was missing. Instead validateStep1 checks on click, names the error at
+// the field (FormField pattern: role="alert", aria-invalid, aria-describedby)
+// and moves focus to the first invalid field.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const isValidWebhookURL = (value) => {
+const isValidWebhookURL = (value: string) => {
   try {
     return new URL(value).protocol === 'https:'
   } catch {
@@ -103,11 +109,11 @@ const isValidWebhookURL = (value) => {
   }
 }
 
-const errors = ref({ channel: '', email: '', webhook: '' })
-const bodyEl = ref(null)
+const errors = ref<FieldErrors>({ channel: '', email: '', webhook: '' })
+const bodyEl = ref<HTMLElement | null>(null)
 
 const validateStep1 = () => {
-  const next = { channel: '', email: '', webhook: '' }
+  const next: FieldErrors = { channel: '', email: '', webhook: '' }
   if (!channel.value) next.channel = t('components.subscribeWizard.errors.channelRequired')
   else if (channel.value === 'email') {
     if (!email.value.trim()) next.email = t('components.subscribeWizard.errors.emailRequired')
@@ -118,11 +124,11 @@ const validateStep1 = () => {
   return !next.channel && !next.email && !next.webhook
 }
 
-const clearError = (key) => {
+const clearError = (key: keyof FieldErrors) => {
   if (errors.value[key]) errors.value = { ...errors.value, [key]: '' }
 }
 
-const selectChannel = (value) => {
+const selectChannel = (value: Channel) => {
   channel.value = value
   errors.value = { channel: '', email: '', webhook: '' }
 }
@@ -133,13 +139,13 @@ const goStep2 = async () => {
     return
   }
   await nextTick()
-  // Fokus aufs erste fehlerhafte Feld; ohne Kanal auf die erste Kanal-Karte.
-  const first = bodyEl.value?.querySelector('[aria-invalid="true"]') ?? bodyEl.value?.querySelector('.channel-card')
+  // Focus the first invalid field; without a channel, the first channel card.
+  const first = bodyEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]') ?? bodyEl.value?.querySelector<HTMLElement>('.channel-card')
   first?.focus()
 }
 
-// „0 / 8 ausgewählt“ las sich wie „nichts gewählt“, obwohl leer
-// im Backend „alle Komponenten“ heißt. Der Zähler sagt jetzt, was gilt.
+// "0 / 8 selected" read like "nothing selected", although empty means
+// "all components" in the backend. The counter now says what applies.
 const selectionSummary = computed(() =>
   selectedComponentIDs.value.length === 0
     ? t('components.subscribeWizard.selectedNone')
@@ -164,13 +170,13 @@ const submit = async () => {
         ? selectedComponentIDs.value.join(',')
         : 'all',
       slug: props.slug,
-      // Besuchersprache als Mailsprache; das Backend übernimmt sie nur,
-      // wenn die Seite sie aktiviert hat (sonst Seitenstandardsprache).
+      // Visitor language as mail language; the backend only takes it if the
+      // page has enabled it (otherwise the page's default language).
       language: locale.value
     }
-    // Mit Token, damit das Backend das Abo dem eingeloggten Konto zuordnet (Review-Befund 1)
-    const headers = { 'Content-Type': 'application/json' }
-    // X-Auth-Token statt Authorization (dort steht Caddys Basic Auth)
+    // With the token, so the backend assigns the subscription to the signed-in account (review finding 1)
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    // X-Auth-Token instead of Authorization (that one carries Caddy's Basic Auth)
     if (token.value) headers['X-Auth-Token'] = token.value
     const res = await safeFetch('/api/subscribe', {
       method: 'POST',
@@ -178,20 +184,20 @@ const submit = async () => {
       body: JSON.stringify(body)
     })
     if (!res.ok) {
-      // Kaputter/leerer Body (z. B. 502 vom Proxy) darf keinen rohen
-      // JSON-Parserfehler anzeigen.
-      const data = await res.json().catch(() => ({}))
-      // stabiler Fehlercode -> api.errors.<code> (wie useApi), sonst Servertext.
+      // A broken/empty body (e.g. 502 from the proxy) must not show a raw
+      // JSON parser error.
+      const data: ApiErrorBody = await res.json().catch(() => ({}))
+      // Stable error code -> api.errors.<code> (like useApi), otherwise the server text.
       const key = typeof data.code === 'string' ? `api.errors.${data.code}` : ''
       throw new Error(key && te(key) ? t(key) : data.error || t('api.errors.server_error'))
     }
-    // Unbestätigte E-Mail-Abos (Double-Opt-in) zeigen den Hinweis auf die Bestätigungsmail.
-    const data = await readJson(res)
+    // Unconfirmed email subscriptions (double opt-in) show the hint about the confirmation mail.
+    const data: { status?: string } = await readJson(res)
     pending.value = data.status === 'pending'
     step.value = 3
     emit('subscribed')
   } catch (e) {
-    errorMsg.value = e.message
+    errorMsg.value = (e as Error).message
     await nextTick()
     errorEl.value?.focus()
   } finally {
@@ -223,7 +229,7 @@ const submit = async () => {
           </button>
         </div>
 
-        <!-- ======= SCHRITT 1: Kanal wählen ======= -->
+        <!-- ======= STEP 1: choose channel ======= -->
         <Transition name="wizard-slide" mode="out-in">
           <div v-if="step === 1" key="step1" ref="bodyEl" class="wizard-body">
             <h2 id="wizard-title-1" class="wizard-title">{{ t('components.subscribeWizard.step1Title') }}</h2>
@@ -261,7 +267,7 @@ const submit = async () => {
               <AppIcon name="alert-circle" :size="14" />{{ errors.channel }}
             </p>
 
-            <!-- Eingabe je nach Kanal -->
+            <!-- Input depending on the channel -->
             <Transition name="wizard-fade" mode="out-in">
               <div v-if="channel === 'email'" key="email-input" class="channel-input">
                 <FormField
@@ -319,7 +325,7 @@ const submit = async () => {
           </div>
         </Transition>
 
-        <!-- ======= SCHRITT 2: Komponenten wählen ======= -->
+        <!-- ======= STEP 2: choose components ======= -->
         <Transition name="wizard-slide" mode="out-in">
           <div v-if="step === 2" key="step2" class="wizard-body">
             <h2 id="wizard-title-2" class="wizard-title">{{ t('components.subscribeWizard.step2Title') }}</h2>
@@ -327,7 +333,7 @@ const submit = async () => {
               {{ t('components.subscribeWizard.step2Subtitle') }}
             </p>
 
-            <!-- Such & Filter -->
+            <!-- Search & filter -->
             <div class="comp-filter">
               <div class="comp-search-wrap">
                 <span class="search-icon-sm"><AppIcon name="search" :size="14" /></span>
@@ -355,7 +361,7 @@ const submit = async () => {
               </div>
             </div>
 
-            <!-- Alle auswählen -->
+            <!-- Select all -->
             <div class="select-all-row">
               <label class="perm-checkbox">
                 <input type="checkbox" :checked="isAllSelected" @change="toggleAll" />
@@ -364,7 +370,7 @@ const submit = async () => {
               <span class="selected-count" aria-live="polite">{{ selectionSummary }}</span>
             </div>
 
-            <!-- Komponenten-Liste -->
+            <!-- Component list -->
             <div class="comp-list">
               <label
                 v-for="c in filteredComponents"
@@ -409,7 +415,7 @@ const submit = async () => {
           </div>
         </Transition>
 
-        <!-- ======= SCHRITT 3: Bestätigung ======= -->
+        <!-- ======= STEP 3: confirmation ======= -->
         <Transition name="wizard-slide" mode="out-in">
           <div v-if="step === 3" key="step3" class="wizard-body wizard-success">
             <div class="success-icon"><AppIcon name="check-circle" :size="48" /></div>
@@ -470,7 +476,7 @@ const submit = async () => {
   color: inherit;
 }
 
-/* Header mit Steps */
+/* Header with steps */
 .wizard-header {
   display: flex;
   align-items: center;
@@ -553,7 +559,7 @@ const submit = async () => {
   line-height: 1.5;
 }
 
-/* Kanal-Karten */
+/* Channel cards */
 .channel-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -605,7 +611,7 @@ const submit = async () => {
   line-height: 1.3;
 }
 
-/* Kanal-Eingabe */
+/* Channel input */
 .channel-input {
   margin-bottom: 8px;
 }
@@ -632,7 +638,7 @@ const submit = async () => {
   border-color: var(--major);
 }
 
-/* Fehler zur Kanalwahl (Schritt 1, noch kein Kanal gewählt) */
+/* Channel choice error (step 1, no channel chosen yet) */
 .wizard-field-error {
   display: flex;
   align-items: flex-start;
@@ -642,7 +648,7 @@ const submit = async () => {
   color: var(--major-text);
 }
 
-/* Komponenten-Filter */
+/* Component filter */
 .comp-filter {
   display: flex;
   flex-direction: column;
@@ -688,7 +694,7 @@ const submit = async () => {
   gap: 6px;
 }
 
-/* Alle auswählen Zeile */
+/* "Select all" row */
 .select-all-row {
   display: flex;
   align-items: center;
@@ -704,7 +710,7 @@ const submit = async () => {
   color: var(--text-3);
 }
 
-/* Komponenten-Liste */
+/* Component list */
 .comp-list {
   max-height: 220px;
   overflow-y: auto;
@@ -826,7 +832,7 @@ const submit = async () => {
   color: var(--major-text);
 }
 
-/* Erfolg */
+/* Success */
 .wizard-success {
   text-align: center;
   padding-top: 32px;
@@ -848,7 +854,7 @@ const submit = async () => {
   margin-top: 16px;
 }
 
-/* Animationen */
+/* Animations */
 .wizard-slide-enter-active,
 .wizard-slide-leave-active {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);

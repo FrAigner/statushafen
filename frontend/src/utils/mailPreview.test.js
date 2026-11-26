@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: DOMPurify braucht ein vollständiges DOM (siehe richText.test.js).
+// jsdom instead of happy-dom: DOMPurify needs a complete DOM (see richText.test.js).
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { sanitizeMailPreview } from './mailPreview'
@@ -28,7 +28,7 @@ describe('sanitizeMailPreview', () => {
     expect(box.querySelector('div').getAttribute('style')).toContain('background')
   })
 
-  // Angriffsmatrix: nichts davon darf in der Admin-Oberfläche erscheinen.
+  // Attack matrix: none of this may appear in the admin UI.
   const attacks = {
     form: '<form action="https://evil.example.org/c" method="post">x</form>',
     input: '<input type="password" name="pw">',
@@ -71,9 +71,9 @@ describe('sanitizeMailPreview', () => {
     expect(box.innerHTML).not.toMatch(/onclick|onmouseover/)
   })
 
-  // Auf erlaubten Tags bleibt nur die feste Attribut-Allowlist. Insbesondere
-  // Ereignis-Attribute mit einem Wert, der wie eine erlaubte URL aussieht
-  // (die URL-Prüfung allein hielte sie nicht auf), sowie src/action, data-* und aria-*.
+  // On allowed tags only the fixed attribute allowlist remains. In particular
+  // event attributes with a value that looks like an allowed URL
+  // (the URL check alone would not stop them), as well as src/action, data-* and aria-*.
   it('entfernt nicht erlaubte Attribute auch auf erlaubten Tags', () => {
     const box = render(
       '<p onclick="https://evil.example.org" onmouseover="mailto:a@example.com" data-x="1" aria-label="x" class="a" id="b" title="t">p</p>' +
@@ -85,7 +85,7 @@ describe('sanitizeMailPreview', () => {
     expect(box.querySelector('a').getAttribute('href')).toBe('https://ok.example.org/')
   })
 
-  // !important würde ein erlaubtes Style-Attribut über die Oberfläche der Anwendung heben.
+  // !important would lift an allowed style attribute above the application's UI.
   it('entfernt !important aus Style-Angaben', () => {
     const box = render('<p style="color:red !important;font-weight:600">p</p>')
     const style = box.querySelector('p').getAttribute('style') || ''
@@ -93,7 +93,7 @@ describe('sanitizeMailPreview', () => {
     expect(style).toContain('font-weight:600')
   })
 
-  // Eine Overlay-Seite über die ganze Oberfläche (Phishing) per Inline-Style.
+  // An overlay page across the whole UI (phishing) via inline style.
   it('entfernt positionierende und fremde Ressourcen ladende CSS-Angaben, behält Darstellung', () => {
     const box = render(
       '<div style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:99999;background:#fff url(https://evil.example.org/b.png);color:#123456;padding:8px">Overlay</div>' +
@@ -109,7 +109,7 @@ describe('sanitizeMailPreview', () => {
     expect(ps).toContain('font-weight:600')
   })
 
-  // Ein Style, von dem nichts übrig bleibt, wird ganz entfernt, statt leer zu stehen.
+  // A style of which nothing remains is removed entirely instead of staying empty.
   it('entfernt das style-Attribut, wenn keine erlaubte Angabe übrig bleibt', () => {
     const box = render('<p style="position:fixed;top:0;background:url(https://evil.example.org/x)">p</p>')
     expect(box.querySelector('p').hasAttribute('style')).toBe(false)

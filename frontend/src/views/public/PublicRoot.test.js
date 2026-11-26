@@ -48,6 +48,15 @@ describe('PublicRoot', () => {
     expect(statusPage.props('slug')).toBe('acme')
   })
 
+  it('behandelt "<slug>.localhost" in der Entwicklung als Statusseite', async () => {
+    const wrapper = mountWithHost('acme.localhost')
+    await flushPromises()
+
+    const statusPage = wrapper.findComponent(StatusPageStub)
+    expect(statusPage.exists()).toBe(true)
+    expect(statusPage.props('slug')).toBe('acme')
+  })
+
   it('ohne konfigurierte Basisdomain gilt keine Subdomain-Konvention: der Host wird als eigene Domain aufgelöst', async () => {
     vi.stubEnv('VITE_APP_BASE_DOMAINS', '')
     const wrapper = mountWithHost('acme.example.com')

@@ -2,15 +2,15 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
 import OrderPage from './OrderPage.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// OrderPage lädt beim Mounten das Flag /api/public/orders/enabled.
-// Der Standard-Mock liefert dafür enabled:true und für POST die Erfolgsantwort;
-// einzelne Tests überschreiben die POST-Antwort bzw. das Flag gezielt.
+// OrderPage loads the flag /api/public/orders/enabled on mount.
+// The default mock returns enabled:true for it and the success answer for POST;
+// individual tests override the POST answer or the flag specifically.
 function routedFetch({ enabled = true, postResponse = jsonResponse({ message: 'ok' }, 201) } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
@@ -31,8 +31,8 @@ function mountOrderPage(fetchImpl) {
 describe('OrderPage', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf deutschen Wortlaut; ohne gespeicherte Präferenz
-    // fiele detectInitialLocale() in happy-dom (navigator.language en-US) auf 'en'.
+    // Tests assert on German wording; without a stored preference
+    // detectInitialLocale() would fall back to 'en' in happy-dom (navigator.language en-US).
     i18n.global.locale.value = 'de'
   })
 
@@ -113,12 +113,12 @@ describe('OrderPage', () => {
     expect(wrapper.find('.order-error').exists()).toBe(true)
     expect(wrapper.find('.order-error').attributes('role')).toBe('alert')
     expect(wrapper.text()).toContain('Slug wird bereits von einer anderen Statusseite verwendet')
-    // Nach einem Fehler bleibt das Formular sichtbar, damit direkt korrigiert werden kann.
+    // After an error the form stays visible, so it can be corrected right away.
     expect(wrapper.find('form').exists()).toBe(true)
   })
 
-  // ist die Bestellung deaktiviert, zeigt die Seite statt des
-  // Formulars einen Hinweis.
+  // If ordering is disabled, the page shows a notice instead of the
+  // form.
   it('shows a disabled notice and no form when ordering is turned off', async () => {
     const wrapper = mountOrderPage(routedFetch({ enabled: false }))
     await flushPromises()
@@ -128,8 +128,8 @@ describe('OrderPage', () => {
     expect(wrapper.text()).toContain('Bestellung derzeit nicht verfügbar')
   })
 
-  // scheitert das Laden des Flags, bleibt die Seite optimistisch
-  // bedienbar (Formular sichtbar), der Fehler wird nur geloggt.
+  // If loading the flag fails, the page stays optimistically
+  // usable (form visible), the error is only logged.
   it('zeigt das Formular weiter, wenn das Flag nicht geladen werden kann', async () => {
     const fetchMock = vi.fn(async (url, options = {}) => {
       const method = options.method || 'GET'
@@ -151,7 +151,7 @@ describe('OrderPage', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Firma und E-Mail sind Pflicht, der optionale Slug nicht.
+  // Company and email are required, the optional slug is not.
   it('kennzeichnet Firma und E-Mail als Pflichtfelder, den Slug nicht', async () => {
     const wrapper = mountOrderPage()
     await flushPromises()
@@ -163,7 +163,7 @@ describe('OrderPage', () => {
     expect(wrapper.find('[data-test="required-hint"]').text()).toBe('Felder mit * sind Pflichtfelder.')
   })
 
-  // reservierter Slug wird mit übersetztem Text gemeldet.
+  // A reserved slug is reported with a translated text.
   it('übersetzt slug_reserved vom Server', async () => {
     const wrapper = mountOrderPage(routedFetch({
       postResponse: jsonResponse({ error: 'Dieser Slug ist reserviert und kann nicht verwendet werden', code: 'slug_reserved' }, 400),

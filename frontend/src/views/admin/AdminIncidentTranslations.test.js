@@ -6,8 +6,8 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant as useTenantStatic } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminIncidentTranslations from './AdminIncidentTranslations.vue'
-import { axe } from '../../test-support/axe.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
+import { axe } from '../../test-support/axe'
+import { clickMenuItem } from '../../test-support/rowMenu'
 import { stubConfirm } from '../../test-support/confirm'
 
 function incidentFixture() {
@@ -98,13 +98,13 @@ describe('AdminIncidentTranslations with translation switched off', () => {
 
 describe('AdminIncidentTranslations', () => {
   beforeEach(() => {
-    // Die Knöpfe hängen an incidents:create/update/delete auf der aktiven Seite.
+    // The buttons depend on incidents:create/update/delete on the active page.
     useAuth().setAuth('jwt-1', { permissions: '' })
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'incidents:create,incidents:read,incidents:update,incidents:delete' }])
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -310,7 +310,7 @@ describe('AdminIncidentTranslations', () => {
     await newButtons[0].trigger('click')
     await flushPromises()
 
-    // Die Nachricht der Übersetzung ist der Editor.
+    // The translation's message is the editor.
     expect(wrapper.find('.rte textarea').exists()).toBe(true)
     const inputs = wrapper.findAll('input')
     const textareas = wrapper.findAll('textarea')
@@ -434,8 +434,8 @@ describe('AdminIncidentTranslations', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Ein Viewer (incidents:read) sah „Neue Übersetzung“, „Bestätigen“
-  // und „Löschen“, das Backend lehnt alle drei mit 403 ab.
+  // A viewer (incidents:read) saw "New translation", "Confirm"
+  // and "Delete"; the backend rejects all three with 403.
   it('blendet Schreibknöpfe und Aktionen-Spalte ohne incidents:write aus', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'incidents:read' }])
     const { wrapper } = await mountComponent()
@@ -479,7 +479,7 @@ describe('AdminIncidentTranslations', () => {
       expect(wrapper.find('.page-head__subtitle').text()).toBe('Übersetzungen zu „Database Outage“')
     })
 
-    // Regression: der Status stand als englischer Rohwert („confirmed“, „draft“) in der Tabelle.
+    // Regression: the status was shown in the table as an English raw value ("confirmed", "draft").
     it('zeigt den Status als Badge mit deutschem Text und Zeilenmenü statt Aktionsknöpfen', async () => {
       const { wrapper } = await mountComponent()
       const rows = wrapper.findAll('tbody tr')
@@ -530,7 +530,7 @@ describe('AdminIncidentTranslations', () => {
     })
   })
 
-  // Bestätigen braucht incidents:update, Löschen incidents:delete, Neu incidents:create.
+  // Confirm needs incidents:update, delete incidents:delete, new incidents:create.
   it('zeigt Bestätigen nur mit update, Löschen nur mit delete und Neu nur mit create', async () => {
     useTenantStatic().setMyPages([{ ID: 1, Permissions: 'incidents:update' }])
     const onlyUpdate = (await mountComponent()).wrapper

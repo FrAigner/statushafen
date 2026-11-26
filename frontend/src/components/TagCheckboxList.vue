@@ -1,26 +1,28 @@
-<script setup>
+<script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { Tag } from '../types/api'
 
-// Gemeinsame Tag-Mehrfachauswahl (Ersatz für das frühere
-// Country-Freitextfeld) - genutzt in AdminComponents/AdminIncidents/
-// AdminMaintenance/AdminUsers, um die dort ursprünglich vierfach duplizierte
-// Checkbox-Liste (SonarCloud New-Code-Duplication-Gate) an einer Stelle zu
-// pflegen.
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  tags: { type: Array, required: true },       // verfügbare Tags (aus GET /api/tags)
-  selectedIds: { type: Array, required: true }, // aktuell ausgewählte Tag-IDs
-  // null statt eines statischen String-Defaults, da ein direkt hier
-  // hinterlegter Default nicht auf einen späteren Sprachwechsel reagieren
-  // würde (Vue-Prop-Defaults werden nur einmal beim ersten Fehlen des Props
-  // ausgewertet) - der reaktive Fallback per t() passiert stattdessen im Template.
-  emptyHint: { type: String, default: null },
+// Shared tag multi-select (replacement for the former country free-text
+// field) - used in AdminComponents/AdminIncidents/AdminMaintenance/AdminUsers,
+// to maintain the checkbox list that was originally duplicated four times
+// there (SonarCloud new-code duplication gate) in one place.
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  tags: Tag[] // available tags (from GET /api/tags)
+  selectedIds: number[] // currently selected tag IDs
+  // null instead of a static string default, because a default stored right
+  // here would not react to a later language switch (Vue evaluates prop
+  // defaults only once, when the prop is first missing) - the reactive
+  // fallback via t() happens in the template instead.
+  emptyHint?: string | null
+}>(), {
+  emptyHint: null,
 })
 // Stryker restore all
 
 const { t } = useI18n()
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['toggle'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ toggle: [tagId: number] }>()
 </script>
 
 <template>

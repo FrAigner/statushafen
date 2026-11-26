@@ -1,8 +1,10 @@
 <!--
-  Startseite des Admin-Bereichs (/admin). AdminLayout erkennt sie an
-  meta.home und leitet zum ersten Tab weiter, den der Nutzer lesen darf (oder
-  zeigt „Keine Berechtigung“). Die View selbst hat keinen Inhalt.
+  Start page of the admin area (/admin). AdminLayout recognises it by
+  meta.home and redirects to the first tab the user may read (or shows
+  "No permission"). The view itself has no content.
 -->
+<script setup lang="ts"></script>
+
 <template>
   <div />
 </template>

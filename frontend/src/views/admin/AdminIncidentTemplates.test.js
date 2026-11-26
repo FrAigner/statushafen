@@ -7,9 +7,9 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { withArchivedComponent, componentTreeFixture, expectedTreeOptionLabels, multiSelectOptionLabels } from '../../test-support/componentTree'
 import AdminIncidentTemplates from './AdminIncidentTemplates.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel, hasLabel } from '../../test-support/fields.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel, hasLabel } from '../../test-support/fields'
+import { clickMenuItem } from '../../test-support/rowMenu'
 import { stubConfirm } from '../../test-support/confirm'
 
 function templatesFixture() {
@@ -19,7 +19,7 @@ function templatesFixture() {
 }
 
 function componentsFixture() {
-  // Baum mit Unterkomponente statt nur oberster Ebene.
+  // Tree with a subcomponent instead of only the top level.
   return componentTreeFixture()
 }
 
@@ -75,8 +75,8 @@ describe('AdminIncidentTemplates', () => {
     useAuth().logout()
   })
 
-  // vorher bot die Auswahl nur die oberste Ebene an, und der
-  // Name einer Unterkomponente fehlte in der Tabelle.
+  // previously the selection only offered the top level, and the
+  // name of a subcomponent was missing in the table.
   it('bietet Unterkomponenten eingerückt an und zeigt ihren Namen in der Tabelle', async () => {
     const base = makeFetchRouter()
     const fetchImpl = vi.fn(async (url, options = {}) => (!options.method && /\/incident-templates$/.test(url))
@@ -89,7 +89,7 @@ describe('AdminIncidentTemplates', () => {
     expect(multiSelectOptionLabels(wrapper)).toEqual(expectedTreeOptionLabels)
   })
 
-  // eine inzwischen archivierte Komponente einer bestehenden Vorlage bleibt in der Auswahl sichtbar.
+  // a meanwhile archived component of an existing template stays visible in the selection.
   it('zeigt beim Bearbeiten eine archivierte, gewählte Komponente weiter in der Auswahl', async () => {
     const base = makeFetchRouter()
     const fetchImpl = withArchivedComponent(vi.fn(async (url, options = {}) => (!options.method && /\/incident-templates$/.test(url))
@@ -122,7 +122,7 @@ describe('AdminIncidentTemplates', () => {
     expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
-  // Nachrichtenfeld der Vorlage ist der Editor.
+  // The template's message field is the editor.
   it('Nachrichtenfeld der Vorlage ist der RichTextEditor', async () => {
     const { wrapper } = await mountTemplates({ fetchImpl: makeFetchRouter() })
     await wrapper.findAll('button').find(b => b.text().includes('Neue Vorlage')).trigger('click')
@@ -173,7 +173,7 @@ describe('AdminIncidentTemplates', () => {
     const { wrapper } = await mountTemplates({ perms: 'incident_templates:read' })
 
     expect(wrapper.find('.page-head button').exists()).toBe(false)
-    // Leser dürfen ansehen, aber nicht ändern oder löschen.
+    // Readers may view, but not update or delete.
     expect(wrapper.findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Ansehen'])
   })
 
@@ -203,7 +203,7 @@ describe('AdminIncidentTemplates', () => {
     expect(none.find('.empty-state__title').exists()).toBe(true)
   })
 
-  // Stufe 4c: Typ-/Status-Auswahl und Komponenten im Formular.
+  // Stage 4c: kind/status selection and components in the form.
   it('übernimmt Typ, Standardstatus und Komponenten aus dem Formular; Wartung blendet den Status aus', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountTemplates({ fetchImpl: fetchMock })
@@ -225,6 +225,15 @@ describe('AdminIncidentTemplates', () => {
     await wrapper.findAll('button').find(b => b.text().includes('Neue Vorlage')).trigger('click')
     await fieldByLabel(wrapper, 'Typ').setValue('maintenance')
     expect(hasLabel(wrapper, 'Standard-Status')).toBe(false)
+  })
+  it('zeigt einen unbekannten Typ unverändert als Rohwert in der Tabelle', async () => {
+    const base = makeFetchRouter()
+    const fetchImpl = vi.fn(async (url, options = {}) => (!options.method && /\/incident-templates$/.test(url))
+      ? jsonResponse([{ ID: 9, Name: 'Altlast', Kind: 'legacy', Title: 'T', Message: 'M', ComponentIDs: '' }])
+      : base(url, options))
+    const { wrapper } = await mountTemplates({ fetchImpl })
+
+    expect(wrapper.find('tbody .tag-pill').text()).toBe('legacy')
   })
   describe('Richtung C', () => {
     const templates = () => [
@@ -275,8 +284,8 @@ describe('AdminIncidentTemplates', () => {
       expect(fetchMock.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(false)
     })
 
-    // Regression: der Standard-Status stand fest auf Englisch im Quelltext
-    // („Investigating“ ...), obwohl die Vorfall-Ansichten ihn übersetzen.
+    // Regression: the default status was hard-coded in English in the source
+    // ("Investigating" ...), although the incident views translate it.
     it('bietet den Standard-Status in der UI-Sprache an', async () => {
       const { wrapper } = await mountTemplates()
       await wrapper.findAll('button').find(b => b.text().includes('Neue Vorlage')).trigger('click')
