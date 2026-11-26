@@ -74,7 +74,7 @@ jobs:
           - 8090:8090
     env:
       # Ohne die Variable überspringt sich der Spec, wenn der Mock fehlt; hier wäre das ein grüner Lauf ohne
-      # jede Prüfung (frontend/src/test-support/ssoMockGate.js).
+      # jede Prüfung (frontend/src/test-support/ssoMockGate.ts).
       E2E_REQUIRE_SSO_MOCK: "1"
     steps:
       - name: Checkout Code

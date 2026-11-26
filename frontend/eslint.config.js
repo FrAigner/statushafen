@@ -2,8 +2,8 @@ import pluginVue from 'eslint-plugin-vue'
 import vueTsEslintConfig from '@vue/eslint-config-typescript'
 
 export default [
-  // Sandbox und Reports von StrykerJS (npm run test:mutation)
-  // sind Kopien bzw. generierte Dateien und dürfen nicht gelintet werden.
+  // StrykerJS sandbox and reports (npm run test:mutation) are copies or generated files and must not
+  // be linted.
   { ignores: ['.stryker-tmp/**', 'reports/**', 'dist/**'] },
   ...pluginVue.configs['flat/essential'],
   // Also covers TypeScript: *.ts and <script lang="ts"> in SFCs get the typescript-eslint parser and its

@@ -3,7 +3,7 @@
 Die Bedienungsanleitung für den Admin-Bereich ist seit der Umstellung App: Sie erscheint
 unter `/docs` (Link „Dokumentation“ im Footer und in der Admin-Seitenleiste) und liegt als
 Markdown in `frontend/src/docs/de/` und `en/`, ein Abschnitt je Datei (Reihenfolge in
-[`index.js`](../../frontend/src/docs/index.js)). Änderungen an der Bedienung bitte dort pflegen, damit Doku und App eine Quelle haben.
+[`index.ts`](../../frontend/src/docs/index.ts)). Änderungen an der Bedienung bitte dort pflegen, damit Doku und App eine Quelle haben.
 
 Die wichtigsten Abschnitte für Admins:
 

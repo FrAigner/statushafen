@@ -24,6 +24,6 @@ coverage
 *.sln
 *.sw?
 
-# Mutationstests
+# Mutation tests
 reports
 .stryker-tmp

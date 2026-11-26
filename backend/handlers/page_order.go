@@ -481,7 +481,7 @@ func (h *Handler) SetOrderPasswordHandler(c *gin.Context) {
 
 // pageOrderConfirmSubject: fester deutscher Betreff, analog zu den übrigen
 // Transaktionsmails (keine Sprachauswahl - die App ist de-first, siehe
-// vue-i18n-Default in frontend/src/i18n/index.js).
+// vue-i18n-Default in frontend/src/i18n/index.ts).
 const pageOrderConfirmSubject = "Bitte bestätige deine Statushafen-Bestellung"
 
 // rawPageOrderConfirmEmailTemplate ist der lesbar formatierte HTML-Body der

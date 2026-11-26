@@ -30,7 +30,7 @@ const MaxLen = 5000
 // that was never checked against MaxLen: if the whole text is longer than
 // MaxRenderLen or a block (lines without a blank line) longer than MaxBlockLen,
 // the text is output without formatting. The same values apply in the
-// frontend (frontend/src/utils/richText.js), so that page and mail format the same
+// frontend (frontend/src/utils/richText.ts), so that page and mail format the same
 // text identically; both are above MaxLen, so allowed
 // texts are always formatted. A test keeps both sides equal.
 const (
