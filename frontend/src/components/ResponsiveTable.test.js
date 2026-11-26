@@ -10,10 +10,10 @@ function mockIsMobile(isMobile) {
   }))
 }
 
-// Tests assertieren auf den deutschen Wortlaut der übersetzten Default-Texte
-// (loadingText/emptyText); ohne gespeicherte Präferenz würde
-// detectInitialLocale() in der Testumgebung (happy-dom navigator.language
-// === 'en-US') sonst auf 'en' fallen.
+// The tests assert the German wording of the translated default texts
+// (loadingText/emptyText); without a stored preference
+// detectInitialLocale() would otherwise fall back to 'en' in the test
+// environment (happy-dom navigator.language === 'en-US').
 beforeEach(() => {
   i18n.global.locale.value = 'de'
 })

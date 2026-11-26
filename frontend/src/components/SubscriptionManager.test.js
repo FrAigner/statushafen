@@ -129,7 +129,7 @@ describe('SubscriptionManager', () => {
     expect(wrapper.find('.edit-abo-result').exists()).toBe(false)
   })
 
-  // Das erwartete 404 darf nicht als Fehler in der Konsole landen.
+  // The expected 404 must not end up as an error in the console.
   it('loggt das erwartete 404 nicht per console.error, ein 500 aber schon', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'Kein Abonnement gefunden' }, 404))
     mountManager()
@@ -146,7 +146,7 @@ describe('SubscriptionManager', () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ error: 'boom' }, 500))
     const wrapper = mountManager()
     await flushPromises()
-    // stiller Vorab-Check meldet bei echtem Fehler nichts über den Abo-Zustand
+    // the silent pre-check reports nothing about the subscription state on a real error
     expect(wrapper.emitted('subscription-state')).toBeUndefined()
 
     await wrapper.find('.edit-abo-header').trigger('click')
@@ -159,8 +159,8 @@ describe('SubscriptionManager', () => {
     expect(wrapper.emitted('subscription-state')).toBeUndefined()
   })
 
-  // Erst 404 (kein Abo), danach echter Fehler -
-  // darf nicht weiter als "kein Abonnement" erscheinen.
+  // First 404 (no subscription), then a real error -
+  // must no longer appear as "no subscription".
   it.each([
     ['500', () => jsonResponse({ error: 'boom' }, 500)],
     ['Netzwerkfehler', () => Promise.reject(new TypeError('Failed to fetch'))],
@@ -282,10 +282,10 @@ describe('SubscriptionManager', () => {
     expect(wrapper.find('.edit-abo-body').exists()).toBe(true)
   })
 
-  // Barrierefreiheit - die Überschrift ist ein echtes
-  // <button>-Element (native Tastaturbedienung über Enter/Space statt eigener
-  // Keydown-Logik auf einem <div>), meldet seinen Zustand über aria-expanded
-  // und verschiebt den Fokus beim Öffnen in den Bereich.
+  // Accessibility - the heading is a real <button> element (native keyboard
+  // operation via Enter/Space instead of custom keydown logic on a <div>),
+  // reports its state via aria-expanded and moves the focus into the section
+  // when opening.
   describe('Barrierefreiheit', () => {
     it('die Überschrift ist ein <button> mit aria-expanded', async () => {
       global.fetch = vi.fn().mockResolvedValue(jsonResponse({ channel: 'email', component_ids: 'all' }))
@@ -353,9 +353,9 @@ describe('SubscriptionManager', () => {
     })
   })
 
-  // "Abonnement beenden" - Bestätigung läuft als eigener
-  // Zustand auf der Seite (kein window.confirm), löscht per DELETE und führt
-  // zurück in Zustand B ("kein Abonnement").
+  // "End subscription" - the confirmation runs as a separate state on the
+  // page (no window.confirm), deletes via DELETE and returns to state B
+  // ("no subscription").
   describe('Abonnement beenden', () => {
     function mountWithSubscription() {
       global.fetch = vi.fn().mockResolvedValue(jsonResponse({ channel: 'email', component_ids: 'all' }))
@@ -408,10 +408,10 @@ describe('SubscriptionManager', () => {
       expect(wrapper.emitted('subscription-state').at(-1)).toEqual([false])
     })
 
-    // Der "Ja, beenden"-Knopf verschwindet mit dem erfolgreichen Beenden
-    // zusammen mit dem ganzen Bereich aus dem DOM - endLoading muss trotzdem
-    // zurückgesetzt werden, sonst bleibt der Knopf nach einem erneuten
-    // Abonnieren dauerhaft deaktiviert ("disabled" hängt am selben Flag).
+    // The "Yes, end" button disappears from the DOM together with the whole
+    // section on a successful end - endLoading must still be reset, otherwise
+    // the button stays disabled for good after subscribing again ("disabled"
+    // hangs on the same flag).
     it('setzt endLoading nach erfolgreichem Beenden zurück, damit ein erneutes Beenden nicht dauerhaft deaktiviert bleibt', async () => {
       const wrapper = mountWithSubscription()
       await wrapper.find('.edit-abo-header').trigger('click')
@@ -422,7 +422,7 @@ describe('SubscriptionManager', () => {
       await flushPromises()
       expect(wrapper.find('.edit-abo-none').exists()).toBe(true)
 
-      // Erneut abonniert (z.B. über den Wizard) und der Bereich neu geladen.
+      // Subscribed again (e.g. via the wizard) and the section reloaded.
       global.fetch.mockResolvedValue(jsonResponse({ channel: 'email', component_ids: 'all' }))
       await wrapper.vm.refresh()
       await wrapper.find('.btn-end-abo').trigger('click')
@@ -443,8 +443,8 @@ describe('SubscriptionManager', () => {
       expect(wrapper.find('.edit-abo-msg').text()).toContain('nicht beendet')
       expect(wrapper.find('.edit-abo-msg').classes()).not.toContain('edit-abo-msg--ok')
       expect(wrapper.find('.edit-abo-result').exists()).toBe(true)
-      // Nach dem Fehlschlag wieder der Knopf statt der (beantworteten) Bestätigung,
-      // und wieder bedienbar (nicht mehr durch die Anfrage deaktiviert).
+      // After the failure the button again instead of the (answered) confirmation,
+      // and operable again (no longer disabled by the request).
       expect(wrapper.find('.edit-abo-end-confirm').exists()).toBe(false)
       expect(wrapper.find('.btn-end-abo').exists()).toBe(true)
     })
@@ -467,8 +467,8 @@ describe('SubscriptionManager', () => {
       await clickPromise
       await flushPromises()
 
-      // Nach der Antwort (hier: Fehler) ist die Anfrage vorbei - der Beenden-
-      // Knopf (nicht deaktiviert) statt der (beantworteten) Bestätigung.
+      // After the answer (here: an error) the request is over - the end
+      // button (not disabled) instead of the (answered) confirmation.
       expect(wrapper.find('.btn-end-abo').exists()).toBe(true)
       expect(wrapper.find('.btn-end-abo').attributes('disabled')).toBeUndefined()
     })
@@ -497,7 +497,7 @@ describe('SubscriptionManager', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
     wrapper.unmount()
   })
-  // 4a: Google-Chat-Abo zeigt die Webhook-URL (Klasse statt Inline-Style).
+  // 4a: a Google Chat subscription shows the webhook URL (class instead of inline style).
   it('zeigt bei einem Google-Chat-Abo die Webhook-URL', async () => {
     global.fetch = vi.fn().mockResolvedValue(
       jsonResponse({ channel: 'google_chat', webhook_url: 'https://chat.example/hook', component_ids: 'all' })
@@ -510,7 +510,7 @@ describe('SubscriptionManager', () => {
     expect(wrapper.find('.edit-abo-webhook').text()).toContain('https://chat.example/hook')
     expect(wrapper.html()).not.toContain('style=')
   })
-  // Mailsprache im Abo-Manager ändern.
+  // Change the mail language in the subscription manager.
   describe('Mailsprache', () => {
     const pageLangs = [
       { code: 'de', name: 'Deutsch', is_default: true },

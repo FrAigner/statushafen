@@ -9,7 +9,7 @@ import PermissionMatrix from './PermissionMatrix.vue'
 import { RESOURCES } from '../utils/permissions'
 import { axe } from '../test-support/axe'
 
-// Berechtigungs-Matrix mit einer Zeile je Tab, gruppiert nach Bereich.
+// Permission matrix with one row per tab, grouped by area.
 let wrapper = null
 
 function mountMatrix(initial = [], standalone = ['admin_dashboard']) {
@@ -48,7 +48,7 @@ describe('PermissionMatrix', () => {
     expect(wrapper.findAll('thead th')).toHaveLength(5)
     expect(wrapper.findAll('thead .perm-abbr').map(e => e.text())).toEqual(['C', 'R', 'U', 'D'])
     expect(wrapper.findAll('thead .perm-action-text').map(e => e.text())).toEqual(['Anlegen', 'Lesen', 'Ändern', 'Löschen'])
-    // Jede Zeile hat vier Zellen mit Checkbox.
+    // Every row has four cells with a checkbox.
     expect(wrapper.findAll('tr[data-area="components"] td input')).toHaveLength(4)
   })
 
@@ -212,7 +212,7 @@ describe('PermissionMatrix', () => {
     expect(box.attributes('tabindex')).toBeUndefined()
     box.element.focus()
     expect(document.activeElement).toBe(box.element)
-    // Leertaste löst bei Checkboxen ein Klick-Ereignis aus.
+    // Space fires a click event on checkboxes.
     await box.trigger('click')
     expect(model.value).toContain('components:create')
     expect(model.value).toContain('components:read')
@@ -224,8 +224,8 @@ describe('PermissionMatrix', () => {
   })
 })
 
-// Layout-Regel gegen Abschneiden: Die Matrix lief im Formular rechts über und
-// verlor die letzte Spalte samt Text. Die Regeln halten sie in der Formularbreite.
+// Layout rule against clipping: the matrix overflowed the form on the right and
+// lost the last column including its text. The rules keep it within the form width.
 describe('PermissionMatrix: Layout bleibt in der Formularbreite', () => {
   const dir = dirname(fileURLToPath(import.meta.url))
   const css = readFileSync(resolve(dir, 'PermissionMatrix.vue'), 'utf8').split('<style scoped>')[1]

@@ -8,7 +8,7 @@ import PermissionSummary from './PermissionSummary.vue'
 import { RESOURCES } from '../utils/permissions'
 import { axe } from '../test-support/axe'
 
-// Rechte einer Rolle kompakt in der Liste.
+// A role's permissions, compact in the list.
 const mountSummary = (props) => mount(PermissionSummary, { props, global: { plugins: [i18n] } })
 const chips = (w) => w.findAll('.perm-summary__chip').map(c => c.text())
 
@@ -39,6 +39,11 @@ describe('PermissionSummary', () => {
   it('zeigt Sonderrechte und zählt den Altwert :write als CRUD', () => {
     const w = mountSummary({ permissions: 'notices:write,admin_dashboard' })
     expect(chips(w)).toEqual(['Ankündigungen: CRUD', 'Admin-Dashboard'])
+  })
+
+  it('zeigt ein unbekanntes Sonderrecht mit seinem Rohwert', () => {
+    const w = mountSummary({ permissions: 'components:read,custom_flag' })
+    expect(chips(w)).toEqual(['Komponenten: R', 'custom_flag'])
   })
 
   it('zeigt „Nur Statusseite“ ohne Admin-Recht (auch mit nur admin_dashboard) und auf Englisch englisch', () => {

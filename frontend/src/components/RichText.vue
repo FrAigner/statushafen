@@ -1,24 +1,26 @@
-<script setup>
-// Zeigt eine Nachricht bzw. Beschreibung als formatierten Text
-// (eingeschränktes Markdown, siehe utils/richText.js). `plain` zeigt den Text
-// unverändert (Fremdtexte externer Quellen sind kein Markdown, Zeilenumbrüche
-// bleiben erhalten).
+<script setup lang="ts">
+// Shows a message or description as formatted text (restricted Markdown, see
+// utils/richText.ts). `plain` shows the text unchanged (foreign texts from
+// external sources are not Markdown, line breaks are preserved).
 import { computed } from 'vue'
 import { renderRichText, plainTextToHtml } from '../utils/richText'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  text: { type: String, default: '' },
-  plain: { type: Boolean, default: false },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  text?: string
+  plain?: boolean
+}>(), {
+  text: '',
+  plain: false,
 })
 // Stryker restore all
 
-// Beide Zweige liefern ausschließlich bereinigtes bzw. maskiertes HTML.
+// Both branches yield only sanitized or escaped HTML.
 const html = computed(() => (props.plain ? plainTextToHtml(props.text) : renderRichText(props.text)))
 </script>
 
 <template>
-  <!-- eslint-disable-next-line vue/no-v-html -- bereinigt durch renderRichText (marked ohne Roh-HTML + DOMPurify mit fester Whitelist) bzw. maskiert -->
+  <!-- eslint-disable-next-line vue/no-v-html -- sanitized by renderRichText (marked without raw HTML + DOMPurify with a fixed allowlist) or escaped -->
   <div class="rich-text" :class="{ 'rich-text--plain': plain }" v-html="html"></div>
 </template>
 

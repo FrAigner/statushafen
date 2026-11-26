@@ -1,23 +1,27 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Statussymbol. Status ist immer Form + Farbe
-  + Text, nie nur Farbe: Kreis-Haken (in Betrieb), Dreieck-! (beeinträchtigt),
-  Raute-– (Teilausfall), Achteck-× (Großstörung), Quadrat-Uhr (Wartung).
-  Die Zuordnung steht in utils/status.js.
+  Redesign stage 3: status icon. Status is always shape + colour + text,
+  never colour alone: circle with check (operational), triangle with !
+  (degraded), diamond with – (partial outage), octagon with × (major outage),
+  square with clock (maintenance). The mapping lives in utils/status.ts.
 
-  Ohne `label` ist das Symbol dekorativ (aria-hidden), weil daneben der
-  Statustext steht (StatusBadge). Allein verwendet braucht es `label`, dann
-  bekommt es role="img" und einen zugänglichen Namen.
-  Farben nur über Tokens (--ok, --deg, …, --icon-on für das Zeichen).
+  Without `label` the icon is decorative (aria-hidden), because the status
+  text sits next to it (StatusBadge). Used on its own it needs `label`; it
+  then gets role="img" and an accessible name.
+  Colours only via tokens (--ok, --deg, …, --icon-on for the glyph).
 */
 import { computed } from 'vue'
 import { statusMeta } from '../utils/status'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  status: { type: String, default: null },
-  size: { type: [Number, String], default: 16 },
-  label: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  status?: string | null
+  size?: number | string
+  label?: string | null
+}>(), {
+  status: null,
+  size: 16,
+  label: null,
 })
 // Stryker restore all
 

@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: Die Vorschau bereinigt mit DOMPurify und braucht ein vollständiges DOM.
+// jsdom instead of happy-dom: the preview sanitizes with DOMPurify and needs a complete DOM.
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
@@ -10,7 +10,7 @@ import { axe } from '../test-support/axe'
 enableAutoUnmount(afterEach)
 beforeEach(() => { i18n.global.locale.value = 'de' })
 
-// v-model verdrahtet: Der Wert läuft in die Props zurück wie in den Formularen.
+// v-model wired up: the value flows back into the props as in the forms.
 const make = (props = {}, attrs = {}) => {
   const w = mount(RichTextEditor, {
     props: { modelValue: '', ...props, 'onUpdate:modelValue': (v) => w.setProps({ modelValue: v }) },
@@ -21,7 +21,7 @@ const make = (props = {}, attrs = {}) => {
   return w
 }
 
-// Prüft die Vorschau auf alles, was nie erscheinen darf.
+// Checks the preview for everything that must never appear.
 const unsafe = (root) => root.querySelectorAll('script, img, iframe, svg, style, h1, h2, h3, form, input, [onerror], [onclick], [style]').length
   + [...root.querySelectorAll('a')].filter((a) => !/^https:/.test(a.getAttribute('href') ?? '')).length
 
@@ -117,7 +117,7 @@ describe('RichTextEditor', () => {
   it('über dem Limit: Warnung in höflicher Live-Region, nichts wird gekürzt', () => {
     const w = make({ modelValue: 'x'.repeat(5001) })
     expect(w.find('.rte__counter').classes()).toContain('rte__counter--over')
-    // Review: role="alert" am Zähler meldete jeden Tastendruck.
+    // Review: role="alert" on the counter announced every keystroke.
     expect(w.find('[role="alert"]').exists()).toBe(false)
     expect(w.find('.rte__counter').attributes('role')).toBeUndefined()
     const live = w.find('.rte__warn')
@@ -135,14 +135,14 @@ describe('RichTextEditor', () => {
     expect(w.find('.rte__warn').text()).toBe(first)
   })
 
-  // Ein zu langer Text allein markiert das Feld nicht als fehlerhaft: focusInvalid wählt sonst
-  // ein früheres, nur zu langes Feld statt des Pflichtfeld-Fehlers.
+  // An overly long text alone does not mark the field invalid: otherwise focusInvalid picks
+  // an earlier, merely too long field instead of the required-field error.
   it('zu langer Text setzt kein aria-invalid, der Fehler des Formulars schon', () => {
     expect(make({ modelValue: 'x'.repeat(5001) }).find('textarea').attributes('aria-invalid')).toBeUndefined()
     expect(make({ modelValue: 'x' }, { 'aria-invalid': true }).find('textarea').attributes('aria-invalid')).toBe('true')
   })
 
-  // Regression: Zahlen folgten der Locale des Prozesses/Browsers statt der UI-Sprache.
+  // Regression: numbers followed the locale of the process/browser instead of the UI language.
   it.each([['de', '5.000'], ['en', '5,000']])('Zähler und Warnung formatieren nach UI-Sprache (%s)', (loc, max) => {
     i18n.global.locale.value = loc
     const w = make({ modelValue: 'x'.repeat(5001) })
@@ -178,7 +178,7 @@ describe('RichTextEditor', () => {
     expect(make().find('.rte__btn--bold').attributes('aria-label')).toBe('Fett (Strg+B)')
   })
 
-  // Regression CRLF: selectionStart zählt im normalisierten Feldwert (\n), der Modellwert hatte \r\n.
+  // Regression CRLF: selectionStart counts in the normalized field value (\n), the model value had \r\n.
   it('Altdaten mit \\r\\n: Auswahl und Text stammen vom selben String', async () => {
     const w = make({ modelValue: 'a\r\nb' })
     const el = w.find('textarea').element
@@ -188,7 +188,7 @@ describe('RichTextEditor', () => {
     expect(w.emitted('update:modelValue').at(-1)).toEqual(['a\n**b**'])
   })
 
-  // Undo: execCommand('insertText') behält die Historie des Feldes; ohne Unterstützung gilt der Fallback.
+  // Undo: execCommand('insertText') keeps the field's history; without support the fallback applies.
   it('formatiert über execCommand("insertText") mit minimalem Austausch, wenn verfügbar', async () => {
     const w = make({ modelValue: 'ab cd' })
     const el = w.find('textarea').element
@@ -238,7 +238,7 @@ describe('RichTextEditor', () => {
     expect(w.find('textarea').isVisible()).toBe(true)
   })
 
-  // Regression: v-show setzte style="display: none" und riss den Inline-Style-Schutz der Views.
+  // Regression: v-show set style="display: none" and broke the views' inline style protection.
   it('setzt nirgends ein style-Attribut, auch nicht beim Umschalten', async () => {
     const w = make({ modelValue: 'x' })
     expect(w.findAll('[style]')).toHaveLength(0)
@@ -247,7 +247,7 @@ describe('RichTextEditor', () => {
     expect(w.find('textarea').attributes('hidden')).toBeDefined()
   })
 
-  // Formulare liefern für ein leeres Feld teils null (API-Antwort ohne Wert).
+  // Forms sometimes pass null for an empty field (API response without a value).
   it('kommt mit null als Wert zurecht (Zähler 0, Werkzeug fügt den Platzhalter ein)', async () => {
     const w = make({ modelValue: null })
     expect(w.find('.rte__counter').text()).toBe('0 / 5.000 Zeichen')
@@ -267,7 +267,7 @@ describe('RichTextEditor', () => {
   })
 })
 
-// XSS-Matrix der Vorschau (Anzeige wie Statusseite: utils/richText.js).
+// XSS matrix of the preview (rendering as on the status page: utils/richText.ts).
 const ATTACKS = {
   script: '<script>alert(1)</script>',
   img: '<img src=x onerror=alert(1)>',
@@ -298,8 +298,8 @@ describe('RichTextEditor: Vorschau maskiert Roh-HTML, Bilder, Überschriften', (
     expect(unsafe(w.find('.rte__preview').element)).toBe(0)
   })
 
-  // Gegenprobe: Der Prüfer muss anschlagen, wenn die Eingabe ungefiltert als HTML
-  // durchgereicht würde; sonst könnte die Matrix leer laufen.
+  // Counter-check: the checker must fire if the input were passed through unfiltered
+  // as HTML; otherwise the matrix could pass vacuously.
   it('Gegenprobe: ungefiltertes Durchreichen wird vom Prüfer erkannt', () => {
     const hits = Object.entries(ATTACKS).filter(([, input]) => {
       const div = document.createElement('div')

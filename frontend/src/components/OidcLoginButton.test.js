@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../i18n'
 import OidcLoginButton from './OidcLoginButton.vue'
 
-// Knopf „Mit SSO anmelden“ für Seiten mit aktivem OIDC.
+// "Sign in with SSO" button for pages with OIDC enabled.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -114,9 +114,9 @@ describe('OidcLoginButton', () => {
     expect(wrapper.find('.sso-login-buttons').classes()).toContain('extra')
   })
 
-  // Private Seiten nennen Seiten-ID und SSO-Art nur Berechtigten: Für alle anderen
-  // antwortet die Auskunft mit 404 wie bei einer fehlenden Seite. Mit `fallback`
-  // bietet der Knopf dann den Einstieg über den Slug an.
+  // Private pages reveal page ID and SSO kind only to authorized users: for everyone
+  // else the lookup answers with 404, as for a missing page. With `fallback` the
+  // button then offers the slug-based entry point.
   describe('Rückfall über den Slug (fallback)', () => {
     async function mountFallback(slug, response) {
       global.fetch = vi.fn().mockResolvedValue(response)

@@ -1,36 +1,38 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Komponentenseite nach Richtung C: Tag-Auswahl als Chips mit ×
-  und „+ Tag“ (Vorlage) statt der Checkbox-Liste. Gleiche Schnittstelle wie
-  TagCheckboxList (`toggle` mit der Tag-ID), damit useTagToggle weiter passt.
-  „+ Tag“ ist ein natives Select mit den noch nicht gewählten Tags: Es ist
-  tastatur- und screenreaderfähig und braucht kein eigenes Flyout.
-  Die Hilfe (v-help) und die Beschriftung der Gruppe setzt der Aufrufer.
+  Component page following direction C: tag selection as chips with ×
+  and "+ Tag" (mock-up) instead of the checkbox list. Same interface as
+  TagCheckboxList (`toggle` with the tag ID), so useTagToggle still fits.
+  "+ Tag" is a native select with the tags not chosen yet: it works with
+  keyboard and screen readers and needs no flyout of its own.
+  The help (v-help) and the group's label are provided by the caller.
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { Tag } from '../types/api'
 import AppIcon from './AppIcon.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  tags: { type: Array, required: true },        // verfügbare Tags (GET /api/tags)
-  selectedIds: { type: Array, required: true }, // gewählte Tag-IDs
-})
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps<{
+  tags: Tag[] // available tags (GET /api/tags)
+  selectedIds: number[] // selected tag IDs
+}>()
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['toggle'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ toggle: [tagId: number] }>()
 
 const { t } = useI18n()
 
-// Gewählte Tags in der Reihenfolge der Auswahl; eine ID ohne Tag in der
-// Liste (z. B. nicht ladbar) bleibt unsichtbar, aber im Formular erhalten.
+// Selected tags in the order of selection; an ID without a tag in the list
+// (e.g. not loadable) stays invisible, but is kept in the form.
 const selected = computed(() =>
-  props.selectedIds.map(id => props.tags.find(tag => tag.ID === id)).filter(Boolean))
+  props.selectedIds.map(id => props.tags.find(tag => tag.ID === id)).filter((tag): tag is Tag => Boolean(tag)))
 const addable = computed(() => props.tags.filter(tag => !props.selectedIds.includes(tag.ID)))
 
-function onAdd(event) {
-  const id = Number(event.target.value)
-  event.target.value = ''
+function onAdd(event: Event) {
+  const select = event.target as HTMLSelectElement
+  const id = Number(select.value)
+  select.value = ''
   if (id) emit('toggle', id)
 }
 </script>
@@ -90,7 +92,7 @@ function onAdd(event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* Zielgröße 24 px (WCAG 2.2 AA); die Kachel selbst bleibt klein. */
+  /* Target size 24 px (WCAG 2.2 AA); the tile itself stays small. */
   inline-size: 24px;
   block-size: 24px;
   margin-inline-end: -6px;

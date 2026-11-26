@@ -1,23 +1,24 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Richtung C, Betriebsseiten: Feldgruppe „Tags“ mit TagChips,
-  Beschriftung und „optional“ wie die übrigen Felder (Stil .form-field--manual).
-  Ersetzt die Checkbox-Liste in den Formularen. Wie bei den Chips meldet
-  `toggle` die Tag-ID (passt zu useTagToggle).
+  Direction C, operations pages: field group "Tags" with TagChips, label and
+  "optional" like the other fields (style .form-field--manual). Replaces the
+  checkbox list in the forms. As with the chips, `toggle` reports the tag ID
+  (fits useTagToggle).
 */
 import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { Tag } from '../types/api'
 import TagChips from './TagChips.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  label: { type: String, required: true },
-  tags: { type: Array, required: true },
-  selectedIds: { type: Array, required: true },
-})
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+defineProps<{
+  label: string
+  tags: Tag[]
+  selectedIds: number[]
+}>()
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['toggle'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ toggle: [tagId: number] }>()
 const { t } = useI18n()
 const labelId = `tag-field-${useId()}`
 </script>

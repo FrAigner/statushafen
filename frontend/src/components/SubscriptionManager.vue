@@ -1,68 +1,72 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApi } from '../composables/useApi'
 import AppIcon from './AppIcon.vue'
 import { usePublicPageLanguages } from '../composables/usePublicPageLanguages'
 import { hasLanguageChoice, subscriberLanguageOptions, selectableSubscriberLanguage } from '../utils/subscriberLanguage'
+import type { ApiError, AuthUser, Component } from '../types/api'
+
+/** Response of GET /api/me/subscription?slug=… (the own subscription on this page). */
+interface MySubscription {
+  channel: string
+  webhook_url?: string
+  /** "all" or comma-separated component IDs. */
+  component_ids: string
+  language?: string
+}
 
 const { apiFetch } = useApi()
 const { t } = useI18n()
-// Sprachen der Seite (aus dem Dashboard, setzt StatusPage.vue) für die Mailsprache.
+// Languages of the page (from the dashboard, set by StatusPage.vue) for the mail language.
 const { pageLanguages } = usePublicPageLanguages()
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  isLoggedIn: {
-    type: Boolean,
-    required: true
-  },
-  currentUser: {
-    type: Object,
-    default: null
-  },
-  components: {
-    type: Array,
-    required: true
-  },
-  slug: {
-    type: String,
-    required: true
-  }
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  isLoggedIn: boolean
+  currentUser?: AuthUser | null
+  components: Component[]
+  slug: string
+}>(), {
+  currentUser: null,
 })
 // Stryker restore all
 
-// Stryker disable next-line all: defineEmits wird von Vue aus der Setup-Funktion gehoben, instrumentierter Code darf dort nicht stehen
-const emit = defineEmits(['open-wizard', 'subscription-state'])
+// Stryker disable next-line all: Vue hoists defineEmits out of the setup function, instrumented code must not live there
+const emit = defineEmits<{
+  'open-wizard': []
+  // true = subscribed, false = no subscription, null = unknown (load error)
+  'subscription-state': [state: boolean | null]
+}>()
 
 const showEditAbo = ref(false)
-const editSub = ref(null)
+const editSub = ref<MySubscription | null>(null)
 const editLoading = ref(false)
 const editMsg = ref('')
 const editMsgOk = ref(false)
-const editSelectedIDs = ref([])
-// Mailsprache ('' = Standardsprache der Seite).
+const editSelectedIDs = ref<number[]>([])
+// Mail language ('' = default language of the page).
 const editLanguage = ref('')
 const showLanguageChoice = computed(() => hasLanguageChoice(pageLanguages.value))
 const languageOptions = computed(() =>
-  subscriberLanguageOptions(pageLanguages.value, (name) => t('components.subscriptionManager.languageDefault', { name }))
+  subscriberLanguageOptions(pageLanguages.value, (name: string) => t('components.subscriptionManager.languageDefault', { name }))
 )
-// "kein Abonnement" (404) ist ein Normalzustand, ein Ladefehler nicht.
+// "No subscription" (404) is a normal state, a load error is not.
 const noSubscription = ref(false)
-// Stryker disable next-line BooleanLiteral: Startwert äquivalent, loadSubscription() setzt ihn vor jedem Lesen zurück
+// Stryker disable next-line BooleanLiteral: equivalent initial value, loadSubscription() resets it before every read
 const loadFailed = ref(false)
-// "Abonnement beenden" - Bestätigung läuft als eigener
-// Zustand auf der Seite statt window.confirm (per Spec nicht erlaubt, u.a.
-// weil es sich nicht stylen/testen lässt).
-// Stryker disable next-line BooleanLiteral: Startwert äquivalent, loadSubscription() setzt ihn vor jedem Lesen zurück
+// "End subscription" - the confirmation runs as a separate state on the page
+// instead of window.confirm (not allowed by the spec, among other things
+// because it cannot be styled/tested).
+// Stryker disable next-line BooleanLiteral: equivalent initial value, loadSubscription() resets it before every read
 const endConfirmOpen = ref(false)
 const endLoading = ref(false)
-const bodyPanelRef = ref(null)
+const bodyPanelRef = ref<HTMLElement | null>(null)
 
-// Alle echten Blatt-Komponenten (flach) für Abo-Edit
+// All real leaf components (flat) for editing the subscription
 const flatComponents = computed(() => {
-  const flatten = (nodes) => {
-    let result = []
+  const flatten = (nodes: Component[]) => {
+    let result: Component[] = []
     for (const n of nodes) {
       if (!n.Children || n.Children.length === 0) result.push(n)
       if (n.Children) result = result.concat(flatten(n.Children))
@@ -72,28 +76,28 @@ const flatComponents = computed(() => {
   return flatten(props.components)
 })
 
-// Lädt das eigene Abonnement. 404 = kein Abonnement (kein Fehler, die Statusseite
-// selbst ist ja geladen); alles andere (500, Netzwerk, ...) ist ein echter Fehler.
+// Loads the own subscription. 404 = no subscription (not an error, the status page
+// itself has loaded after all); everything else (500, network, ...) is a real error.
 const loadSubscription = async () => {
   editLoading.value = true
   loadFailed.value = false
   endConfirmOpen.value = false
   try {
-    // 404 ist der Normalfall (kein Abo) und kein Konsolenfehler
-    const res = await apiFetch(`/api/me/subscription?slug=${encodeURIComponent(props.slug)}`, { expectedStatuses: [404] })
+    // 404 is the normal case (no subscription) and not a console error
+    const res: MySubscription = await apiFetch(`/api/me/subscription?slug=${encodeURIComponent(props.slug)}`, { expectedStatuses: [404] })
     editSub.value = res
     editSelectedIDs.value = res.component_ids === 'all' ? [] : res.component_ids.split(',').map(Number)
     editLanguage.value = selectableSubscriberLanguage(res.language ?? '', pageLanguages.value)
     noSubscription.value = false
     emit('subscription-state', true)
   } catch (err) {
-    if (err.status === 404) {
+    if ((err as ApiError).status === 404) {
       editSub.value = null
       noSubscription.value = true
       emit('subscription-state', false)
     } else {
-      // Ein früheres 404 gilt nicht mehr: Der Zustand ist jetzt unbekannt (null),
-      // sonst hätte "noch kein Abonnement" im Template Vorrang vor dem Fehler.
+      // An earlier 404 no longer applies: the state is now unknown (null),
+      // otherwise "no subscription yet" would take precedence over the error in the template.
       if (noSubscription.value) emit('subscription-state', null)
       noSubscription.value = false
       loadFailed.value = true
@@ -116,16 +120,16 @@ const toggleEditAbo = async () => {
     return
   }
   await openEditAbo()
-  // Barrierefreiheit: Tastaturbedienung braucht einen sichtbaren
-  // Fokus-Sprung in den gerade aufgeklappten Bereich, statt dass der Fokus auf
-  // der (jetzt expandierten) Überschrift verharrt.
+  // Accessibility: keyboard use needs a visible focus jump into the section
+  // that was just expanded, instead of focus lingering on the (now expanded)
+  // heading.
   await nextTick()
-  // Stryker disable next-line OptionalChaining: toggleEditAbo wird nur über den Header gerufen, der nur bei isLoggedIn rendert - bodyPanelRef ist dann immer gesetzt
+  // Stryker disable next-line OptionalChaining: toggleEditAbo is only called via the header, which only renders when isLoggedIn - bodyPanelRef is always set then
   bodyPanelRef.value?.focus()
 }
 
-// Stiller Vorab-Check nach dem Einloggen: die Statusseite braucht den Zustand,
-// um nur passende Bedienelemente zu zeigen. Der Bereich bleibt dabei zu.
+// Silent pre-check after signing in: the status page needs the state to show
+// only the matching controls. The section stays collapsed meanwhile.
 watch(() => props.isLoggedIn, (loggedIn) => {
   if (loggedIn) loadSubscription()
 }, { immediate: true })
@@ -133,7 +137,7 @@ watch(() => props.isLoggedIn, (loggedIn) => {
 // Header menu "Manage subscription": without a subscription the section is not rendered until it
 // opens, so it opens first and only then scrolls into view and takes the focus. The scroll starts
 // before the subscription has loaded; the panel grows downwards, so the section top stays put.
-const sectionRef = ref(null)
+const sectionRef = ref<HTMLElement | null>(null)
 const revealEditAbo = async () => {
   if (!props.isLoggedIn) return
   const loading = openEditAbo()
@@ -143,9 +147,8 @@ const revealEditAbo = async () => {
   await loading
 }
 
-// Erlaubt der übergeordneten StatusPage, den Editor direkt aus dem CTA heraus
-// zu öffnen (openEditAbo), ihn aus dem Kopfmenü anzuspringen (revealEditAbo) und den Zustand
-// nach dem Abonnieren neu zu holen (refresh).
+// Lets the parent StatusPage open the editor straight from the CTA (openEditAbo), jump to it
+// from the header menu (revealEditAbo) and fetch the state again after subscribing (refresh).
 defineExpose({ openEditAbo, revealEditAbo, refresh: loadSubscription })
 
 const saveEditAbo = async () => {
@@ -155,8 +158,8 @@ const saveEditAbo = async () => {
       method: 'PUT',
       body: JSON.stringify({
         component_ids: editSelectedIDs.value.length ? editSelectedIDs.value.join(',') : 'all',
-        // nur mitsenden, wenn die Wahl sichtbar ist; sonst bliebe sie
-        // serverseitig unverändert (fehlendes Feld) statt auf '' zurückzufallen.
+        // only send it when the choice is visible; otherwise it stays unchanged
+        // on the server (missing field) instead of falling back to ''.
         ...(showLanguageChoice.value ? { language: editLanguage.value } : {})
       })
     })
@@ -171,9 +174,9 @@ const saveEditAbo = async () => {
   }
 }
 
-// löscht das eigene Abonnement und führt den Bereich
-// zurück in Zustand B ("kein Abonnement") statt ihn einfach zuzuklappen -
-// der Nutzer bleibt im Kontext und sieht sofort, dass es funktioniert hat.
+// Deletes the own subscription and returns the section to state B ("no
+// subscription") instead of simply collapsing it - the user stays in context
+// and sees right away that it worked.
 const confirmEndSubscription = async () => {
   endLoading.value = true
   try {
@@ -208,7 +211,7 @@ const confirmEndSubscription = async () => {
       </span>
     </button>
 
-    <!-- Außerhalb des einklappbaren Bereichs, damit die Bestätigung nach dem Speichern sichtbar bleibt -->
+    <!-- Outside the collapsible section, so the confirmation stays visible after saving -->
     <p
       v-if="editMsg"
       class="edit-abo-msg"
@@ -244,7 +247,7 @@ const confirmEndSubscription = async () => {
           </button>
         </div>
 
-        <!-- Ergebnis: Abo bearbeiten -->
+        <!-- Result: edit the subscription -->
         <div v-if="editSub" class="edit-abo-result">
           <div class="edit-abo-result-header">
             <div>
@@ -294,8 +297,8 @@ const confirmEndSubscription = async () => {
             <button class="btn-ghost-sm" @click="editSub = null; endConfirmOpen = false">{{ t('common.cancel') }}</button>
           </div>
 
-          <!-- "Abonnement beenden" - Bestätigung läuft als
-               eigener Zustand auf der Seite statt window.confirm. -->
+          <!-- "End subscription" - the confirmation runs as a
+               separate state on the page instead of window.confirm. -->
           <div class="edit-abo-end-section">
             <button
               v-if="!endConfirmOpen"
@@ -466,7 +469,7 @@ const confirmEndSubscription = async () => {
   color: var(--text);
 }
 
-/* "Abonnement beenden" */
+/* "End subscription" */
 .edit-abo-end-section {
   margin-top: 20px;
   padding-top: 16px;

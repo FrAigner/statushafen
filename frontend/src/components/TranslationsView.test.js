@@ -37,7 +37,7 @@ describe('TranslationsView', () => {
     expect(w.emitted('delete')).toEqual([[2]])
   })
 
-  // Nachrichten (richText) bekommen den Editor, Beschreibungen bleiben ein einfaches Feld.
+  // Messages (richText) get the editor, descriptions stay a plain field.
   it('richText: Inhaltsfeld ist der Editor und schreibt ins Formular; ohne richText ein normales textarea', async () => {
     const form = { language_code: 'en', title: 'T', description: '' }
     const w = mountView({ isEditing: true, richText: true, form })
@@ -89,7 +89,7 @@ describe('TranslationsView', () => {
     expect(w.findAll('.page-head__actions button')).toHaveLength(0)
   })
 
-  // Bestätigen braucht update, Löschen delete - jedes Recht einzeln.
+  // Confirming needs update, deleting needs delete - each permission on its own.
   it('zeigt Bestätigen nur mit update und Löschen nur mit delete', () => {
     const onlyDelete = mountView({ canUpdate: false })
     expect(onlyDelete.findAll('tbody tr')[1].findAll('[role="menuitem"]').map(i => i.text())).toEqual(['Löschen'])

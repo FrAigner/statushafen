@@ -1,21 +1,21 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Schnellstatus als Listbox-Button mit Symbol,
-  ersetzt das native select.inline-select in AdminComponents. Nach dem
-  ARIA-Muster „Select-Only Combobox“: Der Fokus bleibt auf dem Button, die
-  aktive Option steht in aria-activedescendant.
+  Redesign stage 3: quick status as a listbox button with an icon, replaces
+  the native select.inline-select in AdminComponents. Follows the ARIA
+  "Select-Only Combobox" pattern: focus stays on the button, the active
+  option is in aria-activedescendant.
 
-  Tastatur (Logik in utils/listbox.js):
-  - geschlossen: Pfeile, Enter, Leertaste öffnen (aktiv ist der aktuelle Wert)
-  - offen: Pfeile/Home/End bewegen, Enter/Leertaste übernehmen, Escape schließt
-    ohne Änderung, Tab schließt; Klick außerhalb schließt.
-  - Nach Übernehmen und Escape bleibt der Fokus auf dem Button.
+  Keyboard (logic in utils/listbox.ts):
+  - closed: arrows, Enter, Space open (the current value is active)
+  - open: arrows/Home/End move, Enter/Space pick, Escape closes without a
+    change, Tab closes; a click outside closes.
+  - After picking and after Escape, focus stays on the button.
 
-  Wert (v-model) ist der Roh-Status des Backends (operational,
-  degraded_performance, partial_outage, major_outage), damit Views nichts
-  umrechnen müssen. Es gibt vier Stufen; Wartung ist kein Komponentenstatus
-  (umsetzung.md). Ein unbekannter Wert wird neutral angezeigt und kann nur
-  durch Auswahl ersetzt werden.
+  The value (v-model) is the backend's raw status (operational,
+  degraded_performance, partial_outage, major_outage), so views need not
+  convert anything. There are four levels; maintenance is not a component
+  status (umsetzung.md). An unknown value is shown neutrally and can only be
+  replaced by picking an option.
 */
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -25,29 +25,34 @@ import { STATUS_LEVELS, statusMeta, toRawStatus } from '../utils/status'
 import { isOpenKey, isSelectKey, nextActiveIndex } from '../utils/listbox'
 import { useDismissable } from '../composables/useDismissable'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  modelValue: { type: String, default: null },
-  // Zugänglicher Name, z. B. „Status von API“; Vorgabe: „Status ändern“.
-  label: { type: String, default: null },
-  disabled: { type: Boolean, default: false },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  modelValue?: string | null
+  // Accessible name, e.g. "Status of API"; default: "Change status".
+  label?: string | null
+  disabled?: boolean
+}>(), {
+  modelValue: null,
+  label: null,
+  disabled: false,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [status: string] }>()
 
 const { t } = useI18n()
 const uid = useId()
 const listId = `qs-list-${uid}`
-const optionId = index => `qs-opt-${uid}-${index}`
+const optionId = (index: number) => `qs-opt-${uid}-${index}`
 
 const options = STATUS_LEVELS.map(level => {
-  const value = toRawStatus(level)
-  return { value, level, labelKey: statusMeta(level).labelKey }
+  // Each of the four levels has a raw value and a label.
+  const value = toRawStatus(level) as string
+  return { value, level, labelKey: statusMeta(level).labelKey as string }
 })
 
-const root = ref(null)
-const button = ref(null)
+const root = ref<HTMLElement | null>(null)
+const button = ref<HTMLButtonElement | null>(null)
 const open = ref(false)
 const active = ref(0)
 
@@ -64,14 +69,14 @@ function close() {
   open.value = false
 }
 
-function choose(index) {
-  const { value } = options[index]
+function choose(index: number) {
+  const { value } = options[index]!
   close()
   if (value !== toRawStatus(props.modelValue)) emit('update:modelValue', value)
-  button.value.focus()
+  button.value!.focus()
 }
 
-function onKeydown(event) {
+function onKeydown(event: KeyboardEvent) {
   if (props.disabled) return
   if (!open.value) {
     if (!isOpenKey(event.key)) return

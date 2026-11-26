@@ -1,44 +1,60 @@
-<script setup>
+<script setup lang="ts" generic="T extends object">
 /*
-  Generisches Tabellen-Pattern für Mobile-First (Phase 6):
-  - Tablet+ (>=768px): klassische Tabelle in einem horizontal scrollbaren
-    .table-wrapper (für Datensätze, die auch bei 768px noch zu breit sind).
-  - Mobile (<768px): Card-Liste, eine Card pro Item mit Label/Value-Zeilen
-    je Spalte statt eng gequetschter Tabellenzellen.
-  Zellinhalte sind über benannte Slots `cell-<column.key>` anpassbar (z.B.
-  für Badges/Avatare); ohne Slot wird der Rohwert `item[column.key]` genutzt.
+  Generic mobile-first table pattern (phase 6):
+  - Tablet+ (>=768px): classic table in a horizontally scrollable
+    .table-wrapper (for records that are still too wide at 768px).
+  - Mobile (<768px): card list, one card per item with label/value rows per
+    column instead of tightly squeezed table cells.
+  Cell contents can be customized via named slots `cell-<column.key>` (e.g.
+  for badges/avatars); without a slot the raw value `item[column.key]` is used.
 
-  Redesign Stufe 3: Mit `dataTable` rendert die Komponente den
-  gemeinsamen Tabellenstil (style.css: .data-table-wrapper > table.data-table,
-  ruhiger Kopf, 52-px-Zeilen, tabular-nums). Die Klassen .data-table und
-  .data-table-wrapper bleiben absichtlich erhalten, die e2e-Specs und alle
-  Views suchen danach. Statt zweier DOM-Varianten (JS-Umschaltung) gibt es nur
-  die Tabelle; unter 860 px macht CSS daraus Karten, die Zellen tragen dafür
-  `data-label`. Zusätzlich:
-  - Spalte `{ key, label, numeric: true }`: rechtsbündig, tabular-nums.
-  - Item mit `isGroup: true`: Gruppenzeile über die ganze Breite, Text aus der
-    ersten Spalte.
-  - Slot `actions` (Parameter `item`): letzte Spalte mit Zeilenaktionen; ihr
-    Kopf ist nur für Screenreader sichtbar.
+  Redesign stage 3: with `dataTable` the component renders the shared table
+  style (style.css: .data-table-wrapper > table.data-table, calm header,
+  52 px rows, tabular-nums). The classes .data-table and .data-table-wrapper
+  are kept on purpose, the e2e specs and all views look for them. Instead of
+  two DOM variants (JS switching) there is only the table; below 860 px CSS
+  turns it into cards, the cells carry `data-label` for that. Additionally:
+  - Column `{ key, label, numeric: true }`: right-aligned, tabular-nums.
+  - Item with `isGroup: true`: group row across the full width, text from the
+    first column.
+  - Slot `actions` (parameter `item`): last column with row actions; its
+    header is visible to screen readers only.
 */
 import { useI18n } from 'vue-i18n'
 import { useIsMobile } from '../composables/useMediaQuery'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  columns: { type: Array, required: true },   // [{ key, label }]
-  items: { type: Array, required: true },
-  rowKey: { type: String, default: 'id' },
-  loading: { type: Boolean, default: false },
-  // null statt eines statischen String-Defaults, da ein direkt hier
-  // hinterlegter Default nicht auf einen späteren Sprachwechsel reagieren
-  // würde (Vue-Prop-Defaults werden nur einmal beim ersten Fehlen des Props
-  // ausgewertet) - der reaktive Fallback per t() passiert im Template.
-  loadingText: { type: String, default: null },
-  emptyText: { type: String, default: null },
-  dataTable: { type: Boolean, default: false },
+interface Column {
+  key: string
+  label: string
+  numeric?: boolean
+}
+
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  columns: Column[]
+  items: T[]
+  rowKey?: string
+  loading?: boolean
+  // null instead of a static string default, because a default stored right
+  // here would not react to a later language switch (Vue evaluates prop
+  // defaults only once, when the prop is first missing) - the reactive
+  // fallback via t() happens in the template.
+  loadingText?: string | null
+  emptyText?: string | null
+  dataTable?: boolean
+}>(), {
+  rowKey: 'id',
+  loading: false,
+  loadingText: null,
+  emptyText: null,
+  dataTable: false,
 })
 // Stryker restore all
+
+// Items are arbitrary records; cells are looked up by the column key.
+const field = (item: T, key: string): unknown => (item as Record<string, unknown>)[key]
+const rowId = (item: T) => field(item, props.rowKey) as PropertyKey
+const isGroupRow = (item: T) => Boolean(field(item, 'isGroup'))
 
 const { t } = useI18n()
 const isMobile = useIsMobile()
@@ -59,13 +75,13 @@ const isMobile = useIsMobile()
             </tr>
           </thead>
           <tbody>
-            <template v-for="item in items" :key="item[rowKey]">
-              <tr v-if="item.isGroup" class="data-table__group">
-                <th :colspan="columns.length + ($slots.actions ? 1 : 0)" scope="colgroup">{{ item[columns[0].key] }}</th>
+            <template v-for="item in items" :key="rowId(item)">
+              <tr v-if="isGroupRow(item)" class="data-table__group">
+                <th :colspan="columns.length + ($slots.actions ? 1 : 0)" scope="colgroup">{{ field(item, columns[0]!.key) }}</th>
               </tr>
               <tr v-else>
                 <td v-for="col in columns" :key="col.key" :data-label="col.label" :class="{ 'is-numeric': col.numeric }">
-                  <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ item[col.key] }}</slot>
+                  <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ field(item, col.key) }}</slot>
                 </td>
                 <td v-if="$slots.actions" class="actions-col"><slot name="actions" :item="item" /></td>
               </tr>
@@ -78,11 +94,11 @@ const isMobile = useIsMobile()
     <template v-else-if="isMobile">
       <div v-if="items.length === 0" class="pad-empty">{{ emptyText ?? t('common.noEntries') }}</div>
       <div v-else class="card-grid">
-        <div v-for="item in items" :key="item[rowKey]" class="card">
+        <div v-for="item in items" :key="rowId(item)" class="card">
           <div v-for="col in columns" :key="col.key" class="card-row">
             <span class="card-row-label">{{ col.label }}</span>
             <span class="card-row-value">
-              <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ item[col.key] }}</slot>
+              <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ field(item, col.key) }}</slot>
             </span>
           </div>
         </div>
@@ -99,9 +115,9 @@ const isMobile = useIsMobile()
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in items" :key="item[rowKey]">
+            <tr v-for="item in items" :key="rowId(item)">
               <td v-for="col in columns" :key="col.key">
-                <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ item[col.key] }}</slot>
+                <slot :name="`cell-${col.key}`" :item="item" :column="col">{{ field(item, col.key) }}</slot>
               </td>
             </tr>
           </tbody>
@@ -114,7 +130,7 @@ const isMobile = useIsMobile()
 <style scoped>
 .pad-empty { padding: 28px; text-align: center; color: var(--text-3, var(--text-3)); }
 
-/* Tablet+: scrollbarer Tabellen-Container statt erzwungenem Layout-Overflow */
+/* Tablet+: scrollable table container instead of forced layout overflow */
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -139,7 +155,7 @@ const isMobile = useIsMobile()
   color: var(--text-3, var(--text-3));
 }
 
-/* Mobile: Card-Liste statt Tabelle */
+/* Mobile: card list instead of a table */
 .card-grid {
   display: flex;
   flex-direction: column;

@@ -1,8 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RESOURCES, ACTIONS, grantsAdminArea } from '../utils/permissions'
 import { NAV_GROUPS } from '../utils/adminNav'
+import type { NavItem } from '../utils/adminNav'
 import {
   ACTION_ABBREVIATION,
   isOn,
@@ -15,35 +16,37 @@ import {
   setStandalone,
 } from '../utils/permissionMatrix'
 
-// Berechtigungs-Matrix als Tabelle. Zeilen sind die Tabs der
-// Navigation, gruppiert nach Bereich (Betrieb, Inhalte, Verwaltung, System),
-// Spalten die Aktionen C R U D (Anlegen, Lesen, Ändern, Löschen). Zeilen- und
-// Spaltenschalter setzen ganze Reihen. Anlegen, Ändern und Löschen setzen Lesen
-// mit (siehe utils/permissionMatrix.js). Das Modell bleibt ein Array derselben
-// Rechte-Strings (v-model), das Backend sieht keinen Unterschied.
+// Permission matrix as a table. Rows are the navigation tabs, grouped by
+// area (operations, content, management, system), columns are the actions
+// C R U D (create, read, update, delete). Row and column toggles set whole
+// lines. Create, update and delete also set read (see utils/permissionMatrix.ts).
+// The model stays an array of the same permission strings (v-model), the
+// backend sees no difference.
 //
-// Aufbau gegen Abschneiden: feste Spaltenbreiten, die Bereichsspalte bricht
-// Text um, und reicht der Platz trotzdem nicht, scrollt nur .perm-matrix-scroll
-// (fokussierbar, damit Tastaturnutzer mitscrollen können), nie die Seite.
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  modelValue: { type: Array, required: true }, // gewählte Rechte
-  standalone: { type: Array, default: () => [] }, // Sonderrechte ohne Aktionen (admin_dashboard)
+// Layout against clipping: fixed column widths, the area column wraps text,
+// and if space still runs out only .perm-matrix-scroll scrolls (focusable, so
+// keyboard users can scroll along), never the page.
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  modelValue: string[] // selected permissions
+  standalone?: string[] // special permissions without actions (admin_dashboard)
+}>(), {
+  standalone: () => [],
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [permissions: string[]] }>()
 const { t, te } = useI18n()
 
 const scopeOf = Object.fromEntries(RESOURCES.map(r => [r.key, r.scope]))
 
-// Gruppen mit ihren Zeilen: Beschriftung = Tab-Beschriftung der Navigation.
+// Groups with their rows: label = tab label of the navigation.
 const groups = computed(() => NAV_GROUPS
   .map(group => ({
     key: group.key,
     label: t(`adminNav.groups.${group.key}`),
     rows: group.items
-      .filter(item => item.resource)
+      .filter((item): item is NavItem & { resource: string } => Boolean(item.resource))
       .map(item => ({
         resource: item.resource,
         label: t(`adminNav.items.${item.labelKey}`),
@@ -52,28 +55,31 @@ const groups = computed(() => NAV_GROUPS
   }))
   .filter(group => group.rows.length))
 
-// Nur Seitenressourcen sind wählbar; globale Zeilen sind gesperrt (nur Global Admins).
+// Only page resources are selectable; global rows are locked (global admins only).
 const editable = computed(() => groups.value.flatMap(g => g.rows).filter(r => !r.locked).map(r => r.resource))
 
-const actionText = (action) => t(`roles.matrix.${action}`)
-const standaloneLabel = (key) => {
+const actionText = (action: string) => t(`roles.matrix.${action}`)
+const standaloneLabel = (key: string) => {
   const path = `roles.matrix.labels.${key}`
   return te(path) ? t(path) : key
 }
 
 const model = computed(() => props.modelValue)
-const update = (next) => emit('update:modelValue', next)
+const update = (next: string[]) => emit('update:modelValue', next)
 
-const toggleCell = (resource, action, enabled) => update(setCell(model.value, resource, action, enabled))
-const toggleRow = (resource, enabled) => update(setRow(model.value, resource, enabled))
-const toggleColumn = (action, enabled) => update(setColumn(model.value, editable.value, action, enabled))
-const toggleAll = (enabled) => update(editable.value.reduce((acc, resource) => setRow(acc, resource, enabled), model.value))
-const toggleStandalone = (key, enabled) => update(setStandalone(model.value, key, enabled))
+const toggleCell = (resource: string, action: string, enabled: boolean) => update(setCell(model.value, resource, action, enabled))
+const toggleRow = (resource: string, enabled: boolean) => update(setRow(model.value, resource, enabled))
+const toggleColumn = (action: string, enabled: boolean) => update(setColumn(model.value, editable.value, action, enabled))
+const toggleAll = (enabled: boolean) => update(editable.value.reduce((acc, resource) => setRow(acc, resource, enabled), model.value))
+const toggleStandalone = (key: string, enabled: boolean) => update(setStandalone(model.value, key, enabled))
 
 // Status page only: no admin right at all. Members view and subscribe to the
 // (private) page but never enter the admin area (backend: GrantsAdminArea).
 // The reset clears every right the matrix owns, foreign entries stay.
 const pageOnly = computed(() => !grantsAdminArea(model.value))
+// State of the checkbox behind a change event.
+const checked = (event: Event) => (event.target as HTMLInputElement).checked
+
 const resetToPageOnly = () => update(model.value.filter(p =>
   !props.standalone.includes(p) && !RESOURCES.some(r => p.startsWith(`${r.key}:`))))
 </script>
@@ -109,7 +115,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
                   :aria-label="t('roles.matrix.matrixAll')"
                   :checked="matrixState(model, editable) === 'all'"
                   :indeterminate="matrixState(model, editable) === 'some'"
-                  @change="toggleAll($event.target.checked)"
+                  @change="toggleAll(checked($event))"
                 />
                 <span>{{ t('roles.matrix.area') }}</span>
               </label>
@@ -122,7 +128,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
                   :aria-label="t('roles.matrix.columnAll', { action: actionText(action) })"
                   :checked="columnState(model, editable, action) === 'all'"
                   :indeterminate="columnState(model, editable, action) === 'some'"
-                  @change="toggleColumn(action, $event.target.checked)"
+                  @change="toggleColumn(action, checked($event))"
                 />
                 <span class="perm-abbr" aria-hidden="true">{{ ACTION_ABBREVIATION[action] }}</span>
                 <span class="perm-action-text" aria-hidden="true">{{ actionText(action) }}</span>
@@ -144,7 +150,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
                   :aria-label="t('roles.matrix.rowAll', { area: row.label })"
                   :checked="rowState(model, row.resource) === 'all'"
                   :indeterminate="rowState(model, row.resource) === 'some'"
-                  @change="toggleRow(row.resource, $event.target.checked)"
+                  @change="toggleRow(row.resource, checked($event))"
                 />
                 <span class="perm-label">{{ row.label }}</span>
               </label>
@@ -158,7 +164,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
                 :title="`${row.resource}:${action}`"
                 :aria-label="`${row.label} – ${actionText(action)}`"
                 :checked="isOn(model, row.resource, action)"
-                @change="toggleCell(row.resource, action, $event.target.checked)"
+                @change="toggleCell(row.resource, action, checked($event))"
               />
             </td>
           </tr>
@@ -174,7 +180,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
           :value="key"
           :title="key"
           :checked="model.includes(key)"
-          @change="toggleStandalone(key, $event.target.checked)"
+          @change="toggleStandalone(key, checked($event))"
         />
         <span class="perm-label">{{ standaloneLabel(key) }}</span>
         <code class="perm-key">{{ key }}</code>
@@ -189,7 +195,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
   border-radius: var(--radius-lg);
   padding: 12px 12px 14px;
   margin: 0 0 1rem;
-  /* Ein fieldset wächst sonst mit seinem Inhalt über die Formularbreite hinaus. */
+  /* Otherwise a fieldset grows with its content beyond the form width. */
   min-width: 0;
   max-width: 100%;
   background: var(--surface);
@@ -238,7 +244,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
-/* Reicht der Platz nicht, scrollt nur die Matrix, nie die Seite. */
+/* If space runs out, only the matrix scrolls, never the page. */
 .perm-matrix-scroll {
   max-width: 100%;
   overflow-x: auto;
@@ -330,7 +336,7 @@ const resetToPageOnly = () => update(model.value.filter(p =>
   font-size: 0.85rem;
   line-height: 1.2;
   min-width: 0;
-  /* Auch ein langes Wort bricht um, statt in die nächste Spalte zu laufen. */
+  /* Even a long word wraps instead of running into the next column. */
   overflow-wrap: anywhere;
 }
 .perm-badge {

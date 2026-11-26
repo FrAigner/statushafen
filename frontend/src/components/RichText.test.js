@@ -1,4 +1,4 @@
-// jsdom statt happy-dom: Die Bereinigung (DOMPurify) braucht ein vollständiges DOM.
+// jsdom instead of happy-dom: the sanitizing (DOMPurify) needs a complete DOM.
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'

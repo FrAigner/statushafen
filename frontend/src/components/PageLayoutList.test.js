@@ -25,7 +25,7 @@ const days = (n = 90) => Array.from({ length: n }, (_, i) => ({
   availability: i === n - 1 ? 97.5 : 100,
   downtime_seconds: 0,
 }))
-// Der Endpunkt liefert nur Blätter (Gruppen haben keine Zeile), hier CDN und API.
+// The endpoint returns leaves only (groups have no row), here CDN and API.
 const availability = {
   components: [
     { id: 2, name: 'CDN', uptime_percent: 99.9, days: days() },
@@ -86,7 +86,7 @@ describe('PageLayoutList (Redesign 4a)', () => {
   it('zeigt Verfügbarkeitsbalken nur für Komponenten mit Daten, nicht für Gruppen', () => {
     const w = mountList()
     const rows = w.findAll('.pl-row')
-    expect(rows[0].findComponent(AvailabilityBars).exists()).toBe(false) // Gruppe „Web“
+    expect(rows[0].findComponent(AvailabilityBars).exists()).toBe(false) // group "Web"
     const cdn = rows[1].findComponent(AvailabilityBars)
     expect(cdn.exists()).toBe(true)
     expect(cdn.props('name')).toBe('CDN')
@@ -168,7 +168,7 @@ describe('PageLayoutList (Redesign 4a)', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // externe Meldungen in der Zeitleiste tragen die Kennzeichnung „extern“ mit Quelle.
+  // External reports in the timeline carry the "external" marker with the source.
   it('kennzeichnet externe Einträge der Zeitleiste mit „extern“ und Quelle, eigene nicht', () => {
     i18n.global.locale.value = 'de'
     const ext = { ID: 'ext-1', Title: 'Fremd', Message: 'm', Status: 'investigating', StartedAt: today, external: { source_name: 'Example Cloud' } }
@@ -179,8 +179,8 @@ describe('PageLayoutList (Redesign 4a)', () => {
     expect(chips[0].text()).toContain('Quelle: Example Cloud')
   })
 
-  // Nachrichten eigener Vorfälle sind formatiert, Texte externer
-  // Quellen bleiben Klartext (kein Markdown aus Fremdtext).
+  // Messages of own incidents are formatted, texts from external
+  // sources stay plain text (no Markdown from foreign text).
   it('zeigt externe Meldungen als Klartext und eigene Vorfälle formatiert', () => {
     const items = [
       { ID: 20, Title: 'Eigen', Message: '**fett**', Status: 'investigating', Components: [], CreatedAt: today },

@@ -1,14 +1,14 @@
-<script setup>
-// Darstellung des Seiten-Layouts "liste" – Komponentengruppen als
-// Karten mit 90-Tage-Balkenreihe und eine Vorfall-Zeitleiste. Reine
-// Darstellung: Daten, Filter und der Verlauf-Dialog gehören weiterhin
-// StatusPage.vue.
-// 4a: Der Gesamtstatus steht jetzt für beide Layouts oben in
-// StatusPage.vue (nicht mehr hier). Die Balken zeigen die Tagesaggregate des
-// Backends (availability, GET …/availability?include=components) statt einer
-// Schätzung aus Vorfällen; Status überall als StatusBadge, Einrückung per Klasse.
+<script setup lang="ts">
+// Rendering of the page layout "liste": component groups as cards with a
+// 90-day bar row, plus an incident timeline. Presentation only: data, filters
+// and the history dialog still belong to StatusPage.vue.
+// 4a: The overall status now sits at the top of StatusPage.vue for both
+// layouts (no longer here). The bars show the backend's daily aggregates
+// (availability, GET …/availability?include=components) instead of an
+// estimate from incidents; status everywhere as StatusBadge, indentation via class.
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { Component, ComponentAvailability, ExternalComponentRef, Incident, PageAvailability } from '../types/api'
 import AppIcon from './AppIcon.vue'
 import AvailabilityBars from './AvailabilityBars.vue'
 import EmptyState from './EmptyState.vue'
@@ -20,44 +20,61 @@ import { toIntlLocale } from '../utils/datetime'
 import { groupIncidentsByDay } from '../utils/pageLayout'
 import { incidentStatusMeta } from '../utils/incidentStatus'
 
-// Stryker disable all: defineProps wird aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  // Gefilterte Komponenten für die Karten.
-  components: { type: Array, required: true },
-  // Gefilterte Vorfälle für die Zeitleiste.
-  timelineIncidents: { type: Array, required: true },
-  // Antwort von GET …/availability?include=components oder null (noch nicht
-  // geladen/fehlgeschlagen): dann entfallen die Balken, der Rest bleibt.
-  availability: { type: Object, default: null },
+/** Timeline entry: an own incident, or a mirrored external one (ID "ext-<id>", `external` holds the original). */
+interface TimelineIncident extends Omit<Incident, 'ID'> {
+  ID: number | string
+  external?: { source_name?: string, [key: string]: unknown }
+}
+
+interface Row {
+  node: Component
+  depth: number
+  avail: ComponentAvailability | null
+}
+
+// Stryker disable all: defineProps is hoisted out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  // Filtered components for the cards.
+  components: Component[]
+  // Filtered incidents for the timeline.
+  timelineIncidents: TimelineIncident[]
+  // Response of GET …/availability?include=components, or null (not loaded yet
+  // or failed): then the bars are left out, the rest stays.
+  availability?: PageAvailability | null
+}>(), {
+  availability: null,
 })
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['open-history'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'open-history': [incident: TimelineIncident] }>()
 // Stryker restore all
 
 const { t, locale } = useI18n()
 
-// Vorfallstatus -> Stufe/Text; unbekannte Werte zeigen neutral den Rohwert.
-const incidentBadge = (status) => {
+// Incident status -> level/text; unknown values show the raw value, neutrally.
+const incidentBadge = (status: string) => {
   const meta = incidentStatusMeta(status)
   return { level: meta.level, label: meta.labelKey ? t(meta.labelKey) : status }
 }
 
+// The dashboard sends full link records; Component.external_sources is typed generically.
+const externalSources = (node: Component) => visibleExternalSources(node) as ExternalComponentRef[]
+
 const days = computed(() => groupIncidentsByDay(props.timelineIncidents))
 
-// Ein Formatter je Sprache; toLocaleDateString baute je Aufruf einen neuen
-// Intl-Formatter auf (Review-Befund 4: Sekunden Renderzeit bei 40 Zeilen).
+// One formatter per language; toLocaleDateString built a new Intl formatter
+// per call (review finding 4: seconds of render time for 40 rows).
 const dayFmt = computed(() => new Intl.DateTimeFormat(toIntlLocale(locale.value), { dateStyle: 'medium', timeZone: 'UTC' }))
-const fmtDay = (iso) => dayFmt.value.format(new Date(`${iso}T12:00:00Z`))
+const fmtDay = (iso: string) => dayFmt.value.format(new Date(`${iso}T12:00:00Z`))
 
-// Tageswerte je Komponente. Gruppen haben keine eigene Zeile im Endpunkt
-// (ein Vorfall an einer Gruppe zählt für ihre Kinder) und bekommen daher
-// keinen Balken, ebenso Komponenten, die der Endpunkt nicht kennt.
+// Daily values per component. Groups have no row of their own in the endpoint
+// (an incident on a group counts for its children) and therefore get no bar,
+// nor do components the endpoint does not know.
 const availabilityById = computed(() => new Map((props.availability?.components ?? []).map(c => [c.id, c])))
 
-// Einrückung als Klasse (pl-d0 … pl-d5) statt Inline-Style; tiefer verschachtelte
-// Ebenen teilen sich die letzte Stufe.
+// Indentation as a class (pl-d0 … pl-d5) instead of an inline style; deeper
+// nested levels share the last step.
 const MAX_INDENT_LEVEL = 5
-const flatten = (node, depth = 0) => [
+const flatten = (node: Component, depth = 0): [Row, ...Row[]] => [
   { node, depth: Math.min(depth, MAX_INDENT_LEVEL), avail: availabilityById.value.get(node.ID) ?? null },
   ...(node.Children || []).flatMap(c => flatten(c, depth + 1)),
 ]
@@ -80,8 +97,8 @@ const groups = computed(() => props.components.map(n => flatten(n)))
           <StatusBadge :status="row.node.Status" />
         </div>
         <ExternalSourceNote
-          v-if="visibleExternalSources(row.node).length > 0"
-          :sources="visibleExternalSources(row.node)"
+          v-if="externalSources(row.node).length > 0"
+          :sources="externalSources(row.node)"
           :name="row.node.Name"
         />
         <AvailabilityBars

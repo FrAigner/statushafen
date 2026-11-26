@@ -70,9 +70,9 @@ describe('RowMenu', () => {
     expect(document.activeElement).toBe(items()[1].element)
     await press(menu(), 'ArrowDown')
     await press(menu(), 'ArrowDown')
-    expect(document.activeElement).toBe(items()[0].element) // Umbruch nach unten
+    expect(document.activeElement).toBe(items()[0].element) // wraps around downwards
     await press(menu(), 'ArrowUp')
-    expect(document.activeElement).toBe(items()[2].element) // Umbruch nach oben
+    expect(document.activeElement).toBe(items()[2].element) // wraps around upwards
     await press(menu(), 'Home')
     expect(document.activeElement).toBe(items()[0].element)
     await press(menu(), 'End')

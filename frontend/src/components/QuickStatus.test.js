@@ -159,7 +159,7 @@ describe('QuickStatus: Öffnen und Schließen', () => {
     await nextTick()
     wrapper.unmount()
     wrapper = null
-    // Darf nach dem Abbau nichts mehr auslösen (keine Fehler).
+    // Must not trigger anything after unmounting (no errors).
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
   })
 })
