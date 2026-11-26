@@ -98,6 +98,17 @@ describe('AdminIncidentDetail', () => {
     expect(rows[0].find('.tl-time').text()).toBe(expectedUpdateTime)
   })
 
+  it('zeigt einen Gedankenstrich, wenn Melde- oder Update-Zeitstempel fehlen', async () => {
+    const fixture = incidentFixture({
+      CreatedAt: null,
+      updates: [{ id: 1, status: 'investigating', message: 'Untersuchung läuft', created_at: null }],
+    })
+    const { wrapper } = await mountDetail({ fetchImpl: vi.fn().mockResolvedValue(jsonResponse(fixture)) })
+
+    expect(wrapper.find('.m-v.mono').text()).toBe('—')
+    expect(wrapper.find('.timeline > li .tl-time').text()).toBe('—')
+  })
+
   it('zeigt das Post-Mortem-Veröffentlichungsdatum im deutschen Langformat', async () => {
     const { wrapper } = await mountDetail()
 

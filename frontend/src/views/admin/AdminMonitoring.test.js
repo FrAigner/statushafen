@@ -234,6 +234,16 @@ describe('AdminMonitoring', () => {
     expect(wrapper.find('.kpi--alert').exists()).toBe(false)
   })
 
+  it('zeigt einen Strich als Requests/Minute, wenn der Wert fehlt', async () => {
+    const wrapper = await mountMonitoring(vi.fn().mockResolvedValue(jsonResponse({
+      ...monitoringFixture(),
+      totals: { ...monitoringFixture().totals, requests_per_minute: null },
+    })))
+
+    const kachel = wrapper.findAll('.kpi').find(el => el.text().includes(i18n.global.t('monitoring.kpiRequestsPerMinute')))
+    expect(kachel.find('.kpi__value').text()).toBe('–')
+  })
+
   it('zeigt den Ladezustand, solange die Daten fehlen', async () => {
     const wrapper = await mountMonitoring(vi.fn(() => new Promise(() => {})))
 

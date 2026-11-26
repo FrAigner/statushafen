@@ -57,7 +57,8 @@ const statusOptions = computed(() => ['investigating', 'identified', 'monitoring
 const actionStateOptions = computed(() => ['open', 'in_progress', 'done']
   .map(value => ({ label: actionBadge(value, t).label, value })))
 const fmtDate = (d: string | null | undefined) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }) : '—'
-const fmtDay  = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString(toIntlLocale(locale.value), { dateStyle: 'long' }) : '—'
+// Only called behind v-if="pm.published_at", so the date is always set here.
+const fmtDay  = (d: string) => new Date(d).toLocaleDateString(toIntlLocale(locale.value), { dateStyle: 'long' })
 
 const title = computed(() => incident.value?.Title ?? t('incidentDetail.pageTitle'))
 const breadcrumbs = usePageCrumbs(() => `#${incident.value?.ID ?? route.params.id}`, {

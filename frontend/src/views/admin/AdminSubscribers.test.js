@@ -182,6 +182,13 @@ describe('AdminSubscribers', () => {
     expect(rows[1].text()).toContain('alle')
   })
 
+  it('zeigt einen unbekannten Kanal unverändert als Rohwert', async () => {
+    const subs = [{ ID: 4, Channel: 'pager', Email: 'p@x.de', SubscribedComponentIDs: '', Status: 'active', CreatedBy: null }]
+    const { wrapper } = await mountAdminSubscribers({ fetchImpl: makeFetchRouter({ subscribersFixtureOverride: subs }) })
+
+    expect(wrapper.find('tbody tr td[data-label="Kanal"] .tag-pill').text()).toBe('pager')
+  })
+
   it('zeigt den Google-Chat-Kanal mit Webhook-URL und Test-Button statt E-Mail', async () => {
     const { wrapper } = await mountAdminSubscribers()
 

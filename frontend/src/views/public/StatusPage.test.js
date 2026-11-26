@@ -1221,6 +1221,24 @@ describe('StatusPage', () => {
     expect(items[1].find('.sp-timeline-latest').exists()).toBe(false)
   })
 
+  it('zeigt auf der Karte einen Gedankenstrich, wenn einem Update der Zeitstempel fehlt', async () => {
+    const updates = [{ id: 1, status: 'identified', message: 'Ohne Zeit', created_at: null }]
+    const { wrapper } = await mountStatusPage({ fetchImpl: routedFetch({ detail: { updates } }) })
+    const item = currentCards(wrapper)[0].findAll('.sp-timeline-item')[0]
+    expect(item.find('.sp-timeline-message').text()).toBe('Ohne Zeit')
+    expect(item.find('.sp-timeline-time').text()).toBe('—')
+  })
+
+  it('stellt einen Hinweis mit unbekannter Stufe wie einen Info-Hinweis dar', async () => {
+    const d = dashboardFixture({
+      notices: [{ ID: 7, Title: 'Sonderfall', Message: 'x', Level: 'unbekannt', Collapsed: false, CreatedAt: '2026-07-01T10:00:00Z' }],
+    })
+    const { wrapper } = await mountStatusPage({ fetchImpl: vi.fn().mockResolvedValue(jsonResponse(d)) })
+    const card = wrapper.find('.notice-card')
+    expect(card.text()).toContain('Sonderfall')
+    expect(card.classes()).toContain('notice-info')
+  })
+
   it('zeigt ohne Updates und ohne Erstmeldung weiter den Leerzustand', async () => {
     const incidents = [{ ID: 100, Title: 'Leer', Message: '', Status: 'investigating', IsMaintenance: false, Tags: [], Components: [], CreatedAt: '2026-07-01T10:00:00Z' }]
     const { wrapper } = await mountStatusPage({ fetchImpl: routedFetch({ dashboard: dashboardFixture({ incidents }), detail: { updates: [] } }) })

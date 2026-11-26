@@ -80,6 +80,13 @@ describe('AdminTags', () => {
     expect(rows[1].text()).toContain('Acme Corp')
   })
 
+  it('zeigt für einen Tag einer unbekannten Seite den Platzhalter mit der Seiten-ID', async () => {
+    const router = vi.fn(async (url) => jsonResponse(/\/api\/tags$/.test(url) ? [{ ID: 3, Name: 'Waise', StatusPageID: 42 }] : pagesFixture()))
+    const { wrapper } = await mountAdminTags({ fetchImpl: router })
+
+    expect(wrapper.find('tbody tr .tag-pill').text()).toBe('Seite #42')
+  })
+
   it('filtert die Tabelle nach Scope (global / bestimmte Seite)', async () => {
     const { wrapper } = await mountAdminTags()
 

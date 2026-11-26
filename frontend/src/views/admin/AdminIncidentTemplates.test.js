@@ -226,6 +226,15 @@ describe('AdminIncidentTemplates', () => {
     await fieldByLabel(wrapper, 'Typ').setValue('maintenance')
     expect(hasLabel(wrapper, 'Standard-Status')).toBe(false)
   })
+  it('zeigt einen unbekannten Typ unverändert als Rohwert in der Tabelle', async () => {
+    const base = makeFetchRouter()
+    const fetchImpl = vi.fn(async (url, options = {}) => (!options.method && /\/incident-templates$/.test(url))
+      ? jsonResponse([{ ID: 9, Name: 'Altlast', Kind: 'legacy', Title: 'T', Message: 'M', ComponentIDs: '' }])
+      : base(url, options))
+    const { wrapper } = await mountTemplates({ fetchImpl })
+
+    expect(wrapper.find('tbody .tag-pill').text()).toBe('legacy')
+  })
   describe('Richtung C', () => {
     const templates = () => [
       { ID: 1, Name: 'DB-Wartung', Kind: 'maintenance', Title: 'Datenbank-Wartung', Message: 'Details', ComponentIDs: '10' },
