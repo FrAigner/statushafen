@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import type { PropType } from 'vue'
+import type { useFormTranslations } from '../composables/useFormTranslations'
 
-// „Übersetzung ist fertig“-Haken; nur in weiteren Sprachen sichtbar.
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({ trans: { type: Object, required: true } })
+// "Translation is done" checkbox; only visible in additional languages.
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps({ trans: { type: Object as PropType<ReturnType<typeof useFormTranslations>>, required: true } })
 const { t } = useI18n()
-const { activeDraft } = props.trans // berechnet, zeigt auf die gerade gewählte Sprache
+const { activeDraft } = props.trans // computed, points to the currently selected language
 </script>
 
 <template>

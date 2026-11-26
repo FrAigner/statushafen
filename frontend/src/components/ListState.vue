@@ -1,22 +1,26 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 4b: Lade-, Fehler- und Leerzustand einer
-  Admin-Liste ohne Tabellenzeile (Nachfolger von ListStateRow für Views, die
-  ResponsiveTable mit dataTable nutzen). Erscheint nur, solange die Liste leer
-  ist (count = 0): vorhandene Zeilen bleiben beim erneuten Laden oder einem
-  Ladefehler stehen. Vorrang: Laden > Fehler > Leer.
-  Der Leerzustand nutzt EmptyState (Titel = Leertext der View).
+  Redesign stage 4b: loading, error and empty state of an admin
+  list without a table row (successor of ListStateRow for views that use
+  ResponsiveTable with dataTable). Only appears while the list is empty
+  (count = 0): existing rows stay in place while reloading or after a load
+  error. Precedence: loading > error > empty.
+  The empty state uses EmptyState (title = the view's empty text).
 */
 import { useI18n } from 'vue-i18n'
 import EmptyState from './EmptyState.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  loading: { type: Boolean, default: false },
-  error: { type: Boolean, default: false },
-  count: { type: Number, required: true },
-  emptyText: { type: String, required: true },
-  icon: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  loading?: boolean
+  error?: boolean
+  count: number
+  emptyText: string
+  icon?: string | null
+}>(), {
+  loading: false,
+  error: false,
+  icon: null,
 })
 // Stryker restore all
 

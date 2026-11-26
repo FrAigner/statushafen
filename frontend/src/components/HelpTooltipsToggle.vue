@@ -1,11 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { OnyxSwitch } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
 import { useHelpTooltips } from '../composables/useHelpTooltips'
 
-// Schalter „Hilfe-Tooltips anzeigen“, im Seitenleisten-Fuß des
-// AdminLayout und im Profil. Wirkt sofort, gespeichert wird am Benutzer
-// (useHelpTooltips.js).
+// "Show help tooltips" switch, in the sidebar footer of the
+// AdminLayout and in the profile. Takes effect immediately, saved on the user
+// (useHelpTooltips.ts).
 
 const { t } = useI18n()
 const { enabled, setHelpTooltips, saveError } = useHelpTooltips()

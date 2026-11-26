@@ -44,9 +44,9 @@ describe('FormPanel', () => {
     expect(wrapper.emitted('close')).toHaveLength(1)
   })
 
-  // Regression: ".edit-card h3" aus admin.css (später geladen) zog eine Trennlinie
-  // und Abstand unter den Titel im Formularkopf. Die Komponente setzt das per
-  // scoped Style zurück (höhere Spezifität, unabhängig von der Ladereihenfolge).
+  // Regression: ".edit-card h3" from admin.css (loaded later) drew a divider
+  // and spacing below the title in the form head. The component resets this with
+  // a scoped style (higher specificity, independent of load order).
   it('setzt Linie und Abstand des Titels im Kopf per scoped Style zurück', () => {
     const style = formPanelSource.slice(formPanelSource.indexOf('<style scoped>'))
     expect(style).toMatch(/\.form-panel__head h3\s*\{[^}]*border:\s*0/)

@@ -6,7 +6,7 @@ import { useAuth } from '../composables/useAuth'
 import AccountDeletion from './AccountDeletion.vue'
 import { axe } from '../test-support/axe'
 
-// Konto-löschen-Bereich im Profil.
+// Account deletion section of the profile.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -241,7 +241,7 @@ describe('AccountDeletion', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Pflichtfeld E-Mail trägt Stern (Klasse), aria-required und den Hinweis.
+  // The required email field carries the asterisk (class), aria-required and the hint.
   it('kennzeichnet die E-Mail-Bestätigung als Pflichtfeld', async () => {
     const { wrapper: w } = mountDeletion()
     await w.find('[data-test="account-delete-open"]').trigger('click')

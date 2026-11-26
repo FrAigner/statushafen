@@ -101,7 +101,7 @@ describe('ExternalIncidentList', () => {
     expect(window.__pwned).toBeUndefined()
   })
 
-  // nur die neuesten Updates in der Karte, der Rest im Verlauf-Dialog.
+  // only the latest updates in the card, the rest in the history dialog.
   it('zeigt höchstens drei Updates und meldet open-history mit der Original-Meldung', async () => {
     i18n.global.locale.value = 'de'
     const updates = [1, 2, 3, 4].map((n) => ({ id: `u${n}`, status: 'identified', body: `U${n}`, display_at: `2026-10-29T1${n}:00:00Z` }))

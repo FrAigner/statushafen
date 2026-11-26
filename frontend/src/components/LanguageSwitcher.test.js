@@ -52,7 +52,7 @@ describe('LanguageSwitcher', () => {
     expect(list().isVisible()).toBe(false)
   })
 
-  // auf einer Statusseite alle Sprachen der Seite, nicht nur de/en.
+  // on a status page all languages of the page, not just de/en.
   it('bietet auf einer Statusseite alle Sprachen der Seite an und wechselt auf eine ohne Oberflächentexte', async () => {
     usePublicPageLanguages().setPageLanguages([
       { code: 'cs', name: 'Čeština', is_default: false },
@@ -191,7 +191,7 @@ describe('LanguageSwitcher', () => {
     expect(list().attributes('aria-label')).toBe(button().attributes('aria-label'))
   })
 
-  // fehlgeschlagenes Speichern ist für eingeloggte User sichtbar.
+  // a failed save is visible to signed-in users.
   it('zeigt bei fehlgeschlagenem Speichern eine Meldung, bei Erfolg keine', async () => {
     useAuth().setAuth('jwt-1', { email: 'a@x.de' })
     mountSwitcher()

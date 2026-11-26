@@ -4,7 +4,7 @@ import i18n from '../i18n'
 import ListStateRow from './ListStateRow.vue'
 import { axe } from '../test-support/axe'
 
-// Lade-, Fehler- und Leerzustand einer Tabellenliste in einer Zeile.
+// Loading, error and empty state of a table list in one row.
 function mountRow(props) {
   return mount(ListStateRow, {
     props: { colspan: 3, emptyText: 'Nichts da', count: 0, ...props },

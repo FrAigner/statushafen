@@ -1,7 +1,7 @@
-<script setup>
+<script setup lang="ts">
 /*
   Quick search in the admin top bar: finds admin pages, individual settings
-  (registry in utils/adminSearch.js) and built-in docs sections. ARIA pattern
+  (registry in utils/adminSearch.ts) and built-in docs sections. ARIA pattern
   "combobox with listbox popup": focus stays in the input, the active option
   is announced via aria-activedescendant. Ctrl/Cmd+K and "/" focus the field.
   On small screens a search button opens the field.
@@ -14,12 +14,15 @@ import { buildSearchIndex, searchIndex } from '../utils/adminSearch'
 import { revealSetting } from '../utils/revealSetting'
 import { nextActiveIndex } from '../utils/listbox'
 import AppIcon from './AppIcon.vue'
+import type { NavItem } from '../utils/adminNav'
+import type { SearchEntry, SearchEntryKind } from '../utils/adminSearch'
+import type * as DocsSearchIndex from '../utils/docsSearchIndex'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps<{
   // Visibility rule of the nav (AdminLayout.canSeeNavItem).
-  canSee: { type: Function, required: true },
-})
+  canSee: (item: NavItem) => boolean
+}>()
 // Stryker restore all
 
 const { t, locale } = useI18n()
@@ -30,19 +33,19 @@ const uid = useId()
 const fieldId = `qs-field-${uid}`
 const listboxId = `qs-listbox-${uid}`
 const hintId = `qs-hint-${uid}`
-const groupId = (kind) => `qs-group-${uid}-${kind}`
-const optionId = (index) => `qs-option-${uid}-${index}`
+const groupId = (kind: SearchEntryKind) => `qs-group-${uid}-${kind}`
+const optionId = (index: number) => `qs-option-${uid}-${index}`
 
-const rootRef = ref(null)
-const inputRef = ref(null)
-const toggleRef = ref(null)
+const rootRef = ref<HTMLElement | null>(null)
+const inputRef = ref<HTMLInputElement | null>(null)
+const toggleRef = ref<HTMLButtonElement | null>(null)
 const query = ref('')
 const open = ref(false)
 const mobileOpen = ref(false)
 const activeIndex = ref(0)
 
 // Docs entries are loaded on first use so marked and the docs stay out of the start bundle.
-const docsModule = ref(null)
+const docsModule = ref<typeof DocsSearchIndex | null>(null)
 const loadDocs = () => {
   if (docsModule.value) return
   import('../utils/docsSearchIndex')
@@ -62,9 +65,9 @@ const groups = computed(() => (locale.value, searchIndex(entries.value, query.va
 const flat = computed(() => groups.value.flatMap(group => group.entries))
 const listOpen = computed(() => open.value && flat.value.length > 0)
 const activeId = computed(() => (listOpen.value ? optionId(activeIndex.value) : undefined))
-const indexOf = (entry) => flat.value.indexOf(entry)
+const indexOf = (entry: SearchEntry) => flat.value.indexOf(entry)
 
-const groupLabel = (kind) => t(`quickSearch.groups.${{ page: 'pages', setting: 'settings', doc: 'docs' }[kind]}`)
+const groupLabel = (kind: SearchEntryKind) => t(`quickSearch.groups.${{ page: 'pages', setting: 'settings', doc: 'docs' }[kind]}`)
 
 const statusText = computed(() => {
   if (!query.value.trim()) return ''
@@ -97,7 +100,7 @@ const reset = () => {
   mobileOpen.value = false
 }
 
-const select = async (entry) => {
+const select = async (entry: SearchEntry) => {
   reset()
   inputRef.value?.blur()
   await router.push(entry.to)
@@ -108,15 +111,15 @@ const scrollActiveIntoView = () => nextTick(() => {
   document.getElementById(optionId(activeIndex.value))?.scrollIntoView?.({ block: 'nearest' })
 })
 
-const onKeydown = (e) => {
+const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault()
     if (!listOpen.value) {
       open.value = true
       return
     }
-    // The list is open, so it has options and the arrow key always moves.
-    activeIndex.value = nextActiveIndex(activeIndex.value, e.key, flat.value.length)
+    // The list is open, so it has options and the arrow key always moves (never null).
+    activeIndex.value = nextActiveIndex(activeIndex.value, e.key, flat.value.length)!
     scrollActiveIntoView()
   } else if (e.key === 'Enter') {
     const entry = listOpen.value ? flat.value[activeIndex.value] : null
@@ -136,8 +139,8 @@ const onKeydown = (e) => {
   }
 }
 
-const onFocusout = (e) => {
-  if (e.relatedTarget && rootRef.value?.contains(e.relatedTarget)) return
+const onFocusout = (e: FocusEvent) => {
+  if (e.relatedTarget && rootRef.value?.contains(e.relatedTarget as Node)) return
   open.value = false
   mobileOpen.value = false
 }
@@ -150,14 +153,14 @@ const toggleMobile = () => {
   focusInput()
 }
 
-const isEditable = (el) => !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
+const isEditable = (el: HTMLElement | null) => !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))
 
-const onGlobalKeydown = (e) => {
+const onGlobalKeydown = (e: KeyboardEvent) => {
   const isK = e.key === 'k' || e.key === 'K'
   if (isK && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
     e.preventDefault()
     focusInput()
-  } else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !isEditable(e.target) && !isEditable(document.activeElement)) {
+  } else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey && !isEditable(e.target as HTMLElement | null) && !isEditable(document.activeElement as HTMLElement | null)) {
     e.preventDefault()
     focusInput()
   }
@@ -228,7 +231,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKeydown))
           @mousemove="activeIndex = indexOf(entry)"
           @click="select(entry)"
         >
-          <AppIcon :name="entry.kind === 'page' ? entry.icon : entry.kind === 'doc' ? 'book' : 'settings'" :size="14" class="quick-search__option-icon" />
+          <AppIcon :name="entry.kind === 'page' ? entry.icon! : entry.kind === 'doc' ? 'book' : 'settings'" :size="14" class="quick-search__option-icon" />
           <span class="quick-search__option-text">
             <span class="quick-search__option-label">{{ entry.label }}</span>
             <span class="quick-search__option-context">{{ entry.context }}</span>

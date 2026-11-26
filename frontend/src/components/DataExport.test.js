@@ -7,7 +7,7 @@ import ProfileView from '../views/admin/ProfileView.vue'
 import { onyxFormStubs } from '../test-support/onyxStubs'
 import { axe } from '../test-support/axe'
 
-// Knopf für den Datenexport (GET /api/me/export) im Profil.
+// Data export button (GET /api/me/export) in the profile.
 
 const EXPORT = { profile: { email: 'a@b.de' }, subscriptions: [] }
 

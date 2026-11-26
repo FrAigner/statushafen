@@ -1,19 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-// Eine Tabellenzeile für Lade-, Fehler- und Leerzustand, damit
-// Admin-Listen vor der ersten Antwort keinen falschen Leerzustand zeigen.
-// Die Zeile erscheint nur, solange die Liste leer ist (count=0): vorhandene
-// Zeilen bleiben beim erneuten Laden oder einem Ladefehler stehen.
-// Vorrang: Laden > Fehler > Leer.
-// Stryker disable all: defineProps wird aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  loading: { type: Boolean, default: false },
-  error: { type: Boolean, default: false },
-  count: { type: Number, required: true },
-  colspan: { type: Number, required: true },
-  emptyText: { type: String, required: true },
-  cellClass: { type: String, default: 'table-empty' },
+// One table row for the loading, error and empty state, so that admin
+// lists do not show a false empty state before the first response.
+// The row only appears while the list is empty (count=0): existing rows
+// stay in place while reloading or after a load error.
+// Precedence: loading > error > empty.
+// Stryker disable all: Vue hoists defineProps out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  loading?: boolean
+  error?: boolean
+  count: number
+  colspan: number
+  emptyText: string
+  cellClass?: string
+}>(), {
+  loading: false,
+  error: false,
+  cellClass: 'table-empty',
 })
 // Stryker restore all
 

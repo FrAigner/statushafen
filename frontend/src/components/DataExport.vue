@@ -1,9 +1,10 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Datenexport (DSGVO Art. 15/20): Knopf auf der Profilseite, der
-  GET /api/me/export abruft (Profil, Seitenrollen, Abos, Audit-Einträge als
-  JSON) und die Antwort als Datei me-export.json speichert. Eigener Baustein
-  wie AccountDeletion.vue, damit die Profilseite nur eine Zeile Einbindung teilt.
+  Data export (GDPR Art. 15/20): button on the profile page that
+  fetches GET /api/me/export (profile, page roles, subscriptions, audit entries
+  as JSON) and saves the response as the file me-export.json. A separate
+  component like AccountDeletion.vue, so the profile page only shares one line
+  of inclusion.
 */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'

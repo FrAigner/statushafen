@@ -20,7 +20,7 @@ const mountBars = (props = {}) => {
   return mount(AvailabilityBars, { props: { name: 'Gesamtstatus', days, uptimePercent: 99.84, ...props }, global: { plugins: [i18n] } })
 }
 
-// 4a: 90-Tage-Balken aus dem Availability-Endpunkt.
+// 4a: 90-day bars from the availability endpoint.
 describe('AvailabilityBars', () => {
   it('zeichnet einen Balken je Tag, ältester links, mit Statusklasse', () => {
     const w = mountBars()
@@ -91,7 +91,7 @@ describe('AvailabilityBars', () => {
     expect(await axe(mountBars())).toHaveNoViolations()
   })
 
-  // Schweregrad im Verlauf (Backend gewichtet, Tagesfarbe = schlimmster Status).
+  // Severity over the day (backend weights it, day colour = worst status).
   describe('Schweregrad', () => {
     const sev = [
       withImpairments(day('2026-10-26', 'degraded_performance', 92.5), [{ status: 'degraded_performance', seconds: 21600 }]),
@@ -112,7 +112,7 @@ describe('AvailabilityBars', () => {
       expect(bars[0].attributes('aria-label')).toMatch(/: Beeinträchtigt, 92,50\s%\sverfügbar\. Dauer: Beeinträchtigt 6 Std\. 0 Min\.$/)
       expect(bars[1].attributes('aria-label')).toMatch(/: Teilausfall, 85,00\s%\sverfügbar\. Dauer: Teilausfall 2 Std\. 30 Min\., Beeinträchtigt 30 Min\.$/)
       expect(bars[2].attributes('aria-label')).toMatch(/: Großstörung, 50,00\s%\sverfügbar\. Dauer: Großstörung 12 Std\. 0 Min\.$/)
-      // sichtbarer Tooltip und Screenreader-Name sind derselbe Text
+      // visible tooltip and screen reader name are the same text
       expect(bars[1].find('.avail__tip').text()).toBe(bars[1].attributes('aria-label'))
     })
 

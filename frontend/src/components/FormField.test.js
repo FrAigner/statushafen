@@ -6,7 +6,7 @@ import { axe } from '../test-support/axe'
 
 let wrapper = null
 
-// Feld mit Slot-Props, wie es Views verwenden.
+// Field with slot props, as views use it.
 function mountField(props = {}) {
   wrapper = mount(FormField, {
     props: { label: 'Name', ...props },

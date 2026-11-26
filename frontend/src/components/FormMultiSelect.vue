@@ -1,40 +1,48 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Mehrfachauswahl (OnyxSelect multiple) im FormField-Muster.
+  Multi-select (OnyxSelect multiple) in the FormField pattern.
 
-  Vorher stand ein OnyxSelect mit hide-label hinter einem FormField-Label, dessen
-  `for` ins Leere zeigte, und der Pflichtfeld-Fehler fehlte am Feld. Hier:
+  Previously an OnyxSelect with hide-label sat behind a FormField label whose
+  `for` pointed nowhere, and the required-field error was missing on the field. Here:
 
-  - Die Feld-ID geht als `id` an OnyxSelect; Onyx setzt sie auf das
-    Combobox-Eingabefeld, damit zeigt `label for` (FormField) auf ein echtes Feld.
-  - OnyxSelect trägt `aria-invalid`/`aria-describedby` nur am Wurzelelement, nicht
-    am Eingabefeld (seine eigene Fehlerzeile würde zudem die FormField-Zeile
-    doppeln). Auch `required` reicht sie nicht an Onyx durch: Es zeigte beim Fokus
-    einen englischen Browser-Tooltip („Please fill out this field.“); stattdessen
-    steht aria-required am Eingabefeld. Deshalb setzt diese Komponente beides selbst am Eingabefeld, damit
-    Screenreader den Fehler lesen und useFormPanel.focusInvalid() dorthin springt.
+  - The field ID goes to OnyxSelect as `id`; Onyx puts it on the combobox
+    input, so `label for` (FormField) points to a real field.
+  - OnyxSelect only puts `aria-invalid`/`aria-describedby` on its root element,
+    not on the input (its own error line would also duplicate the FormField
+    line). It does not pass `required` on to Onyx either: that showed an English
+    browser tooltip ("Please fill out this field.") on focus; instead
+    aria-required sits on the input. So this component sets both on the input itself, so that
+    screen readers read the error and useFormPanel.focusInvalid() jumps there.
 */
 import { computed, onMounted, ref, useId, watch } from 'vue'
 import { OnyxSelect } from 'sit-onyx'
+import type { SelectOption, SelectOptionValue } from 'sit-onyx'
 import FormField from './FormField.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  modelValue: { type: Array, default: () => [] },
-  options: { type: Array, default: () => [] },
-  label: { type: String, required: true },
-  required: { type: Boolean, default: false },
-  error: { type: String, default: null },
-  hint: { type: String, default: null },
-  help: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  modelValue?: SelectOptionValue[]
+  options?: SelectOption[]
+  label: string
+  required?: boolean
+  error?: string | null
+  hint?: string | null
+  help?: string | null
+}>(), {
+  modelValue: () => [],
+  options: () => [],
+  required: false,
+  error: null,
+  hint: null,
+  help: null,
 })
 // Stryker restore all
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['update:modelValue'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'update:modelValue': [value: SelectOptionValue[] | null | undefined] }>()
 
 const uid = useId()
 const id = `ms-${uid}`
-const root = ref(null)
+const root = ref<{ $el: HTMLElement } | null>(null)
 
 const describedby = computed(() => {
   if (props.error) return `${id}-error`
@@ -43,12 +51,12 @@ const describedby = computed(() => {
 })
 
 function syncAria() {
-  const el = root.value.$el
-  // Echtes Onyx: Eingabefeld im Baum; Test-Stub: das Wurzelelement trägt die ID.
-  const field = el.id === id ? el : el.querySelector(`[id="${id}"]`)
+  const el = root.value!.$el
+  // Real Onyx: input inside the tree; test stub: the root element carries the ID.
+  const field = el.id === id ? el : el.querySelector<HTMLElement>(`[id="${id}"]`)!
   if (props.error) field.setAttribute('aria-invalid', 'true')
   else field.removeAttribute('aria-invalid')
-  // aria-required ist nur an Eingabe-Rollen erlaubt (Combobox), nicht am Gruppen-Stub der Tests.
+  // aria-required is only allowed on input roles (combobox), not on the group stub of the tests.
   if (props.required && field.tagName === 'INPUT') field.setAttribute('aria-required', 'true')
   else field.removeAttribute('aria-required')
   // Keep the help tooltip id set by v-help (FormField `help`); it is managed by the directive.

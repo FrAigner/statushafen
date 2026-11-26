@@ -1,21 +1,23 @@
-<script setup>
+<script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { OnyxButton } from 'sit-onyx'
 import SegmentControl from './SegmentControl.vue'
 import FormField from './FormField.vue'
+import type { PropType } from 'vue'
+import type { useFormTranslations } from '../composables/useFormTranslations'
 
-// Bis zu so vielen Einträgen (Standardsprache + weitere) bleibt es ein Umschalter nebeneinander;
-// darüber (die Seite hat viele Sprachen) wird es eine Auswahlliste, weil die Reiter sonst über
-// die Formularbreite hinauslaufen (31 Sprachen liefen aus dem Panel).
+// Up to this many entries (default language + others) it stays a side-by-side switcher;
+// above that (the page has many languages) it becomes a select list, because the tabs would
+// otherwise overflow the form width (31 languages ran out of the panel).
 const MAX_SEGMENTS = 3
 
-// Sprachumschalter über Titel und Text eines Bearbeiten-Formulars.
-// `trans` ist das Ergebnis von useFormTranslations; die Felder darunter binden
-// an trans.titleModel / trans.contentModel.
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({ trans: { type: Object, required: true } })
+// Language switcher above the title and text of an edit form.
+// `trans` is the result of useFormTranslations; the fields below bind
+// to trans.titleModel / trans.contentModel.
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps({ trans: { type: Object as PropType<ReturnType<typeof useFormTranslations>>, required: true } })
 const { t } = useI18n()
-const { active } = props.trans // Ref, das die Ansicht besitzt
+const { active } = props.trans // ref owned by the view
 </script>
 
 <template>
@@ -27,7 +29,7 @@ const { active } = props.trans // Ref, das die Ansicht besitzt
       </select>
     </FormField>
     <p class="lang-switch__hint">{{ trans.onDefaultLang.value ? t('formLanguages.langHintDefault') : t('formLanguages.langHintOther') }}</p>
-    <!-- Alles übersetzen: alle noch leeren weiteren Sprachen auf einmal (Entwürfe). -->
+    <!-- Translate all: every still-empty additional language at once (drafts). -->
     <div v-if="trans.emptyLanguages.value.length > 0" class="lang-switch__translate">
       <OnyxButton
         type="button" mode="outline" data-test="lang-translate-all"
@@ -37,7 +39,7 @@ const { active } = props.trans // Ref, das die Ansicht besitzt
       />
     </div>
     <p v-if="trans.translateAllSummary.value" class="lang-switch__hint" role="status" data-test="lang-translate-all-summary">{{ trans.translateAllSummary.value }}</p>
-    <!-- Vorschlag aus der Standardsprache; das Ergebnis ist ein Entwurf, nie „fertig“. -->
+    <!-- Suggestion from the default language; the result is a draft, never "done". -->
     <div v-if="!trans.onDefaultLang.value" class="lang-switch__translate">
       <OnyxButton
         type="button" mode="outline" data-test="lang-translate"

@@ -26,7 +26,7 @@ describe('ExternalSourceNote', () => {
     expect(a.attributes('rel')).toBe('noopener noreferrer nofollow')
     expect(a.attributes('aria-label')).toContain('öffnet in neuem Tab')
     expect(a.attributes('title')).toContain('Teilausfall')
-    // Status als Text und Form (StatusBadge), nicht nur Farbe
+    // status as text and shape (StatusBadge), not colour alone
     const badge = w.findComponent(StatusBadge)
     expect(badge.props('status')).toBe('partial_outage')
     expect(w.text()).toContain('Service 03')

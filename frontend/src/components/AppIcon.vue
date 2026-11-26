@@ -1,8 +1,10 @@
-<script setup>
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  name: { type: String, required: true },
-  size: { type: [Number, String], default: 16 },
+<script setup lang="ts">
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  name: string
+  size?: number | string
+}>(), {
+  size: 16,
 })
 // Stryker restore all
 
@@ -166,7 +168,7 @@ defineProps({
       <line x1="12" y1="15.5" x2="12" y2="15.55" />
     </template>
 
-    <!-- info (Hilfe-Tooltips, HelpTip.vue) -->
+    <!-- info (help tooltips, HelpTip.vue) -->
     <template v-else-if="name === 'info'">
       <circle cx="12" cy="12" r="8.5" />
       <line x1="12" y1="11" x2="12" y2="16.5" />
@@ -189,7 +191,7 @@ defineProps({
       <polyline points="9,5.5 15.5,12 9,18.5" />
     </template>
 
-    <!-- more: drei Punkte (Zeilenmenü) -->
+    <!-- more: three dots (row menu) -->
     <template v-else-if="name === 'more'">
       <circle cx="5" cy="12" r="1.2" />
       <circle cx="12" cy="12" r="1.2" />
@@ -275,13 +277,13 @@ defineProps({
       <path d="M9.6 9.6a3 3 0 004.2 4.2" />
     </template>
 
-    <!-- clock (Wartungsfenster) -->
+    <!-- clock (maintenance window) -->
     <template v-else-if="name === 'clock'">
       <circle cx="12" cy="12" r="9" />
       <polyline points="12 7 12 12 16 14" />
     </template>
 
-    <!-- external-link (Link auf eine fremde Seite) -->
+    <!-- external-link (link to an external page) -->
     <template v-else-if="name === 'external-link'">
       <polyline points="14 4 20 4 20 10" />
       <line x1="20" y1="4" x2="11" y2="13" />
@@ -299,7 +301,7 @@ defineProps({
       <circle cx="15" cy="8" r="1.4" fill="currentColor" stroke="none" />
     </template>
 
-    <!-- book / Dokumentation -->
+    <!-- book / documentation -->
     <template v-else-if="name === 'book'">
       <rect x="5" y="3" width="14" height="18" rx="1.5" />
       <line x1="9" y1="3" x2="9" y2="21" />

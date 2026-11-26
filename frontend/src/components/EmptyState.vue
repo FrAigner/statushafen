@@ -1,18 +1,21 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Redesign Stufe 3: Leerzustand mit Symbol, Titel, einem Satz und
-  einer Aktion (Slot "action"). Ersetzt .table-empty, .pad-empty und den
-  Leerfall von ListStateRow. In Tabellen innerhalb einer <td colspan> setzen.
-  Der Titel ist bewusst ein <p>, keine Überschrift: ein Leerzustand darf die
-  Überschriftenhierarchie der Seite nicht verändern.
+  Redesign stage 3: empty state with icon, title, one sentence and
+  an action (slot "action"). Replaces .table-empty, .pad-empty and the
+  empty case of ListStateRow. In tables, place it inside a <td colspan>.
+  The title is deliberately a <p>, not a heading: an empty state must not
+  change the page's heading hierarchy.
 */
 import AppIcon from './AppIcon.vue'
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-defineProps({
-  title: { type: String, required: true },
-  text: { type: String, default: null },
-  icon: { type: String, default: null },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+withDefaults(defineProps<{
+  title: string
+  text?: string | null
+  icon?: string | null
+}>(), {
+  text: null,
+  icon: null,
 })
 // Stryker restore all
 </script>

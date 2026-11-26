@@ -8,7 +8,7 @@ import ConfirmDialog from './ConfirmDialog.vue'
 import { confirmDialog, answerConfirm } from '../composables/useConfirm'
 import { axe } from '../test-support/axe'
 
-// gemeinsamer Bestätigungsdialog statt natives confirm().
+// Shared confirmation dialog instead of the native confirm().
 
 let wrapper = null
 const q = (sel) => document.body.querySelector(sel)
@@ -111,7 +111,7 @@ describe('ConfirmDialog', () => {
     expect(document.activeElement).toBe(cancel)
     key(cancel, 'Tab', { shiftKey: true })
     expect(document.activeElement).toBe(ok)
-    // innerhalb des Rings nicht eingreifen
+    // do not interfere inside the ring
     cancel.focus()
     const e = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     cancel.dispatchEvent(e)
@@ -120,7 +120,7 @@ describe('ConfirmDialog', () => {
     ok.focus()
     ok.dispatchEvent(e2)
     expect(e2.defaultPrevented).toBe(false)
-    // andere Tasten werden ignoriert
+    // other keys are ignored
     const e3 = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true })
     ok.dispatchEvent(e3)
     expect(q('[role="alertdialog"]')).not.toBeNull()

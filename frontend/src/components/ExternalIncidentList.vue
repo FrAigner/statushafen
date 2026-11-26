@@ -1,14 +1,14 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Teil D: gespiegelte Vorfälle und Wartungen externer Quellen
-  (Dashboard-Feld external_incidents), eigener Abschnitt der Statusseite.
-  - Jede Meldung ist mit „extern“, der Quelle (source_name) und einem Link auf
-    die Originalmeldung gekennzeichnet (nur http/https, neuer Tab mit Hinweis).
-  - Statuswort wie bei eigenen Vorfällen über StatusBadge (Form + Farbe + Text).
-  - Texte stammen aus fremden Quellen und werden ausschließlich als Text
-    ausgegeben (Mustache-Interpolation, nie v-html); Zeilenumbrüche bleiben per
-    CSS (white-space: pre-wrap) erhalten.
-  - Updates in zeitlicher Folge, neueste zuerst (wie die Zeitleiste eigener Vorfälle).
+  Part D: mirrored incidents and maintenance of external sources
+  (dashboard field external_incidents), a section of its own on the status page.
+  - Every report is marked with "external", the source (source_name) and a link to
+    the original report (http/https only, new tab with a notice).
+  - Status word via StatusBadge as for own incidents (shape + colour + text).
+  - Texts come from foreign sources and are only ever output as text
+    (mustache interpolation, never v-html); line breaks are kept via
+    CSS (white-space: pre-wrap).
+  - Updates in chronological order, newest first (like the timeline of own incidents).
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -17,32 +17,33 @@ import StatusBadge from './StatusBadge.vue'
 import { toIntlLocale } from '../utils/datetime'
 import { incidentStatusMeta } from '../utils/incidentStatus'
 import { safeHttpUrl } from '../utils/externalStatus'
+import type { ExternalIncident } from '../types/api'
 
-// Wie bei eigenen Vorfällen stehen in der Karte nur die neuesten
-// Updates, der Rest im Verlauf-Dialog der Statusseite (Ereignis open-history).
+// As for own incidents, the card only shows the latest
+// updates, the rest is in the status page's history dialog (event open-history).
 const INLINE_UPDATES = 3
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  // external_incidents der Dashboard-Antwort.
-  items: { type: Array, required: true },
-})
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = defineProps<{
+  // external_incidents of the dashboard response.
+  items: ExternalIncident[]
+}>()
 // Stryker restore all
 
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const emit = defineEmits(['open-history'])
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const emit = defineEmits<{ 'open-history': [item: ExternalIncident | undefined] }>()
 
 const { t, locale } = useI18n()
 
 const fmt = computed(() => new Intl.DateTimeFormat(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }))
-const fmtDate = (d) => (d ? fmt.value.format(new Date(d)) : '—')
+const fmtDate = (d: string | null | undefined) => (d ? fmt.value.format(new Date(d)) : '—')
 
-const badge = (status) => {
+const badge = (status: string) => {
   const meta = incidentStatusMeta(status)
   return { level: meta.level, label: meta.labelKey ? t(meta.labelKey) : status }
 }
 
-const byTimeDesc = (a, b) => new Date(b.display_at) - new Date(a.display_at)
+const byTimeDesc = (a: { display_at: string }, b: { display_at: string }) => new Date(b.display_at).getTime() - new Date(a.display_at).getTime()
 
 const rows = computed(() => props.items.map((i) => {
   const maintenance = i.kind === 'maintenance'
