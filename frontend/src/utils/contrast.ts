@@ -25,7 +25,7 @@ export function toHex(rgb: Rgb): string {
 
 function channel(c: number): number {
   const s = c / 255
-  // Stryker disable next-line EqualityOperator: kein 8-Bit-Wert trifft 0,04045 exakt
+  // Stryker disable next-line EqualityOperator: no 8-bit value hits 0.04045 exactly
   return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
 }
 
@@ -37,7 +37,7 @@ export function luminance(rgb: Rgb): number {
 export function contrastRatio(a: Rgb, b: Rgb): number {
   const la = luminance(a)
   const lb = luminance(b)
-  // Stryker disable next-line EqualityOperator: bei Gleichheit liefern beide Zweige dasselbe
+  // Stryker disable next-line EqualityOperator: on equality both branches return the same
   const [hi, lo] = la > lb ? [la, lb] : [lb, la]
   return (hi + 0.05) / (lo + 0.05)
 }
@@ -56,9 +56,9 @@ export function ensureContrast(color: string, against: string | readonly string[
   const enough = (c: Rgb) => backgrounds.every(bg => contrastRatio(c, bg as Rgb) >= minRatio)
   if (enough(rgb)) return color
   // 0.18 is roughly the luminance above which black has more contrast than white.
-  // Stryker disable next-line EqualityOperator: kein Hintergrund trifft 0,18 exakt
+  // Stryker disable next-line EqualityOperator: no background hits 0.18 exactly
   const target = luminance(backgrounds[0] as Rgb) > 0.18 ? 0 : 255
-  // Stryker disable next-line EqualityOperator: Schritt 20 ist die reine Zielfarbe, die danach ohnehin zurückkommt
+  // Stryker disable next-line EqualityOperator: step 20 is the pure target colour, which is returned afterwards anyway
   for (let step = 1; step < STEPS; step++) {
     const mixed = rgb.map(c => c + (target - c) * (step / STEPS))
     if (enough(mixed)) return toHex(mixed)
