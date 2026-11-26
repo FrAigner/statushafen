@@ -15,7 +15,7 @@ export function useTranslationEnabled() {
   // A failed request counts as "off", the default of the server.
   const load = async () => {
     try {
-      const res = await apiFetch('/api/public/translation/enabled')
+      const res = await apiFetch<{ enabled?: boolean } | null>('/api/public/translation/enabled')
       enabled.value = res?.enabled === true
     } catch {
       enabled.value = false

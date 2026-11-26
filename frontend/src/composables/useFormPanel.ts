@@ -1,38 +1,45 @@
-// Richtung C, Betriebsseiten: Fokus und Pflichtfeld-Fehler für das
-// Formular in der Seitenkarte (FormPanel). Vorher stand dasselbe Muster
-// (focusForm, nameError + Fokus aufs fehlerhafte Feld) in AdminComponents.vue;
-// die Betriebsseiten teilen es sich hier.
+// Direction C, operations pages: focus and required-field errors for the
+// form in the page card (FormPanel). Before, the same pattern (focusForm,
+// nameError + focus on the faulty field) lived in AdminComponents.vue; the
+// operations pages share it here.
 import { nextTick, ref } from 'vue'
 
-export function useFormPanel() {
-  const formEl = ref(null)
-  // Fehlertext je Feldschlüssel; leer = kein Fehler.
-  const errors = ref({})
+/** Required field for validateRequired: blank value -> message at the field. */
+export interface RequiredField {
+  key: string
+  value: unknown
+  message: string
+}
 
-  // Nach dem Öffnen: Formular unter 860 px in den Sichtbereich holen, Fokus
-  // aufs erste Feld.
+export function useFormPanel() {
+  const formEl = ref<HTMLElement | null>(null)
+  // Error text per field key; empty = no error.
+  const errors = ref<Record<string, string>>({})
+
+  // After opening: scroll the form into view below 860 px, focus the first
+  // field.
   const focusForm = async () => {
     await nextTick()
     formEl.value?.closest('aside')?.scrollIntoView?.({ block: 'nearest' })
-    formEl.value?.querySelector('input, textarea, select')?.focus({ preventScroll: true })
+    formEl.value?.querySelector<HTMLElement>('input, textarea, select')?.focus({ preventScroll: true })
   }
 
-  // Fokus aufs erste Feld mit aria-invalid (für Seiten mit eigener Prüfung).
+  // Focus the first field with aria-invalid (for pages with their own validation).
   const focusInvalid = async () => {
     await nextTick()
-    formEl.value?.querySelector('[aria-invalid="true"]')?.focus()
+    formEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
   }
 
   const clearErrors = () => { errors.value = {} }
-  const clearError = (key) => {
+  const clearError = (key: string) => {
     if (errors.value[key]) errors.value = { ...errors.value, [key]: '' }
   }
 
-  const isBlank = (value) => Array.isArray(value) ? value.length === 0 : !String(value ?? '').trim()
+  const isBlank = (value: unknown) => Array.isArray(value) ? value.length === 0 : !String(value ?? '').trim()
 
-  // fields: [{ key, value, message }]. Fehlende Pflichtfelder bekommen ihren
-  // Text am Feld, der Fokus springt aufs erste fehlerhafte Feld.
-  const validateRequired = async (fields) => {
+  // fields: [{ key, value, message }]. Missing required fields get their
+  // text at the field, the focus jumps to the first faulty field.
+  const validateRequired = async (fields: RequiredField[]): Promise<boolean> => {
     const failed = fields.filter(f => isBlank(f.value))
     errors.value = Object.fromEntries(failed.map(f => [f.key, f.message]))
     if (failed.length === 0) return true

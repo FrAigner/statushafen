@@ -3,18 +3,18 @@ import { useI18n } from 'vue-i18n'
 import { useAuth } from './useAuth'
 import { useApi } from './useApi'
 
-// Hilfe-Tooltips im Admin-Bereich pro Benutzer ein- und
-// ausschalten. Gespeichert wird serverseitig am User (PATCH /api/me
-// {"help_tooltips": bool}, Ausgabe in /api/me, Login-Antwort und SSO-Token),
-// damit die Wahl auf allen Geräten gilt. Default ist an: Fehlt das Feld
-// (alter Client-Zustand, Test-Setups), gelten die Tooltips als eingeschaltet.
+// Switch the help tooltips in the admin area on and off per user. Stored on
+// the server at the user (PATCH /api/me {"help_tooltips": bool}, output in
+// /api/me, the login response and the SSO token), so the choice applies on
+// all devices. Default is on: if the field is missing (old client state, test
+// setups), the tooltips count as switched on.
 //
-// Der Schalter wirkt sofort über currentUser (lokaler Zustand), die Antwort
-// des Servers wird nicht abgewartet. Schlägt das Speichern fehl, bleibt die
-// Wahl für diese Sitzung erhalten und saveError nennt das Problem (wie bei
-// der Sprachwahl, useLanguage.js).
+// The switch takes effect immediately via currentUser (local state); the
+// server's response is not awaited. If saving fails, the choice is kept for
+// this session and saveError names the problem (as with the language choice,
+// useLanguage.ts).
 
-let auth = null
+let auth: ReturnType<typeof useAuth> | null = null
 const user = () => (auth ??= useAuth()).currentUser
 
 export const helpTooltipsEnabled = computed(() => user().value?.help_tooltips !== false)
@@ -24,7 +24,7 @@ export function useHelpTooltips() {
   const { apiFetch } = useApi()
   const saveError = ref('')
 
-  const setHelpTooltips = async (on) => {
+  const setHelpTooltips = async (on: boolean) => {
     const current = user()
     if (!current.value) return
     current.value = { ...current.value, help_tooltips: on }

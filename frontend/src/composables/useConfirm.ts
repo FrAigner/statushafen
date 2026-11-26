@@ -1,34 +1,54 @@
-// Ein gemeinsamer Bestätigungsdialog statt des nativen Browser-Dialogs.
+// A shared confirmation dialog instead of the browser's native dialog.
 //
-// Aufruf: `if (!(await confirmDialog({ message, title?, confirmLabel?, danger? }))) return`.
-// Der Zustand liegt auf Modulebene, genau eine <ConfirmDialog /> (in App.vue) zeigt ihn an.
-// Ein zweiter Aufruf, während ein Dialog offen ist, beantwortet den ersten mit "abgebrochen"
-// (nie zwei Dialoge übereinander, nie ein hängendes Promise).
+// Usage: `if (!(await confirmDialog({ message, title?, confirmLabel?, danger? }))) return`.
+// The state lives at module level; exactly one <ConfirmDialog /> (in App.vue) shows it.
+// A second call while a dialog is open answers the first one with "cancelled"
+// (never two dialogs on top of each other, never a hanging promise).
 import { reactive, readonly } from 'vue'
 
-const state = reactive({
+export interface ConfirmOptions {
+  message?: string
+  title?: string
+  confirmLabel?: string
+  danger?: boolean
+}
+
+export interface ConfirmState {
+  open: boolean
+  title: string
+  message: string
+  confirmLabel: string
+  danger: boolean
+  opener: Element | null
+  themeClass: 'theme-admin' | 'theme-public'
+}
+
+/** Test replacement for the dialog (src/test-support/confirm): answers with a fixed value. */
+export type ConfirmHandler = (options: ConfirmOptions & Required<Omit<ConfirmOptions, 'message'>>) => boolean | Promise<boolean>
+
+const state = reactive<ConfirmState>({
   open: false,
   title: '',
   message: '',
   confirmLabel: '',
   danger: true,
-  // Das Element, das den Dialog ausgelöst hat; bekommt beim Schließen den Fokus zurück.
+  // The element that triggered the dialog; gets the focus back on close.
   opener: null,
-  // Themeklasse (theme-admin/theme-public) des auslösenden Elements: der Dialog hängt per Teleport am <body>
-  // und läge sonst außerhalb der Token-Ebene des Layouts.
+  // Theme class (theme-admin/theme-public) of the triggering element: the dialog is teleported to <body>
+  // and would otherwise sit outside the layout's token layer.
   themeClass: 'theme-public',
 })
-let resolver = null
-let testHandler = null
+let resolver: ((answer: boolean) => void) | null = null
+let testHandler: ConfirmHandler | null = null
 
-function settle(answer) {
+function settle(answer: boolean) {
   const done = resolver
   resolver = null
   state.open = false
   done?.(answer)
 }
 
-export function confirmDialog({ message, title = '', confirmLabel = '', danger = true } = {}) {
+export function confirmDialog({ message, title = '', confirmLabel = '', danger = true }: ConfirmOptions = {}): Promise<boolean> {
   if (testHandler) return Promise.resolve(testHandler({ message, title, confirmLabel, danger }))
   if (resolver) settle(false)
   return new Promise((resolve) => {
@@ -41,7 +61,7 @@ export function confirmDialog({ message, title = '', confirmLabel = '', danger =
   })
 }
 
-export function answerConfirm(answer) {
+export function answerConfirm(answer: boolean): Element | null {
   const opener = state.opener
   settle(answer)
   state.opener = null
@@ -52,7 +72,7 @@ export function useConfirmState() {
   return readonly(state)
 }
 
-// Nur für Tests (src/test-support/confirm.js): ersetzt den Dialog durch eine feste Antwort.
-export function setConfirmHandler(fn) {
+// Tests only (src/test-support/confirm.ts): replaces the dialog with a fixed answer.
+export function setConfirmHandler(fn: ConfirmHandler | null) {
   testHandler = fn
 }

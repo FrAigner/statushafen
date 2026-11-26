@@ -2,16 +2,22 @@ import { ref, computed } from 'vue'
 import { useApi } from './useApi'
 import { useAuth } from './useAuth'
 import { useTenant } from './useTenant'
+import type { TenantId } from './useTenant'
+import type { AdminNotification } from '../types/api'
 
-// Admin-Nachrichtencenter (Glocke in der Kopfzeile). Zustand und
-// Abrufe für die Glocke. Nachrichten der aktiven Statusseite kommen von
-// /api/pages/:id/admin-notifications, systemweite (nur Global Admins) von
-// /api/admin-notifications; beide Quellen werden gemischt.
+/** A message of the bell plus the route base it came from (page-specific or system-wide). */
+export interface AdminNotificationEntry extends AdminNotification {
+  base: string
+}
+
+// Admin notification center (bell in the header). State and requests for
+// the bell. Messages of the active status page come from
+// /api/pages/:id/admin-notifications, system-wide ones (global admins only)
+// from /api/admin-notifications; both sources are merged.
 //
-// Antworten, die erst nach einem Mandantenwechsel eintreffen, werden
-// verworfen (Muster Ausfall-Banner): jede Anfrage merkt sich die
-// Seite und eine Laufnummer und schreibt ihr Ergebnis nur, wenn beides noch
-// stimmt.
+// Responses that only arrive after a tenant switch are discarded (pattern of
+// the outage banner): every request remembers the page and a run number and
+// only writes its result if both still match.
 
 const LIST_LIMIT = 20
 
@@ -20,17 +26,17 @@ export function useAdminNotifications() {
   const { isGlobalAdmin, hasPerm } = useAuth()
   const { activeTenantId } = useTenant()
 
-  const items = ref([])
+  const items = ref<AdminNotificationEntry[]>([])
   const unreadCount = ref(0)
   const loading = ref(false)
   const failed = ref(false)
 
-  // Die Glocke gibt es für Global Admins und Rollen, die das Backend ebenfalls
-  // bedient (external_sources:update oder subscribers:update auf der aktiven Seite).
+  // The bell exists for global admins and for roles the backend serves as well
+  // (external_sources:update or subscribers:update on the active page).
   const enabled = computed(() => isGlobalAdmin.value || hasPerm('external_sources:update') || hasPerm('subscribers:update'))
 
   const sources = () => {
-    const list = []
+    const list: string[] = []
     if (activeTenantId.value) list.push(`/api/pages/${activeTenantId.value}/admin-notifications`)
     if (isGlobalAdmin.value) list.push('/api/admin-notifications')
     return list
@@ -38,7 +44,7 @@ export function useAdminNotifications() {
 
   let countRun = 0
   let listRun = 0
-  const stillCurrent = (pageId) => String(pageId) === String(activeTenantId.value)
+  const stillCurrent = (pageId: TenantId | null) => String(pageId) === String(activeTenantId.value)
 
   const refreshCount = async () => {
     const pageId = activeTenantId.value
@@ -49,12 +55,12 @@ export function useAdminNotifications() {
       return
     }
     try {
-      const results = await Promise.all(bases.map(b => apiFetch(`${b}/unread-count`)))
+      const results = await Promise.all(bases.map(b => apiFetch<{ unread_count?: number } | null>(`${b}/unread-count`)))
       if (run !== countRun || !stillCurrent(pageId)) return
-      unreadCount.value = results.reduce((sum, r) => sum + (Number.isFinite(r?.unread_count) ? r.unread_count : 0), 0)
+      unreadCount.value = results.reduce((sum, r) => sum + (Number.isFinite(r?.unread_count) ? r!.unread_count! : 0), 0)
     } catch (err) {
-      // Das Polling darf die Seite nicht stören: Der letzte Stand bleibt stehen,
-      // die nächste Runde versucht es erneut.
+      // Polling must not disturb the page: the last state stays,
+      // the next round tries again.
       if (run === countRun) console.error('Failed to load admin notification count', err)
     }
   }
@@ -67,7 +73,7 @@ export function useAdminNotifications() {
     failed.value = false
     try {
       const results = await Promise.all(bases.map(async (base) => {
-        const res = await apiFetch(`${base}?limit=${LIST_LIMIT}`)
+        const res = await apiFetch<{ items?: AdminNotification[] } | null>(`${base}?limit=${LIST_LIMIT}`)
         return (Array.isArray(res?.items) ? res.items : []).map(it => ({ ...it, base }))
       }))
       if (run !== listRun || !stillCurrent(pageId)) return
@@ -83,7 +89,7 @@ export function useAdminNotifications() {
     }
   }
 
-  const markRead = async (item) => {
+  const markRead = async (item: AdminNotificationEntry) => {
     if (item.read) return
     item.read = true
     if (!item.resolved_at) unreadCount.value = Math.max(0, unreadCount.value - 1)
@@ -103,14 +109,14 @@ export function useAdminNotifications() {
     try {
       await Promise.all(sources().map(b => apiFetch(`${b}/read-all`, { method: 'POST' })))
     } catch (err) {
-      items.value.forEach((it, i) => { it.read = before[i] })
+      items.value.forEach((it, i) => { it.read = before[i]! })
       console.error('Failed to mark all notifications as read', err)
       await refreshCount()
     }
   }
 
-  // Beim Mandantenwechsel: alte Liste und Zähler sofort leeren, laufende
-  // Antworten werden über die Laufnummern ungültig.
+  // On a tenant switch: clear the old list and counter immediately; pending
+  // responses become invalid via the run numbers.
   const reset = () => {
     countRun++
     listRun++

@@ -3,46 +3,60 @@ import { useTenant } from './useTenant'
 import i18n, { SUPPORTED_LOCALES, LANGUAGE_STORAGE_KEY, isLocaleLoaded, loadLocaleMessages } from '../i18n'
 import { clearInvitationToken } from '../utils/invitationToken'
 import { grants, isGlobalResource } from '../utils/permissions'
+import type { AuthUser } from '../types/api'
 
 const token = ref(localStorage.getItem('jwt_token') || '')
-const currentUser = ref(null)
+const currentUser = ref<AuthUser | null>(null)
+
+/** Claims of the JWT that the SSO login receives in the URL. */
+interface SsoTokenPayload {
+  user_id?: number
+  email?: string
+  role?: string
+  permissions?: string
+  is_global_admin?: boolean
+  sso?: string
+  name?: string
+  hide_help_tooltips?: boolean
+  preferred_language?: string
+}
 
 export function useAuth() {
   const { activeTenantPermissions, setMyPages, setActiveTenant } = useTenant()
 
-  // Wie das Backend (middleware.requirePermissionCheck) zählt nur
-  // die Rolle auf der gerade aktiven Statusseite (UserStatusPageRole); die
-  // globale Rolle im JWT (currentUser.permissions) wird nie ausgewertet, sonst
-  // zeigt das UI Schreibknöpfe, die mit 403 enden. Global Admins bypassen
-  // immer. create, update und delete einer Ressource schließen
-  // deren read ein; der Altwert `:write` zählt als alle vier Aktionen
-  // (Backend: permissions.Has). Globale Ressourcen (users, roles, tags, ...)
-  // gehören nur Global Admins, auch wenn eine Seitenrolle den String trägt.
-  const hasPerm = (required) => {
+  // Like the backend (middleware.requirePermissionCheck), only the role on
+  // the currently active status page (UserStatusPageRole) counts; the global
+  // role in the JWT (currentUser.permissions) is never evaluated, otherwise
+  // the UI shows write buttons that end in a 403. Global admins always
+  // bypass. create, update and delete of a resource imply its read; the
+  // legacy value `:write` counts as all four actions (backend:
+  // permissions.Has). Global resources (users, roles, tags, ...) belong to
+  // global admins only, even if a page role carries the string.
+  const hasPerm = (required: string): boolean => {
     if (currentUser.value?.is_global_admin) return true
     if (!currentUser.value) return false
-    if (isGlobalResource(required.split(':')[0])) return false
+    if (isGlobalResource(required.split(':')[0] ?? '')) return false
     return grants(activeTenantPermissions.value, required)
   }
 
-  // Übernimmt eine serverseitig gespeicherte Sprachpräferenz in
-  // die aktive UI-Sprache, damit sie sich geräteübergreifend durchsetzt statt
-  // der ggf. abweichenden lokalen localStorage-Wahl. Wird sowohl vom
-  // Passwort-Login (setAuth) als auch vom SSO-Login (loginWithToken)
-  // aufgerufen, damit beide Login-Wege konsistent synchronisieren.
-  const applyPreferredLanguage = (preferredLanguage) => {
+  // Applies a language preference stored on the server to the active UI
+  // language, so it wins across devices over a possibly different local
+  // localStorage choice. Called by both the password login (setAuth) and the
+  // SSO login (loginWithToken), so both login paths sync consistently.
+  const applyPreferredLanguage = (preferredLanguage: string | undefined) => {
     if (preferredLanguage && SUPPORTED_LOCALES.includes(preferredLanguage)) {
       const apply = () => {
-        i18n.global.locale.value = preferredLanguage
+        // vue-i18n types the locale as one of the bundled message locales; lazily loaded ones are valid too.
+        i18n.global.locale.value = preferredLanguage as typeof i18n.global.locale.value
         localStorage.setItem(LANGUAGE_STORAGE_KEY, preferredLanguage)
       }
-      // Nachgeladene Sprachen erst nach dem Laden ihrer Texte aktivieren.
+      // Activate lazily loaded languages only once their texts are loaded.
       if (isLocaleLoaded(preferredLanguage)) apply()
       else loadLocaleMessages(preferredLanguage).then((ok) => ok && apply())
     }
   }
 
-  const setAuth = (newToken, userProfile) => {
+  const setAuth = (newToken: string, userProfile: AuthUser | null) => {
     token.value = newToken
     localStorage.setItem('jwt_token', newToken)
     currentUser.value = userProfile
@@ -50,27 +64,27 @@ export function useAuth() {
     applyPreferredLanguage(userProfile?.preferred_language)
   }
 
-  // SSO: JWT direkt aus URL-Token dekodieren und setzen
-  const loginWithToken = (jwtToken) => {
+  // SSO: decode the JWT directly from the URL token and set it
+  const loginWithToken = (jwtToken: string) => {
     try {
       const parts = jwtToken.split('.')
       if (parts.length !== 3) {
         throw new Error('Ungültiges Token-Format')
       }
-      const base64Url = parts[1]
+      const base64Url = parts[1]!
       const base64 = base64Url.replaceAll('-', '+').replaceAll('_', '/')
       const jsonPayload = decodeURIComponent(
         atob(base64)
           .split('')
-          .map(c => '%' + ('00' + c.codePointAt(0).toString(16)).slice(-2))
+          .map(c => '%' + ('00' + c.codePointAt(0)!.toString(16)).slice(-2))
           .join('')
       )
-      const payload = JSON.parse(jsonPayload)
+      const payload = JSON.parse(jsonPayload) as SsoTokenPayload
       token.value = jwtToken
       localStorage.setItem('jwt_token', jwtToken)
       currentUser.value = {
-        // id wie bei /api/me, sonst erkennt die
-        // Benutzerverwaltung die eigene Zeile nicht.
+        // id as with /api/me, otherwise the user management does not
+        // recognize the user's own row.
         id: payload.user_id,
         email: payload.email,
         role: payload.role,
@@ -78,8 +92,8 @@ export function useAuth() {
         is_global_admin: payload.is_global_admin,
         sso_provider: payload.sso,
         name: payload.name,
-        // SSO lädt /api/me nicht, die Tooltip-Einstellung kommt
-        // deshalb aus dem Token (Claim fehlt = Default an).
+        // SSO does not load /api/me, so the tooltip setting comes from
+        // the token (missing claim = default on).
         help_tooltips: !payload.hide_help_tooltips,
       }
 
@@ -93,11 +107,11 @@ export function useAuth() {
     token.value = ''
     localStorage.removeItem('jwt_token')
     currentUser.value = null
-    // Seitenrollen und aktiver Tenant gehören dem abgemeldeten
-    // Nutzer; der nächste Nutzer darf sie nicht erben.
+    // Page roles and the active tenant belong to the logged-out user;
+    // the next user must not inherit them.
     setMyPages([])
     setActiveTenant(null)
-    // ein gemerkter Einladungs-Token gehört dem abgemeldeten Nutzer.
+    // a remembered invitation token belongs to the logged-out user.
     clearInvitationToken()
   }
 

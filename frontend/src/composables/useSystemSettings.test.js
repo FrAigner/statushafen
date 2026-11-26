@@ -6,16 +6,15 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// Composable-Tests für die globalen Systemeinstellungen. Wie
-// die übrigen Composable-Tests wird global.fetch gestubbt (useApi baut direkt
-// darauf auf).
+// Composable tests for the global system settings. Like the other
+// composable tests, global.fetch is stubbed (useApi builds directly on it).
 describe('useSystemSettings', () => {
   beforeEach(() => {
     useAuth().logout()
     vi.restoreAllMocks()
   })
 
-  // Muss vor dem ersten Laden stehen (Modulzustand): Betreiber-Entscheidung.
+  // Must come before the first load (module state): operator decision.
   it('startet mit ausgeschalteter Selbstüberwachung', () => {
     expect(useSystemSettings().settings.value.selfmonitor_enabled).toBe(false)
   })

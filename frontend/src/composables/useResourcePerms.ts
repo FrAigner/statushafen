@@ -2,10 +2,10 @@ import { computed } from 'vue'
 import { useAuth } from './useAuth'
 import { perm } from '../utils/permissions'
 
-// Rechte eines Tabs je Aktion für die Views. „Neu …“-Knöpfe hängen
-// an canCreate, Bearbeiten/Formular/Schnellstatus an canUpdate, Löschen an
-// canDelete; ohne canUpdate öffnet sich das Formular schreibgeschützt.
-export function useResourcePerms(resource) {
+// Permissions of a tab per action for the views. "New …" buttons depend on
+// canCreate, edit/form/quick status on canUpdate, delete on canDelete; without
+// canUpdate the form opens read-only.
+export function useResourcePerms(resource: string) {
   const { hasPerm } = useAuth()
   return {
     canCreate: computed(() => hasPerm(perm(resource, 'create'))),

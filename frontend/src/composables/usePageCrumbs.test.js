@@ -4,7 +4,7 @@ import i18n from '../i18n'
 import { usePageCrumbs } from './usePageCrumbs'
 import { useTenant } from './useTenant'
 
-// useI18n braucht eine Komponente; für das Composable genügt ein Setup-Aufruf.
+// useI18n needs a component; for the composable a setup call is enough.
 import { mount } from '@vue/test-utils'
 function run(...args) {
   let result
@@ -43,8 +43,8 @@ describe('usePageCrumbs', () => {
     expect(run('Tags').value).toEqual([{ label: 'Hafen', to: '/admin' }, { label: 'Tags' }])
   })
 
-  // Regression (nach einer Zusammenführung): ein Getter als Titel wurde als Funktion
-  // statt als Text ausgegeben; ein statisches `extra` folgte dem Sprachwechsel nicht.
+  // Regression (after a merge): a getter as title was output as a function instead
+  // of text; a static `extra` did not follow the language switch.
   it('löst Getter für Titel und extra auf', () => {
     const lang = ref('Vorfälle')
     const crumbs = run(() => `#${lang.value}`, { extra: () => [{ label: lang.value, to: '/admin/incidents' }] })

@@ -8,9 +8,9 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// useI18n() (von useLanguage.js intern genutzt) verlangt eine aktive
-// Komponenten-Instanz ("Must be called at the top of a setup function") -
-// ein Host-Stub macht setLanguage im Test aufrufbar.
+// useI18n() (used internally by useLanguage) requires an active component
+// instance ("Must be called at the top of a setup function"); a host stub
+// makes setLanguage callable in the test.
 function mountUseLanguage() {
   let result
   const wrapper = mount({
@@ -79,7 +79,7 @@ describe('useLanguage', () => {
     expect(i18n.global.locale.value).toBe('en')
   })
 
-  // Fehler beim Speichern muss dem Nutzer sichtbar gemeldet werden.
+  // An error while saving must be reported visibly to the user.
   it('meldet einen fehlgeschlagenen PATCH mit verständlicher Meldung und behält die lokale Umschaltung', async () => {
     useAuth().setAuth('jwt-1', { email: 'a@x.de' })
     global.fetch = vi.fn()

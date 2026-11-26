@@ -9,15 +9,14 @@ export function useTheme() {
 
   const applyTheme = () => {
     document.documentElement.dataset.theme = theme.value
-    // sit-onyx-Komponenten (z.B. OnyxButton) reagieren nicht auf unser
-    // data-theme-Attribut, sondern standardmäßig auf prefers-color-scheme,
-    // erkennen aber zusätzlich eine .dark-Klasse auf <html> (siehe
-    // sit-onyx/dist/style.css: ":root { color-scheme: light } .dark {
-    // color-scheme: dark }"). Ohne diesen Sync läuft der App-Theme-Toggle
-    // aus dem Ruder mit sit-onyx' eigener OS-basierter Dark-Mode-Erkennung -
-    // z.B. App im Dark-Mode, aber Browser/OS auf hell eingestellt, lässt
-    // OnyxButton dann mit hellen (auf dem dunklen Hintergrund unleserlichen)
-    // Farben rendern.
+    // sit-onyx components (e.g. OnyxButton) do not react to our data-theme
+    // attribute but to prefers-color-scheme by default; they additionally
+    // recognize a .dark class on <html> (see sit-onyx/dist/style.css:
+    // ":root { color-scheme: light } .dark { color-scheme: dark }"). Without
+    // this sync the app's theme toggle gets out of step with sit-onyx's own
+    // OS-based dark mode detection: e.g. the app in dark mode while the
+    // browser/OS is set to light makes OnyxButton render with light colors
+    // (unreadable on the dark background).
     document.documentElement.classList.toggle('dark', theme.value === 'dark')
     localStorage.setItem('theme', theme.value)
   }

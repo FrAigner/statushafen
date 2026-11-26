@@ -1,26 +1,26 @@
 import { ref } from 'vue'
 import { useApi } from './useApi'
+import type { SystemSettings } from '../types/api'
 
-// Globale Systemeinstellungen: Schalter für die Self-Service-
-// Bestellung (öffentliche Route /order) und seit der Umstellung für den
-// globalen E-Mail-Versand und für die Selbstüberwachung der Systemseite. Vorbild: useContentLanguages.js (module-scoped ref,
-// nutzt apiFetch aus useApi), damit mehrere Views denselben Stand teilen.
+// Global system settings: switches for self-service ordering (public route
+// /order) and, since the migration, for global email sending and for the
+// self-monitoring of the system page. Modelled on useContentLanguages (module-scoped ref,
+// uses apiFetch from useApi), so several views share the same state.
 
-const settings = ref({ orders_enabled: true, email_enabled: true, selfmonitor_enabled: false })
+const settings = ref<SystemSettings>({ orders_enabled: true, email_enabled: true, selfmonitor_enabled: false })
 
 export function useSystemSettings() {
   const { apiFetch } = useApi()
 
   const loadSettings = async () => {
-    settings.value = await apiFetch('/api/settings')
+    settings.value = await apiFetch<SystemSettings>('/api/settings')
     return settings.value
   }
 
-  // saveSettings schickt nur die übergebenen Felder (der PUT
-  // speichert ausschließlich gesetzte Felder) und übernimmt den vollständigen
-  // Stand aus der Antwort.
-  const saveSettings = async (patch) => {
-    settings.value = await apiFetch('/api/settings', {
+  // saveSettings sends only the given fields (the PUT stores only fields that
+  // are set) and takes the complete state from the response.
+  const saveSettings = async (patch: Partial<SystemSettings>) => {
+    settings.value = await apiFetch<SystemSettings>('/api/settings', {
       method: 'PUT',
       body: JSON.stringify(patch),
     })

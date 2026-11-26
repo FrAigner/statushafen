@@ -1,33 +1,54 @@
-// Gemeinsame Save/Delete-Handler für die Admin-CRUD-Views (Components,
+// Shared save/delete handlers for the admin CRUD views (Components,
 // Incidents, IncidentTemplates, Maintenance, Notices, Roles, StatusPages,
-// Users) - der isSaving/try/catch/finally- bzw. confirm/deletingId/try/
-// catch/finally-Rahmen war in allen acht Views nahezu identisch dupliziert
-// (Code-Duplikation). Payload-Aufbau
-// und Erfolgsverhalten bleiben bewusst in den Views, da die dort variieren.
+// Users): the isSaving/try/catch/finally and confirm/deletingId/try/
+// catch/finally frames were duplicated almost identically in all eight views
+// (code duplication). Building the payload and the success behaviour
+// deliberately stay in the views, since they vary there.
 
-// onStart räumt die Meldung des vorigen Schritts ab, bevor eine neue Aktion läuft (sonst
-// blieb z. B. „Wartungsfenster erstellt.“ nach dem Löschen stehen); onDeleted meldet das Löschen.
+// onStart clears the message of the previous step before a new action runs (otherwise
+// e.g. "Maintenance window created." stayed after deleting); onDeleted reports the deletion.
 import { confirmDialog } from './useConfirm'
+import type { Ref } from 'vue'
+import type { ApiFetch } from './useApi'
+import type { EntityId } from './useTranslationFactory'
+import type { ApiError } from '../types/api'
 
-export function useSaveAction({ apiFetch, isSaving, reload, onError, onStart }) {
-  return async (url, method, payload, onSuccess) => {
+interface CrudActionOptions {
+  apiFetch: ApiFetch
+  reload: () => unknown
+  /** Receives what apiFetch (or onSuccess/reload) threw; apiFetch throws ApiError. */
+  onError: (err: ApiError) => void
+  onStart?: () => void
+}
+
+export interface SaveActionOptions extends CrudActionOptions {
+  isSaving: Ref<boolean>
+}
+
+export interface DeleteActionOptions extends CrudActionOptions {
+  deletingId: Ref<EntityId | null>
+  onDeleted?: () => void
+}
+
+export function useSaveAction({ apiFetch, isSaving, reload, onError, onStart }: SaveActionOptions) {
+  return async <T = unknown>(url: string, method: string, payload: unknown, onSuccess?: (saved: T) => unknown): Promise<void> => {
     onStart?.()
     isSaving.value = true
     try {
-      // Antwort und Wartezeit für Aufrufer, die danach noch Folgeaufrufe brauchen (z. B. Übersetzungen mit der neuen ID).
-      const saved = await apiFetch(url, { method, body: JSON.stringify(payload) })
+      // Response and waiting for callers that need follow-up calls afterwards (e.g. translations with the new ID).
+      const saved = await apiFetch<T>(url, { method, body: JSON.stringify(payload) })
       if (onSuccess) await onSuccess(saved)
       await reload()
     } catch (err) {
-      onError(err)
+      onError(err as ApiError)
     } finally {
       isSaving.value = false
     }
   }
 }
 
-export function useDeleteAction({ apiFetch, deletingId, reload, onError, onStart, onDeleted }) {
-  return async (url, id, confirmMessage) => {
+export function useDeleteAction({ apiFetch, deletingId, reload, onError, onStart, onDeleted }: DeleteActionOptions) {
+  return async (url: string, id: EntityId, confirmMessage: string): Promise<void> => {
     if (!(await confirmDialog({ message: confirmMessage }))) return
     onStart?.()
     deletingId.value = id
@@ -36,7 +57,7 @@ export function useDeleteAction({ apiFetch, deletingId, reload, onError, onStart
       onDeleted?.()
       await reload()
     } catch (err) {
-      onError(err)
+      onError(err as ApiError)
     } finally {
       deletingId.value = null
     }

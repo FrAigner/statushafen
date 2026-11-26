@@ -3,7 +3,7 @@ import { defineComponent, h, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
 import { useFormPanel } from './useFormPanel'
 
-// Ein <aside> mit Formular, wie es FormPanel liefert.
+// An <aside> with a form, as FormPanel renders it.
 function mountPanel() {
   let api
   const Comp = defineComponent({
@@ -46,7 +46,7 @@ describe('useFormPanel', () => {
     await api.validateRequired([{ key: 'a', value: '', message: 'A' }, { key: 'b', value: '', message: 'B' }])
     api.clearError('a')
     expect(api.errors.value).toEqual({ a: '', b: 'B' })
-    api.clearError('zzz') // unbekanntes Feld: nichts passiert
+    api.clearError('zzz') // unknown field: nothing happens
     expect(api.errors.value).toEqual({ a: '', b: 'B' })
     api.clearErrors()
     expect(api.errors.value).toEqual({})

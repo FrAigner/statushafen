@@ -1,101 +1,117 @@
 import { ref, computed, nextTick } from 'vue'
+import type { Ref } from 'vue'
 
-// Platzhalter ({{.Title}} & Co.) in Textfelder einfügen, per Klick
-// auf die Platzhalterliste oder per Autovervollständigung beim Tippen von `{`.
+/** A placeholder of the list; only the name is needed here. */
+export interface Placeholder {
+  name: string
+}
+
+export type PlaceholderTextElement = HTMLInputElement | HTMLTextAreaElement
+
+/** A text field that placeholders can be inserted into. element() returns the native field (present once mounted). */
+export interface PlaceholderField {
+  model: Ref<string>
+  element: () => PlaceholderTextElement | null
+}
+
+export interface PlaceholderInsertOptions<F extends string, P extends Placeholder> {
+  placeholders: Readonly<Ref<P[]>>
+  fields: Record<F, PlaceholderField>
+  /** Target of a click as long as no field has been focused yet. */
+  defaultField: NoInfer<F>
+  /** Prefix for the IDs of listbox and options. */
+  idPrefix: string
+}
+
+// Insert placeholders ({{.Title}} & co.) into text fields, by clicking the
+// placeholder list or by autocompletion when typing `{`.
 //
-// Die reinen Funktionen (insertText, findPlaceholderPrefix, filterPlaceholders)
-// sind getrennt exportiert und ohne DOM testbar. usePlaceholderInsert hält den
-// Zustand (zuletzt fokussiertes Feld, offene Vorschlagsliste, aktiver Eintrag)
-// und arbeitet auf den nativen <input>/<textarea>-Elementen, die die View über
-// `fields[name].element()` liefert. Die View bindet die Handler per
-// Event-Delegation an einen Wrapper um die sit-onyx-Felder, weil OnyxInput/
-// OnyxTextarea das native Element nicht direkt herausgeben.
+// The pure functions (insertText, findPlaceholderPrefix, filterPlaceholders)
+// are exported separately and testable without a DOM. usePlaceholderInsert
+// holds the state (last focused field, open suggestion list, active entry)
+// and works on the native <input>/<textarea> elements the view provides via
+// `fields[name].element()`. The view binds the handlers via event delegation
+// to a wrapper around the sit-onyx fields, because OnyxInput/OnyxTextarea do
+// not expose the native element directly.
 
-export const placeholderToken = (name) => `{{.${name}}}`
+export const placeholderToken = (name: string) => `{{.${name}}}`
 
-// Ersetzt value[start, end) durch text; cursor steht danach hinter text.
-// start === end ist ein reines Einfügen, sonst wird die Auswahl ersetzt.
-export function insertText(value, start, end, text) {
+// Replaces value[start, end) with text; the cursor then sits behind text.
+// start === end is a plain insert, otherwise the selection is replaced.
+export function insertText(value: string, start: number, end: number, text: string): { value: string; cursor: number } {
   return {
     value: value.slice(0, start) + text + value.slice(end),
     cursor: start + text.length,
   }
 }
 
-// Erkennt ein angefangenes Platzhalter-Präfix direkt vor dem Cursor: `{`, `{{`,
-// `{{.` oder `{{.Sta`. Liefert Startindex des Präfixes und den bisher
-// getippten Namensteil, sonst null.
+// Detects a started placeholder prefix directly before the cursor: `{`, `{{`,
+// `{{.` or `{{.Sta`. Returns the start index of the prefix and the part of the
+// name typed so far, otherwise null.
 const PREFIX_PATTERN = /\{\{?(?:\.(\w*))?$/
 
-export function findPlaceholderPrefix(value, cursor) {
+export function findPlaceholderPrefix(value: string, cursor: number): { start: number; query: string } | null {
   const match = PREFIX_PATTERN.exec(value.slice(0, cursor))
   if (!match) return null
   return { start: match.index, query: match[1] ?? '' }
 }
 
-// Filtert nach Namensanfang, ohne Groß-/Kleinschreibung: `sta` findet Status
-// und StatusLabel.
-export function filterPlaceholders(placeholders, query) {
+// Filters by the start of the name, case-insensitively: `sta` finds Status
+// and StatusLabel.
+export function filterPlaceholders<P extends Placeholder>(placeholders: P[], query: string): P[] {
   const needle = query.toLowerCase()
   return placeholders.filter((p) => p.name.toLowerCase().startsWith(needle))
 }
 
-/**
- * @param {object} options
- * @param {import('vue').Ref<Array<{name: string}>>} options.placeholders
- * @param {Record<string, {model: import('vue').Ref<string>, element: () => HTMLInputElement|HTMLTextAreaElement}>} options.fields
- * @param {string} options.defaultField Ziel eines Klicks, solange noch kein Feld fokussiert war
- * @param {string} options.idPrefix Präfix für die IDs von Listbox und Optionen
- */
-export function usePlaceholderInsert({ placeholders, fields, defaultField, idPrefix }) {
-  const lastField = ref(defaultField)
-  const openField = ref(null)
+export function usePlaceholderInsert<F extends string, P extends Placeholder = Placeholder>({ placeholders, fields, defaultField, idPrefix }: PlaceholderInsertOptions<F, P>) {
+  const lastField = ref(defaultField) as Ref<F>
+  const openField = ref(null) as Ref<F | null>
   const query = ref('')
   const activeIndex = ref(0)
-  // Felder, die schon einmal fokussiert waren: Nur dort ist selectionStart
-  // eine echte Cursorposition. Ein nie fokussiertes Feld bekommt den
-  // Platzhalter ans Ende statt an Position 0.
-  const focusedFields = new Set()
+  // Fields that have been focused before: only there is selectionStart a real
+  // cursor position. A never focused field gets the placeholder at the end
+  // instead of at position 0.
+  const focusedFields = new Set<F>()
   let prefixStart = 0
 
   const suggestions = computed(() => filterPlaceholders(placeholders.value, query.value))
-  const isOpen = (field) => openField.value === field && suggestions.value.length > 0
-  const listboxId = (field) => `${idPrefix}-${field}-listbox`
-  const optionId = (field, index) => `${idPrefix}-${field}-option-${index}`
+  const isOpen = (field: F) => openField.value === field && suggestions.value.length > 0
+  const listboxId = (field: F) => `${idPrefix}-${field}-listbox`
+  const optionId = (field: F, index: number) => `${idPrefix}-${field}-option-${index}`
 
   const close = () => {
     openField.value = null
   }
 
-  const replaceRange = async (field, start, end, text) => {
+  const replaceRange = async (field: F, start: number, end: number, text: string) => {
     const { model, element } = fields[field]
     const result = insertText(model.value, start, end, text)
     model.value = result.value
     lastField.value = field
     await nextTick()
-    const el = element()
+    const el = element()!
     el.focus()
     el.setSelectionRange(result.cursor, result.cursor)
   }
 
-  const insertPlaceholder = (item) => {
+  const insertPlaceholder = (item: P) => {
     const field = lastField.value
-    const el = fields[field].element()
+    const el = fields[field].element()!
     const end = fields[field].model.value.length
-    const [start, stop] = focusedFields.has(field) ? [el.selectionStart, el.selectionEnd] : [end, end]
+    const [start, stop] = focusedFields.has(field) ? [el.selectionStart!, el.selectionEnd!] : [end, end]
     close()
     return replaceRange(field, start, stop, placeholderToken(item.name))
   }
 
-  const accept = (field, item) => {
-    const cursor = fields[field].element().selectionStart
+  const accept = (field: F, item: P) => {
+    const cursor = fields[field].element()!.selectionStart!
     close()
     return replaceRange(field, prefixStart, cursor, placeholderToken(item.name))
   }
 
-  const evaluate = (field, el) => {
+  const evaluate = (field: F, el: PlaceholderTextElement) => {
     const collapsed = el.selectionStart === el.selectionEnd
-    const prefix = collapsed ? findPlaceholderPrefix(el.value, el.selectionStart) : null
+    const prefix = collapsed ? findPlaceholderPrefix(el.value, el.selectionStart!) : null
     if (!prefix) {
       close()
       return
@@ -106,49 +122,49 @@ export function usePlaceholderInsert({ placeholders, fields, defaultField, idPre
     prefixStart = prefix.start
   }
 
-  const isOwnTarget = (field, event) => event.target === fields[field].element()
+  const isOwnTarget = (field: F, event: Event) => event.target === fields[field].element()
 
-  const onFocus = (field) => {
+  const onFocus = (field: F) => {
     lastField.value = field
     focusedFields.add(field)
   }
 
-  const onInput = (field, event) => {
-    if (isOwnTarget(field, event)) evaluate(field, event.target)
+  const onInput = (field: F, event: Event) => {
+    if (isOwnTarget(field, event)) evaluate(field, event.target as PlaceholderTextElement)
   }
 
-  // Klick oder Pfeiltaste links/rechts verschiebt den Cursor: Liegt er danach
-  // nicht mehr hinter einem Präfix, schließt die Liste.
-  const onCaretMove = (field, event) => {
-    if (openField.value === field && isOwnTarget(field, event)) evaluate(field, event.target)
+  // A click or arrow key left/right moves the cursor: if it no longer sits
+  // behind a prefix afterwards, the list closes.
+  const onCaretMove = (field: F, event: Event) => {
+    if (openField.value === field && isOwnTarget(field, event)) evaluate(field, event.target as PlaceholderTextElement)
   }
 
-  const onKeydown = (field, event) => {
+  const onKeydown = (field: F, event: KeyboardEvent) => {
     if (!isOpen(field)) return
     const count = suggestions.value.length
-    const actions = {
+    const actions: Record<string, () => unknown> = {
       ArrowDown: () => { activeIndex.value = (activeIndex.value + 1) % count },
       ArrowUp: () => { activeIndex.value = (activeIndex.value - 1 + count) % count },
-      Enter: () => accept(field, suggestions.value[activeIndex.value]),
-      Tab: () => accept(field, suggestions.value[activeIndex.value]),
+      Enter: () => accept(field, suggestions.value[activeIndex.value]!),
+      Tab: () => accept(field, suggestions.value[activeIndex.value]!),
       Escape: () => {
-        // Escape gehört der Liste, nicht einem umgebenden Dialog o. ä.
+        // Escape belongs to the list, not to a surrounding dialog or the like.
         event.stopPropagation()
         close()
       },
     }
     const action = actions[event.key]
     if (!action) return
-    // Verhindert u. a., dass Enter im Betreff-Feld das Formular absendet.
+    // Prevents, among other things, Enter in the subject field from submitting the form.
     event.preventDefault()
     action()
   }
 
-  // ARIA-Combobox-Muster: Das Feld behält den Fokus, die aktive Option wird
-  // per aria-activedescendant angesagt. role=combobox/aria-expanded nur am
-  // einzeiligen <input>: Ein <textarea> darf laut ARIA in HTML keine andere
-  // Rolle tragen, und aria-expanded ist an role=textbox nicht erlaubt.
-  const ariaFor = (field, combobox) => ({
+  // ARIA combobox pattern: the field keeps the focus, the active option is
+  // announced via aria-activedescendant. role=combobox/aria-expanded only on
+  // the single-line <input>: per ARIA in HTML a <textarea> must not carry
+  // another role, and aria-expanded is not allowed on role=textbox.
+  const ariaFor = (field: F, combobox: boolean) => ({
     role: combobox ? 'combobox' : undefined,
     'aria-expanded': combobox ? String(isOpen(field)) : undefined,
     'aria-autocomplete': 'list',

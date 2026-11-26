@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { confirmDialog, answerConfirm, useConfirmState, setConfirmHandler } from './useConfirm'
 import { stubConfirm, resetConfirm } from '../test-support/confirm'
 
-// Promise-API des gemeinsamen Bestätigungsdialogs.
+// Promise API of the shared confirmation dialog.
 describe('useConfirm', () => {
   afterEach(() => { answerConfirm(false); resetConfirm() })
 

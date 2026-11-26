@@ -7,22 +7,43 @@ import { useContentLanguages } from './useContentLanguages'
 import { useTranslationEnabled } from './useTranslationEnabled'
 import { confirmDialog } from './useConfirm'
 import { useRouter } from 'vue-router'
+import type { Ref } from 'vue'
+import type { AdminTranslationsApi } from './useAdminTranslationFactory'
+import type { EntityId } from './useTranslationFactory'
 
-// Gemeinsame CRUD-Logik für die drei Admin-Übersetzungs-Views (Incident/
-// Component/GeneralNotice, Stage 5) - die Views waren bis auf
-// Endpoint-Segment, Content-Feldname (message/description) und
-// Entity-Titelfeld (Title/Name) identisch, was nach der i18n-Umstellung
-// (Folge-PR) das SonarCloud-Duplication-Gate auf "New Code"
-// gerissen hat. Extrahiert nach demselben Muster wie
-// useAdminTranslationFactory.js für die reinen API-Aufrufe.
+/** The translated entity as the panel shows it (incident, component or notice). */
+export interface TranslatableEntity {
+  ID: number
+  Title?: string
+  Name?: string
+  Children?: TranslatableEntity[]
+  [key: string]: unknown
+}
+
+export interface AdminTranslationsPanelOptions {
+  entityId: Readonly<Ref<string | number>>
+  apiSegment: string
+  findInList?: boolean
+  contentField: string
+  translationsApi: AdminTranslationsApi
+  resource: string
+  overviewPath: string
+}
+
+// Shared CRUD logic for the three admin translation views (incident/
+// component/general notice, stage 5). The views were identical except for
+// the endpoint segment, the content field name (message/description) and the
+// entity title field (Title/Name), which broke SonarCloud's duplication gate
+// on "New Code" after the i18n migration (follow-up PR). Extracted following
+// the same pattern as useAdminTranslationFactory for the plain API calls.
 //
-// Für Komponenten und Ankündigungen gibt es im Backend keinen
-// Einzel-GET (`/api/pages/:id/components/:id` bzw. `…/notices/:id` liefern
-// 404). Statt dafür zwei neue Endpunkte zu bauen, die nur diese View braucht,
-// lädt `findInList` die vorhandene Liste der Seite (Komponenten als Baum mit
-// `Children`, Ankündigungen über `notices/all`) und sucht den Eintrag darin.
-// Vorfälle haben einen Einzel-GET und nutzen ihn weiter.
-export function findEntityById(list, id) {
+// For components and notices the backend has no single GET
+// (`/api/pages/:id/components/:id` and `…/notices/:id` return 404). Instead
+// of building two new endpoints that only this view needs, `findInList` loads
+// the page's existing list (components as a tree with `Children`, notices via
+// `notices/all`) and looks up the entry in it. Incidents have a single GET and
+// keep using it.
+export function findEntityById<T extends { ID: number | string; Children?: T[] | null }>(list: T[] | null | undefined, id: EntityId): T | null {
   for (const entry of list || []) {
     if (String(entry.ID) === String(id)) return entry
     const nested = findEntityById(entry.Children, id)
@@ -31,7 +52,7 @@ export function findEntityById(list, id) {
   return null
 }
 
-export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = false, contentField, translationsApi, resource, overviewPath }) {
+export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = false, contentField, translationsApi, resource, overviewPath }: AdminTranslationsPanelOptions) {
   const { apiFetch } = useApi()
   // Switched off translation: the page goes back to its overview (overviewPath).
   const { load: loadTranslationEnabled } = useTranslationEnabled()
@@ -40,23 +61,23 @@ export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = f
   const { catalog, loadCatalog } = useContentLanguages()
   const { t } = useI18n()
   const { canCreate, canUpdate, canDelete } = useResourcePerms(resource)
-  // Anlegen, Bestätigen und Löschen prüft das Backend mit
-  // <ressource>:create, :update (Bestätigen) und :delete (siehe main.go); ohne
-  // das Recht blenden die Views die Knöpfe aus statt 403 zu kassieren. Die
-  // Ressource ist ein eigener Parameter statt aus apiSegment abgeleitet, weil das
-  // Segment der Ankündigungen 'notices/all' lautet.
+  // The backend checks creating, confirming and deleting with
+  // <resource>:create, :update (confirm) and :delete (see main.go); without
+  // the permission the views hide the buttons instead of collecting a 403. The
+  // resource is a separate parameter instead of being derived from apiSegment,
+  // because the notices' segment is 'notices/all'.
   const { translations, loadTranslations, createTranslation, confirmTranslation, deleteTranslation } = translationsApi
 
-  const entity = ref(null)
+  const entity = ref<TranslatableEntity | null>(null)
   const alertMsg = ref('')
   const alertType = ref('info')
   const isEditing = ref(false)
-  const formData = ref({})
+  const formData = ref<Record<string, string>>({})
   const isSaving = ref(false)
-  const confirmingId = ref(null)
-  const deletingId = ref(null)
+  const confirmingId = ref<EntityId | null>(null)
+  const deletingId = ref<EntityId | null>(null)
 
-  const showAlert = (msg, type = 'info') => { alertMsg.value = msg; alertType.value = type }
+  const showAlert = (msg: string, type = 'info') => { alertMsg.value = msg; alertType.value = type }
 
   const loadData = async () => {
     if (!(await loadTranslationEnabled())) {
@@ -66,12 +87,12 @@ export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = f
     try {
       const base = `/api/pages/${activeTenantId.value}/${apiSegment}`
       entity.value = findInList
-        ? findEntityById(await apiFetch(base), entityId.value)
-        : await apiFetch(`${base}/${entityId.value}`)
-      await loadTranslations(apiFetch, parseInt(entityId.value))
+        ? findEntityById(await apiFetch<TranslatableEntity[] | null>(base), entityId.value)
+        : await apiFetch<TranslatableEntity>(`${base}/${entityId.value}`)
+      await loadTranslations(apiFetch, parseInt(String(entityId.value)))
       await loadCatalog()
     } catch (err) {
-      showAlert(t('common.loadError') + err.message, 'error')
+      showAlert(t('common.loadError') + (err as Error).message, 'error')
     }
   }
 
@@ -91,44 +112,44 @@ export function useAdminTranslationsPanel({ entityId, apiSegment, findInList = f
     }
     isSaving.value = true
     try {
-      await createTranslation(apiFetch, parseInt(entityId.value), {
+      await createTranslation(apiFetch, parseInt(String(entityId.value)), {
         language_code: formData.value.language_code,
         title: formData.value.title,
         [contentField]: formData.value[contentField],
         source: 'manual'
       })
-      await loadTranslations(apiFetch, parseInt(entityId.value))
+      await loadTranslations(apiFetch, parseInt(String(entityId.value)))
       cancelEdit()
       showAlert(t('translations.created'), 'success')
     } catch (err) {
-      showAlert(t('common.saveError') + err.message, 'error')
+      showAlert(t('common.saveError') + (err as Error).message, 'error')
     } finally {
       isSaving.value = false
     }
   }
 
-  const handleConfirm = async (transId) => {
+  const handleConfirm = async (transId: EntityId) => {
     confirmingId.value = transId
     try {
       await confirmTranslation(apiFetch, transId)
-      await loadTranslations(apiFetch, parseInt(entityId.value))
+      await loadTranslations(apiFetch, parseInt(String(entityId.value)))
       showAlert(t('translations.confirmed'), 'success')
     } catch (err) {
-      showAlert(t('translations.confirmError') + err.message, 'error')
+      showAlert(t('translations.confirmError') + (err as Error).message, 'error')
     } finally {
       confirmingId.value = null
     }
   }
 
-  const handleDelete = async (transId) => {
+  const handleDelete = async (transId: EntityId) => {
     if (!(await confirmDialog({ message: t('translations.confirmDelete') }))) return
     deletingId.value = transId
     try {
       await deleteTranslation(apiFetch, transId)
-      await loadTranslations(apiFetch, parseInt(entityId.value))
+      await loadTranslations(apiFetch, parseInt(String(entityId.value)))
       showAlert(t('translations.deleted'), 'success')
     } catch (err) {
-      showAlert(t('common.deleteError') + err.message, 'error')
+      showAlert(t('common.deleteError') + (err as Error).message, 'error')
     } finally {
       deletingId.value = null
     }

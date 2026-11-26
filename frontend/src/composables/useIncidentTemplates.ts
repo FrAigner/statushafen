@@ -1,18 +1,21 @@
 import { ref } from 'vue'
+import type { ApiFetch } from './useApi'
+import type { TenantId } from './useTenant'
+import type { EntityTranslation, IncidentTemplate } from '../types/api'
 
-// Lädt Incident-/Wartungsfenster-Vorlagen für eine Statusseite
-// und filtert nach kind ('incident' | 'maintenance'). Vorlagen sind an die
-// incident_templates:read-Berechtigung gebunden; loadTemplates schlägt deshalb ohne
-// Fehler fehl (leere Liste), damit ein 403 hier nicht die eigentliche
-// Listenansicht für Nutzer ohne Schreibrecht mitreißt.
-export function useIncidentTemplates(kind) {
-  const templates = ref([])
+// Loads incident/maintenance window templates for a status page and filters
+// by kind ('incident' | 'maintenance'). Templates are bound to the
+// incident_templates:read permission; loadTemplates therefore fails without an
+// error (empty list), so a 403 here does not drag down the actual list view
+// for users without write permission.
+export function useIncidentTemplates(kind: 'incident' | 'maintenance') {
+  const templates = ref<IncidentTemplate[]>([])
   const selectedTemplateId = ref('')
 
-  const loadTemplates = async (apiFetch, tenantId, hasPerm) => {
+  const loadTemplates = async (apiFetch: ApiFetch, tenantId: TenantId | null, hasPerm: (required: string) => boolean) => {
     if (!hasPerm('incident_templates:read')) return
     try {
-      const tpls = await apiFetch(`/api/pages/${tenantId}/incident-templates`)
+      const tpls = await apiFetch<IncidentTemplate[] | null>(`/api/pages/${tenantId}/incident-templates`)
       templates.value = (tpls || []).filter(t => t.Kind === kind)
     } catch (err) {
       // Silently degrade — user may lack incident_templates:read permission (403)
@@ -21,14 +24,14 @@ export function useIncidentTemplates(kind) {
     }
   }
 
-  const selectedTemplate = () =>
+  const selectedTemplate = (): IncidentTemplate | null =>
     templates.value.find(t => String(t.ID) === String(selectedTemplateId.value)) || null
 
-  // Übersetzungen einer Vorlage (leer, wenn sie fehlen oder nicht lesbar sind), damit
-  // „Vorlage verwenden“ auch die Texte der weiteren Sprachen ins Formular übernimmt.
-  const loadTemplateTranslations = async (apiFetch, tenantId, templateId) => {
+  // Translations of a template (empty if they are missing or not readable), so that
+  // "use template" also takes the texts of the further languages into the form.
+  const loadTemplateTranslations = async (apiFetch: ApiFetch, tenantId: TenantId | null, templateId: number): Promise<EntityTranslation[]> => {
     try {
-      return (await apiFetch(`/api/pages/${tenantId}/incident-templates/${templateId}/translations`)) || []
+      return (await apiFetch<EntityTranslation[] | null>(`/api/pages/${tenantId}/incident-templates/${templateId}/translations`)) || []
     } catch (err) {
       console.error('Übersetzungen der Vorlage konnten nicht geladen werden:', err)
       return []
