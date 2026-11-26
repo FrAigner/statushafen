@@ -32,6 +32,13 @@ func newTestPage(db *gorm.DB) models.StatusPage {
 	return page
 }
 
+// offerLanguages gives the page en as default and de as additional language
+// (creating a translation needs an additional language the page offers).
+func offerLanguages(db *gorm.DB, pageID uint) {
+	db.Create(&models.StatusPageLanguage{StatusPageID: pageID, LanguageCode: "en", IsDefault: true})
+	db.Create(&models.StatusPageLanguage{StatusPageID: pageID, LanguageCode: "de"})
+}
+
 // Request helper
 func doTranslationRequest(r http.Handler, method, path string, body []byte) *httptest.ResponseRecorder {
 	var reqBody io.Reader

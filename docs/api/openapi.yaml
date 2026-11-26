@@ -434,6 +434,11 @@ paths:
         Code für eine eigene Domain nur dort (`Origin`- oder `Host`-Header),
         ein Code für `FRONTEND_URL` nie auf einer eigenen Domain; sonst `401`
         `login_code_invalid` (der Code ist dann verbraucht).
+        Der Code ist an den Browser des Login-Starts gebunden (Login-CSRF):
+        Jeder Login- und Verknüpfungs-Start setzt das HttpOnly-Cookie
+        `sso_binding` (Secure, SameSite=Lax, Pfad `/api/auth/sso-exchange`);
+        eingelöst wird nur mit diesem Cookie (sonst ebenfalls `401`
+        `login_code_invalid`), danach wird es gelöscht.
       security: []
       x-rate-limit: 10/min pro IP
       requestBody:
@@ -1128,7 +1133,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createIncidentTranslation
       summary: Übersetzungsentwurf für einen Vorfall anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: incidents:create|maintenance:create
       requestBody:
         required: true
@@ -1369,7 +1379,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createComponentTranslation
       summary: Übersetzungsentwurf für eine Komponente anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: components:create
       requestBody:
         required: true
@@ -1439,7 +1454,12 @@ paths:
       tags: [Admin – Translations]
       operationId: createNoticeTranslation
       summary: Übersetzungsentwurf für einen Hinweis anlegen
-      description: Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+      description: |
+        Die Statusseite wird aus der Ressource abgeleitet (unbekannt → 404, fremde Seite → 403).
+        `language_code` muss eine weitere Sprache der Seite sein (nicht die
+        Standardsprache, nur de/en; sonst 400 `language_not_available`), wie
+        beim Speichern je Sprache. Bei ausgeschalteter Übersetzung 409
+        `translation_disabled`.
       x-required-permission: notices:create
       requestBody:
         required: true
@@ -1959,6 +1979,11 @@ paths:
         `last_global_admin`).
         Eine Sitzung, die auf einer eigenen Domain ausgestellt wurde (Claim
         `custom_domain`), bekommt `403` mit Code `custom_domain_session`.
+        Eine Seiten-SSO-Sitzung (Claim `sso_page_id`) eines Kontos ohne
+        Passwort darf nur löschen, wenn das Konto ausschließlich über diese
+        Seite besteht (keine andere Anmeldung, keine Rolle auf einer anderen
+        Seite); sonst `403` mit Code `page_sso_session`. Konten mit Passwort
+        bestätigen wie immer mit dem Passwort.
       x-required-permission: authenticated
       requestBody:
         required: true
@@ -4797,6 +4822,9 @@ components:
         Login-Start selbst auf einer verifizierten eigenen Domain an, leitet er
         zuerst mit `307` auf denselben Pfad unter `BASE_URL` um und setzt
         `return_host` auf diese Domain (der `Host` gewinnt gegen die Query).
+        Dabei setzt er auf der Domain das Cookie `sso_binding` und hängt nur
+        dessen SHA-256-Hash als `login_binding` an; ein `return_host` ohne
+        gültiges `login_binding` wird verworfen (Ziel `FRONTEND_URL`).
       schema: { type: string, maxLength: 253 }
     ProviderId:
       name: id

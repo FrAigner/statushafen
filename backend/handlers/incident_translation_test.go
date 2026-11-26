@@ -98,6 +98,7 @@ func TestCreateIncidentTranslationHandler_Success(t *testing.T) {
 	r.POST("/api/incidents/:incident_id/translations", h.CreateIncidentTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	incident := newTestIncident(db, page.ID)
 	iid := strconv.Itoa(int(incident.ID))
 
@@ -135,6 +136,7 @@ func TestCreateIncidentTranslationHandler_DuplicateLanguageReturns409(t *testing
 	r.POST("/api/incidents/:incident_id/translations", h.CreateIncidentTranslationHandler)
 
 	page := newTestPage(db)
+	offerLanguages(db, page.ID)
 	incident := newTestIncident(db, page.ID)
 
 	db.Create(newTranslation(incident.ID, "de", "draft"))

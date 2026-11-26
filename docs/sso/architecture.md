@@ -99,7 +99,7 @@ STRIDE:
 | Spoofing | Fremdes ID-Token, Token eines anderen Issuers oder Clients | Signatur über das JWKS, `iss`, `aud`, `exp`, Nonce aus dem State; leeres `sub` abgelehnt. |
 | Spoofing | Konto-Übernahme über eine gleichlautende E-Mail | Verknüpfung per E-Mail nur bei `email_verified=true` und nur bei globalen Anbietern; Seiten-SSO nie per E-Mail. |
 | Spoofing | Vorab angelegtes Konto für eine fremde E-Mail (Pre-Account-Hijacking) | Neue Konten nur mit bestätigter E-Mail; fehlendes `email_verified` zählt nur bei `OIDC_<ID>_EMAIL_TRUSTED=true`. |
-| Spoofing | Login-CSRF (eigener Code im Browser des Opfers) | State an HttpOnly-Cookie gebunden, Vergleich in konstanter Zeit. |
+| Spoofing | Login-CSRF (eigener Code im Browser des Opfers) | State an HttpOnly-Cookie gebunden, Vergleich in konstanter Zeit. Der Einmal-Code ist an den Browser des Login-Starts gebunden: Der Start setzt eine Zufalls-Nonce als HttpOnly-, Secure-, SameSite=Lax-Cookie `sso_binding` (Pfad `/api/auth/sso-exchange`), State und Code kennen nur ihren SHA-256-Hash, `sso-exchange` verlangt das passende Cookie und löscht es danach. Beim Start auf einer eigenen Domain setzt der Umweg über `BASE_URL` dort ein zweites Cookie und reicht nur dessen Hash weiter (`login_binding`); ohne ihn verfällt `return_host`. |
 | Tampering | Manipulierter oder fremder State, State eines anderen Anbieters | State nur aus der Datenbank, genau einmal einlösbar (`DELETE … RETURNING`), 10 Minuten gültig, Anbieter/Seite muss zum Callback passen. |
 | Tampering | Abgefangener Code beim Anbieter | PKCE (S256) mit Verifier nur im Backend. |
 | Repudiation | Unbemerkte Anmeldungen | Audit-Einträge `auth.sso_login`/`auth.sso_linked` mit Anbieter. |

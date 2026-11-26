@@ -125,5 +125,7 @@ In addition to the role, tags can narrow access to individual components and inc
 Under **Profile** (user menu at the top right) every user sets their interface language, links
 their account to the SSO of a status page and can delete their account. If you are the only admin
 of a page, that page is deleted too after a separate confirmation. The last global admin cannot
-delete themselves. Your own data can be downloaded as a JSON file with "Download my data"
+delete themselves. Signed in through the SSO of a status page without a password, you can delete
+your account only if it exists solely through that page; otherwise sign in on the main address
+for this. Your own data can be downloaded as a JSON file with "Download my data"
 (technically `GET /api/me/export`, login required).

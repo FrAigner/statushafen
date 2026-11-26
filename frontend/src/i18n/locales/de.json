@@ -1661,6 +1661,7 @@
       "login_code_required": "Bitte gib den Anmeldecode an.",
       "login_code_invalid": "Der Anmeldecode ist ungültig oder abgelaufen.",
       "custom_domain_session": "Auf einer eigenen Domain nicht möglich. Melde dich dafür unter der Hauptadresse an.",
+      "page_sso_session": "Mit einer Anmeldung über eine Statusseite nicht möglich, solange das Konto auch anders erreichbar ist. Melde dich dafür unter der Hauptadresse an.",
       "password_login_disabled": "Die Anmeldung mit E-Mail und Passwort ist abgeschaltet.",
       "provider_unknown": "Dieser Anmeldeanbieter ist unbekannt oder nicht mehr aktiv.",
       "identity_not_found": "Die Verknüpfung wurde nicht gefunden.",

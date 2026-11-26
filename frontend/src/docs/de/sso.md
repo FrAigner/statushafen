@@ -21,6 +21,10 @@ eingerichtet, weist die Login-Seite darauf hin.
    Anmeldung ausging.
 3. Eine Sitzung über das SSO einer Statusseite gilt nur für diese Statusseite.
 
+Die Anmeldung muss im selben Browser enden, in dem sie begann: Ein Anmelde-Link aus einem anderen
+Browser (etwa per Mail oder Chat zugeschickt) meldet niemanden an, sondern führt zurück zur
+Login-Seite. So kann niemand ein fremdes Konto unbemerkt im eigenen Browser anmelden.
+
 **Wichtig:** Über das SSO einer Statusseite entstehen keine neuen Konten. Man meldet sich einmal
 anders an und klickt im **Profil** unter „SSO-Anmeldung“ auf „Mit SSO verknüpfen“. Erkannt wird das
 Konto danach an der Kennung des IdP, nie an der E-Mail. Ein bestehendes Konto lässt sich dort auch

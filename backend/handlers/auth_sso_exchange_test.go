@@ -20,17 +20,21 @@ func TestSSOExchangeHandler(t *testing.T) {
 	r := testutils.SetupRouter()
 	r.POST("/api/auth/sso-exchange", h.SSOExchangeHandler)
 
+	// The browser that started the login carries the binding cookie.
+	nonce := randomToken(32)
+	binding := hashLoginBinding(nonce)
 	doExchange := func(code string) *httptest.ResponseRecorder {
 		body, _ := json.Marshal(map[string]string{"code": code})
 		req, _ := http.NewRequest("POST", "/api/auth/sso-exchange", bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: loginBindingCookie, Value: nonce})
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 		return w
 	}
 
 	t.Run("Gültiger Code liefert das hinterlegte Token", func(t *testing.T) {
-		code := storeSSOCode("test-jwt-token-value", "", "")
+		code := storeSSOCode("test-jwt-token-value", "", "", binding)
 
 		w := doExchange(code)
 
@@ -47,7 +51,7 @@ func TestSSOExchangeHandler(t *testing.T) {
 	})
 
 	t.Run("Code ist Einmalgebrauch - zweiter Austausch schlägt fehl", func(t *testing.T) {
-		code := storeSSOCode("single-use-token", "", "")
+		code := storeSSOCode("single-use-token", "", "", binding)
 
 		first := doExchange(code)
 		if first.Code != http.StatusOK {

@@ -107,7 +107,7 @@ func TestStoreSSOCodeUsesConfigurableExpiry(t *testing.T) {
 	_ = os.Setenv("SSO_CODE_EXPIRY_SECONDS", "1")
 	defer func() { _ = os.Unsetenv("SSO_CODE_EXPIRY_SECONDS") }()
 
-	code := storeSSOCode("short-lived-token", "", "")
+	code := storeSSOCode("short-lived-token", "", "", "")
 	t.Cleanup(func() {
 		ssoCodeMu.Lock()
 		delete(ssoCodeStore, code)
@@ -120,7 +120,7 @@ func TestStoreSSOCodeUsesConfigurableExpiry(t *testing.T) {
 
 	// Code erneut speichern (consumeSSOCode hat ihn bereits gelöscht), dann
 	// über die konfigurierte Expiry hinaus warten.
-	code = storeSSOCode("short-lived-token-2", "", "")
+	code = storeSSOCode("short-lived-token-2", "", "", "")
 	time.Sleep(1100 * time.Millisecond)
 	if _, ok := consumeSSOCode(code); ok {
 		t.Fatal("expected code to be expired after the configured 1s expiry")

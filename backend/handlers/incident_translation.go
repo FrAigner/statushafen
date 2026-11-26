@@ -130,6 +130,12 @@ func (h *Handler) CreateIncidentTranslationHandler(c *gin.Context) {
 		return
 	}
 
+	// Only an additional language the page offers, as for the save per language.
+	req.LanguageCode = strings.ToLower(strings.TrimSpace(req.LanguageCode))
+	if !h.requireAdditionalLanguage(c, incident.StatusPageID, req.LanguageCode) {
+		return
+	}
+
 	// Check if translation already exists for this language.
 	var existing models.IncidentTranslation
 	result := h.DB.Where("incident_id = ? AND language_code = ?", incidentID, req.LanguageCode).

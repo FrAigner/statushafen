@@ -72,6 +72,8 @@ instead.
 Only with automatic translation switched on: incidents (title and message), their updates (message
 only), components (name and description) and notices can be translated into the second language. Each translation starts as a **draft** and has to be **confirmed**; the public API
 only returns confirmed translations.
+Translations exist only in an additional language the page offers; Statushafen refuses the
+default language or a language the page does not offer with a message.
 
 The public status page shows the names and descriptions of components and groups as well as the
 title and message of incidents and notices, as well as the messages of an incident's updates, in

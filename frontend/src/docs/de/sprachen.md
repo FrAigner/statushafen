@@ -74,6 +74,8 @@ Nur bei eingeschalteter automatischer Übersetzung: Vorfälle (Titel und Nachric
 (nur Nachricht), Komponenten (Name und Beschreibung) und Ankündigungen lassen sich in die zweite
 Sprache übersetzen. Jede Übersetzung ist zunächst ein **Entwurf** und muss **bestätigt**
 werden; nur bestätigte Übersetzungen gibt die öffentliche API aus.
+Übersetzungen gibt es nur in einer weiteren Sprache, die die Seite anbietet; die Standardsprache
+oder eine nicht angebotene Sprache lehnt Statushafen mit einer Meldung ab.
 
 Die öffentliche Statusseite zeigt Namen und Beschreibungen von Komponenten und Gruppen sowie Titel
 und Meldung von Vorfällen und Ankündigungen sowie die Nachrichten der Updates eines Vorfalls in der
