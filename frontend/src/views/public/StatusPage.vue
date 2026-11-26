@@ -387,13 +387,17 @@ onMounted(async () => {
 })
 
 // Provide the slug for the login button in the header (PublicLayout.vue).
-const { currentPageSlug } = useCurrentPageSlug()
+const { currentPageSlug, subscriptionsAvailable } = useCurrentPageSlug()
 // Languages of the page for the language switcher in the header.
 const { setPageLanguages, clearPageLanguages } = usePublicPageLanguages()
 watch(() => props.slug, (slug) => { if (!isPreview.value) currentPageSlug.value = slug }, { immediate: true })
+// Same condition as the SubscriptionManager in the template (content shown, no preview).
+const showsSubscriptions = computed(() => !isPreview.value && !isPrivateError.value && !initialLoading.value)
+watch(showsSubscriptions, (shown) => { subscriptionsAvailable.value = shown }, { immediate: true })
 onUnmounted(() => {
   if (isPreview.value) return
   currentPageSlug.value = null
+  subscriptionsAvailable.value = false
   clearPageLanguages()
 })
 
@@ -1020,7 +1024,7 @@ const closeHistory = () => {
 
       <!-- ====== Manage subscription (the only place; the header menu item opens it via an event) ====== -->
       <SubscriptionManager
-        v-if="!isPreview"
+        v-if="showsSubscriptions"
         id="subscription-manager-anchor"
         ref="subscriptionManagerRef"
         :isLoggedIn="isLoggedIn"
