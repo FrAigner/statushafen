@@ -16,9 +16,9 @@ const (
 	uiOverrideScopePage   = "page"
 )
 
-// scopeUiOverrideQuery wendet auf eine bestehende Query die WHERE-Klausel für
-// den globalen (statusPageID nil) bzw. Seiten-Scope an - gemeinsame Logik für
-// upsertUiOverride/deleteUiOverride/listUiOverrides statt dreifach dupliziert.
+// scopeUiOverrideQuery applies the WHERE clause for the global (statusPageID nil)
+// or page scope to an existing query - shared logic for
+// upsertUiOverride/deleteUiOverride/listUiOverrides instead of triplicated.
 func scopeUiOverrideQuery(query *gorm.DB, statusPageID *uint) *gorm.DB {
 	if statusPageID == nil {
 		return query.Where("status_page_id IS NULL")
@@ -33,23 +33,23 @@ func uiOverrideScopeLabel(statusPageID *uint) string {
 	return uiOverrideScopeGlobal
 }
 
-// UiTranslationOverride: globale (Global Admin) und
-// pro-Seite (Page Admin, nur eigene Seite) editierbare Overrides für
-// App-UI-Texte (Nav, Buttons, Formularlabels - der statisch aus
-// frontend/src/i18n/locales/{de,en}.json kompilierte Text). Anders als die
-// Content-Translation-Modelle (IncidentTranslation etc.) gibt es hier
-// keinen Draft/Confirm-Workflow - ein Override ist entweder gesetzt oder
-// nicht, kein mehrsprachiger Redaktionsprozess.
+// UiTranslationOverride: global (Global Admin) and
+// per-page (Page Admin, own page only) editable overrides for
+// app UI texts (nav, buttons, form labels - the text statically compiled from
+// frontend/src/i18n/locales/{de,en}.json). Unlike the
+// content translation models (IncidentTranslation etc.), there is no
+// draft/confirm workflow here - an override is either set or
+// not, no multilingual editorial process.
 //
-// Kein serverseitiger Abgleich gegen die bekannte Key-Menge: das Frontend
-// kennt aus dem eigenen Bundle (de.json/en.json) bereits alle gültigen
-// Keys und erzeugt daraus die Editor-Liste - das Backend ist ein
-// generischer (scope, locale, key) -> value Store.
+// No server-side check against the known key set: the frontend
+// already knows all valid keys from its own bundle (de.json/en.json)
+// and builds the editor list from them - the backend is a
+// generic (scope, locale, key) -> value store.
 
-// uiOverrideKeyPattern erlaubt nur Segmente aus [a-zA-Z0-9_-], getrennt durch
-// einzelne Punkte. Die Segmente __proto__, constructor und
-// prototype sind zusätzlich verboten, weil das Frontend den Key zu einem
-// verschachtelten Objekt aufbaut und sonst Object.prototype verschmutzt würde.
+// uiOverrideKeyPattern allows only segments from [a-zA-Z0-9_-], separated by
+// single dots. The segments __proto__, constructor and
+// prototype are additionally forbidden because the frontend builds the key into a
+// nested object and Object.prototype would otherwise be polluted.
 var uiOverrideKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)*$`)
 
 func isValidUiOverrideKey(key string) bool {
@@ -73,8 +73,8 @@ func overridesToMap(overrides []models.UiTranslationOverride) map[string]string 
 	return result
 }
 
-// upsertUiOverride legt einen Override an oder aktualisiert ihn - gemeinsame
-// Logik für den globalen (statusPageID nil) und den Seiten-Scope.
+// upsertUiOverride creates or updates an override - shared
+// logic for the global (statusPageID nil) and the page scope.
 func (h *Handler) upsertUiOverride(c *gin.Context, statusPageID *uint) {
 	var req struct {
 		LanguageCode string `json:"language_code"`
@@ -96,12 +96,12 @@ func (h *Handler) upsertUiOverride(c *gin.Context, statusPageID *uint) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Ungültiger key", "code": "override_key_invalid"})
 		return
 	}
-	// Ein leerer Wert wurde bisher als Override "" gespeichert und
-	// hat den Text (im globalen Scope für alle Besucher) gelöscht. Bewusst 400
-	// statt implizitem Löschen: PUT heißt "diesen Text setzen", ein leeres Feld
-	// ist fast immer ein Versehen, und ein stilles Delete würde einen
-	// bestehenden Override ebenso unbemerkt verwerfen. Zurücksetzen auf den
-	// Standardtext geht nur explizit per DELETE für genau diesen Eintrag.
+	// An empty value used to be stored as override "" and
+	// deleted the text (in the global scope for all visitors). Deliberately 400
+	// instead of implicit deletion: PUT means "set this text", an empty field
+	// is almost always a mistake, and a silent delete would discard an
+	// existing override just as unnoticed. Resetting to the
+	// default text works only explicitly via DELETE for exactly this entry.
 	if strings.TrimSpace(value) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "value darf nicht leer sein; zum Zurücksetzen DELETE verwenden", "code": "override_value_empty"})
 		return
@@ -134,9 +134,9 @@ func (h *Handler) upsertUiOverride(c *gin.Context, statusPageID *uint) {
 	c.JSON(http.StatusOK, gin.H{"key": key, "language_code": languageCode, "value": value})
 }
 
-// deleteUiOverride löscht einen Override wieder (Revert auf den
-// Bundle-Default) - idempotent, ein Delete ohne vorhandenen Override ist
-// kein Fehler, da "kein Override" bereits der gewünschte Endzustand ist.
+// deleteUiOverride deletes an override again (revert to the
+// bundle default) - idempotent, a delete without an existing override is
+// not an error, since "no override" is already the desired end state.
 func (h *Handler) deleteUiOverride(c *gin.Context, statusPageID *uint) {
 	languageCode := strings.TrimSpace(c.Query("language_code"))
 	key := strings.TrimSpace(c.Query("key"))
@@ -171,18 +171,18 @@ func (h *Handler) listUiOverrides(c *gin.Context, statusPageID *uint) {
 	c.JSON(http.StatusOK, overridesToMap(overrides))
 }
 
-// GetPublicUiOverridesHandler liefert die globalen Overrides ohne Auth -
-// auch anonyme Besucher (Startseite, öffentliche Statusseiten) sollen die
-// global angepassten Texte sehen. Enthält bewusst keine Seiten-Overrides,
-// die gelten nur innerhalb des Admin-Bereichs der jeweiligen Seite (siehe
+// GetPublicUiOverridesHandler returns the global overrides without auth -
+// anonymous visitors too (home page, public status pages) should see the
+// globally customized texts. Deliberately contains no page overrides,
+// those apply only within the admin area of the respective page (see
 // frontend/src/layouts/AdminLayout.vue).
 func (h *Handler) GetPublicUiOverridesHandler(c *gin.Context) {
 	h.listUiOverrides(c, nil)
 }
 
-// GetGlobalUiOverridesHandler ist die Admin-Variante von
-// GetPublicUiOverridesHandler (Global Admin, identische Daten - für die
-// Editor-Ansicht).
+// GetGlobalUiOverridesHandler is the admin variant of
+// GetPublicUiOverridesHandler (Global Admin, identical data - for the
+// editor view).
 func (h *Handler) GetGlobalUiOverridesHandler(c *gin.Context) {
 	h.listUiOverrides(c, nil)
 }

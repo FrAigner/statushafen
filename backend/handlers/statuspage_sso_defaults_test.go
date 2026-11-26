@@ -12,10 +12,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Bei der ersten Anlage übersprang GORM Nullwerte für Spalten mit
-// default-Tag (test_login_enabled=false, leere Strings) und speicherte den
-// DB-Default. false muss ankommen; leere Scopes/Attribute bekommen bewusst die
-// Model-Defaults – beim Anlegen wie beim Aktualisieren gleich.
+// On first creation GORM skipped zero values for columns with a
+// default tag (test_login_enabled=false, empty strings) and stored the
+// DB default. false must arrive; empty scopes/attributes deliberately get the
+// model defaults – the same on creation as on update.
 func TestUpdateSSO_ErstanlageSpeichertNullwerte(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))
@@ -56,8 +56,8 @@ func TestUpdateSSO_ErstanlageSpeichertNullwerte(t *testing.T) {
 	}
 }
 
-// Gesetzte Scopes/Attribute werden unverändert übernommen (die
-// Defaults greifen nur bei leeren Werten).
+// Set scopes/attributes are taken over unchanged (the
+// defaults apply only to empty values).
 func TestUpdateSSO_ErstanlageUebernimmtGesetzteWerte(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))
@@ -80,8 +80,8 @@ func TestUpdateSSO_ErstanlageUebernimmtGesetzteWerte(t *testing.T) {
 	}
 }
 
-// Auch ohne gespeicherte Config liefert GET alle Formularfelder,
-// damit das Admin-Formular die Antwort direkt übernehmen kann.
+// Even without a stored config, GET returns all form fields,
+// so that the admin form can take the response over directly.
 func TestGetSSO_DefaultEnthaeltAlleFelder(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))
@@ -102,10 +102,10 @@ func TestGetSSO_DefaultEnthaeltAlleFelder(t *testing.T) {
 	}
 }
 
-// oidc_acs_url wurde beim Speichern aus BASE_URL festgeschrieben
-// und veraltete, sobald sich BASE_URL änderte – die echte Redirect-URL des
-// Logins entsteht aber zur Laufzeit (oidcRedirectURL). GET liefert deshalb
-// immer die aktuell gültige URL statt des gespeicherten Werts.
+// oidc_acs_url was fixed from BASE_URL on save
+// and became stale as soon as BASE_URL changed – but the real redirect URL of the
+// login is built at runtime (oidcRedirectURL). GET therefore always
+// returns the currently valid URL instead of the stored value.
 func TestGetSSO_ACSUrlZurLaufzeit(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))
@@ -127,10 +127,10 @@ func TestGetSSO_ACSUrlZurLaufzeit(t *testing.T) {
 	}
 }
 
-// GET liefert das Secret nie aus. Damit das Admin-Formular nicht
-// bei jedem Speichern das Secret neu verlangt, behält ein leeres Secret beim
-// Aktualisieren das gespeicherte; Pflicht ist es nur, solange keins gespeichert
-// ist. GET meldet per oidc_client_secret_set, ob eins hinterlegt ist.
+// GET never returns the secret. So that the admin form does not
+// demand the secret anew on every save, an empty secret keeps the stored one on
+// update; it is required only as long as none is stored.
+// GET reports via oidc_client_secret_set whether one is stored.
 func TestUpdateSSO_SecretBeibehalten(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))
@@ -219,8 +219,8 @@ func TestUpdateSSO_SecretBeibehalten(t *testing.T) {
 	})
 }
 
-// Erstanlage läuft als INSERT + UPDATE in einer Transaktion;
-// scheitert das UPDATE, bleibt keine halbe Zeile stehen.
+// Initial creation runs as INSERT + UPDATE in one transaction;
+// if the UPDATE fails, no half-written row remains.
 func TestUpdateSSO_UpdateNachInsertScheitert(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupSSORouter(NewHandler(db))

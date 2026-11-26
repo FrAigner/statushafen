@@ -15,29 +15,29 @@ import (
 	"gorm.io/gorm"
 )
 
-// Admin-CRUD für die NotificationTemplate. Seiten-scoped
-// unter /pages/:page_id/notification-templates, dieselbe pages:write-
-// Permission wie die Statusseiten-Einstellungen selbst - Templates sind
-// eine Konfigurationsoption der Seite und logisch dort verortet, nicht
-// bei Incidents (die haben incidents:write).
+// Admin CRUD for the NotificationTemplate. Page-scoped
+// under /pages/:page_id/notification-templates, the same pages:write
+// permission as the status page settings themselves - templates are
+// a configuration option of the page and logically located there, not
+// with incidents (which have incidents:write).
 //
-// Das Datenmodell ist bewusst upsert-basiert: der Key ist (StatusPageID,
-// Kind, Audience, Language), und das UI verwaltet keine "welches Template
-// hat welche ID"-Liste, sondern schreibt für ein bekanntes Quartett direkt
-// PUT und erzeugt/aktualisiert - DELETE mit demselben Quartett setzt zurück
-// auf den hartkodierten Default (kein Custom-Template mehr dafür).
+// The data model is deliberately upsert-based: the key is (StatusPageID,
+// Kind, Audience, Language), and the UI does not manage a "which template
+// has which ID" list, but for a known quadruple writes directly
+// PUT and creates/updates - DELETE with the same quadruple resets
+// to the hard-coded default (no custom template for it anymore).
 
-// Wiederholte Literale in sampleNotificationTemplateData (go:S1192).
+// Repeated literals in sampleNotificationTemplateData (go:S1192).
 const (
 	sampleMaintenanceTitle = "Scheduled DB maintenance"
 	sampleMaintenanceComps = "Database Cluster"
 )
 
-// validNotificationKinds sind die derzeit editierbaren Kind-Werte.
-// Incident-Kinds stammen, Maintenance-Kinds sind
-// dazugekommen. General-Notice-Kinds fehlen bewusst - siehe Kommentar
-// in notification_template.go bei den Konstanten (Notices versenden
-// aktuell keine Mails).
+// validNotificationKinds are the currently editable kind values.
+// Incident kinds are the original ones, maintenance kinds were
+// added later on.
+// General notice kinds are deliberately missing - see the comment in
+// notification_template.go at the constants (notices currently send no mails).
 var validNotificationKinds = map[string]bool{
 	NotificationKindIncidentCreated:      true,
 	NotificationKindIncidentUpdated:      true,
@@ -49,7 +49,7 @@ var validNotificationKinds = map[string]bool{
 	NotificationKindNoticeUpdated:        true,
 	NotificationKindNoticeEnded:          true,
 	NotificationKindSubscriptionConfirm:  true,
-	// Meldungen externer Quellen.
+	// Reports from external sources.
 	NotificationKindExternalIncidentCreated:     true,
 	NotificationKindExternalIncidentUpdated:     true,
 	NotificationKindExternalIncidentResolved:    true,
@@ -58,27 +58,27 @@ var validNotificationKinds = map[string]bool{
 	NotificationKindExternalMaintenanceResolved: true,
 }
 
-// validNotificationAudiences sind die beiden Zielgruppen
-// (Stage 5 der Mehrsprachigkeit) - siehe NotificationAudienceStaff/
+// validNotificationAudiences are the two target audiences
+// (stage 5 of multilingual support) - see NotificationAudienceStaff/
 // NotificationAudienceSubscriber in notification_template.go.
 var validNotificationAudiences = map[string]bool{
 	NotificationAudienceStaff:      true,
 	NotificationAudienceSubscriber: true,
 }
 
-// isValidNotificationLanguage prüft (Stage 5 der Mehrsprachigkeit)
-// den Language-Parameter gegen den echten, pro Statusseite konfigurierten
-// Sprachkatalog (StatusPageLanguage) statt gegen die
-// vorherige hartkodierte en/de-Konvention. Damit kollidiert eine Seite, die
-// sich z.B. "fr" aktiviert hat, nicht mehr mit dem alten Zwei-Sprachen-Limit.
+// isValidNotificationLanguage checks (stage 5 of multilingual support)
+// the language parameter against the real language catalog configured per status page
+// (StatusPageLanguage) instead of against the
+// previous hard-coded en/de convention. This way a page that has
+// activated e.g. "fr" no longer collides with the old two-language limit.
 //
-// Hat eine Statusseite noch KEINE einzige StatusPageLanguage-Zeile (Bestands-
-// seiten vor der Migration der Sprachkataloge, oder direkt in der DB angelegte Test-
-// Seiten), fällt die Prüfung auf genau die bisherige Konvention (en/de)
-// zurück - das bewahrt exaktes Bestandsverhalten, bis für die Seite ein
-// echter Sprachkatalog vorliegt (siehe database.backfillStatusPageLanguages /
-// database.SeedDefaultStatusPageLanguages, die genau das für jede reale
-// Seite nachziehen).
+// If a status page has NO StatusPageLanguage row at all (existing
+// pages from before the language catalog migration, or test
+// pages created directly in the DB), the check falls back to exactly the previous convention (en/de)
+// - this preserves exact existing behavior until a
+// real language catalog exists (see database.backfillStatusPageLanguages /
+// database.SeedDefaultStatusPageLanguages, which backfill exactly that for every real
+// page).
 func isValidNotificationLanguage(db *gorm.DB, pageID uint, lang string) bool {
 	// Content languages are only de and en.
 	if !database.IsContentLanguage(lang) {
@@ -96,10 +96,10 @@ func isValidNotificationLanguage(db *gorm.DB, pageID uint, lang string) bool {
 	return enabledCount > 0
 }
 
-// notificationTemplateUpsertReq bündelt die (bewusst schlanke) Payload für
-// Create/Update - alle anderen Felder sind aus den URL-Parametern
-// abgeleitet und stünden bei ihrer Übernahme aus dem Request nur zur
-// Verwechslung frei.
+// notificationTemplateUpsertReq bundles the (deliberately lean) payload for
+// create/update - all other fields are derived from the URL parameters
+// and, if taken over from the request, would only be a source of
+// confusion.
 type notificationTemplateUpsertReq struct {
 	Subject  string `json:"Subject" binding:"required"`
 	BodyHTML string `json:"BodyHTML" binding:"required"`
@@ -128,9 +128,9 @@ func parseNotificationTemplateKey(c *gin.Context, db *gorm.DB) (pageID uint, kin
 	return uint(tenantID), kind, audience, language, true
 }
 
-// GetNotificationTemplatesHandler liefert alle Custom-Templates einer
-// Statusseite. Das UI baut sich daraus die Editor-Matrix (Kind × Audience ×
-// Language) zusammen; fehlende Einträge = "wird per Default gerendert".
+// GetNotificationTemplatesHandler returns all custom templates of a
+// status page. The UI builds the editor matrix (kind x audience x
+// language) from them; missing entries = "rendered by default".
 func (h *Handler) GetNotificationTemplatesHandler(c *gin.Context) {
 	tenantID, ok := parsePageIDParam(c)
 	if !ok {
@@ -149,9 +149,9 @@ func (h *Handler) GetNotificationTemplatesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, templates)
 }
 
-// PutNotificationTemplateHandler ist upsert: existiert für (pageID, kind,
-// audience, language) noch kein Eintrag, wird einer erzeugt, sonst
-// aktualisiert. Das UI muss dadurch keinen ID-Zustand tracken.
+// PutNotificationTemplateHandler is an upsert: if no entry exists for (pageID, kind,
+// audience, language), one is created, otherwise it is
+// updated. This way the UI does not have to track any ID state.
 func (h *Handler) PutNotificationTemplateHandler(c *gin.Context) {
 	pageID, kind, audience, language, ok := parseNotificationTemplateKey(c, h.DB)
 	if !ok || !h.requireTemplateLanguageEnabled(c, pageID, language) {
@@ -192,10 +192,10 @@ func (h *Handler) PutNotificationTemplateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, tmpl)
 }
 
-// DeleteNotificationTemplateHandler entfernt ein Custom-Template - die
-// Statusseite fällt für dieses (Kind, Audience, Language) danach wieder auf
-// den hartkodierten Default zurück. 404 wenn keins existiert (idempotent-
-// unfreundlich, aber informativer als stiller 200).
+// DeleteNotificationTemplateHandler removes a custom template - the
+// status page then falls back to the hard-coded default for this (kind, audience, language)
+// again. 404 if none exists (idempotency-
+// unfriendly, but more informative than a silent 200).
 func (h *Handler) DeleteNotificationTemplateHandler(c *gin.Context) {
 	pageID, kind, audience, language, ok := parseNotificationTemplateKey(c, h.DB)
 	if !ok || !h.requireTemplateLanguageEnabled(c, pageID, language) {
@@ -218,9 +218,9 @@ func (h *Handler) DeleteNotificationTemplateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Notification template deleted"})
 }
 
-// PreviewNotificationTemplateHandler rendert das übergebene Subject/Body
-// mit realistischen Beispielwerten, damit der Admin vor dem Speichern
-// sehen kann, wie eine echte Mail aussieht. Speichert nichts.
+// PreviewNotificationTemplateHandler renders the given subject/body
+// with realistic sample values, so that the admin can see before saving
+// what a real mail looks like. Stores nothing.
 func (h *Handler) PreviewNotificationTemplateHandler(c *gin.Context) {
 	_, kind, _, language, ok := parseNotificationTemplateKey(c, h.DB)
 	if !ok {
@@ -239,7 +239,7 @@ func (h *Handler) PreviewNotificationTemplateHandler(c *gin.Context) {
 	sample := models.NotificationTemplate{Subject: req.Subject, BodyHTML: req.BodyHTML, Kind: kind, Language: language}
 	subject, body, err := renderNotificationTemplate(&sample, sampleNotificationTemplateData(kind, language))
 	if err != nil {
-		// Parse-/Ausführungsfehler der Vorlage: der Text hilft beim Korrigieren.
+		// Parse/execution error of the template: the text helps with fixing it.
 		if TemplateErrorCode(err) == "" {
 			err = newCodedError("template_invalid", err.Error())
 		}
@@ -249,10 +249,10 @@ func (h *Handler) PreviewNotificationTemplateHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"subject": subject, "bodyHTML": body})
 }
 
-// sampleNotificationTemplateData liefert repräsentative Beispielwerte für
-// die Vorschau. Bewusst nicht-generische Werte ("Zahlungs-Gateway"),
-// damit der Admin gleich sieht, wie ein Platzhalter mit echtem Text
-// wirkt, nicht mit "TITLE"/"MESSAGE"-Dummy.
+// sampleNotificationTemplateData returns representative sample values for
+// the preview. Deliberately non-generic values ("Zahlungs-Gateway"),
+// so that the admin immediately sees how a placeholder with real text
+// looks, not with "TITLE"/"MESSAGE" dummies.
 func sampleNotificationTemplateData(kind, language string) NotificationTemplateData {
 	action := "created"
 	statusRaw := "investigating"
@@ -329,7 +329,7 @@ func sampleNotificationTemplateData(kind, language string) NotificationTemplateD
 	case NotificationKindNoticeCreated, NotificationKindNoticeUpdated, NotificationKindNoticeEnded:
 		data.Level = "warning"
 	case NotificationKindSubscriptionConfirm:
-		// Title ist hier der Name der Statusseite.
+		// Title here is the name of the status page.
 		data = NotificationTemplateData{
 			Title:       "Acme Status",
 			Language:    language,

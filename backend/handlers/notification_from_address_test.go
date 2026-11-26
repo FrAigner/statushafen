@@ -39,10 +39,10 @@ func TestValidateNotificationFromAddress(t *testing.T) {
 	}
 }
 
-// TestResolveNotificationFromAddress: Die Absenderadresse gehört immer dem
-// Betreiber (SMTP_FROM); die Seite steuert nur den Anzeigenamen bei. Die
-// frühere Semantik (Seitenadresse bzw. "<slug>@<Frontend-Host>" als Absender)
-// ließ Seiten-Admins beliebige Absender fälschen und ist bewusst entfallen.
+// TestResolveNotificationFromAddress: the sender address always belongs to the
+// operator (SMTP_FROM); the page only contributes the display name. The
+// former semantics (page address or "<slug>@<frontend host>" as sender)
+// let page admins forge arbitrary senders and was deliberately dropped.
 func TestResolveNotificationFromAddress(t *testing.T) {
 	const operator = "Statushafen <alerts@mail.example.com>"
 

@@ -11,11 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// ── Review-Nachbesserung 2: F1–F4 ──────────────────────────────────
+// ── Review follow-up 2: F1–F4 ──────────────────────────────────
 
-// F1: Zieht ein Admin die Einladung zwischen Vorprüfung und Transaktion zurück
-// (Grabstein), darf die Annahme nicht mehr durchgehen. Der Verbrauch löschte
-// früher Unscoped nach ID und traf auch den Grabstein (RowsAffected = 1).
+// F1: If an admin revokes the invitation between pre-check and transaction
+// (tombstone), the accept must no longer go through. Consuming used to
+// delete Unscoped by ID and also hit the tombstone (RowsAffected = 1).
 func TestPageInvitationReview_AcceptLosesAgainstConcurrentRevoke(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -43,8 +43,8 @@ func TestPageInvitationReview_AcceptLosesAgainstConcurrentRevoke(t *testing.T) {
 	}
 }
 
-// O1: Verbraucht ein gleichzeitiges Annehmen die Einladung zwischen Laden und
-// Zurückziehen, trifft das Löschen 0 Zeilen: 404 ohne Audit statt 200.
+// O1: If a concurrent accept consumes the invitation between loading and
+// revoking, the delete hits 0 rows: 404 without audit instead of 200.
 func TestPageInvitationReview_RevokeLosesAgainstConcurrentAccept(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -69,22 +69,22 @@ func TestPageInvitationReview_RevokeLosesAgainstConcurrentAccept(t *testing.T) {
 	}
 }
 
-// openInvitations zählt nicht weich gelöschte Einladungen.
+// openInvitations counts invitations that are not soft-deleted.
 func (f invFixture) openInvitations() int64 {
 	var n int64
 	f.db.Model(&models.PageInvitation{}).Count(&n)
 	return n
 }
 
-// F2: Ein vorübergehender DB-Fehler darf eine gültige Einladung nicht
-// verbrauchen: 500, kein Schreibzugriff, kein Audit. Nur "nicht gefunden" ist
-// gegenstandslos (404 und Grabstein).
+// F2: A transient DB error must not consume a valid invitation:
+// 500, no write access, no audit. Only "not found" is
+// moot (404 and tombstone).
 func TestPageInvitationReview_TransientDBErrorsFailClosed(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
 	cases := []struct {
 		name, path, table string
-		afterPage         bool // Fehler erst, nachdem invitationContext die Seite geladen hat
+		afterPage         bool // Error only after invitationContext has loaded the page
 	}{
 		{"Vorschau: Seite", "preview", "status_pages", false},
 		{"Annehmen: Seite", "accept", "status_pages", false},
@@ -135,8 +135,8 @@ func TestPageInvitationReview_TransientDBErrorsFailClosed(t *testing.T) {
 		})
 	}
 
-	// Konto-Abfrage in loadOwnInvitation: Der erste users-Zugriff gehört ggf. der
-	// Anmeldung, deshalb den ersten scheitern lassen, der nach dem Token kommt.
+	// Account query in loadOwnInvitation: The first users access may belong to the
+	// login, so make the first one fail that comes after the token.
 	for _, path := range []string{"preview", "accept"} {
 		t.Run(path+": Konto-Abfrage", func(t *testing.T) {
 			f := newInvFixture(t)
@@ -184,7 +184,7 @@ func TestPageInvitationReview_TransientDBErrorsFailClosed(t *testing.T) {
 		requireStatusCode(t, w, http.StatusNotFound)
 	})
 
-	// Gegenproben: "nicht gefunden" bleibt gegenstandslos (404, Grabstein).
+	// Control checks: "not found" stays moot (404, tombstone).
 	t.Run("Einladender ohne Rechte: 404 und Grabstein", func(t *testing.T) {
 		f := newInvFixture(t)
 		u, tok := f.account(t, "gone@x.example")
@@ -208,8 +208,8 @@ func TestPageInvitationReview_TransientDBErrorsFailClosed(t *testing.T) {
 	})
 }
 
-// F4: Ein DB-Fehler beim Prüfen der alten Rolle macht die alte Einladung nicht
-// ersetzbar (fail closed: 500, die alte Einladung bleibt).
+// F4: A DB error when checking the old role does not make the old invitation
+// replaceable (fail closed: 500, the old invitation stays).
 func TestPageInvitationReview_ReinviteRoleLookupErrorFailsClosed(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -235,8 +235,8 @@ func TestPageInvitationReview_ReinviteRoleLookupErrorFailsClosed(t *testing.T) {
 	}
 }
 
-// F4 (Gegenprobe): Ist die Rolle der alten Einladung gelöscht ("nicht gefunden"),
-// bleibt die alte Einladung ersetzbar.
+// F4 (control check): If the role of the old invitation is deleted ("not found"),
+// the old invitation stays replaceable.
 func TestPageInvitationReview_ReinviteWithDeletedOldRoleReplaces(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -254,13 +254,13 @@ func TestPageInvitationReview_ReinviteWithDeletedOldRoleReplaces(t *testing.T) {
 	}
 }
 
-// F3: Scheitert das Sperren der Seitenzeile, endet das Einladen fail closed.
+// F3: If locking the page row fails, inviting ends fail closed.
 func TestPageInvitationReview_PageLockErrorFailsClosed(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
 	f := newInvFixture(t)
 	f.account(t, "lock-err@x.example")
-	// Nur die Abfrage mit FOR UPDATE (Sperre der Seitenzeile) scheitert.
+	// Only the query with FOR UPDATE (lock of the page row) fails.
 	failOn(t, f.db, "query", "status_pages", func(tx *gorm.DB) bool {
 		_, locking := tx.Statement.Clauses["FOR"]
 		return locking
@@ -273,9 +273,9 @@ func TestPageInvitationReview_PageLockErrorFailsClosed(t *testing.T) {
 	}
 }
 
-// F3: Zwei gleichzeitige Einladungen derselben Adresse: Die zweite scheitert am
-// Unique-Index (status_page_id, email) und antwortet neutral, ohne Mail und
-// ohne Audit.
+// F3: Two concurrent invitations of the same address: The second fails on the
+// unique index (status_page_id, email) and responds neutrally, without mail and
+// without audit.
 func TestPageInvitationReview_ConcurrentInviteSameAddress(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -288,11 +288,11 @@ func TestPageInvitationReview_ConcurrentInviteSameAddress(t *testing.T) {
 			return
 		}
 		armed = false
-		// Der "gleichzeitige" Aufruf hat die Adresse zwischen Prüfung und Insert
-		// angelegt. SQLite sperrt die Tabelle für eine zweite Verbindung, deshalb
-		// schreibt der Test in dieselbe Transaktion; das Create darunter scheitert
-		// dann wie unter Postgres am Unique-Index. (Die Zeile rollt mit zurück,
-		// deshalb gibt es unten keine Zeilenzahl zu prüfen.)
+		// The "concurrent" call created the address between check and insert.
+		// SQLite locks the table for a second connection, so
+		// the test writes in the same transaction; the create below
+		// then fails on the unique index as under Postgres. (The row rolls back too,
+		// so there is no row count to check below.)
 		err := tx.Session(&gorm.Session{NewDB: true}).Exec("INSERT INTO page_invitations (created_at, updated_at, status_page_id, email, role_id, token_hash, expires_at, invited_by_id, invited_user_id) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, ?, 'konkurrent', ?, ?, 0)",
 			f.page.ID, "twice@x.example", f.viewer.ID, time.Now().Add(time.Hour), f.owner.ID).Error
 		if err != nil {
@@ -308,9 +308,9 @@ func TestPageInvitationReview_ConcurrentInviteSameAddress(t *testing.T) {
 	}
 }
 
-// F3: Der Audit-Eintrag, aus dem die Tagesgrenze zählt, entsteht in derselben
-// Transaktion wie die Einladung (sonst sieht eine zweite Transaktion zwischen
-// Commit und Audit noch den alten Zähler). Scheitert er, entsteht keine Einladung.
+// F3: The audit entry from which the daily limit counts arises in the same
+// transaction as the invitation (otherwise a second transaction between
+// commit and audit sees the old counter). If it fails, no invitation is created.
 func TestPageInvitationReview_AuditInSameTransaction(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()

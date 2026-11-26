@@ -7,9 +7,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Die Beispieldaten der Vorschau müssen für JEDE Vorlagenart
-// gefüllt sein; vorher war der Zweig je Art ungetestet (Gesamtquote unter
-// Baseline).
+// The preview's sample data must be filled in for EVERY template kind;
+// previously the branch per kind was untested (overall coverage below
+// baseline).
 func TestSampleNotificationTemplateData_AlleArten(t *testing.T) {
 	cases := map[string]struct{ action, status string }{
 		NotificationKindIncidentCreated:             {"created", "investigating"},
@@ -51,7 +51,7 @@ func TestIsValidNotificationLanguage(t *testing.T) {
 	if err := db.Create(&page).Error; err != nil {
 		t.Fatal(err)
 	}
-	// Ohne Sprachzeilen: Rückfall en/de.
+	// Without language rows: fallback en/de.
 	if !isValidNotificationLanguage(db, page.ID, "de") || isValidNotificationLanguage(db, page.ID, "fr") {
 		t.Error("Rückfall en/de falsch")
 	}
@@ -65,7 +65,7 @@ func TestIsValidNotificationLanguage(t *testing.T) {
 	if !isValidNotificationLanguage(db, page.ID, "en") || isValidNotificationLanguage(db, page.ID, "de") || isValidNotificationLanguage(db, page.ID, "fr") {
 		t.Error("configured languages wrong")
 	}
-	// DB-Fehler (Tabelle weg): Rückfall en/de.
+	// DB error (table gone): fallback en/de.
 	if err := db.Migrator().DropTable(&models.StatusPageLanguage{}); err != nil {
 		t.Fatal(err)
 	}

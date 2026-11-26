@@ -13,8 +13,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// doWebhookStatusPost postet einen Status-Update ans Component-Status-Webhook;
-// token wird nur als X-Webhook-Token-Header gesetzt, wenn nicht leer.
+// doWebhookStatusPost posts a status update to the component status webhook;
+// token is only set as the X-Webhook-Token header if not empty.
 func doWebhookStatusPost(r http.Handler, compIDStr, status, token string) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(map[string]string{"status": status})
 	req, _ := http.NewRequest("POST", "/api/webhooks/components/"+compIDStr+"/status", bytes.NewBuffer(body))
@@ -27,8 +27,8 @@ func doWebhookStatusPost(r http.Handler, compIDStr, status, token string) *httpt
 	return w
 }
 
-// TestComponentStatusWebhook: gültiger Token setzt den
-// Status korrekt, ungültiger/fehlender Token wird mit 401 abgelehnt.
+// TestComponentStatusWebhook: a valid token sets the
+// status correctly, an invalid/missing token is rejected with 401.
 func TestComponentStatusWebhook(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -116,9 +116,9 @@ func TestComponentStatusWebhook(t *testing.T) {
 		requireStatusCode(t, w, http.StatusBadRequest)
 	})
 
-	// Keine Enumeration: eine unbekannte ID antwortet exakt wie eine bekannte
-	// ID mit falschem Token (Status und Body), auch mit einem gültigen Token
-	// einer anderen Seite.
+	// No enumeration: an unknown ID answers exactly like a known
+	// ID with a wrong token (status and body), even with a valid token
+	// of another page.
 	t.Run("Unbekannte Component-ID antwortet wie falscher Token", func(t *testing.T) {
 		unknown := doWebhookStatusPost(r, "999999", "major_outage", validToken)
 		wrong := doWebhookStatusPost(r, compIDStr, "major_outage", "not-the-right-token")
@@ -135,7 +135,7 @@ func TestComponentStatusWebhook(t *testing.T) {
 		}
 	})
 
-	// Token widerrufen -> vorher gültiger Token darf nicht mehr funktionieren.
+	// Revoke token -> a previously valid token must no longer work.
 	req, _ = http.NewRequest("DELETE", "/api/admin/pages/"+pageIDStr+"/webhook-token", nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -160,11 +160,11 @@ func TestComponentStatusWebhook(t *testing.T) {
 			t.Fatalf("Erwartete einen neuen, nicht-leeren Token, bekam %q", resp.Token)
 		}
 
-		// Alter Token darf nicht mehr funktionieren
+		// Old token must no longer work
 		w2 := doWebhookStatusPost(r, compIDStr, "major_outage", validToken)
 		requireStatusCode(t, w2, http.StatusUnauthorized)
 
-		// Neuer Token funktioniert
+		// New token works
 		w3 := doWebhookStatusPost(r, compIDStr, "major_outage", resp.Token)
 		requireStatusCode(t, w3, http.StatusOK)
 	})

@@ -56,7 +56,7 @@ func TestPruneExpiredOrders(t *testing.T) {
 	require.NoError(t, db.Model(&models.PageOrder{}).Where("id = ?", stale.ID).Select("confirm_token").Scan(&token).Error)
 	assert.Empty(t, token, "Bestätigungstoken wird mit dem Ablauf entwertet")
 
-	// Idempotent: ein zweiter Lauf ändert nichts mehr.
+	// Idempotent: a second run changes nothing more.
 	marked, deleted, err = pruneExpiredOrders(db, now)
 	require.NoError(t, err)
 	assert.Zero(t, marked+deleted)
@@ -80,7 +80,7 @@ func TestPruneExpiredOrders_DatabaseErrorIsReported(t *testing.T) {
 	_, _, err := pruneExpiredOrders(db, time.Now())
 	assert.Error(t, err)
 
-	// Der Wartungs-Tick loggt den Fehler, statt abzubrechen.
+	// The maintenance tick logs the error instead of aborting.
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))

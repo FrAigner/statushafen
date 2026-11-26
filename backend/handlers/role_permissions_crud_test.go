@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Der Altwert "<ressource>:write" wird nie mehr gespeichert. Ein
-// noch gecachtes Alt-Frontend schickt ihn beim Speichern einer Rolle; der
-// Server macht daraus create+read+update+delete.
+// The legacy value "<ressource>:write" is never stored anymore. A
+// still-cached old frontend sends it when saving a role; the
+// server turns it into create+read+update+delete.
 func TestRoleHandlers_WriteWirdBeimSpeichernZuCrud(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -54,7 +54,7 @@ func TestRoleHandlers_WriteWirdBeimSpeichernZuCrud(t *testing.T) {
 	require.NoError(t, db.First(&stored, created.ID).Error)
 	assert.Equal(t, updated.Permissions, stored.Permissions, "gespeichert, nicht nur in der Antwort")
 
-	// Create/Update/Delete setzen Read automatisch.
+	// Create/Update/Delete set Read automatically.
 	only := send(http.MethodPut, "/api/roles/"+strconv.Itoa(int(created.ID)), "notices:update")
 	assert.Equal(t, "notices:update,notices:read", only.Permissions)
 }

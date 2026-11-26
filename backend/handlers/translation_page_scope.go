@@ -10,27 +10,27 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seiten-Scope für die Übersetzungs-Schreibrouten.
+// Page scope for the translation write routes.
 //
-// Die Routen POST /api/{incidents,components,notices}/:id/translations und
-// PATCH/DELETE /api/*-translations/:translation_id tragen keine :page_id im
-// Pfad. middleware.RequirePermission verlangt sie aber zwingend und wies
-// deshalb jeden Nicht-Global-Admin mit 400 ab - Seiten-Admins konnten keine
-// Übersetzungen pflegen. Statt die Routen umzubauen (Frontend und Spec
-// bleiben unverändert), leitet diese Middleware die Seite aus der Ressource
-// ab und setzt :page_id, bevor RequirePermission läuft. Weil die Seite aus
-// der Ressource selbst stammt, ist die Mandanten-Zugehörigkeit automatisch
-// geprüft: Wer nur auf Seite A Rechte hat, bekommt für Ressourcen von Seite B
-// 403. Unbekannte (oder gelöschte) Ressourcen ergeben 404, wie es die
-// Handler selbst bisher auch taten.
+// The routes POST /api/{incidents,components,notices}/:id/translations and
+// PATCH/DELETE /api/*-translations/:translation_id carry no :page_id in the
+// path. middleware.RequirePermission requires it, however, and therefore rejected
+// every non-global admin with 400 - page admins could not maintain
+// translations. Instead of restructuring the routes (frontend and spec
+// stay unchanged), this middleware derives the page from the resource
+// and sets :page_id before RequirePermission runs. Because the page comes from
+// the resource itself, tenant membership is checked automatically:
+// anyone with rights only on page A gets 403 for resources of page B.
+// Unknown (or deleted) resources yield 404, as the
+// handlers themselves did before.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// pageIDLookup liefert die StatusPageID der Ressource mit der gegebenen ID
-// oder ok=false, wenn sie nicht existiert.
+// pageIDLookup returns the StatusPageID of the resource with the given ID
+// or ok=false if it does not exist.
 type pageIDLookup func(h *Handler, id uint) (uint, bool)
 
-// scopeToResourcePage parst den Pfad-Parameter param, ermittelt per lookup
-// die zugehörige Statusseite und hängt sie als :page_id an die Parameter an.
+// scopeToResourcePage parses the path parameter param, uses lookup to determine
+// the associated status page, and appends it as :page_id to the parameters.
 func (h *Handler) scopeToResourcePage(param string, lookup pageIDLookup) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id, err := strconv.ParseUint(c.Param(param), 10, 32)
@@ -96,35 +96,35 @@ func noticeTranslationPageID(h *Handler, id uint) (uint, bool) {
 	return noticePageID(h, tr.GeneralNoticeID)
 }
 
-// IncidentPageScope setzt :page_id aus :incident_id.
+// IncidentPageScope sets :page_id from :incident_id.
 func (h *Handler) IncidentPageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("incident_id", incidentPageID)
 }
 
-// ComponentPageScope setzt :page_id aus :component_id.
+// ComponentPageScope sets :page_id from :component_id.
 func (h *Handler) ComponentPageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("component_id", componentPageID)
 }
 
-// NoticePageScope setzt :page_id aus :notice_id.
+// NoticePageScope sets :page_id from :notice_id.
 func (h *Handler) NoticePageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("notice_id", noticePageID)
 }
 
-// IncidentTranslationPageScope setzt :page_id aus :translation_id
-// (Übersetzung → Incident → Seite).
+// IncidentTranslationPageScope sets :page_id from :translation_id
+// (translation → incident → page).
 func (h *Handler) IncidentTranslationPageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("translation_id", incidentTranslationPageID)
 }
 
-// ComponentTranslationPageScope setzt :page_id aus :translation_id
-// (Übersetzung → Component → Seite).
+// ComponentTranslationPageScope sets :page_id from :translation_id
+// (translation → component → page).
 func (h *Handler) ComponentTranslationPageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("translation_id", componentTranslationPageID)
 }
 
-// NoticeTranslationPageScope setzt :page_id aus :translation_id
-// (Übersetzung → Notice → Seite).
+// NoticeTranslationPageScope sets :page_id from :translation_id
+// (translation → notice → page).
 func (h *Handler) NoticeTranslationPageScope() gin.HandlerFunc {
 	return h.scopeToResourcePage("translation_id", noticeTranslationPageID)
 }

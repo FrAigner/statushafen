@@ -26,8 +26,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// automatische Übersetzung - Einstellungen, Verbindungstest und
-// Übersetzungsvorschlag.
+// automatic translation - settings, connection test and
+// translation suggestion.
 
 const translationSecret = "GEHEIMER-SCHLUESSEL-676"
 
@@ -37,8 +37,8 @@ func (r fixedResolver) LookupIPAddr(context.Context, string) ([]net.IPAddr, erro
 	return []net.IPAddr{{IP: net.ParseIP(r.ip)}}, nil
 }
 
-// fakeTranslationServer antwortet wie LibreTranslate (Pfad /translate) bzw.
-// DeepL (/v2/translate) und zählt die Aufrufe.
+// fakeTranslationServer responds like LibreTranslate (path /translate) or
+// DeepL (/v2/translate) and counts the calls.
 func fakeTranslationServer(t *testing.T, tls bool, status int) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	var calls atomic.Int32
@@ -62,7 +62,7 @@ func fakeTranslationServer(t *testing.T, tls bool, status int) (*httptest.Server
 			_, _ = w.Write([]byte(`{"translations":[` + strings.Join(items, ",") + `]}`))
 			return
 		}
-		if strings.HasPrefix(strings.TrimSpace(string(req.Q)), "[") { // Stapel: Liste in, Liste aus
+		if strings.HasPrefix(strings.TrimSpace(string(req.Q)), "[") { // batch: list in, list out
 			var qs []string
 			_ = json.Unmarshal(req.Q, &qs)
 			items := make([]string, len(qs))
@@ -84,8 +84,8 @@ func fakeTranslationServer(t *testing.T, tls bool, status int) (*httptest.Server
 	return srv, &calls
 }
 
-// safeClientTo liefert einen SSRF-geschützten Client, dessen Namensauflösung
-// resolvedIP meldet und der nach der Prüfung zum Testserver verbindet.
+// safeClientTo returns an SSRF-protected client whose name resolution
+// reports resolvedIP and which connects to the test server after the check.
 func safeClientTo(srv *httptest.Server, resolvedIP string) *http.Client {
 	return externalstatus.NewSafeClient(externalstatus.ClientConfig{
 		Resolver: fixedResolver{ip: resolvedIP},
@@ -158,7 +158,7 @@ func TestTranslationSettings_SchluesselWirdNieAusgegebenOderGeloggt(t *testing.T
 	w := doStatusPageRequest(f.r, "GET", "/api/settings/translation", nil)
 	assert.NotContains(t, w.Body.String(), translationSecret)
 
-	// Fehlerpfad mit Geheimnis als Eingabe: Dienst lehnt ab, nichts im Log.
+	// Error path with a secret as input: service rejects, nothing in the log.
 	srv, _ := fakeTranslationServer(t, true, http.StatusForbidden)
 	f.h.TranslationSafeClient = safeClientTo(srv, "93.184.216.34")
 	f.h.TranslationDeepLURL = "https://deepl.example.org"
@@ -189,7 +189,7 @@ func TestTranslationSettings_Aktualisieren(t *testing.T) {
 	w = doStatusPageRequest(f.r, "PUT", "/api/settings/translation", map[string]any{"provider": "google"})
 	assert.Equal(t, "translation_provider_invalid", codeOf(t, w.Body.Bytes()))
 
-	// Interne bzw. unsichere Adressen werden schon beim Speichern abgelehnt.
+	// Internal or insecure addresses are already rejected on saving.
 	for _, u := range []string{"http://libretranslate:5000", "https://translate.example.org:8443", "ftp://x"} {
 		w = doStatusPageRequest(f.r, "PUT", "/api/settings/translation", map[string]any{"url": u})
 		assert.Equal(t, http.StatusBadRequest, w.Code, u)
@@ -201,13 +201,13 @@ func TestTranslationSettings_Aktualisieren(t *testing.T) {
 	assert.Equal(t, "https://translate.example.org", out["url"])
 	assert.Equal(t, true, out["api_key_set"])
 
-	// Schlüssel bleibt, wenn api_key fehlt; leerer String löscht ihn.
+	// The key stays if api_key is missing; an empty string deletes it.
 	out = f.put(t, map[string]any{"url": ""})
 	assert.Equal(t, true, out["api_key_set"])
 	assert.Equal(t, "", out["url"])
 	out = f.put(t, map[string]any{"api_key": ""})
 	assert.Equal(t, false, out["api_key_set"])
-	// Erneutes Setzen nach Löschen (Upsert)
+	// Setting again after deletion (upsert)
 	out = f.put(t, map[string]any{"api_key": "neu"})
 	assert.Equal(t, true, out["api_key_set"])
 }
@@ -256,7 +256,7 @@ func TestTranslate_NichtKonfiguriert(t *testing.T) {
 
 func TestTranslate_StandardAdresseAusUmgebungDarfInternSein(t *testing.T) {
 	f := newTranslationFixture(t)
-	srv, calls := fakeTranslationServer(t, false, http.StatusOK) // http, Loopback: für die SSRF-Sperre verboten
+	srv, calls := fakeTranslationServer(t, false, http.StatusOK) // http, loopback: forbidden by the SSRF block
 	t.Setenv("LIBRETRANSLATE_URL", srv.URL)
 
 	w := doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": " EN ", "title": "Störung", "message": "Details"})
@@ -269,24 +269,24 @@ func TestTranslate_StandardAdresseAusUmgebungDarfInternSein(t *testing.T) {
 	assert.Equal(t, "de", out["source_language"])
 	assert.EqualValues(t, 1, calls.Load(), "Titel und Nachricht in EINER Anfrage")
 
-	// Ohne Nachricht ebenfalls ein Aufruf; leere Nachricht bleibt leer.
+	// Without a message also one call; an empty message stays empty.
 	calls.Store(0)
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "Nur Titel", "message": "  "})
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.EqualValues(t, 1, calls.Load())
 
-	// Ein gesetzter Client wird für die Umgebungsadresse benutzt (Test-Einhängepunkt).
+	// A set client is used for the environment address (test hook).
 	var used atomic.Int32
 	f.h.TranslationTrustedClient = &http.Client{Transport: countingTransport{n: &used}}
 	doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "x"})
 	assert.EqualValues(t, 1, used.Load())
 	f.h.TranslationTrustedClient = nil
 
-	// Verbindungstest nutzt dieselbe Adresse
+	// Connection test uses the same address
 	w = doStatusPageRequest(f.r, "POST", "/api/settings/translation/test", nil)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// libretranslate gewählt, aber keine eigene Adresse: Umgebung gilt
+	// libretranslate chosen, but no own address: the environment applies
 	f.put(t, map[string]any{"provider": "libretranslate"})
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "x"})
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -296,7 +296,7 @@ func TestTranslate_EingetrageneInterneAdresseWirdAbgelehnt(t *testing.T) {
 	f := newTranslationFixture(t)
 	srv, calls := fakeTranslationServer(t, true, http.StatusOK)
 
-	// Hostname löst auf eine interne Adresse auf (Rebinding): der Dialer sperrt.
+	// Hostname resolves to an internal address (rebinding): the dialer blocks.
 	f.h.TranslationSafeClient = safeClientTo(srv, "10.0.0.5")
 	f.put(t, map[string]any{"provider": "libretranslate", "url": "https://translate.example.org"})
 	w := doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "x"})
@@ -304,12 +304,12 @@ func TestTranslate_EingetrageneInterneAdresseWirdAbgelehnt(t *testing.T) {
 	assert.Equal(t, "translation_unavailable", codeOf(t, w.Body.Bytes()))
 	assert.EqualValues(t, 0, calls.Load(), "interner Zielhost darf nie erreicht werden")
 
-	// Direkt in der DB abgelegte, ungültige Adresse (z. B. Altbestand): nicht konfiguriert.
+	// Invalid address stored directly in the DB (e.g. legacy data): not configured.
 	f.db.Model(&models.SystemSetting{}).Where("key = ?", "translation.url").Update("value", "http://libretranslate:5000")
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "x"})
 	assert.Equal(t, "translation_not_configured", codeOf(t, w.Body.Bytes()))
 
-	// Öffentliche Adresse wird erreicht.
+	// Public address is reachable.
 	f.h.TranslationSafeClient = safeClientTo(srv, "93.184.216.34")
 	f.put(t, map[string]any{"url": "https://translate.example.org"})
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "x"})
@@ -352,7 +352,7 @@ func TestTranslate_FehlerDesDienstes(t *testing.T) {
 
 func TestTranslate_FehlerBeiNachrichtUndEingabepruefung(t *testing.T) {
 	f := newTranslationFixture(t)
-	// Dienst antwortet auf den Stapel (Titel + Nachricht) mit zu wenigen Texten.
+	// Service answers the batch (title + message) with too few texts.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"translatedText":["ok"]}`))
 	}))
@@ -369,7 +369,7 @@ func TestTranslate_FehlerBeiNachrichtUndEingabepruefung(t *testing.T) {
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": strings.Repeat("ä", 2500), "message": strings.Repeat("ä", 2501)})
 	assert.Equal(t, "translation_text_too_long", codeOf(t, w.Body.Bytes()))
 
-	// Standardsprache und nicht aktivierte Sprache sind keine Ziele.
+	// Default language and non-enabled language are not targets.
 	for _, lang := range []string{"de", "fr"} {
 		w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": lang, "title": "x"})
 		assert.Equal(t, "language_not_available", codeOf(t, w.Body.Bytes()), lang)
@@ -386,7 +386,7 @@ func (c countingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return http.DefaultTransport.RoundTrip(r)
 }
 
-// Ersatzdienst: Fällt DeepL aus, übersetzt der LibreTranslate-Dienst des Betreibers.
+// Fallback service: if DeepL fails, the operator's LibreTranslate service translates.
 func deepLFixture(t *testing.T, deepLStatus int) translationFixture {
 	t.Helper()
 	f := newTranslationFixture(t)
@@ -430,7 +430,7 @@ func TestTranslate_DeepLOkNutztKeinenErsatz(t *testing.T) {
 }
 
 func TestTranslate_DeepLFehlerOhneErsatzdienstMeldetDenDeepLFehler(t *testing.T) {
-	f := deepLFixture(t, http.StatusTooManyRequests) // keine LIBRETRANSLATE_URL
+	f := deepLFixture(t, http.StatusTooManyRequests) // no LIBRETRANSLATE_URL
 
 	w := doStatusPageRequest(f.r, "POST", f.translatePath(), translateBody())
 
@@ -460,9 +460,9 @@ func TestTranslate_ErsatzdienstOhneTitelUebersetztNurDieNachricht(t *testing.T) 
 	assert.EqualValues(t, 1, calls.Load())
 }
 
-// Update-Nachrichten haben keinen Titel. Nur die Nachricht wird
-// übersetzt (ein Aufruf), der Titel bleibt leer; ohne Text in Titel UND
-// Nachricht gibt es 400. Gegenprobe: vorher verlangte der Endpunkt einen Titel.
+// Update messages have no title. Only the message is
+// translated (one call), the title stays empty; without text in title AND
+// message there is a 400. Control check: previously the endpoint required a title.
 func TestTranslate_NurNachrichtOhneTitel(t *testing.T) {
 	f := newTranslationFixture(t)
 	srv, calls := fakeTranslationServer(t, false, http.StatusOK)
@@ -476,7 +476,7 @@ func TestTranslate_NurNachrichtOhneTitel(t *testing.T) {
 	assert.Equal(t, "übersetzt", out["message"])
 	assert.EqualValues(t, 1, calls.Load(), "leerer Titel wird nicht an den Dienst geschickt")
 
-	// Blanker Titel zählt wie keiner.
+	// A blank title counts as none.
 	calls.Store(0)
 	w = doStatusPageRequest(f.r, "POST", f.translatePath(), map[string]any{"target_language": "en", "title": "  ", "message": "Text"})
 	require.Equal(t, http.StatusOK, w.Code)
@@ -491,7 +491,7 @@ func TestTranslate_NurNachrichtOhneTitel(t *testing.T) {
 		assert.Equal(t, "invalid_request", codeOf(t, w.Body.Bytes()))
 	}
 
-	// Fehler des Dienstes bei der Nachricht ohne Titel wird wie sonst gemeldet.
+	// A service error on the message without a title is reported as usual.
 	failing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusInternalServerError) }))
 	defer failing.Close()
 	t.Setenv("LIBRETRANSLATE_URL", failing.URL)
@@ -499,8 +499,8 @@ func TestTranslate_NurNachrichtOhneTitel(t *testing.T) {
 	assert.Equal(t, "translation_unavailable", codeOf(t, w.Body.Bytes()), "Fehler beim Titel")
 }
 
-// Zusammen mit dem Ersatzdienst (Review): Update-Texte ohne Titel gehen auch über
-// DeepL und den Ersatzdienst, ohne leeren Titel an den Dienst zu senden; ohne Text 400.
+// Together with the fallback service (review): update texts without a title also go via
+// DeepL and the fallback service, without sending an empty title to the service; without text 400.
 func TestTranslate_OhneTitelUeberDeepLUndErsatzdienst(t *testing.T) {
 	f := deepLFixture(t, http.StatusInternalServerError)
 	lt, calls := fakeTranslationServer(t, false, http.StatusOK)

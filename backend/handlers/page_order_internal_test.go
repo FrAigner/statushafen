@@ -28,9 +28,9 @@ func TestCreateOrderHandler_RejectsInvalidSlug(t *testing.T) {
 	assert.Zero(t, n, "keine Bestellung gespeichert")
 }
 
-// Eine Empfängeradresse, die sich nicht parsen lässt, bricht den Versand ab,
-// ohne dass eine SMTP-Verbindung aufgebaut wird (der Server in der Konfiguration
-// existiert nicht).
+// A recipient address that cannot be parsed aborts sending
+// without opening an SMTP connection (the server in the configuration
+// does not exist).
 func TestSendOrderConfirmationEmail_InvalidRecipientIsSkipped(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()
@@ -87,7 +87,7 @@ func TestConfirmOrderHandler_StorageErrorsAreRolledBack(t *testing.T) {
 	}
 }
 
-// assertTxOutcome prüft, dass bei einem Fehler weder Seite noch Konto zurückbleiben.
+// assertTxOutcome checks that on an error neither page nor account remain.
 func assertTxOutcome(t *testing.T, db *gorm.DB, wantPages int64) {
 	t.Helper()
 	var pages, users int64

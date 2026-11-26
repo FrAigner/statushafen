@@ -12,30 +12,30 @@ import (
 	"github.com/fraigner/statushafen/selfmonitor"
 )
 
-// Umgebung der Selbstüberwachung.
+// Environment of the self-monitoring.
 const (
-	// selfMonitorBackupJobEnv: job-run-Name der Backup-Metrik (z. B. "backup-prod").
-	// Leer = Backup-Prüfung aus.
+	// selfMonitorBackupJobEnv: job-run name of the backup metric (e.g. "backup-prod").
+	// Empty = backup check off.
 	selfMonitorBackupJobEnv = "SELFMONITOR_BACKUP_JOB"
-	// selfMonitorMetricsDirEnv: Ordner mit den job-run-Textfiles (im Container
-	// read-only eingehängt, siehe docker-compose.app.yml).
+	// selfMonitorMetricsDirEnv: folder with the job-run text files (mounted
+	// read-only in the container, see docker-compose.app.yml).
 	selfMonitorMetricsDirEnv     = "SELFMONITOR_METRICS_DIR"
 	defaultSelfMonitorMetricsDir = "/job-metrics"
-	// Das nächtliche Backup läuft täglich 03:00 UTC; 36 h lassen einen
-	// verpassten Lauf nicht sofort alarmieren, einen zweiten schon.
+	// The nightly backup runs daily at 03:00 UTC; 36 h do not raise an alarm
+	// immediately for one missed run, but do for a second one.
 	selfMonitorBackupMaxAge = 36 * time.Hour
-	// SMTP-Verbindungstest nur alle 5 Takte (Minuten), um den Anbieter zu schonen.
+	// SMTP connection test only every 5 ticks (minutes), to go easy on the provider.
 	selfMonitorMailEvery = 5
 )
 
-// SMTPAddress liefert das Dial-Target des Mailservers (wie der Versand).
+// SMTPAddress returns the dial target of the mail server (as used for sending).
 func SMTPAddress() string { return loadSMTPConfig().addr() }
 
-// selfMonitorChecks baut die Prüfungen aus der Umgebung. API (Loopback auf dem
-// eigenen Port) und Datenbank laufen immer; Frontend nur mit FRONTEND_URL
-// (Zeichen einer Produktionsumgebung mit ausgeliefertem Frontend), geprüft wird
-// aber die eigene Auslieferung auf dem Loopback, nie die öffentliche Adresse
-// (Cloudflare/Caddy antworten Go-Clients mit 401/403). Backup nur mit
+// selfMonitorChecks builds the checks from the environment. API (loopback on its
+// own port) and database always run; frontend only with FRONTEND_URL
+// (sign of a production environment with a deployed frontend), but what is checked
+// is the own delivery on the loopback, never the public address
+// (Cloudflare/Caddy answer Go clients with 401/403). Backup only with
 // SELFMONITOR_BACKUP_JOB.
 func (h *Handler) selfMonitorChecks(getenv func(string) string) []selfmonitor.Check {
 	client := &http.Client{Timeout: 15 * time.Second}
@@ -58,8 +58,8 @@ func (h *Handler) selfMonitorChecks(getenv func(string) string) []selfmonitor.Ch
 			FailedStatus: componentstatus.MajorOutage, Run: selfmonitor.FrontendCheck(client, "http://127.0.0.1:"+port)})
 	}
 	if job := strings.TrimSpace(getenv(selfMonitorBackupJobEnv)); job != "" && !selfmonitor.ValidJobName(job) {
-		// Review Der Name geht in den Dateinamen; ungültig = keine Prüfung.
-		// Fester Text, der Wert selbst wird nicht geloggt.
+		// Review: The name goes into the file name; invalid = no check.
+		// Fixed text, the value itself is not logged.
 		slog.Error("Selbstüberwachung: SELFMONITOR_BACKUP_JOB ungültig (erlaubt: a-z, 0-9, -), Backup-Prüfung nicht registriert")
 	} else if job != "" {
 		dir := getenv(selfMonitorMetricsDirEnv)
@@ -73,19 +73,19 @@ func (h *Handler) selfMonitorChecks(getenv func(string) string) []selfmonitor.Ch
 	return checks
 }
 
-// NewSelfMonitor baut den Monitor (Schalter: Systemeinstellung selfmonitor.enabled).
+// NewSelfMonitor builds the monitor (switch: system setting selfmonitor.enabled).
 func (h *Handler) NewSelfMonitor(getenv func(string) string) *selfmonitor.Monitor {
 	return selfmonitor.New(h.DB, h.selfMonitorChecks(getenv), func() (bool, error) {
 		return h.readSystemSettingBool(settingSelfMonitorEnabled, selfMonitorEnabledDefault)
 	})
 }
 
-// StartSelfMonitorFromEnv startet die Selbstüberwachung; Aufruf in main.go:
+// StartSelfMonitorFromEnv starts the self-monitoring; called in main.go:
 // defer h.StartSelfMonitorFromEnv(ctx, os.Getenv)().
 func (h *Handler) StartSelfMonitorFromEnv(ctx context.Context, getenv func(string) string) (stop func()) {
-	// Altfälle bereinigen, unabhängig vom Schalter (die Texte sind
-	// öffentlich). Idempotent, bei jedem Start; ein Fehler (alles zurückgerollt)
-	// verhindert den Start nicht, der nächste Start wiederholt ihn.
+	// Clean up legacy cases, independent of the switch (the texts are
+	// public). Idempotent, on every start; an error (everything rolled back)
+	// does not prevent startup, the next start repeats it.
 	if err := selfmonitor.NeutralizeHiddenIncidents(h.DB); err != nil {
 		slog.Error("Selbstüberwachung: Vorfalltexte nicht bereinigt", "error", err)
 	}

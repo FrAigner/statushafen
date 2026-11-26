@@ -16,15 +16,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// Ein Page Owner darf per E-Mail kein Konto an seine Seite hängen,
-// das schon eine Rolle auf einer anderen Seite oder eine SSO-Verknüpfung hat
-// (das Opfer verlöre sonst die SSO-Anmeldung der eigenen Seite).
+// A Page Owner may not attach by email an account to their page
+// that already has a role on another page or an SSO link
+// (the victim would otherwise lose the SSO login of their own page).
 func TestStatusPageUsers_SSOKonten(t *testing.T) {
 	t.Setenv("SMTP_HOST", "127.0.0.1")
-	t.Setenv("SMTP_PORT", "1") // keine echte Mail (anhängbare Konten bekommen eine Einladung)
+	t.Setenv("SMTP_PORT", "1") // no real mail (attachable accounts get an invitation)
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
-	t.Cleanup(h.WaitMails) // Einladungsmails laufen im Hintergrund
+	t.Cleanup(h.WaitMails) // Invitation mails run in the background
 	r := testutils.SetupRouter()
 	g := r.Group("/api/admin/pages/:page_id/users")
 	g.Use(middleware.AuthMiddleware())
@@ -59,15 +59,15 @@ func TestStatusPageUsers_SSOKonten(t *testing.T) {
 		db.Model(&models.UserStatusPageRole{}).Where("user_id = ? AND status_page_id = ?", uid, pageA.ID).Count(&n)
 		return n
 	}
-	// Statt anzuhängen entsteht eine Einladung; eine Mail bekommt nur
-	// ein anhängbares Konto (Versuch scheitert hier an SMTP_PORT=1 und wird auditiert).
+	// An invitation is created instead of attaching; only an attachable
+	// account gets a mail (the attempt fails here due to SMTP_PORT=1 and is audited).
 	invited := func(email string) bool {
 		var n int64
 		db.Model(&models.PageInvitation{}).Where("email = ? AND status_page_id = ?", email, pageA.ID).Count(&n)
 		return n == 1
 	}
 	mailFailures := func() int64 {
-		h.WaitMails() // der Versand läuft im Hintergrund
+		h.WaitMails() // sending runs in the background
 		return auditCountFor(db, "statuspage.invitation_email_failed")
 	}
 
@@ -106,7 +106,7 @@ func TestStatusPageUsers_SSOKonten(t *testing.T) {
 		if count(onlyA.ID) != 0 || !invited(onlyA.Email) || mailFailures() != before+1 {
 			t.Error("Verknüpfung nur mit Seite A darf nicht sperren (Einladung mit Mailversuch erwartet)")
 		}
-		// DB-Fehler bei der Prüfung "Rolle auf anderer Seite": nie fail-open.
+		// DB error during the "role on another page" check: never fail open.
 		_ = db.Callback().Query().Before("gorm:query").Register("fail803b", func(tx *gorm.DB) {
 			if tx.Statement.Table == "user_status_page_roles" && strings.Contains(fmt.Sprintf("%+v", tx.Statement.Clauses["WHERE"].Expression), "<>") {
 				_ = tx.AddError(errors.New("boom"))
@@ -166,7 +166,7 @@ func TestStatusPageUsers_SSOKonten(t *testing.T) {
 	})
 
 	t.Run("Versuch mit unbekannter Adresse wird ohne E-Mail im Audit vermerkt", func(t *testing.T) {
-		// als statuspage.invitation_created (gleich für jede Adresse).
+		// as statuspage.invitation_created (the same for every address).
 		var logs []models.AuditLog
 		db.Where("action = ?", "statuspage.invitation_created").Find(&logs)
 		if len(logs) == 0 {

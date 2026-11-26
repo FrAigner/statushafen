@@ -25,41 +25,41 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Einladungsablauf für Seitenbenutzer.
+// Invitation flow for page users.
 //
-// Bedrohung: Ein Seitenadmin hängte ein fremdes, vorhandenes Konto
-// per E-Mail direkt an seine Seite. Das Konto bekam ungefragt Staff-Mails und
-// konnte die SSO-Anmeldung seiner eigentlichen Seite verlieren.
+// Threat: A page admin attached a foreign, existing account
+// to their page directly by email. The account received staff mails unasked and
+// could lose the SSO login of its actual page.
 //
-// Ablauf jetzt (nur Nicht-Global-Admins; Global Admins ordnen weiter direkt zu):
-//  1. POST /api/admin/pages/:page_id/users {email, role_id} legt für jede Adresse,
-//     die noch kein Mitglied ist, eine Einladung an (gleiche Antwort und gleiche
-//     Liste, ob ein Konto existiert oder nicht). Nur ein vorhandenes, anhängbares
-//     Konto bekommt eine Mail; sie geht im Hintergrund raus. Die Kontosuche führt für
-// bekannte und unbekannte Adressen dieselben Abfragen aus; eine
-//     exakt gleiche Laufzeit wird nicht zugesichert.
-//  2. Die Mail enthält einen Einmal-Link mit 128 Bit Zufall; gespeichert ist nur
-//     der SHA-256. Gültig pageInvitationTTL.
-//  3. Annehmen/Ablehnen (POST /api/invitations/{preview,accept,decline}) nur
-//     angemeldet UND mit dem Konto, dessen Adresse eingeladen wurde. Jede
-//     Abweichung (falscher Token, anderes Konto) ergibt dieselbe 404.
-// 4. Beim Annehmen gelten dieselben Grenzen wie: Global-Admin-Konten,
-//     Konten mit SSO-Verknüpfung oder Rolle auf einer anderen Seite und
-//     Seiten-SSO-Sitzungen nehmen nicht selbst an (409), das bleibt dem Global
-//     Admin. Außerdem muss der Einladende die Rolle noch vergeben dürfen.
+// Flow now (non-global admins only; global admins still assign directly):
+//  1. POST /api/admin/pages/:page_id/users {email, role_id} creates an invitation
+//     for each address that is not yet a member (same response and same
+//     list whether an account exists or not). Only an existing, attachable
+//     account gets a mail; it is sent in the background. The account lookup runs
+//     the same queries for known and unknown addresses; an
+//     exactly equal runtime is not guaranteed.
+//  2. The mail contains a one-time link with 128 bits of randomness; only
+//     its SHA-256 is stored. Valid for pageInvitationTTL.
+//  3. Accepting/declining (POST /api/invitations/{preview,accept,decline}) only
+//     logged in AND with the account whose address was invited. Any
+//     deviation (wrong token, different account) yields the same 404.
+// 4. On accepting, the same limits apply as when attaching directly: global admin accounts,
+//     accounts with an SSO link or a role on another page, and
+//     page SSO sessions do not accept on their own (409); that stays with the global
+//     admin. In addition, the inviter must still be allowed to grant the role.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const (
-	// pageInvitationTTL: so lange gilt eine Einladung.
+	// pageInvitationTTL: how long an invitation stays valid.
 	pageInvitationTTL = 7 * 24 * time.Hour
-	// maxPendingPageInvitations begrenzt offene Einladungen je Seite (Schutz vor
-	// Mail-Flut über viele Adressen; gezählt werden alle, auch ohne Konto).
+	// maxPendingPageInvitations limits open invitations per page (protection against
+	// mail flooding via many addresses; all are counted, even without an account).
 	maxPendingPageInvitations = 100
-	// Security-Review Eine offene Einladung derselben Adresse, die
-	// jünger ist als pageInvitationResendAfter, bleibt unverändert (keine neue
-	// Mail, kein neuer Token). Höchstens maxPageInvitationsPerDay neue
-	// Einladungen je Seite in 24 Stunden. Beide Regeln gelten für jede Adresse,
-	// mit oder ohne Konto (kein Orakel).
+	// Security review: An open invitation for the same address that is
+	// younger than pageInvitationResendAfter stays unchanged (no new
+	// mail, no new token). At most maxPageInvitationsPerDay new
+	// invitations per page within 24 hours. Both rules apply to every address,
+	// with or without an account (no oracle).
 	pageInvitationResendAfter = 30 * time.Minute
 	maxPageInvitationsPerDay  = 200
 	auditInvitationCreated    = "statuspage.invitation_created"
@@ -72,9 +72,9 @@ const (
 	codeInvitationTokenMissing    = "invitation_token_missing"
 )
 
-// pageUserEmailAcceptedMsg ist die einheitliche Antwort beim Hinzufügen per
-// E-Mail (Einladung angelegt, Rolle eines Mitglieds geändert oder nichts
-// geändert), gleich für bekannte und unbekannte Adressen.
+// pageUserEmailAcceptedMsg is the uniform response when adding by
+// email (invitation created, a member's role changed, or nothing
+// changed), the same for known and unknown addresses.
 const pageUserEmailAcceptedMsg = "Wenn ein Konto mit dieser E-Mail-Adresse existiert, erhält es eine Einladung; bestehende Mitglieder erhalten die gewählte Rolle"
 
 func hashPageInvitationToken(token string) string {
@@ -82,15 +82,15 @@ func hashPageInvitationToken(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// invitePageUser legt (oder erneuert) die Einladung für email auf der Seite an.
-// target ist das gefundene, anhängbare Konto (ID 0: keins, dann keine Mail),
-// actorPerms die Rechte des Aufrufers auf der Seite. Die Antwort ist in jedem
-// Fall dieselbe neutrale 200 (außer bei Formfehlern und den Obergrenzen, die
-// ebenfalls nicht vom Konto abhängen).
+// invitePageUser creates (or renews) the invitation for email on the page.
+// target is the account found and attachable (ID 0: none, then no mail),
+// actorPerms the caller's permissions on the page. In every case the response is
+// the same neutral 200 (except for form errors and the upper limits, which
+// also do not depend on the account).
 func (h *Handler) invitePageUser(c *gin.Context, page models.StatusPage, role models.Role, email string, target models.User, actorPerms string) {
 	email = strings.ToLower(strings.TrimSpace(email))
-	// Nur nackte Adressen: Sie landen im To:-Header und in der Liste. Die
-	// Prüfung hängt nicht vom Konto ab (kein Orakel).
+	// Bare addresses only: They end up in the To: header and in the list. The
+	// check does not depend on the account (no oracle).
 	if !isPlainEmailAddress(email) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email address", "code": "email_invalid"})
 		return
@@ -100,21 +100,21 @@ func (h *Handler) invitePageUser(c *gin.Context, page models.StatusPage, role mo
 	var inv models.PageInvitation
 	var audit models.AuditLog
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
-		// Review F3: Einladungen einer Seite laufen nacheinander. Die
-		// Seitenzeile wird unter Postgres gesperrt (SQLite lässt die Klausel weg und
-		// serialisiert Schreiber ohnehin); erst nach dem Commit der ersten sieht die
-		// zweite Sperre und Zähler. Fehler gehen nach oben.
-		// Re-Review W1: FOR NO KEY UPDATE statt FOR UPDATE. Der INSERT in
-		// user_status_page_roles (Annehmen) braucht wegen des Fremdschlüssels FOR KEY
-		// SHARE auf die Seitenzeile; FOR UPDATE kollidiert damit und führte mit einem
-		// gleichzeitigen Neu-Einladen derselben Adresse (wartet auf die vom Annehmen
-		// gelöschte Einladungszeile) zum Deadlock (40P01). NO KEY UPDATE sperrt
-		// Einladende gegeneinander, nicht gegen KEY SHARE.
+		// Review F3: Invitations of a page run one after another. The
+		// page row is locked under Postgres (SQLite omits the clause and
+		// serializes writers anyway); only after the first one commits does the
+		// second see lock and counters. Errors go upward.
+		// Re-review W1: FOR NO KEY UPDATE instead of FOR UPDATE. The INSERT into
+		// user_status_page_roles (accepting) needs FOR KEY
+		// SHARE on the page row because of the foreign key; FOR UPDATE collides with it and, with a
+		// concurrent re-invite of the same address (waiting for the invitation row
+		// deleted by the accept), led to a deadlock (40P01). NO KEY UPDATE locks
+		// inviters against each other, not against KEY SHARE.
 		if err := tx.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Select("id").
 			Where("id = ?", page.ID).Take(&models.StatusPage{}).Error; err != nil {
 			return err
 		}
-		// Abgelaufene Einladungen der Seite aufräumen.
+		// Clean up expired invitations of the page.
 		if err := tx.Unscoped().Where("status_page_id = ? AND expires_at < ?", page.ID, now).
 			Delete(&models.PageInvitation{}).Error; err != nil {
 			return err
@@ -136,23 +136,23 @@ func (h *Handler) invitePageUser(c *gin.Context, page models.StatusPage, role mo
 		}
 		if err := tx.Create(&inv).Error; err != nil {
 			if isUniqueViolation(err) {
-				// Ein gleichzeitiger Aufruf hat die Adresse zuerst angelegt (Unique-Index
-				// auf (Seite, Adresse)): wie "unverändert" behandeln, keine Mail.
+				// A concurrent call created the address first (unique index
+				// on (page, address)): treat as "unchanged", no mail.
 				return errInvitationUnchanged
 			}
 			return err
 		}
-		// Audit-Eintrag in derselben Transaktion: Die Tagesgrenze zählt diese
-		// Einträge, ein späteres Schreiben ließe eine zweite Transaktion zwischen
-		// Commit und Audit den alten Zähler sehen. Scheitert er, entsteht nichts.
-		// Audit ohne Adresse und ohne Konto-Bezug: Der Eintrag ist für bekannte und
-		// unbekannte Adressen gleich (Forensik über Anzahl und Zeitpunkt).
+		// Audit entry in the same transaction: The daily limit counts these
+		// entries; writing later would let a second transaction between
+		// commit and audit see the old counter. If it fails, nothing is created.
+		// Audit without address and without account reference: The entry is the same for known and
+		// unknown addresses (forensics via count and time).
 		audit = newAuditEntry(c, auditInvitationCreated, "config", "StatusPage", strconv.Itoa(int(page.ID)), page.Name,
 			fmt.Sprintf("invitation_id=%d role_id=%d", inv.ID, role.ID))
 		return tx.Create(&audit).Error
 	})
 	if errors.Is(err, errInvitationUnchanged) {
-		// Gleiche Antwort wie beim Anlegen, aber nichts geändert, keine Mail.
+		// Same response as when creating, but nothing changed, no mail.
 		c.JSON(http.StatusOK, gin.H{"message": pageUserEmailAcceptedMsg})
 		return
 	}
@@ -176,19 +176,19 @@ var (
 	errInvitationUnchanged = errors.New("invitation unchanged")
 )
 
-// replaceablePendingInvitation prüft die Sperre für (Seite, Adresse).
-// Review B1: Die 30-Minuten-Sperre hängt an der Adresse, nicht an
-// der offenen Zeile. Zurückgezogene und abgelehnte Einladungen bleiben deshalb
-// als soft-gelöschte Zeile ("Grabstein") bis zum Ablauf der Sperre stehen und
-// zählen hier mit (Unscoped); sonst hebt DELETE + neues POST die Sperre auf und
-// erzeugt beliebig viele Mails. Der Schlüssel ist die schon normalisierte
-// Adresse (Trim/Lowercase) und immer auf status_page_id begrenzt.
+// replaceablePendingInvitation checks the lock for (page, address).
+// Review B1: The 30-minute lock is tied to the address, not to
+// the open row. Revoked and declined invitations therefore remain
+// as a soft-deleted row ("tombstone") until the lock expires and
+// count here (Unscoped); otherwise DELETE + new POST lifts the lock and
+// produces arbitrarily many mails. The key is the already normalized
+// address (trim/lowercase), always restricted to status_page_id.
 //
-// Ergebnis: keine Zeile -> nil; jüngste Zeile jünger als
-// pageInvitationResendAfter (offen oder Grabstein) oder offene Einladung mit
-// einer Rolle, die der Aufrufer nicht abdeckt -> errInvitationUnchanged; sonst
-// werden alle Zeilen der Adresse endgültig gelöscht (alter Link ungültig) und
-// nil geliefert. DB-Fehler gehen unverändert nach oben (fail closed).
+// Result: no row -> nil; newest row younger than
+// pageInvitationResendAfter (open or tombstone) or open invitation with
+// a role the caller does not cover -> errInvitationUnchanged; otherwise
+// all rows of the address are permanently deleted (old link invalid) and
+// nil is returned. DB errors go upward unchanged (fail closed).
 func replaceablePendingInvitation(tx *gorm.DB, pageID uint, email, actorPerms string, now time.Time) error {
 	var rows []models.PageInvitation
 	if err := tx.Unscoped().Where("status_page_id = ? AND email = ?", pageID, email).
@@ -203,12 +203,12 @@ func replaceablePendingInvitation(tx *gorm.DB, pageID uint, email, actorPerms st
 	}
 	for _, old := range rows {
 		if old.DeletedAt.Valid {
-			continue // Grabstein: keine Rolle mehr zu schützen
+			continue // Tombstone: no role left to protect
 		}
 		var oldRole models.Role
-		// Review F4: Nur "Rolle gelöscht" macht die alte Einladung ersetzbar;
-		// jeder andere Fehler bricht ab (fail closed), sonst ließe ein DB-Fehler
-		// eine stärkere Einladung überschreiben.
+		// Review F4: Only "role deleted" makes the old invitation replaceable;
+		// every other error aborts (fail closed), otherwise a DB error would
+		// let a stronger invitation be overwritten.
 		if err := tx.First(&oldRole, old.RoleID).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
 				return err
@@ -223,9 +223,9 @@ func replaceablePendingInvitation(tx *gorm.DB, pageID uint, email, actorPerms st
 		Delete(&models.PageInvitation{}).Error
 }
 
-// checkInvitationLimits: höchstens maxPendingPageInvitations offen und
-// maxPageInvitationsPerDay neu angelegt (gezählt im Audit-Log, CreatedAt in
-// Unix-Sekunden) je Seite.
+// checkInvitationLimits: at most maxPendingPageInvitations open and
+// maxPageInvitationsPerDay newly created (counted in the audit log, CreatedAt in
+// Unix seconds) per page.
 func checkInvitationLimits(tx *gorm.DB, pageID uint, now time.Time) error {
 	var open int64
 	if err := tx.Model(&models.PageInvitation{}).Where("status_page_id = ?", pageID).Count(&open).Error; err != nil {
@@ -246,31 +246,31 @@ func checkInvitationLimits(tx *gorm.DB, pageID uint, now time.Time) error {
 	return nil
 }
 
-// deletePageInvitationsOfUser (Security-Review): beim Löschen eines
-// Kontos alle Einladungen an seine Adresse oder an das Konto sowie alle von
-// ihm ausgesprochenen Einladungen entfernen.
+// deletePageInvitationsOfUser (security review): when deleting an
+// account, remove all invitations to its address or to the account as well as all
+// invitations issued by it.
 func deletePageInvitationsOfUser(tx *gorm.DB, u models.User) error {
 	return tx.Unscoped().Where("email = ? OR invited_user_id = ? OR invited_by_id = ?", strings.ToLower(strings.TrimSpace(u.Email)), u.ID, u.ID).
 		Delete(&models.PageInvitation{}).Error
 }
 
-// lockAccountForDeletion: Einstieg jeder Konto-Löschung
-// (DeleteUserHandler, deleteAccount). Zuerst die Einladungen des Kontos
-// löschen, danach die Benutzerzeile mit FOR UPDATE sperren; erst DANACH dürfen
-// Rollen, Tags usw. entfernt werden. Gründe:
-//   - Die Annahme (AcceptPageInvitationHandler) löscht ihre Einladungszeile und
-//     sperrt dann die Benutzerzeile. Wer die Rollen vor dieser Sperre entfernt,
-//     löscht nichts, die Annahme committet danach ihre Rolle: Waise am weich
-//     gelöschten Konto bzw. FK-Fehler (500) beim harten Löschen in me_delete.
-//     Mit der Sperre serialisieren beide Wege; die spätere Rollen-Löschung sieht
-//     die committete Rolle (READ COMMITTED).
-//   - Reihenfolge Einladung -> Benutzer ist die der Annahme. Umgekehrt
-//     (Benutzer zuerst) hielte die Löschung die Benutzersperre und wartete auf
-//     die Einladungszeile, die die Annahme hält und mit der sie auf die
-//     Benutzersperre wartet: Deadlock. Wartet die Löschung auf die Einladungszeile,
-//     hält sie noch keine Benutzersperre.
+// lockAccountForDeletion: entry point of every account deletion
+// (DeleteUserHandler, deleteAccount). First delete the account's invitations,
+// then lock the user row with FOR UPDATE; only AFTER that may
+// roles, tags, etc. be removed. Reasons:
+//   - Accepting (AcceptPageInvitationHandler) deletes its invitation row and
+//     then locks the user row. Anyone who removes the roles before this lock
+//     deletes nothing, and the accept commits its role afterwards: orphan on the soft-
+//     deleted account or FK error (500) on the hard delete in me_delete.
+//     With the lock both paths serialize; the later role deletion sees
+//     the committed role (READ COMMITTED).
+//   - The order invitation -> user is that of accepting. The reverse
+//     (user first) would have the deletion hold the user lock and wait for
+//     the invitation row, which the accept holds and with which it waits for
+//     the user lock: deadlock. If the deletion waits for the invitation row,
+//     it does not yet hold a user lock.
 //
-// Fehler (auch Konto nicht mehr da) brechen die Transaktion ab: fail closed.
+// Errors (also account no longer there) abort the transaction: fail closed.
 func lockAccountForDeletion(tx *gorm.DB, u models.User) error {
 	if err := deletePageInvitationsOfUser(tx, u); err != nil {
 		return err
@@ -278,27 +278,27 @@ func lockAccountForDeletion(tx *gorm.DB, u models.User) error {
 	return lockLiveUser(tx, u.ID)
 }
 
-// lockLiveUser sperrt die Benutzerzeile mit FOR UPDATE und liefert
-// gorm.ErrRecordNotFound, wenn das Konto nicht (mehr) existiert, also auch
-// nach einer gleichzeitig committeten Löschung (deleted_at-Filter von GORM;
-// unter READ COMMITTED prüft Postgres die Zeile nach dem Warten neu).
+// lockLiveUser locks the user row with FOR UPDATE and returns
+// gorm.ErrRecordNotFound if the account does not (or no longer) exist, i.e. also
+// after a concurrently committed deletion (GORM deleted_at filter;
+// under READ COMMITTED Postgres rechecks the row after waiting).
 //
-// Wer Rollen an einem Konto anlegt oder ändert (applyUserUpdate,
-// AddStatusPageUserHandler), ruft das ZUERST in seiner Transaktion auf. Ohne
-// Sperre wartete der Schreiber höchstens auf Rollenzeilen, die die Löschung
-// schon entfernt hat, und legte danach trotzdem eine Rolle am gelöschten Konto
-// an (Antwort 200). Lock-Reihenfolge: Einladungszeile (nur Annahme/Löschung)
-// -> Benutzerzeile -> Rollenzeilen. Diese Schreiber halten vor der
-// Benutzersperre nichts (keine Einladungs- oder Rollenzeile), reihen sich also
-// vor Annahme und Löschung ein und können keinen Zyklus bilden.
+// Anyone who creates or changes roles on an account (applyUserUpdate,
+// AddStatusPageUserHandler) calls this FIRST in their transaction. Without the
+// lock the writer would at most wait for role rows that the deletion
+// has already removed, and would still create a role on the deleted account
+// afterwards (response 200). Lock order: invitation row (accept/deletion only)
+// -> user row -> role rows. These writers hold nothing before the
+// user lock (no invitation or role row), so they queue up
+// before accept and deletion and cannot form a cycle.
 func lockLiveUser(tx *gorm.DB, userID uint) error {
 	var locked models.User
 	return tx.Clauses(clause.Locking{Strength: "UPDATE"}).Select("id").First(&locked, userID).Error
 }
 
-// pruneExpiredInvitations löscht abgelaufene Einladungen aller Seiten sowie
-// Grabsteine zurückgezogener/abgelehnter Einladungen, deren Sperre vorbei ist
-// (Review B1; idempotent, läuft im Wartungs-Tick).
+// pruneExpiredInvitations deletes expired invitations of all pages as well as
+// tombstones of revoked/declined invitations whose lock has ended
+// (review B1; idempotent, runs in the maintenance tick).
 func pruneExpiredInvitations(db *gorm.DB, now time.Time) (int64, error) {
 	res := db.Unscoped().
 		Where("expires_at < ? OR (deleted_at IS NOT NULL AND created_at < ?)", now, now.Add(-pageInvitationResendAfter)).
@@ -306,7 +306,7 @@ func pruneExpiredInvitations(db *gorm.DB, now time.Time) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// pageInvitationDTO: offene Einladung in der Seitenverwaltung (ohne Token).
+// pageInvitationDTO: open invitation in page administration (without token).
 type pageInvitationDTO struct {
 	ID        uint      `json:"ID"`
 	Email     string    `json:"Email"`
@@ -316,7 +316,7 @@ type pageInvitationDTO struct {
 	CreatedAt time.Time `json:"CreatedAt"`
 }
 
-// GET /api/admin/pages/:page_id/invitations: offene, gültige Einladungen der Seite.
+// GET /api/admin/pages/:page_id/invitations: open, valid invitations of the page.
 func (h *Handler) GetPageInvitationsHandler(c *gin.Context) {
 	pageID, err := strconv.Atoi(c.Param("page_id"))
 	if err != nil {
@@ -335,8 +335,8 @@ func (h *Handler) GetPageInvitationsHandler(c *gin.Context) {
 	}
 	if len(roleIDs) > 0 {
 		var roles []models.Role
-		// H5: Ein Fehler beim Laden der Rollennamen ist ein 500, keine
-		// Liste mit leeren Namen.
+		// H5: An error while loading the role names is a 500, not a
+		// list with empty names.
 		if err := h.DB.Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Laden", "code": "server_error"})
 			return
@@ -352,9 +352,9 @@ func (h *Handler) GetPageInvitationsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// DELETE /api/admin/pages/:page_id/invitations/:id: Einladung zurückziehen.
-// Wie beim Entfernen eines Mitglieds: Eine Einladung mit stärkerer Rolle zieht
-// nur zurück, wer diese Rolle selbst abdeckt (oder Global Admin ist).
+// DELETE /api/admin/pages/:page_id/invitations/:id: revoke an invitation.
+// As when removing a member: An invitation with a stronger role is revoked
+// only by someone who covers that role themselves (or is a global admin).
 func (h *Handler) RevokePageInvitationHandler(c *gin.Context) {
 	pageID, err1 := strconv.Atoi(c.Param("page_id"))
 	invID, err2 := strconv.Atoi(c.Param("id"))
@@ -368,14 +368,14 @@ func (h *Handler) RevokePageInvitationHandler(c *gin.Context) {
 			respondInvitationNotFound(c)
 			return
 		}
-		// Review F2: DB-Fehler sind kein "nicht gefunden".
+		// Review F2: DB errors are not "not found".
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Zurückziehen", "code": "server_error"})
 		return
 	}
 	if !h.isEffectiveGlobalAdmin(c) {
-		// F6: Eine gelöschte Rolle (nicht gefunden) schützt nichts
-		// mehr, die Einladung ist ohnehin gegenstandslos: Zurückziehen erlaubt.
-		// Jeder andere Lesefehler ist ein 500 (fail closed, nichts geändert).
+		// F6: A deleted role (not found) protects nothing
+		// anymore, the invitation is moot anyway: revoking allowed.
+		// Any other read error is a 500 (fail closed, nothing changed).
 		var role models.Role
 		if err := h.DB.First(&role, inv.RoleID).Error; err != nil {
 			if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -387,14 +387,14 @@ func (h *Handler) RevokePageInvitationHandler(c *gin.Context) {
 			return
 		}
 	}
-	// Soft-Delete (Review B1): Die Zeile bleibt als Grabstein für die Sperre.
+	// Soft delete (review B1): The row remains as a tombstone for the lock.
 	res := h.DB.Delete(&inv)
 	if res.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Zurückziehen", "code": "server_error"})
 		return
 	}
 	if res.RowsAffected == 0 {
-		// O1: Ein gleichzeitiges Annehmen/Ablehnen war schneller; nichts zurückgezogen, kein Audit.
+		// O1: A concurrent accept/decline was faster; nothing revoked, no audit.
 		respondInvitationNotFound(c)
 		return
 	}
@@ -406,9 +406,9 @@ type pageInvitationTokenRequest struct {
 	Token string `json:"token"`
 }
 
-// loadOwnInvitation liest Token und angemeldetes Konto und liefert die
-// Einladung, wenn sie zu genau diesem Konto gehört. Sonst ist die Antwort
-// schon gesendet (400 ohne Token, 404 für unbekannte Token UND fremde Konten).
+// loadOwnInvitation reads the token and logged-in account and returns the
+// invitation if it belongs to exactly this account. Otherwise the response is
+// already sent (400 without token, 404 for unknown tokens AND foreign accounts).
 func (h *Handler) loadOwnInvitation(c *gin.Context) (models.PageInvitation, models.User, bool) {
 	var in pageInvitationTokenRequest
 	if err := c.ShouldBindJSON(&in); err != nil || strings.TrimSpace(in.Token) == "" {
@@ -419,8 +419,8 @@ func (h *Handler) loadOwnInvitation(c *gin.Context) (models.PageInvitation, mode
 	var u models.User
 	invErr := h.DB.Where("token_hash = ?", hashPageInvitationToken(strings.TrimSpace(in.Token))).First(&inv).Error
 	userErr := h.DB.First(&u, getUserID(c)).Error
-	// Review F2: Nur "nicht gefunden" ist die neutrale 404; ein anderer DB-Fehler
-	// ist ein 500 und verändert nichts.
+	// Review F2: Only "not found" is the neutral 404; any other DB error
+	// is a 500 and changes nothing.
 	if nonNotFound(invErr) != nil || nonNotFound(userErr) != nil {
 		respondInvitationServerError(c)
 		return models.PageInvitation{}, models.User{}, false
@@ -436,7 +436,7 @@ func respondInvitationServerError(c *gin.Context) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Laden der Einladung", "code": "server_error"})
 }
 
-// nonNotFound liefert err, außer es ist "nicht gefunden" (dann nil).
+// nonNotFound returns err unless it is "not found" (then nil).
 func nonNotFound(err error) error {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
@@ -448,8 +448,8 @@ func respondInvitationNotFound(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "Invitation not found", "code": codeInvitationNotFound})
 }
 
-// invitationContext prüft eine eigene Einladung auf Ablauf, Seite und Rolle.
-// Abgelaufene oder gegenstandslose Einladungen werden dabei gelöscht.
+// invitationContext checks an own invitation for expiry, page and role.
+// Expired or moot invitations are deleted in the process.
 func (h *Handler) invitationContext(c *gin.Context, inv models.PageInvitation) (models.StatusPage, models.Role, bool) {
 	var page models.StatusPage
 	var role models.Role
@@ -458,9 +458,9 @@ func (h *Handler) invitationContext(c *gin.Context, inv models.PageInvitation) (
 		c.JSON(http.StatusGone, gin.H{"error": "Invitation expired", "code": codeInvitationExpired})
 		return page, role, false
 	}
-	// Review F2: Nur "nicht gefunden" (Seite/Rolle/Einladender weg oder Rechte
-	// verloren) macht die Einladung gegenstandslos. Ein anderer DB-Fehler
-	// verbraucht sie nicht: 500, kein Schreibzugriff, kein Audit.
+	// Review F2: Only "not found" (page/role/inviter gone or rights
+	// lost) makes the invitation moot. Any other DB error
+	// does not consume it: 500, no write access, no audit.
 	gone, err := h.invitationSubjectGone(h.DB, &page, &role, inv)
 	if err != nil {
 		respondInvitationServerError(c)
@@ -474,10 +474,10 @@ func (h *Handler) invitationContext(c *gin.Context, inv models.PageInvitation) (
 	return page, role, true
 }
 
-// invitationSubjectGone lädt Seite und Rolle und meldet, ob die Einladung
-// gegenstandslos ist (true) oder ob ein DB-Fehler vorliegt (Fehler). db ist
-// h.DB für die Vorprüfung und die Transaktion beim Annehmen (F5:
-// Rolle und Rechte des Einladenden werden dort erneut gelesen).
+// invitationSubjectGone loads page and role and reports whether the invitation
+// is moot (true) or whether a DB error occurred (error). db is
+// h.DB for the pre-check and the transaction when accepting (F5:
+// role and inviter's rights are re-read there).
 func (h *Handler) invitationSubjectGone(db *gorm.DB, page *models.StatusPage, role *models.Role, inv models.PageInvitation) (bool, error) {
 	if err := db.First(page, inv.StatusPageID).Error; err != nil {
 		return errors.Is(err, gorm.ErrRecordNotFound), nonNotFound(err)
@@ -496,12 +496,12 @@ func (h *Handler) invitationSubjectGone(db *gorm.DB, page *models.StatusPage, ro
 	return !may, err
 }
 
-// inviterMayStillAssign: Der Einladende ist noch Global Admin oder hat auf der
-// Seite eine Rolle, die Konten hinzufügen darf und die Einladungsrolle abdeckt.
-// Wer seine Rechte verloren hat, dessen offene Einladungen verfallen.
+// inviterMayStillAssign: The inviter is still a global admin or has on the
+// page a role that may add accounts and covers the invitation role.
+// Whoever lost their rights has their open invitations lapse.
 //
-// Review F2: (false, nil) heißt "Rechte verloren oder Konto/Rolle nicht
-// gefunden"; jeder andere DB-Fehler kommt als Fehler zurück (fail closed).
+// Review F2: (false, nil) means "rights lost or account/role not
+// found"; any other DB error is returned as an error (fail closed).
 func (h *Handler) inviterMayStillAssign(db *gorm.DB, inv models.PageInvitation, role models.Role) (bool, error) {
 	var inviter models.User
 	if err := db.First(&inviter, inv.InvitedByID).Error; err != nil {
@@ -517,16 +517,16 @@ func (h *Handler) inviterMayStillAssign(db *gorm.DB, inv models.PageInvitation, 
 	return permissions.Covers(ur.Role.Permissions, "pages:create") && roleCoveredByActor(ur.Role.Permissions, role), nil
 }
 
-// accountMayJoinByInvitation: dieselben Grenzen wie beim direkten Anhängen
-// durch Nicht-Global-Admins. Die Mitgliedschaft auf einer zweiten
-// Seite sperrte sonst die SSO-Anmeldung der ersten (errOIDCOtherPageRole).
+// accountMayJoinByInvitation: the same limits as for direct attaching
+// by non-global admins. Membership on a second
+// page would otherwise block the SSO login of the first (errOIDCOtherPageRole).
 func (h *Handler) accountMayJoinByInvitation(c *gin.Context, u models.User, pageID uint) bool {
 	return middleware.SSOPageID(c) == 0 && !u.IsGlobalAdmin && u.SSOProvider == "" && u.SSOSubject == "" &&
 		!h.hasRoleOnOtherPage(u.ID, pageID) && !h.hasSSOIdentityOnOtherPage(u.ID, pageID)
 }
 
-// POST /api/invitations/preview {token}: Seite und Rolle der eigenen Einladung.
-// Verbraucht den Token nicht (Mail-Gateways mit Link-Prefetching).
+// POST /api/invitations/preview {token}: page and role of the own invitation.
+// Does not consume the token (mail gateways with link prefetching).
 func (h *Handler) PreviewPageInvitationHandler(c *gin.Context) {
 	inv, _, ok := h.loadOwnInvitation(c)
 	if !ok {
@@ -539,7 +539,7 @@ func (h *Handler) PreviewPageInvitationHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"page_name": page.Name, "role_name": role.Name, "expires_at": inv.ExpiresAt})
 }
 
-// POST /api/invitations/accept {token}: Einladung annehmen (einmalig).
+// POST /api/invitations/accept {token}: accept an invitation (one-time).
 func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 	inv, u, ok := h.loadOwnInvitation(c)
 	if !ok {
@@ -554,10 +554,10 @@ func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 		return
 	}
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
-		// Einmalig: Nur wer die Zeile tatsächlich löscht, legt die Mitgliedschaft an.
-		// Review F1: nur die offene Zeile. Ohne "deleted_at IS NULL" träfe das
-		// Unscoped-DELETE auch den Grabstein einer gleichzeitig zurückgezogenen
-		// oder abgelehnten Einladung (RowsAffected = 1) und die Annahme ginge durch.
+		// One-time: Only whoever actually deletes the row creates the membership.
+		// Review F1: only the open row. Without "deleted_at IS NULL" the
+		// Unscoped DELETE would also hit the tombstone of a concurrently revoked
+		// or declined invitation (RowsAffected = 1) and the accept would go through.
 		res := tx.Unscoped().Where("id = ? AND deleted_at IS NULL", inv.ID).Delete(&models.PageInvitation{})
 		if res.Error != nil {
 			return res.Error
@@ -565,14 +565,14 @@ func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 		if res.RowsAffected != 1 {
 			return gorm.ErrRecordNotFound
 		}
-		// H3, Review-Fund 1: ZUERST die Benutzerzeile mit FOR UPDATE
-		// lesen (samt Global-Admin/SSO-Prüfung). Jeder INSERT in
-		// user_status_page_roles nimmt wegen des Fremdschlüssels FOR KEY SHARE auf
-		// die Benutzerzeile; das kollidiert mit FOR UPDATE und macht diese Sperre zum
-		// echten Serialisierungspunkt je Konto. Ein FOR UPDATE auf die Rollenzeilen
-		// allein sperrt bei einem Konto ohne Rolle nichts: Zwei gleichzeitig
-		// angenommene Einladungen (Seite A und B) sähen beide "keine Rolle". Erst
-		// nach der Sperre wird die Ein-Seiten-Grenze geprüft.
+		// H3, review finding 1: FIRST read the user row with FOR UPDATE
+		// (including the global admin/SSO check). Every INSERT into
+		// user_status_page_roles takes FOR KEY SHARE on
+		// the user row because of the foreign key; that collides with FOR UPDATE and makes this lock the
+		// real serialization point per account. A FOR UPDATE on the role rows
+		// alone locks nothing for an account without a role: two concurrently
+		// accepted invitations (page A and B) would both see "no role". Only
+		// after the lock is the one-page limit checked.
 		var fresh models.User
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&fresh, u.ID).Error; err != nil {
 			return err
@@ -580,15 +580,15 @@ func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 		if fresh.IsGlobalAdmin || fresh.SSOProvider != "" || fresh.SSOSubject != "" {
 			return errInvitationOtherPage
 		}
-		// Security-Review Ein-Seiten-Grenze in der Transaktion erneut
-		// prüfen (nach der Benutzersperre; die Rollenzeilen werden unter Postgres
-		// zusätzlich gesperrt), damit eine gleichzeitig vergebene Rolle auf einer
-		// anderen Seite nicht durchrutscht.
+		// Security review: Re-check the one-page limit in the transaction
+		// (after the user lock; the role rows are additionally locked under
+		// Postgres) so that a concurrently granted role on
+		// another page does not slip through.
 		if err := ensureNoRoleOnOtherPage(tx, u.ID, page.ID); err != nil {
 			return err
 		}
-		// F5: Seite, Rolle und Rechte des Einladenden gelten nur, wenn
-		// sie auch jetzt noch bestehen (vorher nur Vorprüfung, kleines Zeitfenster).
+		// F5: Page, role and the inviter's rights count only if
+		// they still exist now (before that only a pre-check, small time window).
 		var txPage models.StatusPage
 		var txRole models.Role
 		gone, err := h.invitationSubjectGone(tx, &txPage, &txRole, inv)
@@ -621,7 +621,7 @@ func (h *Handler) AcceptPageInvitationHandler(c *gin.Context) {
 		respondInvitationAccountConflict(c)
 		return
 	case errors.Is(err, errInvitationAlreadyMember) || isUniqueViolation(err):
-		// Die Einladung ist verbraucht; die bestehende Rolle bleibt unverändert.
+		// The invitation is consumed; the existing role remains unchanged.
 		h.DB.Unscoped().Where("id = ?", inv.ID).Delete(&models.PageInvitation{}) //nolint:errcheck // Best Effort
 		c.JSON(http.StatusConflict, gin.H{"error": "Already a member of this page", "code": codeInvitationAlreadyMember})
 		return
@@ -644,9 +644,9 @@ func respondInvitationAccountConflict(c *gin.Context) {
 	c.JSON(http.StatusConflict, gin.H{"error": "This account cannot join the page by invitation; ask a global admin", "code": codeInvitationAccountConflict})
 }
 
-// ensureNoRoleOnOtherPage: Rollen bzw. Seiten-SSO-Verknüpfungen des Kontos auf
-// anderen Seiten in der laufenden Transaktion; die Rollenzeilen werden unter
-// Postgres gesperrt (SQLite lässt FOR UPDATE weg und serialisiert Schreiber).
+// ensureNoRoleOnOtherPage: roles or page SSO links of the account on
+// other pages in the running transaction; the role rows are locked under
+// Postgres (SQLite omits FOR UPDATE and serializes writers).
 func ensureNoRoleOnOtherPage(tx *gorm.DB, userID, pageID uint) error {
 	var roles []models.UserStatusPageRole
 	if err := tx.Where("user_id = ?", userID).
@@ -668,14 +668,14 @@ func ensureNoRoleOnOtherPage(tx *gorm.DB, userID, pageID uint) error {
 	return nil
 }
 
-// POST /api/invitations/decline {token}: Einladung ablehnen (löscht sie, auch
-// wenn sie abgelaufen ist).
+// POST /api/invitations/decline {token}: decline an invitation (deletes it, even
+// if it has expired).
 func (h *Handler) DeclinePageInvitationHandler(c *gin.Context) {
 	inv, u, ok := h.loadOwnInvitation(c)
 	if !ok {
 		return
 	}
-	// Soft-Delete (Review B1): Ablehnen hebt die Sperre ebenfalls nicht auf.
+	// Soft delete (review B1): Declining does not lift the lock either.
 	if err := h.DB.Delete(&inv).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Ablehnen", "code": "server_error"})
 		return
@@ -702,11 +702,11 @@ const rawPageInvitationEmailTemplate = `<div style="font-family:-apple-system,Bl
 	</div>
 </div>`
 
-// Einzeilig wie pageOrderConfirmEmailTemplate (CR/LF-Guard).
+// Single-line like pageOrderConfirmEmailTemplate (CR/LF guard).
 var pageInvitationEmailTemplate = strings.NewReplacer("\n", "", "\t", "").Replace(rawPageInvitationEmailTemplate)
 
-// buildPageInvitationMail liefert Betreff und HTML-Body in der Sprache des
-// Kontos (en, sonst de). Seiten- und Rollenname sind maskiert.
+// buildPageInvitationMail returns subject and HTML body in the language of the
+// account (en, otherwise de). Page and role names are escaped.
 func buildPageInvitationMail(lang, pageName, roleName, link string) (string, string) {
 	p, r := html.EscapeString(pageName), html.EscapeString(roleName)
 	if strings.HasPrefix(strings.ToLower(lang), "en") {
@@ -723,29 +723,29 @@ func buildPageInvitationMail(lang, pageName, roleName, link string) (string, str
 		"Der Link ist 7 Tage gültig und nur einmal verwendbar. Wenn du diese Einladung nicht erwartest, lehne sie ab oder ignoriere diese E-Mail.")
 }
 
-// sendPageInvitationEmail baut die Mail synchron und verschickt sie über die
-// begrenzte Hintergrund-Warteschlange (mail_queue.go), damit die Antwort für
-// Adressen mit und ohne Konto gleich lange dauert und ein ausgefallener
-// Mailserver keine unbegrenzt vielen Versand-Goroutinen aufstaut. Weder Token
-// noch Link landen im Log.
+// sendPageInvitationEmail builds the mail synchronously and sends it via the
+// bounded background queue (mail_queue.go), so that the response takes equally long for
+// addresses with and without an account and a failed
+// mail server does not pile up unboundedly many sending goroutines. Neither token
+// nor link end up in the log.
 func (h *Handler) sendPageInvitationEmail(u models.User, page models.StatusPage, role models.Role, token string) {
-	// Die Adresse entspricht (bis auf Groß-/Kleinschreibung) der geprüften
-	// Eingabe aus invitePageUser; der CR/LF-Guard unten deckt sie zusätzlich ab.
+	// The address matches (apart from upper/lower case) the checked
+	// input from invitePageUser; the CR/LF guard below additionally covers it.
 	recipient := strings.TrimSpace(u.Email)
 	smtpCfg := loadSMTPConfig()
 	smtpCfg.applyPageSender(page)
-	// Der Token steht im URL-FRAGMENT, nicht in der Query. Ein
-	// Fragment geht nie an den Server (keine Caddy-/Cloudflare-/Proxy-Logs) und
-	// nie im Referer hinaus; in der Query läge er in Logs und Browser-Verlauf.
-	// Das Frontend liest weiter auch die alte Query (schon verschickte Mails).
+	// The token is in the URL FRAGMENT, not in the query. A
+	// fragment never goes to the server (no Caddy/Cloudflare/proxy logs) and
+	// never leaves in the Referer; in the query it would be in logs and browser history.
+	// The frontend still also reads the old query (mails already sent).
 	link := getFrontendURL() + "/invitation#token=" + url.QueryEscape(token)
 	subject, body := buildPageInvitationMail(u.PreferredLanguage, page.Name, role.Name, link)
 	if hasHeaderInjectionChars(subject) || hasHeaderInjectionChars(body) || hasHeaderInjectionChars(smtpCfg.From) || hasHeaderInjectionChars(recipient) {
 		slog.Error("Skipping page invitation mail: subject/body/sender contain invalid CR/LF characters", "page_id", page.ID, "user_id", u.ID)
 		return
 	}
-	// Der Seitenname steht im Betreff; Umlaute brauchen die
-	// RFC-2047-Kodierung (der CR/LF-Guard oben prüft den Klartext vorher).
+	// The page name is in the subject; umlauts need
+	// RFC 2047 encoding (the CR/LF guard above checks the plain text beforehand).
 	msg := smtpCfg.fromHeaders() +
 		"To: " + recipient + "\n" +
 		"Subject: " + mime.QEncoding.Encode("utf-8", subject) + "\n" +

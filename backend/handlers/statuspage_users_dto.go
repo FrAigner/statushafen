@@ -14,9 +14,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Antworten der Seitenbenutzer-API tragen nur, was die Verwaltung
-// braucht. Die Schlüssel behalten die bisherige Schreibweise (ID, User.Email,
-// Role.Name), damit das Frontend unverändert bleibt.
+// Responses of the page user API carry only what the administration
+// needs. The keys keep their previous spelling (ID, User.Email,
+// Role.Name) so the frontend stays unchanged.
 type pageUserDTO struct {
 	ID           uint            `json:"ID"`
 	UserID       uint            `json:"UserID"`
@@ -44,8 +44,8 @@ func newPageUserDTO(e models.UserStatusPageRole) pageUserDTO {
 	}
 }
 
-// respondPageUserAssigned: per E-Mail hinzugefügt -> neutrale Antwort (verrät
-// nichts über das Konto), sonst die Zuordnung ohne Kontodaten.
+// respondPageUserAssigned: added by email -> neutral response (reveals
+// nothing about the account), otherwise the assignment without account data.
 func respondPageUserAssigned(c *gin.Context, status int, e models.UserStatusPageRole, byEmail bool) {
 	if byEmail {
 		c.JSON(http.StatusOK, gin.H{"message": pageUserEmailAcceptedMsg})
@@ -54,8 +54,8 @@ func respondPageUserAssigned(c *gin.Context, status int, e models.UserStatusPage
 	c.JSON(status, pageUserDTO{ID: e.ID, UserID: e.UserID, StatusPageID: e.StatusPageID, RoleID: e.RoleID})
 }
 
-// isEffectiveGlobalAdmin: frischer DB-Blick auf IsGlobalAdmin (Seiten-SSO-
-// Sitzungen zählen nie).
+// isEffectiveGlobalAdmin: fresh DB view of IsGlobalAdmin (page SSO
+// sessions never count).
 func (h *Handler) isEffectiveGlobalAdmin(c *gin.Context) bool {
 	var u models.User
 	if err := h.DB.First(&u, getUserID(c)).Error; err != nil {
@@ -64,8 +64,8 @@ func (h *Handler) isEffectiveGlobalAdmin(c *gin.Context) bool {
 	return middleware.EffectiveGlobalAdmin(c, u)
 }
 
-// actorPagePermissions: Rechte-Liste des angemeldeten Nutzers auf der Seite
-// (leer, wenn er dort keine Rolle hat).
+// actorPagePermissions: permission list of the signed-in user on the page
+// (empty if they have no role there).
 func (h *Handler) actorPagePermissions(c *gin.Context, pageID uint) string {
 	var ur models.UserStatusPageRole
 	if err := h.DB.Preload("Role").Where(whereUserIDAndStatusPageID, getUserID(c), pageID).First(&ur).Error; err != nil {
@@ -74,12 +74,12 @@ func (h *Handler) actorPagePermissions(c *gin.Context, pageID uint) string {
 	return ur.Role.Permissions
 }
 
-// resolvePageUserTarget bestimmt das Zielkonto. Rückgabe: Konto,
-// gefunden, Status != 0 wenn die Antwort schon gesendet wurde.
-//   - Global Admin: user_id (unbekannt -> 404 user_not_found) oder E-Mail.
-//   - Sonst: user_id nur für bestehende Mitglieder dieser Seite; jedes andere
-//     Konto nur per E-Mail. Ohne beides -> 400 (für bekannte und unbekannte
-//     ID gleich, damit sich Konten nicht abzählen lassen).
+// resolvePageUserTarget determines the target account. Returns: account,
+// found, status != 0 if the response has already been sent.
+//   - Global Admin: user_id (unknown -> 404 user_not_found) or email.
+//   - Otherwise: user_id only for existing members of this page; any other
+//     account only by email. With neither -> 400 (the same for a known and an
+//     unknown ID, so accounts cannot be enumerated).
 func (h *Handler) resolvePageUserTarget(c *gin.Context, isGA bool, pageID, userID uint, email string) (models.User, bool, int) {
 	var u models.User
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -103,8 +103,8 @@ func (h *Handler) resolvePageUserTarget(c *gin.Context, isGA bool, pageID, userI
 	}
 	lookupErr := h.DB.Where("lower(email) = ?", email).First(&u).Error
 	if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
-		// Ein DB-Fehler ist keine "unbekannte Adresse" (sonst entstünde
-		// eine Einladung ohne Mail und der Fehler bliebe unsichtbar): fail closed.
+		// A DB error is not an "unknown address" (otherwise an invitation without
+		// a mail would be created and the error would stay invisible): fail closed.
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Hinzufügen", "code": "server_error"})
 		return u, false, http.StatusInternalServerError
 	}
@@ -112,35 +112,35 @@ func (h *Handler) resolvePageUserTarget(c *gin.Context, isGA bool, pageID, userI
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "code": "user_not_found"})
 		return u, false, http.StatusNotFound
 	}
-	// Timing-Orakel: Die drei Folgeabfragen laufen für gefundene
-	// UND unbekannte Adressen (bei unbekannter Adresse mit ID 0, die nichts
-	// findet) und alle unbedingt (kein Kurzschluss durch ||), damit die Zahl der
-	// Abfragen nicht verrät, ob ein Konto existiert. Die Laufzeit-Gleichheit
-	// bleibt eine Annäherung (Cache, Zeilenzahl), die Abfragezahl ist gleich.
+	// Timing oracle: the three follow-up queries run for found
+	// AND unknown addresses (for an unknown address with ID 0, which finds
+	// nothing) and all unconditionally (no short-circuit via ||), so the number of
+	// queries does not reveal whether an account exists. Equal runtime
+	// remains an approximation (cache, row count); the query count is equal.
 	otherPageRole := h.hasRoleOnOtherPage(u.ID, pageID)
 	otherPageSSO := h.hasSSOIdentityOnOtherPage(u.ID, pageID)
 	var memberN int64
 	if err := h.DB.Model(&models.UserStatusPageRole{}).Where(whereUserIDAndStatusPageID, u.ID, pageID).Count(&memberN).Error; err != nil {
-		// Review-Fund 5: kein "memberN = 0" bei DB-Fehler (fail closed).
+		// Review finding 5: no "memberN = 0" on a DB error (fail closed).
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Hinzufügen", "code": "server_error"})
 		return u, false, http.StatusInternalServerError
 	}
 	if lookupErr != nil {
 		return u, false, 0
 	}
-	// Global-Admin-Konten, Konten mit (altem oder Seiten-)SSO-Verknüpfung oder Rolle auf einer anderen Seite
-	// hängt nur ein Global Admin an (sonst verlöre das Opfer die SSO-Anmeldung
-	// seiner Seite). Wie "unbekannt" behandelt: gleiche Antwort, nichts geschrieben.
-	// Mitglieder dieser Seite bleiben umstufbar.
+	// Global Admin accounts, accounts with an (old or page) SSO link, or a role on another page
+	// can only be attached by a Global Admin (otherwise the victim would lose the SSO login
+	// of their page). Treated like "unknown": same response, nothing written.
+	// Members of this page can still be re-ranked.
 	if !isGA && (u.IsGlobalAdmin || u.SSOProvider != "" || u.SSOSubject != "" || otherPageRole || otherPageSSO) && memberN == 0 {
 		return models.User{}, false, 0
 	}
 	return u, true, 0
 }
 
-// roleCoveredByActor: die Rechte der Rolle liegen vollständig in den Rechten
-// des Aufrufers. Eine fehlende (z. B. soft-gelöschte) Rolle gilt nie als
-// abgedeckt; nur Global Admins ändern solche Mitglieder.
+// roleCoveredByActor: the role's permissions lie entirely within the caller's
+// permissions. A missing (e.g. soft-deleted) role never counts as
+// covered; only Global Admins change such members.
 func roleCoveredByActor(actorPerms string, r models.Role) bool {
 	return r.ID != 0 && permissions.Covers(actorPerms, r.Permissions)
 }

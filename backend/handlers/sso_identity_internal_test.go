@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Identität wird über Seite, Protokoll, Issuer, Subject und Format
-// gesucht. Ein leeres Subject (oder Issuer) darf nie als "beliebig" gelten:
-// GORMs Struktur-Where ignorierte Nullwerte und lieferte sonst die erste
-// verknüpfte Identität der Seite, also fremde Konten.
+// The identity is looked up by page, protocol, issuer, subject and format.
+// An empty subject (or issuer) must never count as "any":
+// GORM's struct Where ignored zero values and would otherwise return the first
+// linked identity of the page, i.e. accounts of other people.
 func TestResolveSSOUser_EmptySubjectOrIssuerNeverMatchesAnotherIdentity(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -77,10 +77,10 @@ func TestResolveSSOUser_EmptySubjectOrIssuerNeverMatchesAnotherIdentity(t *testi
 	})
 }
 
-// Jede der fünf Schlüsselspalten (Seite, Protokoll, Issuer, Subject, Format)
-// zählt beim Suchen und beim Aktualisieren der E-Mail. Der Test legt je Spalte
-// eine Identität an, die sich nur in dieser einen Spalte unterscheidet; keine
-// darf als die bekannte gelten, und ihre Daten bleiben unberührt.
+// Each of the five key columns (page, protocol, issuer, subject, format)
+// counts when looking up and when updating the email. The test creates, per column,
+// an identity that differs only in that one column; none
+// may count as the known one, and its data stays untouched.
 func TestResolveSSOUser_EveryKeyColumnSeparatesIdentities(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -104,7 +104,7 @@ func TestResolveSSOUser_EveryKeyColumnSeparatesIdentities(t *testing.T) {
 		"Issuer":    func(k models.UserSSOIdentity) models.UserSSOIdentity { k.Issuer = "https://idp.example.org"; return k },
 		"Subject":   func(k models.UserSSOIdentity) models.UserSSOIdentity { k.Subject = "sub-anders"; return k },
 		"Format":    func(k models.UserSSOIdentity) models.UserSSOIdentity { k.SubjectFormat = "urn:fmt:b"; return k },
-		// GORMs Struktur-Where ließe ein leeres Format weg und träfe damit die Identität mit Format.
+		// GORM's struct Where would drop an empty format and thus match the identity with a format.
 		"Format leer": func(k models.UserSSOIdentity) models.UserSSOIdentity { k.SubjectFormat = ""; return k },
 	}
 
@@ -131,8 +131,8 @@ func TestResolveSSOUser_EveryKeyColumnSeparatesIdentities(t *testing.T) {
 		})
 	}
 
-	// Die E-Mail-Aktualisierung trifft nur die Identität mit dem vollen Schlüssel,
-	// auch wenn sich Geschwister-Identitäten in genau einer Spalte unterscheiden.
+	// The email update affects only the identity with the full key,
+	// even if sibling identities differ in exactly one column.
 	t.Run("die Aktualisierung der E-Mail trifft keine Geschwister-Identität", func(t *testing.T) {
 		sibling := map[string]uint{}
 		for column, mutate := range differ {

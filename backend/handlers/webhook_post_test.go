@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-// Tests für postWebhook (Fehlerklassen, Retry-After, Obergrenzen,
-// kein Retry bei Permanent, keine Geheimnisse im Log) und den Limiter.
-// Gesendet wird nur an httptest-Server auf Loopback; Wartezeiten laufen über
-// die injizierte Schlaffunktion, nichts wartet wirklich.
+// Tests for postWebhook (error classes, Retry-After, upper limits,
+// no retry on Permanent, no secrets in the log) and the limiter.
+// Sending only goes to httptest servers on loopback; wait times run through
+// the injected sleep function, nothing really waits.
 
 var webhookTestEpoch = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
 
@@ -24,8 +24,8 @@ type fakeResp struct {
 	retryAfter string
 }
 
-// webhookEnv: Zeit, Schlaf und Jitter sind deterministisch; der Limiter hat
-// einen großen Burst, damit er die Fälle nicht stört (eigene Tests unten).
+// webhookEnv: time, sleep and jitter are deterministic; the limiter has
+// a large burst so it does not interfere with the cases (own tests below).
 type webhookEnv struct {
 	mu     sync.Mutex
 	sleeps []time.Duration
@@ -51,7 +51,7 @@ func newWebhookEnv(t *testing.T) *webhookEnv {
 	return env
 }
 
-// sequenceServer antwortet der Reihe nach mit seq (die letzte Antwort wiederholt sich).
+// sequenceServer answers in order with seq (the last answer repeats).
 func sequenceServer(t *testing.T, seq []fakeResp) (*httptest.Server, *int) {
 	t.Helper()
 	calls := 0
@@ -197,8 +197,8 @@ func TestPostWebhook_UngueltigeEingaben(t *testing.T) {
 	}
 }
 
-// Geheimnisse: URL, Pfad, key und token dürfen in keiner Logzeile und in
-// keinem Err() auftauchen, egal welche Fehlerklasse.
+// Secrets: URL, path, key and token must appear in no log line and in
+// any Err(), regardless of the error class.
 func TestPostWebhook_LogEnthaeltNieDieURL(t *testing.T) {
 	const secretPath = "/v1/spaces/GEHEIMERSPACE/messages"
 	const secretQuery = "?key=GEHEIMERKEY&token=GEHEIMERTOKEN"
@@ -302,14 +302,14 @@ func TestWebhookRateLimiter_BurstUndNachfuellung(t *testing.T) {
 	if ok, wait := l.reserve("a", now, 5*time.Second); !ok || wait != time.Second {
 		t.Fatalf("mit Warteerlaubnis: ok=%v wait=%v, erwartet 1s", ok, wait)
 	}
-	// Die Reservierung zählt: die nächste muss 2 s warten.
+	// The reservation counts: the next one must wait 2 s.
 	if ok, wait := l.reserve("a", now, 5*time.Second); !ok || wait != 2*time.Second {
 		t.Fatalf("zweite Reservierung: ok=%v wait=%v, erwartet 2s", ok, wait)
 	}
 	if ok, wait := l.reserve("a", now, time.Second); ok || wait != 3*time.Second {
 		t.Fatalf("über der Obergrenze: ok=%v wait=%v, erwartet abgelehnt/3s", ok, wait)
 	}
-	// Nach 10 s ist der Bucket wieder voll (höchstens Burst).
+	// After 10 s the bucket is full again (at most burst).
 	later := now.Add(10 * time.Second)
 	for i := 0; i < 2; i++ {
 		if ok, _ := l.reserve("a", later, 0); !ok {
@@ -337,7 +337,7 @@ func TestWebhookRateLimiter_SpeicherIstBegrenzt(t *testing.T) {
 	l.reserve("alt1", now, 0)
 	l.reserve("alt2", now, 0)
 	l.reserve("jung", now.Add(90*time.Second), 0)
-	// Voll: alt1/alt2 sind nach 2 Minuten abgelaufen und fliegen raus, "jung" bleibt.
+	// Full: alt1/alt2 have expired after 2 minutes and are dropped, "jung" stays.
 	l.reserve("neu", now.Add(2*time.Minute), 0)
 	if _, ok := l.buckets["alt1"]; ok {
 		t.Error("abgelaufener Eintrag alt1 wurde nicht entfernt")
@@ -345,7 +345,7 @@ func TestWebhookRateLimiter_SpeicherIstBegrenzt(t *testing.T) {
 	if len(l.buckets) != 2 {
 		t.Errorf("Einträge = %d, erwartet 2 (jung, neu)", len(l.buckets))
 	}
-	// Dauerlauf mit lauter frischen Schlüsseln: nie über der Obergrenze.
+	// Endurance run with only fresh keys: never above the upper limit.
 	for i := 0; i < 50; i++ {
 		l.reserve(string(rune('A'+i)), now.Add(2*time.Minute), 0)
 		if len(l.buckets) > 3 {
@@ -354,8 +354,8 @@ func TestWebhookRateLimiter_SpeicherIstBegrenzt(t *testing.T) {
 	}
 }
 
-// Vorfall-Sturm: viele Nachrichten an dieselbe URL werden vom Limiter auf
-// etwa eine pro Sekunde gestreckt (nicht alle sofort gesendet).
+// Incident storm: many messages to the same URL are stretched by the limiter to
+// about one per second (not all sent immediately).
 func TestPostWebhook_LimiterStrecktSturm(t *testing.T) {
 	env := newWebhookEnv(t)
 	webhookLimiter = newWebhookRateLimiter(1, 2, 10, time.Hour)
@@ -392,11 +392,11 @@ func TestPostWebhook_ProbeUmgehtDenLimiterNichtUndWartetNicht(t *testing.T) {
 	}
 }
 
-// Ist nach einem gesendeten Versuch der lokale Limiter am Zug und die
-// Obergrenze erreicht, gilt das Ergebnis des gesendeten Versuchs.
+// If after a sent attempt the local limiter is up and the
+// upper limit is reached, the result of the sent attempt applies.
 func TestPostWebhook_LokalerStauNachVersuchLiefertLetztesErgebnis(t *testing.T) {
 	newWebhookEnv(t)
-	webhookLimiter = newWebhookRateLimiter(0.01, 1, 10, time.Hour) // 100 s je Token
+	webhookLimiter = newWebhookRateLimiter(0.01, 1, 10, time.Hour) // 100 s per token
 	srv, calls := sequenceServer(t, []fakeResp{{503, "1"}})
 	res := postWebhook(context.Background(), srv.URL, "x", webhookModeNotify)
 	if res.Kind != webhookTransient || res.Status != 503 || *calls != 1 {
@@ -415,13 +415,13 @@ func TestWebhookSleep_StandardImplementierung(t *testing.T) {
 	}
 }
 
-// Bricht der Kontext beim Warten auf den lokalen Limiter ab, wird nichts
-// gesendet (erster Versuch) bzw. das Ergebnis des letzten Versuchs geliefert.
+// If the context is canceled while waiting for the local limiter, nothing is
+// sent (first attempt) or the result of the last attempt is returned.
 func TestPostWebhook_AbbruchBeimLimiterWarten(t *testing.T) {
 	newWebhookEnv(t)
 	webhookLimiter = newWebhookRateLimiter(1, 1, 10, time.Hour)
 	srv, calls := sequenceServer(t, []fakeResp{{503, "1"}})
-	// Token verbrauchen, damit der nächste Aufruf warten muss.
+	// Consume tokens so that the next call has to wait.
 	webhookLimiter.reserve(webhookKey(srv.URL), webhookTestEpoch, 0)
 	webhookSleep = func(context.Context, time.Duration) error { return context.Canceled }
 	res := postWebhook(context.Background(), srv.URL, "x", webhookModeNotify)
@@ -436,7 +436,7 @@ func TestPostWebhook_AbbruchBeimLimiterWarten(t *testing.T) {
 func TestWebhookJitter_Standard(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		d := time.Duration(1000) * time.Millisecond
-		// Original-Implementierung: webhookJitter wurde in newWebhookEnv nicht ersetzt.
+		// Original implementation: webhookJitter was not replaced in newWebhookEnv.
 		got := webhookJitter(d)
 		if got < 750*time.Millisecond || got > 1250*time.Millisecond {
 			t.Fatalf("Jitter %v außerhalb von +-25 %%", got)

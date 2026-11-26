@@ -23,32 +23,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// hexColorRegex validiert Hex-Farbwerte wie "#007bff" (Branding).
-// Leerer String ist erlaubt - er bedeutet "keine eigene Farbe gesetzt", die
-// öffentliche Seite fällt dann auf die globalen CSS-Defaults zurück.
+// hexColorRegex validates hex color values such as "#007bff" (branding).
+// An empty string is allowed - it means "no custom color set", and the
+// public page then falls back to the global CSS defaults.
 var hexColorRegex = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
-// validHeaderStyles sind die vordefinierten Layout-Varianten für den
-// Statusseiten-Header. Leerer String ist NICHT erlaubt, da das
-// Feld einen "not null default 'classic'"-DB-Default hat.
+// validHeaderStyles are the predefined layout variants for the
+// status page header. An empty string is NOT allowed because the
+// field has a "not null default 'classic'" DB default.
 var validHeaderStyles = map[string]bool{
 	"classic":  true,
 	"centered": true,
 	"minimal":  true,
 }
 
-// validPageLayouts sind die wählbaren Seiten-Layouts. Anders als
-// bei HeaderStyle ist auch hier der leere String ungültig: Fehlt das Feld im
-// Body, bleibt der bisherige Wert bzw. der Default "standard" erhalten (siehe
-// applyStatusPageWritableFields), nur ein explizit gesendeter Wert wird geprüft.
+// validPageLayouts are the selectable page layouts. Unlike
+// with HeaderStyle, the empty string is invalid here too: if the field is missing from the
+// body, the previous value or the default "standard" is kept (see
+// applyStatusPageWritableFields); only an explicitly sent value is validated.
 var validPageLayouts = map[string]bool{
 	"standard": true,
 	"liste":    true,
 }
 
-// validateBranding prüft die neuen Branding-Felder einer StatusPage
-// und liefert bei Bedarf eine deutschsprachige Fehlermeldung, konsistent
-// zum restlichen Fehler-Stil dieses Handlers.
+// validateBranding validates the new branding fields of a StatusPage
+// and, if needed, returns a German-language error message, consistent
+// with the rest of this handler's error style.
 func validateBranding(page *models.StatusPage) (string, bool) {
 	if page.PrimaryColor != "" && !hexColorRegex.MatchString(page.PrimaryColor) {
 		return "PrimaryColor muss ein Hex-Farbwert sein (z.B. #007bff)", false
@@ -68,13 +68,13 @@ func validateBranding(page *models.StatusPage) (string, bool) {
 	return "", true
 }
 
-// maxLogoURLLength begrenzt die gespeicherte Logo-Adresse.
+// maxLogoURLLength limits the stored logo address.
 const maxLogoURLLength = 2048
 
-// validLogoURL: Das Logo landet als <img src> im Browser der Besucher. Erlaubt
-// sind eine leere Angabe, eine https-URL mit Host oder ein absoluter Pfad auf
-// dem eigenen Host. Andere Schemata (javascript:, data:, http:), protokoll-
-// relative Adressen und Steuerzeichen werden abgelehnt.
+// validLogoURL: the logo ends up as <img src> in the visitors' browser. Allowed
+// are an empty value, an https URL with a host, or an absolute path on
+// the own host. Other schemes (javascript:, data:, http:), protocol-
+// relative addresses and control characters are rejected.
 func validLogoURL(raw string) bool {
 	if raw == "" {
 		return true
@@ -89,14 +89,14 @@ func validLogoURL(raw string) bool {
 	return err == nil && u.Scheme == "https" && u.Host != ""
 }
 
-// validateNotificationFromAddress prüft das optionale NotificationFromAddress-
-// Feld. Leer ist erlaubt (Fallback auf einen Slug-Default, siehe
-// resolveNotificationFromAddress). Ist es gesetzt, muss es sich wie
-// der bestehende SMTP_FROM-Wert per mail.ParseAddress
-// parsen lassen ("Anzeigename <adresse>" oder reine Adresse) und darf keine
-// CR/LF enthalten - dieselbe Prüfung, die sendAlertEmail auf smtpCfg.From
-// anwendet, hier nur vorgezogen, damit ein Admin sofort eine verständliche
-// Fehlermeldung statt eines stillschweigend verworfenen Versands sieht.
+// validateNotificationFromAddress validates the optional NotificationFromAddress
+// field. Empty is allowed (falls back to a slug default, see
+// resolveNotificationFromAddress). If set, it must, like
+// the existing SMTP_FROM value, be parseable via mail.ParseAddress
+// ("Display Name <address>" or a bare address) and must not contain
+// CR/LF - the same check sendAlertEmail applies to smtpCfg.From,
+// merely moved forward here so that an admin immediately sees an understandable
+// error message instead of a silently discarded send.
 func validateNotificationFromAddress(page *models.StatusPage) (string, bool) {
 	if page.NotificationFromAddress == "" {
 		return "", true
@@ -110,18 +110,18 @@ func validateNotificationFromAddress(page *models.StatusPage) (string, bool) {
 	return "", true
 }
 
-// resolveNotificationFromAddress liefert den From-Header einer Mail für eine
-// Statusseite. Die Adresse (und damit auch der SMTP-Envelope, siehe
-// envelopeFrom) gehört immer dem Betreiber: sie stammt aus operatorFrom
-// (SMTP_FROM). Die Statusseite steuert nur den Anzeigenamen bei. Eine frei
-// wählbare Absenderadresse ließe den Server als Relais mit gefälschtem
-// Absender missbrauchen. Die Adresse der Seite (NotificationFromAddress) wirkt
-// nur als Reply-To, siehe resolveNotificationReplyTo.
+// resolveNotificationFromAddress returns the From header of an email for a
+// status page. The address (and thus the SMTP envelope, see
+// envelopeFrom) always belongs to the operator: it comes from operatorFrom
+// (SMTP_FROM). The status page only contributes the display name. A freely
+// selectable sender address would let the server be abused as a relay with a forged
+// sender. The page's address (NotificationFromAddress) acts
+// only as Reply-To, see resolveNotificationReplyTo.
 func resolveNotificationFromAddress(operatorFrom string, page models.StatusPage) string {
 	op, err := mail.ParseAddress(operatorFrom)
 	if err != nil {
-		// Nicht parsebare Betreiberkonfiguration: unverändert lassen, der
-		// SMTP-Server lehnt sie wie bisher ab.
+		// Unparseable operator configuration: leave it unchanged, the
+		// SMTP server rejects it as before.
 		return operatorFrom
 	}
 	name := sanitizeDisplayName(page.Name)
@@ -131,8 +131,8 @@ func resolveNotificationFromAddress(operatorFrom string, page models.StatusPage)
 	return (&mail.Address{Name: name, Address: op.Address}).String()
 }
 
-// sanitizeDisplayName entfernt Steuerzeichen (u. a. CR/LF) aus einem
-// Anzeigenamen und kürzt ihn.
+// sanitizeDisplayName removes control characters (including CR/LF) from a
+// display name and truncates it.
 func sanitizeDisplayName(name string) string {
 	name = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
@@ -147,8 +147,8 @@ func sanitizeDisplayName(name string) string {
 	return name
 }
 
-// resolveNotificationReplyTo liefert die Antwortadresse der Statusseite für
-// den Reply-To-Header ("" ohne gültige Angabe).
+// resolveNotificationReplyTo returns the status page's reply address for
+// the Reply-To header ("" without a valid value).
 func resolveNotificationReplyTo(page models.StatusPage) string {
 	if page.NotificationFromAddress == "" || hasHeaderInjectionChars(page.NotificationFromAddress) {
 		return ""
@@ -160,10 +160,10 @@ func resolveNotificationReplyTo(page models.StatusPage) string {
 	return addr.String()
 }
 
-// frontendURLHost liefert den Hostnamen aus FRONTEND_URL (z.B.
-// "example.com"), mit "localhost" als Fallback, falls FRONTEND_URL nicht
-// gesetzt oder nicht parsebar ist (z.B. im lokalen Dev-Setup, wo FRONTEND_URL
-// auf localhost zeigt).
+// frontendURLHost returns the hostname from FRONTEND_URL (e.g.
+// "example.com"), with "localhost" as a fallback if FRONTEND_URL is not
+// set or not parseable (e.g. in the local dev setup, where FRONTEND_URL
+// points to localhost).
 func frontendURLHost() string {
 	if u, err := url.Parse(getFrontendURL()); err == nil && u.Hostname() != "" {
 		return u.Hostname()
@@ -171,30 +171,30 @@ func frontendURLHost() string {
 	return "localhost"
 }
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const (
-	// slugWhereClause ist die GORM-Where-Bedingung für einen Slug-Lookup, an
-	// mehreren Stellen wiederverwendet, statt den Literal-String zu duplizieren.
+	// slugWhereClause is the GORM where condition for a slug lookup, reused in
+	// several places instead of duplicating the literal string.
 	slugWhereClause            = "slug = ?"
 	whereUserIDAndStatusPageID = "user_id = ? AND status_page_id = ?"
 	whereStatusPageIDEquals    = "status_page_id = ?"
 )
 
-// validSlugRegex erlaubt nur Kleinbuchstaben, Ziffern und einzelne Bindestriche
-// als Trenner (kein führender/nachgestellter/doppelter Bindestrich) - dieselbe
-// Zeichenmenge, die slugify() aus einem Statusseiten-Namen erzeugt, damit
-// manuell eingegebene und automatisch generierte Slugs demselben Format folgen.
+// validSlugRegex allows only lowercase letters, digits and single hyphens
+// as separators (no leading/trailing/double hyphen) - the same
+// character set that slugify() produces from a status page name, so that
+// manually entered and automatically generated slugs follow the same format.
 var validSlugRegex = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
-// slugSanitizeRegex ersetzt jede Folge nicht erlaubter Zeichen durch genau
-// einen Bindestrich.
+// slugSanitizeRegex replaces every run of disallowed characters with exactly
+// one hyphen.
 var slugSanitizeRegex = regexp.MustCompile(`[^a-z0-9]+`)
 
-// slugify wandelt einen Statusseiten-Namen in einen URL-sicheren
-// Vorschlag für den Slug um, unter dem die Seite dann automatisch als
-// <slug>.<Basisdomain> erreichbar ist (siehe PublicRoot.vue, isOwnBaseDomain).
-// Deutsche Umlaute werden transliteriert statt einfach entfernt, damit z.B.
-// "Müller GmbH" nicht zu "mller-gmbh" wird.
+// slugify converts a status page name into a URL-safe
+// slug suggestion, under which the page is then automatically reachable as
+// <slug>.<base domain> (see PublicRoot.vue, isOwnBaseDomain).
+// German umlauts are transliterated instead of simply removed, so that e.g.
+// "Müller GmbH" does not become "mller-gmbh".
 func slugify(name string) string {
 	s := strings.ToLower(name)
 	umlautReplacer := strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss")
@@ -203,16 +203,16 @@ func slugify(name string) string {
 	return strings.Trim(s, "-")
 }
 
-// slugTakenMessage ist die 409-Meldung bei Slug-Kollision (Anlegen und Ändern).
+// slugTakenMessage is the 409 message on a slug collision (create and update).
 const slugTakenMessage = "Slug wird bereits von einer anderen Statusseite verwendet"
 
-// slugReservedMessage: 400-Meldung für reservierte Slugs.
+// slugReservedMessage: 400 message for reserved slugs.
 const slugReservedMessage = "Dieser Slug ist reserviert und kann nicht verwendet werden"
 
-// uniqueSlug hängt bei einer Kollision mit einem bestehenden Slug "-2", "-3", …
-// an, bis ein freier Slug gefunden ist. Wird nur für automatisch generierte
-// Slugs verwendet (leeres Slug-Feld im Formular) - ein manuell eingegebener
-// Slug soll bei Kollision stattdessen einen klaren 409-Fehler auslösen, siehe
+// uniqueSlug appends "-2", "-3", ... on a collision with an existing slug
+// until a free slug is found. Used only for automatically generated
+// slugs (empty slug field in the form) - a manually entered
+// slug should instead trigger a clear 409 error on collision, see
 // CreateStatusPageHandler.
 func (h *Handler) uniqueSlug(base string) string {
 	if base == "" {
@@ -229,10 +229,10 @@ func (h *Handler) uniqueSlug(base string) string {
 	}
 }
 
-// Das Verzeichnis ist anonym lesbar und wuchs mit der Zahl der Seiten und der
-// Länge von Name und Beschreibung ohne Grenze. Jetzt liefert ein Aufruf höchstens
-// maxPublicDirectoryLimit Seiten (limit/offset zum Blättern); Name und
-// Beschreibung erscheinen gekürzt, die Seite selbst zeigt den vollen Text.
+// The directory is anonymously readable and grew without bound with the number of pages and the
+// length of name and description. Now a call returns at most
+// maxPublicDirectoryLimit pages (limit/offset for paging); name and
+// description appear truncated, the page itself shows the full text.
 const (
 	maxPublicDirectoryLimit  = 200
 	maxPublicDirectoryOffset = 100000
@@ -240,7 +240,7 @@ const (
 	publicDirectoryDescMax   = 500
 )
 
-// truncateRunes kürzt s auf höchstens max Zeichen; eine Kürzung endet mit „…“.
+// truncateRunes truncates s to at most max characters; a truncation ends with "…".
 func truncateRunes(s string, max int) string {
 	if utf8.RuneCountInString(s) <= max {
 		return s
@@ -257,8 +257,8 @@ func (h *Handler) GetPublicPagesHandler(c *gin.Context) {
 	}
 	limit = min(limit, maxPublicDirectoryLimit)
 	pages := []models.StatusPage{}
-	// substr schon in der Abfrage, damit eine riesige Beschreibung nicht erst
-	// geladen und dann gekürzt wird; ein Zeichen mehr als erlaubt zeigt die Kürzung.
+	// substr already in the query, so that a huge description is not first
+	// loaded and then truncated; one character more than allowed shows the truncation.
 	if err := h.DB.Model(&models.StatusPage{}).
 		Select("id, slug, logo_url, primary_color, secondary_color, header_style, page_layout, "+
 			"substr(name, 1, ?) AS name, substr(description, 1, ?) AS description",
@@ -279,16 +279,16 @@ func (h *Handler) GetPublicPagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// publicStatusPage ist die öffentliche Darstellung einer Statusseite
-// Die öffentlichen Endpunkte (Verzeichnis,
-// Dashboard, Slug-Lookup) serialisierten bisher das komplette Model inkl.
-// interner Mandanten-Konfiguration (AutoJoinEmailDomains, DefaultRoleID,
-// NotificationFromAddress, CustomDomain/-Status, IsPrivate, ...). Das DTO
-// enthält genau die Felder, die das öffentliche Frontend liest
-// (LandingPage.vue: ID/Name/Slug/Description, StatusPage.vue zusätzlich
-// Logo, Farben, Header-Stil und Layout). JSON-Namen bleiben wie beim Model,
-// damit das Frontend unverändert weiterläuft. Admin-Endpunkte liefern
-// weiterhin das volle Model.
+// publicStatusPage is the public representation of a status page.
+// The public endpoints (directory,
+// dashboard, slug lookup) previously serialized the complete model incl.
+// internal tenant configuration (AutoJoinEmailDomains, DefaultRoleID,
+// NotificationFromAddress, CustomDomain/-Status, IsPrivate, ...). The DTO
+// contains exactly the fields the public frontend reads
+// (LandingPage.vue: ID/Name/Slug/Description, StatusPage.vue additionally
+// logo, colors, header style and layout). JSON names stay the same as in the model,
+// so the frontend keeps working unchanged. Admin endpoints
+// still return the full model.
 type publicStatusPage struct {
 	ID             uint   `json:"ID"`
 	Name           string `json:"Name"`
@@ -315,34 +315,34 @@ func toPublicStatusPage(p models.StatusPage) publicStatusPage {
 	}
 }
 
-// autoAssignDefaultRole legt bei fehlender UserStatusPageRole
-// automatisch eine mit page.DefaultRoleID an - mandantenübergreifendes
-// Self-Service-Onboarding: JEDER eingeloggte Account erhält beim ersten
-// Aufruf einer privaten Seite mit gesetztem DefaultRoleID automatisch Zugriff.
-// Das gilt nur noch für Konten, deren E-Mail-Domain in
-// AutoJoinEmailDomains der Seite steht (sonst könnte sich jeder per
-// Selbstregistrierung Zugriff verschaffen). Ist DefaultRoleID oder die
-// Allowlist leer, gilt "nur explizit eingeladene Nutzer" und der Zugriff
-// wird verweigert.
+// autoAssignDefaultRole automatically creates a UserStatusPageRole
+// with page.DefaultRoleID when none exists - cross-tenant
+// self-service onboarding: EVERY logged-in account automatically gets access on the first
+// visit to a private page with DefaultRoleID set.
+// This now applies only to accounts whose email domain is in the page's
+// AutoJoinEmailDomains (otherwise anyone could gain access through
+// self-registration). If DefaultRoleID or the
+// allowlist is empty, "only explicitly invited users" applies and access
+// is denied.
 func (h *Handler) autoAssignDefaultRole(c *gin.Context, user models.User, page models.StatusPage) (int, string, bool) {
 	userID := user.ID
 	if page.DefaultRoleID == nil || !emailMatchesAutoJoin(user.Email, page.AutoJoinEmailDomains) {
 		return http.StatusForbidden, "Access denied", false
 	}
 
-	// Die Rolle wird beim Beitritt erneut geprüft.
-	// Sie kann nach dem Speichern der Seite um Schreib- oder Abonnentenrechte
-	// erweitert oder gelöscht worden sein; Bestandsseiten wurden nie geprüft.
+	// The role is checked again on joining.
+	// After the page was saved, the role may have been extended with write or subscriber permissions
+	// or deleted; existing pages were never checked.
 	var defaultRole models.Role
 	if err := h.DB.First(&defaultRole, *page.DefaultRoleID).Error; err != nil || !roleSafeAsDefault(defaultRole.Permissions) {
 		return http.StatusForbidden, "Access denied", false
 	}
 
-	// ein Soft-Delete durch RemoveStatusPageUserHandler (gezielte,
-	// korrekt auditierte Admin-Entscheidung) ist für die gescopte Query oben in
-	// checkPrivatePageAccess nicht von "hatte nie eine Rolle" unterscheidbar.
-	// Ohne diesen Unscoped()-Check würde ein einfacher Seitenaufruf die
-	// Entfernung stillschweigend rückgängig machen.
+	// a soft delete by RemoveStatusPageUserHandler (a deliberate,
+	// properly audited admin decision) is indistinguishable from "never had a role" for the scoped query above in
+	// checkPrivatePageAccess.
+	// Without this Unscoped() check, a simple page visit would silently
+	// undo the removal.
 	var removed models.UserStatusPageRole
 	if err := h.DB.Unscoped().Where(whereUserIDAndStatusPageID, userID, page.ID).First(&removed).Error; err == nil {
 		return http.StatusForbidden, "Access denied", false
@@ -357,25 +357,25 @@ func (h *Handler) autoAssignDefaultRole(c *gin.Context, user models.User, page m
 		JoinedVia: models.JoinedViaAutoJoin,
 	}
 	if err := h.DB.Create(&newRole).Error; err != nil {
-		// Die SPA fragt beim ersten Aufruf parallel an; die Anfrage, die
-		// am Unique-Index verliert, hat trotzdem Zugriff (die Mitgliedschaft existiert).
+		// The SPA requests in parallel on the first visit; the request that
+		// loses at the unique index still has access (the membership exists).
 		if isUniqueViolation(err) {
 			return 0, "", true
 		}
 		return http.StatusInternalServerError, "Fehler bei der Rollenzuweisung", false
 	}
-	// Bisher komplett ohne Audit-Trail, obwohl Rollenvergabe - auch die
-	// automatische - genauso protokolliert gehört wie die manuelle
+	// Previously entirely without an audit trail, although role assignment - including the
+	// automatic one - should be logged just like the manual one
 	// (AddStatusPageUserHandler: "statuspage.user_role_assigned").
 	h.RecordAudit(c, "statuspage.user_role_auto_assigned", "config", "StatusPage",
 		strconv.FormatUint(uint64(page.ID), 10), "", "")
 	return 0, "", true
 }
 
-// checkPrivatePageAccess prüft, ob der eingeloggte User Zugriff auf eine
-// private Statusseite hat (Global Admin, bestehende Rolle oder Auto-Join per
-// DefaultRoleID). Ausgelagert aus GetPublicDashboardHandler, damit dessen
-// kognitive Komplexität die SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// checkPrivatePageAccess checks whether the logged-in user has access to a
+// private status page (Global Admin, existing role or auto-join via
+// DefaultRoleID). Extracted from GetPublicDashboardHandler so that its
+// cognitive complexity does not exceed the SonarCloud limit (go:S3776).
 func (h *Handler) checkPrivatePageAccess(c *gin.Context, page models.StatusPage) (int, string, bool) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -393,7 +393,7 @@ func (h *Handler) checkPrivatePageAccess(c *gin.Context, page models.StatusPage)
 	if middleware.EffectiveGlobalAdmin(c, user) {
 		return 0, "", true
 	}
-	// weder Lesezugriff noch Auto-Join außerhalb der SSO-Seite.
+	// neither read access nor auto-join outside the SSO page.
 	if !middleware.SSOAllowsPage(c, page.ID) {
 		return http.StatusForbidden, "Access denied", false
 	}
@@ -419,13 +419,13 @@ func (h *Handler) GetPublicDashboardHandler(c *gin.Context) {
 	h.writePublicDashboard(c, page)
 }
 
-// authorizePublicPageRead prüft den Lesezugriff auf die öffentliche Sicht einer
-// Statusseite und schreibt bei Ablehnung selbst die Fehlerantwort (false).
-// ein Subscriber-Token, das zu genau dieser privaten Statusseite
-// gehört, gewährt Lesezugriff ohne User-Login - z.B. für einen Abonnenten
-// ohne eigenes Konto, der dem Link in einer Benachrichtigungsmail folgt.
-// Sonst gilt bei privaten Seiten die Rollenprüfung. Gemeinsam genutzt von
-// Dashboard und Verfügbarkeit, damit beide dieselbe Regel haben.
+// authorizePublicPageRead checks read access to the public view of a
+// status page and, on rejection, writes the error response itself (false).
+// A subscriber token that belongs to exactly this private status page
+// grants read access without a user login - e.g. for a subscriber
+// without an account who follows the link in a notification email.
+// Otherwise the role check applies to private pages. Shared by
+// dashboard and availability so that both follow the same rule.
 func (h *Handler) authorizePublicPageRead(c *gin.Context, page models.StatusPage) bool {
 	if !page.IsPrivate || h.subscriberTokenGrantsPageAccess(c, page.ID) {
 		return true
@@ -441,30 +441,30 @@ func (h *Handler) authorizePublicPageRead(c *gin.Context, page models.StatusPage
 	return true
 }
 
-// writePublicDashboard lädt Components/Incidents/Notices einer bereits als
-// zugriffsberechtigt geprüften StatusPage und schreibt die Dashboard-Antwort.
-// Ausgelagert aus GetPublicDashboardHandler, damit sowohl der reguläre
-// Session-Pfad als auch der Subscriber-Token-Pfad denselben
-// Antwortaufbau verwenden.
+// writePublicDashboard loads components/incidents/notices of a StatusPage
+// already checked as accessible and writes the dashboard response.
+// Extracted from GetPublicDashboardHandler so that both the regular
+// session path and the subscriber token path use the same
+// response structure.
 func (h *Handler) writePublicDashboard(c *gin.Context, page models.StatusPage) {
 	// Fetch components
 	all := []models.Component{}
 	h.DB.Where(whereStatusPageIDEquals, page.ID).Order("sort_order asc").Find(&all)
-	// unsichtbare Komponenten (samt Nachfahren) erscheinen weder im
-	// Baum noch in den Komponenten der Vorfälle; id-Menge vor dem Filtern merken.
+	// invisible components (including descendants) appear neither in the
+	// tree nor in the components of incidents; remember the id set before filtering.
 	hidden := hiddenComponentIDs(all)
 	all = withoutHiddenComponents(all)
-	// der auf der öffentlichen Statusseite angezeigte Status
-	// einer Komponente wird hier - nur für diese Antwort, nicht in der DB -
-	// mit offenen zugeordneten Vorfällen überlagert, damit ein offener
-	// Vorfall nicht weiterhin "operational" vorgaukelt. Der admin-seitige
-	// GetComponentsHandler bleibt bewusst unverändert und liefert den
-	// manuell gesetzten Status, damit das Admin-Formular beim Speichern
-	// keinen abgeleiteten Status versehentlich als neuen manuellen Status
-	// persistiert (siehe effectiveComponentStatus in component.go).
+	// the status of a component shown on the public status page
+	// is overlaid here - only for this response, not in the DB -
+	// with open assigned incidents, so that an open
+	// incident does not keep pretending "operational". The admin-side
+	// GetComponentsHandler deliberately stays unchanged and returns the
+	// manually set status, so that the admin form on save
+	// does not accidentally store a derived status as the new manual
+	// status (see effectiveComponentStatus in component.go).
 	openComponentIDs := h.componentIDsWithOpenIncidents(page.ID)
-	// effective_status/external_sources; Status behält die
-	// bisherige Bedeutung (gespeichert + offene Vorfälle), Teil D zeigt
+	// effective_status/external_sources; status keeps its
+	// previous meaning (stored + open incidents), part D shows
 	// effective_status an.
 	h.annotateEffectiveStatus(page.ID, all, openComponentIDs)
 	tagsByComponent := h.tagsByComponentOfPage(page.ID)
@@ -476,18 +476,18 @@ func (h *Handler) writePublicDashboard(c *gin.Context, page models.StatusPage) {
 	}
 	tree := buildTree(all, nil)
 
-	// Vorfälle: alle offenen (höchstens 200) plus die neuesten behobenen
-	// (incident_limit, Standard 50, höchstens 200); ältere lädt die Oberfläche
-	// seitenweise über GET /api/pages/:page_id/incidents nach.
+	// Incidents: all open ones (at most 200) plus the newest resolved ones
+	// (incident_limit, default 50, at most 200); the UI loads older ones
+	// page by page via GET /api/pages/:page_id/incidents.
 	incidents, more, ok := h.dashboardIncidents(c, page.ID)
 	if !ok {
 		return
 	}
 	stripHiddenIncidentComponents(incidents, hidden)
 
-	// Fetch active General Notices: IsActive muss true sein, und
-	// falls StartAt/EndAt gesetzt sind, muss "jetzt" innerhalb liegen. Neueste
-	// zuerst, analog zu Incidents.
+	// Fetch active General Notices: IsActive must be true, and
+	// if StartAt/EndAt are set, "now" must lie within. Newest
+	// first, analogous to incidents.
 	now := time.Now()
 	notices := []models.GeneralNotice{}
 	h.DB.Where("status_page_id = ? AND is_active = ?", page.ID, true).
@@ -501,18 +501,18 @@ func (h *Handler) writePublicDashboard(c *gin.Context, page models.StatusPage) {
 		"languages":  h.publicPageLanguages(page.ID),
 		"components": tree,
 		"incidents":  h.toIncidentResponses(incidents),
-		// incidents_more: es gibt ältere behobene Vorfälle als die gelieferten.
+		// incidents_more: there are older resolved incidents than the ones delivered.
 		"incidents_more": more,
 		"notices":        notices,
-		// gespiegelte Meldungen externer Quellen (Teil D).
+		// mirrored notices from external sources (part D).
 		"external_incidents": h.publicExternalIncidents(page.ID),
 	})
 }
 
-// dashboardIncidents lädt die Vorfälle der öffentlichen Sicht: alle offenen und
-// die neuesten behobenen, beide begrenzt. more meldet weitere behobene.
-// Bei einem ungültigen incident_limit (400) oder einem Datenbankfehler (500)
-// ist die Antwort geschrieben (ok=false).
+// dashboardIncidents loads the incidents of the public view: all open ones and
+// the newest resolved ones, both limited. more reports further resolved ones.
+// On an invalid incident_limit (400) or a database error (500)
+// the response has been written (ok=false).
 func (h *Handler) dashboardIncidents(c *gin.Context, pageID uint) (incidents []models.Incident, more, ok bool) {
 	limit, valid := parseCount(c, "incident_limit", defaultIncidentListLimit, 1)
 	if !valid {
@@ -525,14 +525,14 @@ func (h *Handler) dashboardIncidents(c *gin.Context, pageID uint) (incidents []m
 	base := func() *gorm.DB {
 		return h.DB.Where(whereStatusPageIDEquals, pageID).Preload("IncidentComponents.Component").Order(incidentNewestFirst)
 	}
-	// Fehler brechen ab (500), statt eine scheinbar leere Statusseite zu zeigen.
+	// Errors abort (500) instead of showing a seemingly empty status page.
 	if err := base().Where("status NOT IN ?", models.ResolvedIncidentStatuses).Limit(maxIncidentListLimit).Find(&incidents).Error; err != nil {
 		slog.Error("Dashboard: offene Vorfälle nicht lesbar", "page", pageID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents", "code": "server_error"})
 		return nil, false, false
 	}
 	resolved := []models.Incident{}
-	// Eine Zeile mehr als verlangt zeigt, ob es noch ältere gibt.
+	// One row more than requested shows whether there are older ones.
 	if err := base().Where("status IN ?", models.ResolvedIncidentStatuses).Limit(limit + 1).Find(&resolved).Error; err != nil {
 		slog.Error("Dashboard: behobene Vorfälle nicht lesbar", "page", pageID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch incidents", "code": "server_error"})
@@ -545,21 +545,21 @@ func (h *Handler) dashboardIncidents(c *gin.Context, pageID uint) (incidents []m
 	return append(incidents, resolved...), more, true
 }
 
-// publicLanguage ist eine für die Statusseite aktivierte Sprache:
-// Code, Eigenbezeichnung aus dem Sprachkatalog und Standardmarkierung.
+// publicLanguage is a language enabled for the status page:
+// code, native name from the language catalog and default flag.
 type publicLanguage struct {
 	Code      string `json:"code"`
 	Name      string `json:"name"`
 	IsDefault bool   `json:"is_default"`
-	// IsActive: im Sprachkatalog aktiv. Der Sprachumschalter zeigt
-	// weiter alle Seitensprachen, die Abo-Auswahlen nur aktive.
+	// IsActive: active in the language catalog. The language switcher shows
+	// all page languages as before, the subscription selections only active ones.
 	IsActive bool `json:"is_active"`
 }
 
-// publicPageLanguages liefert die Sprachen der Seite (nach Code sortiert) für
-// den öffentlichen Sprachumschalter. Fehler ergeben eine leere Liste: der
-// Umschalter fällt dann auf die Oberflächensprachen zurück, das Dashboard
-// bleibt nutzbar.
+// publicPageLanguages returns the page's languages (sorted by code) for
+// the public language switcher. Errors yield an empty list: the
+// switcher then falls back to the UI languages, the dashboard
+// stays usable.
 func (h *Handler) publicPageLanguages(pageID uint) []publicLanguage {
 	// Errors yield an empty list (see above).
 	rows, _ := h.pageContentLanguages(pageID)
@@ -583,15 +583,15 @@ func (h *Handler) GetStatusPagesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, pages)
 }
 
-// GET /api/pages/slug/:slug — einzelne Statusseite per Slug
+// GET /api/pages/slug/:slug — a single status page by slug
 //
-// dieser Endpunkt läuft öffentlich (keine AuthMiddleware, main.go
-// hängt aber OptionalAuthMiddleware ein) und lieferte private Seiten bisher
-// ungeprüft aus - wer den Slug kennt/errät, bekam Name/Beschreibung/
-// CustomDomain auch ohne Berechtigung. Bei page.IsPrivate ohne gültige
-// Berechtigung wird jetzt konsequent 404 zurückgegeben (wie bei einem nicht
-// existierenden Slug), damit ein Aufrufer nicht unterscheiden kann, ob die
-// Seite gar nicht existiert oder nur privat ist.
+// this endpoint is public (no AuthMiddleware, main.go
+// does attach OptionalAuthMiddleware though) and previously returned private pages
+// unchecked - anyone who knew/guessed the slug got name/description/
+// CustomDomain even without permission. For page.IsPrivate without valid
+// permission, 404 is now consistently returned (as for a non-
+// existent slug), so that a caller cannot tell whether the
+// page does not exist at all or is merely private.
 func (h *Handler) GetStatusPageBySlugHandler(c *gin.Context) {
 	slug := c.Param("slug")
 	var page models.StatusPage
@@ -605,23 +605,23 @@ func (h *Handler) GetStatusPageBySlugHandler(c *gin.Context) {
 		return
 	}
 
-	// öffentlicher Endpunkt, daher nur das DTO.
+	// public endpoint, therefore only the DTO.
 	c.JSON(http.StatusOK, toPublicStatusPage(page))
 }
 
-// statusPageWritableFields ist das Bind-Ziel für Create/Update.
-// Bewusst ein eigenes DTO statt direkt in models.StatusPage zu binden: die
-// Model-Struct bettet gorm.Model ein, dessen ID-Feld kein json:"-" trägt -
-// ein Request-Body mit z.B. {"ID": 7, ...} würde sonst page.ID überschreiben
-// und Save() damit auf eine andere (fremde) Statusseite umlenken, unabhängig
-// vom :page_id in der URL. Das DTO enthält nur die tatsächlich vom Client
-// änderbaren Felder, WebhookTokenHash (json:"-") bleibt zusätzlich ausgeschlossen.
-// CustomDomain/CustomDomainStatus sind aus demselben Grund NICHT hier
-// enthalten: sie laufen ausschließlich über die dedizierten
-// Endpunkte in custom_domain.go, damit ein Domain-Wechsel immer zuverlässig
-// den Verifikationsstatus auf "pending" zurücksetzt, statt über diesen
-// generischen Bind versehentlich mit einer stehengebliebenen "verified"/
-// "active"-Markierung kombiniert werden zu können.
+// statusPageWritableFields is the bind target for create/update.
+// Deliberately a separate DTO instead of binding directly into models.StatusPage: the
+// model struct embeds gorm.Model, whose ID field carries no json:"-" -
+// a request body with e.g. {"ID": 7, ...} would otherwise overwrite page.ID
+// and thereby redirect Save() to a different (foreign) status page, independent
+// of the :page_id in the URL. The DTO contains only the fields actually
+// changeable by the client; WebhookTokenHash (json:"-") additionally stays excluded.
+// CustomDomain/CustomDomainStatus are NOT included here for the same reason:
+// they go exclusively through the dedicated
+// endpoints in custom_domain.go, so that a domain change always reliably
+// resets the verification status to "pending", instead of this
+// generic bind accidentally combining it with a leftover "verified"/
+// "active" marker.
 type statusPageWritableFields struct {
 	Name            string `json:"Name"`
 	Slug            string `json:"Slug"`
@@ -630,15 +630,15 @@ type statusPageWritableFields struct {
 	IsPublicIndexed bool   `json:"IsPublicIndexed"`
 	IsPrivate       bool   `json:"IsPrivate"`
 	DefaultRoleID   *uint  `json:"DefaultRoleID"`
-	// AutoJoinEmailDomains: siehe models.StatusPage.
+	// AutoJoinEmailDomains: see models.StatusPage.
 	AutoJoinEmailDomains string `json:"AutoJoinEmailDomains"`
 	PrimaryColor         string `json:"PrimaryColor"`
 	SecondaryColor       string `json:"SecondaryColor"`
 	HeaderStyle          string `json:"HeaderStyle"`
-	// PageLayout: Zeiger, damit "Feld fehlt" (Wert behalten) von
-	// einem explizit gesendeten leeren Wert (400) unterscheidbar bleibt.
+	// PageLayout: pointer, so that "field missing" (keep value) stays
+	// distinguishable from an explicitly sent empty value (400).
 	PageLayout *string `json:"PageLayout"`
-	// NotificationFromAddress: siehe validateNotificationFromAddress.
+	// NotificationFromAddress: see validateNotificationFromAddress.
 	NotificationFromAddress string `json:"NotificationFromAddress"`
 }
 
@@ -648,7 +648,7 @@ func applyStatusPageWritableFields(page *models.StatusPage, in statusPageWritabl
 	page.Description = in.Description
 	page.LogoURL = in.LogoURL
 	page.IsPrivate = in.IsPrivate
-	// private Seiten dürfen nie öffentlich gelistet sein.
+	// private pages must never be publicly listed.
 	page.IsPublicIndexed = in.IsPublicIndexed && !in.IsPrivate
 	page.DefaultRoleID = in.DefaultRoleID
 	page.AutoJoinEmailDomains = in.AutoJoinEmailDomains
@@ -661,12 +661,12 @@ func applyStatusPageWritableFields(page *models.StatusPage, in statusPageWritabl
 	page.NotificationFromAddress = in.NotificationFromAddress
 }
 
-// userHasRoleOnPrivatePage prüft Global-Admin-Status oder eine bestehende
-// UserStatusPageRole für pageID - bewusst OHNE den Auto-Join-Seiteneffekt aus
-// GetPublicDashboardHandler (DefaultRoleID würde dort bei fehlender Rolle
-// automatisch eine neue UserStatusPageRole anlegen). Für einen reinen
-// Metadaten-Read-Endpunkt wie GetStatusPageBySlugHandler soll das Aufrufen
-// selbst keine Rollen-Zuweisung als Nebeneffekt auslösen.
+// userHasRoleOnPrivatePage checks global admin status or an existing
+// UserStatusPageRole for pageID - deliberately WITHOUT the auto-join side effect from
+// GetPublicDashboardHandler (DefaultRoleID would automatically create a new
+// UserStatusPageRole there when no role exists). For a pure
+// metadata read endpoint like GetStatusPageBySlugHandler, calling it
+// should not trigger a role assignment as a side effect.
 func (h *Handler) userHasRoleOnPrivatePage(c *gin.Context, pageID uint) bool {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -692,17 +692,17 @@ func (h *Handler) userHasRoleOnPrivatePage(c *gin.Context, pageID uint) bool {
 	return h.DB.Where(whereUserIDAndStatusPageID, userID, pageID).First(&userRole).Error == nil
 }
 
-// userHasPermissionOnPrivatePage prüft, ob der eingeloggte User auf pageID
-// eine Rolle mit genau der übergebenen Permission hat (oder Global Admin
-// ist) - anders als userHasRoleOnPrivatePage genügt nicht "irgendeine
-// Rolle". Das wäre nach Auto-Join (StatusPage.DefaultRoleID) für JEDEN
-// eingeloggten User wahr, unabhängig davon, was die zugewiesene Rolle
-// tatsächlich darf (Sonderfall Auto-Join, per unabhängigem Review
-// gefunden). Wiederverwendbar für
-// künftige Fälle, die dieselbe Berechtigungs- statt Rollenprüfung brauchen;
-// spiegelt dieselbe Permission-String-Logik wie middleware.RequirePermission,
-// nur als aufrufbare Funktion statt Middleware (die dortige roleHasPermission
-// ist unexported und nicht paketübergreifend nutzbar).
+// userHasPermissionOnPrivatePage checks whether the logged-in user has, on pageID,
+// a role with exactly the given permission (or is Global Admin)
+// - unlike userHasRoleOnPrivatePage, "any
+// role" is not enough. After auto-join (StatusPage.DefaultRoleID) that would be true for EVERY
+// logged-in user, regardless of what the assigned role
+// actually allows (special case of auto-join, found by an independent review).
+// Reusable for
+// future cases that need the same permission check instead of a role check;
+// mirrors the same permission-string logic as middleware.RequirePermission,
+// just as a callable function instead of middleware (the roleHasPermission there
+// is unexported and not usable across packages).
 func (h *Handler) userHasPermissionOnPrivatePage(c *gin.Context, pageID uint, permission string) bool {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -731,14 +731,14 @@ func (h *Handler) userHasPermissionOnPrivatePage(c *gin.Context, pageID uint, pe
 	return permissions.Has(userRole.Role.Permissions, permission)
 }
 
-// pageIsAccessible ist der gemeinsame Zugriffs-Check für alle page_id-/
-// globale-ID-Endpunkte, die dieselben Daten wie GetPublicDashboardHandler
-// liefern (Components, Incidents, Notices, Translations): öffentliche Seiten
-// sind immer lesbar, private Seiten über checkPrivatePageAccess (Global
-// Admin, bestehende Rolle, oder Auto-Join per DefaultRoleID). Der Auto-Join
-// galt bisher nur für die Dashboard-Route - Deep Links und direkte
-// API-Aufrufe auf dieselben Daten sollen ihn genauso auslösen, sonst würde
-// ein Nutzer je nach Einstiegspunkt (Dashboard vs. Deep Link) unterschiedlich
+// pageIsAccessible is the shared access check for all page_id-/
+// global-ID endpoints that return the same data as GetPublicDashboardHandler
+// (components, incidents, notices, translations): public pages
+// are always readable, private pages via checkPrivatePageAccess (Global
+// Admin, existing role, or auto-join via DefaultRoleID). Auto-join
+// previously applied only to the dashboard route - deep links and direct
+// API calls to the same data should trigger it just the same, otherwise
+// a user would be treated differently depending on the entry point (dashboard vs. deep link).
 // behandelt.
 func (h *Handler) pageIsAccessible(c *gin.Context, page models.StatusPage) bool {
 	if !page.IsPrivate {
@@ -748,24 +748,24 @@ func (h *Handler) pageIsAccessible(c *gin.Context, page models.StatusPage) bool 
 	return ok
 }
 
-// respondNotVisible beantwortet den Zugriff auf etwas, das der Aufrufer nicht
-// sehen darf, genau wie den Zugriff auf etwas, das es nicht gibt: 404 mit dem
-// Text und Code, den die Route für ein fehlendes Ziel verwendet. Würde eine
-// private Seite mit 401 oder 403 antworten, ließe sich anonym erkennen, welche
-// Slugs und IDs zu privaten Seiten gehören.
+// respondNotVisible answers access to something the caller must not
+// see exactly like access to something that does not exist: 404 with the
+// text and code the route uses for a missing target. If a
+// private page answered with 401 or 403, it would be possible to tell anonymously which
+// slugs and IDs belong to private pages.
 func respondNotVisible(c *gin.Context, message, code string) {
 	c.JSON(http.StatusNotFound, gin.H{"error": message, "code": code})
 }
 
-// respondPageNotVisible: die Antwort für „Seite fehlt“ und „Seite privat, keine
-// Berechtigung“ der Routen, die eine Seite über Slug oder page_id ansprechen.
+// respondPageNotVisible: the response for "page missing" and "page private, no
+// permission" of the routes that address a page by slug or page_id.
 func respondPageNotVisible(c *gin.Context) {
 	respondNotVisible(c, "Status page not found", "page_not_found")
 }
 
-// requirePageVisible prüft den Lesezugriff auf eine Seite (wie pageIsAccessible,
-// samt Auto-Join) und antwortet bei Ablehnung mit der Antwort der Route für
-// ein fehlendes Ziel. false: die Antwort ist geschrieben.
+// requirePageVisible checks read access to a page (like pageIsAccessible,
+// including auto-join) and on rejection answers with the route's response for
+// a missing target. false: the response has been written.
 func (h *Handler) requirePageVisible(c *gin.Context, page models.StatusPage, notFoundMessage, notFoundCode string) bool {
 	if h.pageIsAccessible(c, page) {
 		return true
@@ -774,7 +774,7 @@ func (h *Handler) requirePageVisible(c *gin.Context, page models.StatusPage, not
 	return false
 }
 
-// POST /api/pages — neue Statusseite anlegen
+// POST /api/pages — create a new status page
 func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 	var in statusPageWritableFields
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -783,8 +783,8 @@ func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 	}
 	page := models.StatusPage{PageLayout: "standard"}
 	applyStatusPageWritableFields(&page, in)
-	// ein Name ist Pflicht (Frontend prüfte es, das Backend legte
-	// sonst Seiten ohne Namen an).
+	// a name is required (the frontend checked it, the backend otherwise created
+	// pages without names).
 	page.Name = strings.TrimSpace(page.Name)
 	if page.Name == "" {
 		abortInvalidInput(c, codeNameRequired, "Name darf nicht leer sein")
@@ -794,11 +794,11 @@ func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 		return
 	}
 
-	// ein leeres Slug-Feld wird automatisch aus dem Namen generiert
-	// (die Seite ist dann sofort unter <slug>.<Basisdomain> erreichbar, DNS-
-	// Wildcard + TLS laufen bereits über Caddy). Ein manuell eingegebener Slug
-	// wird dagegen strikt validiert und bei Kollision klar zurückgewiesen statt
-	// dem Nutzer nur den generischen 500er des DB-uniqueIndex zu zeigen.
+	// an empty slug field is generated automatically from the name
+	// (the page is then immediately reachable as <slug>.<base domain>, DNS
+	// wildcard + TLS already run via Caddy). A manually entered slug
+	// is by contrast strictly validated and clearly rejected on collision instead of
+	// showing the user only the generic 500 of the DB uniqueIndex.
 	slug := strings.ToLower(strings.TrimSpace(page.Slug))
 	if slug == "" {
 		page.Slug = h.uniqueSlug(slugify(page.Name))
@@ -830,7 +830,7 @@ func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 		return
 	}
 	if err := h.DB.Create(&page).Error; err != nil {
-		// Race zwischen Vorabprüfung und Insert -> 409 wie oben.
+		// Race between pre-check and insert -> 409 as above.
 		if isUniqueViolation(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": slugTakenMessage, "code": "slug_taken"})
 			return
@@ -838,21 +838,21 @@ func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Erstellen", "code": "server_error"})
 		return
 	}
-	// GORM ersetzt das Nullwert-false durch default:true. Bei privaten
-	// Seiten muss "nicht gelistet" deshalb nach dem Anlegen explizit gesetzt werden.
+	// GORM replaces the zero-value false with default:true. For private
+	// pages, "not listed" therefore has to be set explicitly after creation.
 	if page.IsPrivate {
 		if err := h.DB.Model(&page).Update("is_public_indexed", false).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Erstellen", "code": "server_error"})
 			return
 		}
 	}
-	// jede neue Statusseite bekommt dieselbe de+en/de-Default-
-	// Sprachkonfiguration wie der Backfill für Bestandsseiten (siehe
-	// database.backfillStatusPageLanguages), damit sich neue und bestehende
-	// Seiten nicht unterscheiden. Ein Fehler hier darf das Anlegen der Seite
-	// selbst nicht verhindern - isValidNotificationLanguage fällt ohnehin auf
-	// dieselbe en/de-Konvention zurück, solange keine StatusPageLanguage-Zeile
-	// existiert (siehe handlers/notification_template_admin.go).
+	// every new status page gets the same de+en/de default
+	// language configuration as the backfill for existing pages (see
+	// database.backfillStatusPageLanguages), so that new and existing
+	// pages do not differ. An error here must not prevent the creation of the page
+	// itself - isValidNotificationLanguage falls back to
+	// the same en/de convention anyway as long as no StatusPageLanguage row
+	// exists (see handlers/notification_template_admin.go).
 	if err := database.SeedDefaultStatusPageLanguages(h.DB, page.ID); err != nil {
 		slog.Error("Failed to seed default languages for new status page", "status_page_id", page.ID, "error", err)
 	}
@@ -860,7 +860,7 @@ func (h *Handler) CreateStatusPageHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, page)
 }
 
-// PUT /api/admin/pages/:page_id — Statusseite aktualisieren
+// PUT /api/admin/pages/:page_id — update a status page
 func (h *Handler) UpdateStatusPageHandler(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("page_id"))
 	var page models.StatusPage
@@ -875,12 +875,12 @@ func (h *Handler) UpdateStatusPageHandler(c *gin.Context) {
 	}
 	originalSlug := page.Slug
 	applyStatusPageWritableFields(&page, in)
-	// Defensive: das DTO hat ohnehin kein ID-Feld, page.ID kann also durch den
-	// Bind oben gar nicht überschrieben werden - trotzdem hart auf den
-	// URL-Wert zurückgesetzt, damit dieser Invariant auch bei künftigen
-	// Änderungen an statusPageWritableFields nicht stillschweigend wegfällt.
+	// Defensive: the DTO has no ID field anyway, so page.ID cannot be overwritten by the
+	// bind above - still hard-reset to the
+	// URL value, so that this invariant does not silently disappear with future
+	// changes to statusPageWritableFields.
 	page.ID = uint(id)
-	// Name bleibt Pflicht (siehe CreateStatusPageHandler).
+	// Name stays mandatory (see CreateStatusPageHandler).
 	page.Name = strings.TrimSpace(page.Name)
 	if page.Name == "" {
 		abortInvalidInput(c, codeNameRequired, "Name darf nicht leer sein")
@@ -890,8 +890,8 @@ func (h *Handler) UpdateStatusPageHandler(c *gin.Context) {
 		return
 	}
 
-	// derselbe Kollisions-Check wie beim Anlegen, falls der Slug
-	// (und damit die Subdomain) nachträglich geändert wird.
+	// same collision check as on create, in case the slug
+	// (and thus the subdomain) is changed later.
 	slug := strings.ToLower(strings.TrimSpace(page.Slug))
 	if !validSlugRegex.MatchString(slug) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Slug darf nur Kleinbuchstaben, Ziffern und einzelne Bindestriche enthalten", "code": "slug_invalid"})
@@ -902,14 +902,14 @@ func (h *Handler) UpdateStatusPageHandler(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": slugTakenMessage, "code": "slug_taken"})
 		return
 	}
-	// reservierte Slugs nur beim Ändern des Slugs sperren; eine
-	// bestehende Seite (auch die Systemseite mit "system") darf ihren Slug
-	// behalten und sonst weiter gespeichert werden.
+	// block reserved slugs only when changing the slug; an
+	// existing page (including the system page with "system") may keep its slug
+	// and otherwise continue to be saved.
 	if slug != originalSlug && isReservedSlug(slug) {
 		abortInvalidInput(c, codeSlugReserved, slugReservedMessage)
 		return
 	}
-	// Der Slug der Systemseite ist fest (öffentliche URL, Dogfooding).
+	// The slug of the system page is fixed (public URL, dogfooding).
 	if page.IsSystem && slug != database.SystemStatusPageSlug {
 		c.JSON(http.StatusConflict, gin.H{"error": "Der Slug der Systemstatusseite kann nicht geändert werden", "code": "system_page_slug_locked"})
 		return
@@ -940,7 +940,7 @@ func (h *Handler) UpdateStatusPageHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, page)
 }
 
-// DELETE /api/admin/pages/:page_id — Statusseite löschen
+// DELETE /api/admin/pages/:page_id — delete status page
 func (h *Handler) DeleteStatusPageHandler(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("page_id"))
 	if err != nil {
@@ -952,11 +952,11 @@ func (h *Handler) DeleteStatusPageHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Nicht gefunden", "code": "page_not_found"})
 		return
 	}
-	// Die Systemseite bildet den Zustand dieser
-	// Installation selbst ab und wird bei jedem Start von
-	// database.SeedSystemStatusPage erwartet. Löschen ist deshalb gesperrt statt
-	// still erlaubt: Ein Neuanlegen beim nächsten Start hätte eine leere Seite
-	// mit neuer ID ergeben, Komponenten, Abos und Rollen der alten wären verloren.
+	// The system page represents the state of this
+	// installation itself and is expected on every start by
+	// database.SeedSystemStatusPage. Deleting is therefore blocked rather than
+	// silently allowed: re-creating it on the next start would have produced an empty page
+	// with a new ID, and the old one's components, subscriptions and roles would be lost.
 	if page.IsSystem || page.Slug == database.SystemStatusPageSlug {
 		c.JSON(http.StatusConflict, gin.H{"error": "Die Systemstatusseite kann nicht gelöscht werden", "code": "system_page_protected"})
 		return
@@ -969,9 +969,9 @@ func (h *Handler) DeleteStatusPageHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Gelöscht"})
 }
 
-// GET /api/admin/pages/:page_id/users — Benutzer einer Seite auflisten
-// Nur die für die Verwaltung nötigen Felder (ID, E-Mail, Rollenname),
-// nie SSO-Kennung, Admin-Flag oder Rechte-Liste der Konten.
+// GET /api/admin/pages/:page_id/users — list users of a page
+// Only the fields needed for administration (ID, email, role name),
+// never the SSO identifier, admin flag or permission list of the accounts.
 func (h *Handler) GetStatusPageUsersHandler(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("page_id"))
 	if err != nil {
@@ -988,18 +988,18 @@ func (h *Handler) GetStatusPageUsersHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// POST /api/admin/pages/:page_id/users — Benutzer zu einer Seite hinzufügen (oder Rolle ändern)
+// POST /api/admin/pages/:page_id/users — add a user to a page (or change role)
 //
-// Nicht-Global-Admins laden per E-Mail ein (page_invitation.go),
-// die Mitgliedschaft entsteht erst mit der Zustimmung des Kontoinhabers.
+// Non-Global-Admins invite by email (page_invitation.go),
+// the membership only comes into being with the account holder's consent.
 //
-// user_id und role_id werden gegen die Datenbank geprüft.
-// Ein Global Admin wählt das Konto per user_id (oder E-Mail). Alle anderen
-// (z. B. Page Owner) dürfen kein beliebiges Konto per ID einschleusen: Sie
-// ändern die Rolle bestehender Mitglieder dieser Seite oder fügen ein Konto
-// per E-Mail hinzu; die Antwort ist dort für bekannte und unbekannte Adressen
-// gleich (keine Kontenabfrage). Die vergebene Rolle darf nie mehr Rechte haben
-// als die des Zuweisenden auf dieser Seite.
+// user_id and role_id are checked against the database.
+// A Global Admin selects the account by user_id (or email). All others
+// (e.g. Page Owner) must not inject an arbitrary account by ID: they
+// change the role of existing members of this page or add an account
+// by email; the response there is the same for known and unknown addresses
+// (no account lookup). The assigned role must never have more permissions
+// than that of the assigner on this page.
 func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 	pageID, err := strconv.Atoi(c.Param("page_id"))
 	if err != nil {
@@ -1016,8 +1016,8 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 		return
 	}
 
-	// Formfehler (ohne role_id) sind kein Rollen-Orakel: 400 statt 403 (Regression,
-	// aufgefallen an den Router-Tests TestRoutePermissions/TestRouter_SSOSession).
+	// Form errors (without role_id) are no role oracle: 400 instead of 403 (regression,
+	// noticed in the router tests TestRoutePermissions/TestRouter_SSOSession).
 	if input.RoleID == 0 {
 		respondInvalidInput(c)
 		return
@@ -1029,10 +1029,10 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 	}
 	isGA := h.isEffectiveGlobalAdmin(c)
 
-	// Rollenbezogene Prüfungen laufen für Nicht-Global-Admins VOR der Konto-
-	// Suche und antworten für fehlende, Global-Admin- und nicht abgedeckte
-	// Rollen gleich: Weder die Adresse noch vorhandene Rollen-IDs lassen sich
-	// so erraten (Review).
+	// Role-related checks run for non-Global-Admins BEFORE the account
+	// lookup and respond the same for missing, Global Admin and uncovered
+	// roles: neither the address nor existing role IDs can be
+	// guessed this way (review).
 	var role models.Role
 	roleErr := h.DB.First(&role, input.RoleID).Error
 	var actorPerms string
@@ -1040,7 +1040,7 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 		actorPerms = h.actorPagePermissions(c, uint(pageID))
 		globalOnly, goErr := h.globalOnlyRoleIDs(h.DB, []uint{role.ID})
 		if goErr != nil {
-			// O2: DB-Fehler der Rollenprüfung sperren (fail closed).
+			// O2: block on DB error of the role check (fail closed).
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Hinzufügen", "code": "server_error"})
 			return
 		}
@@ -1053,17 +1053,17 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 		return
 	}
 
-	// Ein User kann pro Statusseite immer nur eine Rolle haben. Ohne diesen Check
-	// würde ein erneutes Zuweisen (z.B. Upgrade von Viewer auf Editor) eine zweite
-	// Zeile anlegen; RequirePermission liest per First() aber immer die älteste
-	// Zeile, sodass die neu vergebene Rolle nie greifen würde.
+	// A user can only ever have one role per status page. Without this check,
+	// reassigning (e.g. upgrade from Viewer to Editor) would create a second
+	// row; RequirePermission however always reads the oldest row via First(),
+	// so the newly assigned role would never take effect.
 	target, found, status := h.resolvePageUserTarget(c, isGA, uint(pageID), input.UserID, input.Email)
 	if status != 0 {
 		return
 	}
 	byEmail := input.UserID == 0 && !isGA
 
-	// Gleiche Abfragen für bekannte und unbekannte Adressen (ID 0 findet nichts).
+	// Same queries for known and unknown addresses (ID 0 finds nothing).
 	var existing models.UserStatusPageRole
 	err = h.DB.Preload("Role").Where(whereUserIDAndStatusPageID, target.ID, pageID).First(&existing).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1072,11 +1072,11 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 	}
 	isMember := err == nil
 	if !isGA && !isMember {
-		// Ein Nicht-Global-Admin hängt kein Konto mehr direkt an.
-		// Jede Adresse, die noch kein Mitglied ist (mit, ohne oder mit nicht
-		// anhängbarem Konto), bekommt eine Einladung und dieselbe Antwort; nur ein
-		// gefundenes Konto (found) erhält die Mail. Per user_id (ein gerade
-		// entferntes Mitglied) gibt es keinen Weg an der Einladung vorbei.
+		// A non-Global-Admin no longer attaches an account directly.
+		// Every address that is not yet a member (with, without or with a non-
+		// attachable account) gets an invitation and the same response; only a
+		// found account (found) receives the email. Via user_id (a just
+		// removed member) there is no way around the invitation.
 		if byEmail {
 			mailTo := models.User{}
 			if found {
@@ -1090,14 +1090,14 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 	}
 
 	if isGA {
-		// "Global Admin" ist keine Seitenrolle (siehe pageRolesAssignable).
+		// "Global Admin" is not a page role (see pageRolesAssignable).
 		if !h.pageRolesAssignable(target.ID, []PageRoleInput{{StatusPageID: uint(pageID), RoleID: input.RoleID}}) {
 			abortGlobalAdminRoleNotAssignable(c)
 			return
 		}
 	} else if isMember && !roleCoveredByActor(actorPerms, existing.Role) {
-		// Mitglied mit stärkerer (oder gelöschter) Rolle: auf dem E-Mail-Weg
-		// neutral und ohne Änderung, sonst 403 (das Mitglied ist sichtbar).
+		// Member with a stronger (or deleted) role: on the email path
+		// neutral and without change, otherwise 403 (the member is visible).
 		if byEmail {
 			c.JSON(http.StatusOK, gin.H{"message": pageUserEmailAcceptedMsg})
 			return
@@ -1111,14 +1111,14 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 		return
 	}
 
-	// Ab hier nur noch Global Admins (alle anderen laden oben ein).
+	// From here on only Global Admins (all others invite above).
 	entry := models.UserStatusPageRole{
 		UserID:       target.ID,
 		StatusPageID: uint(pageID),
 		RoleID:       input.RoleID,
 	}
-	// Benutzerzeile sperren, bevor die Rolle entsteht; ein gleichzeitig
-	// gelöschtes Konto bekommt keine Rolle mehr (404 statt 201).
+	// Lock the user row before the role is created; a concurrently
+	// deleted account no longer gets a role (404 instead of 201).
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
 		if err := lockLiveUser(tx, target.ID); err != nil {
 			return err
@@ -1130,9 +1130,9 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 			return
 		}
 		if isUniqueViolation(err) {
-			// Ein gleichzeitiger Aufruf war schneller (Unique-Index
-			// user_id + status_page_id). Das Hinzufügen ist idempotent: das nun
-			// vorhandene Mitglied bekommt die angeforderte Rolle, statt 500.
+			// A concurrent call was faster (unique index
+			// user_id + status_page_id). Adding is idempotent: the now
+			// existing member gets the requested role, instead of a 500.
 			h.assignAfterRace(c, role, uint(pageID), target.ID)
 			return
 		}
@@ -1143,7 +1143,7 @@ func (h *Handler) AddStatusPageUserHandler(c *gin.Context) {
 	respondPageUserAssigned(c, http.StatusCreated, entry, false)
 }
 
-// DELETE /api/admin/pages/:page_id/users/:uid — Benutzer von einer Seite entfernen
+// DELETE /api/admin/pages/:page_id/users/:uid — remove a user from a page
 func (h *Handler) RemoveStatusPageUserHandler(c *gin.Context) {
 	pageID, err := strconv.Atoi(c.Param("page_id"))
 	if err != nil {
@@ -1155,8 +1155,8 @@ func (h *Handler) RemoveStatusPageUserHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uid", "code": "invalid_id"})
 		return
 	}
-	// Jeder DB-Fehler außer "nicht gefunden" bricht ab (fail closed), die
-	// Rechteprüfung folgt in mayRemovePageUser.
+	// Every DB error except "not found" aborts (fail closed), the
+	// permission check follows in mayRemovePageUser.
 	details := fmt.Sprintf("user_id=%d", userID)
 	var current models.UserStatusPageRole
 	curErr := h.DB.Preload("Role").Where(whereUserIDAndStatusPageID, userID, pageID).First(&current).Error
@@ -1171,13 +1171,13 @@ func (h *Handler) RemoveStatusPageUserHandler(c *gin.Context) {
 		details += fmt.Sprintf(" role_id=%d", current.RoleID)
 	}
 	lockCheck := curErr == nil && h.lockOutApplies(c, uint(userID), current.Role, nil)
-	// Review: Zwischen Prüfung und Löschen kann die
-	// Mitgliedschaft schon weg sein (TOCTOU). Ein Nicht-Global-Admin darf dann
-	// keine Verknüpfungen mehr löschen: Rückrollen und 404 wie ohne Mitgliedschaft.
+	// Review: between the check and the deletion, the
+	// membership may already be gone (TOCTOU). A non-Global-Admin must then
+	// not delete any links anymore: roll back and 404 as without a membership.
 	requireMember := !h.isEffectiveGlobalAdmin(c)
-	// Rolle und Seiten-SSO-Verknüpfung dieses Kontos enden gemeinsam.
-	// Die Prüfung "letzter Owner" läuft in derselben Transaktion (unter
-	// Postgres mit FOR UPDATE auf die Mitgliedszeilen der Seite).
+	// Role and page-SSO link of this account end together.
+	// The "last owner" check runs in the same transaction (under
+	// Postgres with FOR UPDATE on the page's membership rows).
 	var ssoRemoved int64
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
 		if lockCheck {
@@ -1203,23 +1203,23 @@ func (h *Handler) RemoveStatusPageUserHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Entfernen", "code": "server_error"})
 		return
 	}
-	// Der Audit-Eintrag nennt die mitgelöschten Verknüpfungen.
+	// The audit entry names the links deleted along with it.
 	details += fmt.Sprintf(" sso_identities_removed=%d", ssoRemoved)
 	h.RecordAudit(c, "statuspage.user_role_removed", "config", "StatusPage", strconv.Itoa(pageID), "", details)
 	c.JSON(http.StatusOK, gin.H{"message": "Entfernt"})
 }
 
-// mayRemovePageUser prüft die Rechte für RemoveStatusPageUserHandler und
-// antwortet bei Ablehnung selbst. Ein Mitglied mit mehr Rechten als
-// der Zuweisende bleibt unberührt. Ohne aktive Mitgliedschaft
-// des Ziels gibt es keine Rolle, gegen die sich die Rechte des Aufrufers prüfen
-// ließen; das Entfernen hätte dann nur noch beliebige Seiten-SSO-Verknüpfungen
-// fremder Konten gelöscht. Das darf nur ein Global Admin (Aufräumen verwaister
-// Verknüpfungen), alle anderen bekommen 404 wie bei einem unbekannten Konto –
-// ausdrücklich auch Konten, die pages:delete über eine globale Rolle haben, aber
-// kein Global Admin sind: Nur ein Global Admin räumt auf. Unbekanntes Konto,
-// existierendes Nicht-Mitglied und nur soft-gelöschte Mitgliedschaft liefern
-// denselben Status und Body (keine Aufzählung von Konten).
+// mayRemovePageUser checks the permissions for RemoveStatusPageUserHandler and
+// responds itself on rejection. A member with more permissions than
+// the assigner remains untouched. Without an active membership
+// of the target there is no role against which the caller's permissions could be
+// checked; removal would then only have deleted arbitrary page-SSO links
+// of foreign accounts. Only a Global Admin may do that (cleaning up orphaned
+// links), everyone else gets 404 as for an unknown account -
+// explicitly including accounts that have pages:delete via a global role but
+// are not Global Admin: only a Global Admin cleans up. Unknown account,
+// existing non-member and only soft-deleted membership return
+// the same status and body (no account enumeration).
 func (h *Handler) mayRemovePageUser(c *gin.Context, curErr error, current models.UserStatusPageRole, pageID uint) bool {
 	if h.isEffectiveGlobalAdmin(c) {
 		return true
@@ -1235,12 +1235,12 @@ func (h *Handler) mayRemovePageUser(c *gin.Context, curErr error, current models
 	return true
 }
 
-// errNotPageMember: Die Mitgliedschaft war beim Löschen schon weg.
+// errNotPageMember: the membership was already gone at deletion time.
 var errNotPageMember = errors.New("not a page member")
 
-// deletePageMembership löscht (soft) die Mitgliedschaft des Kontos auf der
-// Seite. Mit requireMember gilt "nichts gelöscht" als errNotPageMember, damit
-// der Aufrufer die Transaktion zurückrollt (TOCTOU).
+// deletePageMembership (soft-)deletes the account's membership on the
+// page. With requireMember, "nothing deleted" counts as errNotPageMember, so that
+// the caller rolls back the transaction (TOCTOU).
 func deletePageMembership(tx *gorm.DB, userID, pageID uint, requireMember bool) error {
 	res := tx.Where("status_page_id = ? AND user_id = ?", pageID, userID).Delete(&models.UserStatusPageRole{})
 	if res.Error != nil {
@@ -1256,14 +1256,14 @@ func respondNotPageMember(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "Benutzer ist kein Mitglied dieser Seite", "code": "user_not_found"})
 }
 
-// updatePageUserRole setzt die Rolle eines bestehenden Mitglieds (
-// Herabstufen des letzten Owners durch sich selbst -> 409 last_page_owner).
+// updatePageUserRole sets the role of an existing member
+// (the last owner downgrading themselves -> 409 last_page_owner).
 func (h *Handler) updatePageUserRole(c *gin.Context, existing models.UserStatusPageRole, role models.Role, byEmail bool) {
 	lockCheck := h.lockOutApplies(c, existing.UserID, existing.Role, &role)
 	existing.RoleID = role.ID
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
-		// Benutzerzeile zuerst sperren. Sonst legt Save() die von der
-		// Kontolöschung entfernte Rollenzeile per Upsert wieder an.
+		// Lock the user row first. Otherwise Save() re-creates via upsert the role row removed by the
+		// account deletion.
 		if err := lockLiveUser(tx, existing.UserID); err != nil {
 			return err
 		}
@@ -1272,13 +1272,13 @@ func (h *Handler) updatePageUserRole(c *gin.Context, existing models.UserStatusP
 				return err
 			}
 		}
-		// Gezieltes Update statt Save(). Save() setzt bei 0 getroffenen
-		// Zeilen einen Upsert ab und holt damit eine gleichzeitig entfernte
-		// (soft-gelöschte) Mitgliedschaft zurück. Das UPDATE wartet unter Postgres
-		// auf die Sperre des Entfernens und wertet danach deleted_at IS NULL neu
-		// aus; 0 Zeilen heißt "Mitglied ist weg" (404 user_not_found, fail closed).
-		// Lock-Ordnung unverändert: Benutzer, dann Rollenzeilen; das Entfernen nimmt
-		// keine Benutzersperre, es entsteht kein Zyklus.
+		// Targeted update instead of Save(). With 0 affected rows, Save()
+		// issues an upsert and thereby brings back a concurrently removed
+		// (soft-deleted) membership. Under Postgres the UPDATE waits
+		// for the removal's lock and then re-evaluates deleted_at IS NULL;
+		// 0 rows means "member is gone" (404 user_not_found, fail closed).
+		// Lock order unchanged: user, then role rows; the removal takes
+		// no user lock, so no cycle arises.
 		res := tx.Model(&models.UserStatusPageRole{}).
 			Where("id = ? AND deleted_at IS NULL", existing.ID).
 			Update("role_id", role.ID)
@@ -1306,9 +1306,9 @@ func (h *Handler) updatePageUserRole(c *gin.Context, existing models.UserStatusP
 	respondPageUserAssigned(c, http.StatusOK, existing, byEmail)
 }
 
-// assignAfterRace behandelt die Unique-Verletzung beim Anlegen:
-// vorhandene Zeile lesen, Rolle aktualisieren. Seit der Umstellung legen nur noch
-// Global Admins direkt Mitglieder an, deshalb ohne eigene Rechteprüfung.
+// assignAfterRace handles the unique violation on creation:
+// read the existing row, update the role. Since the change, only
+// Global Admins create members directly, hence no permission check of its own.
 func (h *Handler) assignAfterRace(c *gin.Context, role models.Role, pageID, userID uint) {
 	var existing models.UserStatusPageRole
 	if err := h.DB.Preload("Role").Where(whereUserIDAndStatusPageID, userID, pageID).First(&existing).Error; err != nil {

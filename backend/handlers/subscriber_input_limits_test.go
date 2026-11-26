@@ -12,9 +12,9 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Öffentliche Abo-Eingaben haben feste Obergrenzen und enthalten keine
-// Steuerzeichen. Ein NUL-Byte erreichte sonst die Datenbank, die es ablehnt
-// (500 statt 400); überlange Werte wurden bis zum Body-Limit gespeichert.
+// Public subscription inputs have fixed upper limits and contain no
+// control characters. A NUL byte otherwise reached the database, which rejects it
+// (500 instead of 400); overlong values were stored up to the body limit.
 func TestSubscribe_EingabenBegrenztUndOhneSteuerzeichen(t *testing.T) {
 	db, r, _ := setupDOIRouter(t)
 	valid := func() map[string]string {

@@ -14,9 +14,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// doTagRequest führt einen Request gegen den Test-Router aus und JSON-kodiert
-// payload (falls gesetzt) als Body; reduziert die sonst pro Subtest
-// wiederholte Request/Serve-Boilerplate.
+// doTagRequest executes a request against the test router and JSON-encodes
+// payload (if set) as the body; reduces the otherwise per-subtest
+// repeated request/serve boilerplate.
 func doTagRequest(r http.Handler, method, path string, payload interface{}) *httptest.ResponseRecorder {
 	var body io.Reader
 	if payload != nil {

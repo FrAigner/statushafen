@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestTranslationTagGuards prüft die Wächter einzeln: kaputte ID (400),
-// unbekannte Ressource (404), fremder Tag (403) und die Gegenprobe mit
-// passendem Tag bzw. ohne Tag (200). Die Verdrahtung an den echten Routen
-// prüft main_translation_tag_access_test.go.
+// TestTranslationTagGuards checks the guards individually: broken ID (400),
+// unknown resource (404), foreign tag (403) and the control check with a
+// matching tag or no tag (200). The wiring on the real routes is
+// checked by main_translation_tag_access_test.go.
 func TestTranslationTagGuards(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -71,7 +71,7 @@ func TestTranslationTagGuards(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, get(c.prefix+"abc"), c.prefix+" ungültige ID")
 	}
 
-	// Gegenprobe: derselbe Nutzer darf die Ressource, sobald sie seinen Tag trägt.
+	// Control check: the same user may access the resource once it carries their tag.
 	require.NoError(t, db.Create(&models.IncidentTag{IncidentID: inc.ID, TagID: eu.ID}).Error)
 	require.NoError(t, db.Create(&models.ComponentTag{ComponentID: comp.ID, TagID: eu.ID}).Error)
 	for _, p := range []string{"/incident/" + id(inc.ID), "/component/" + id(comp.ID), "/incident-tr/" + id(incTr.ID), "/component-tr/" + id(compTr.ID)} {

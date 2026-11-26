@@ -12,9 +12,9 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// readSystemSettingBool wie getSystemSettingBool, unterscheidet aber "nicht
-// gesetzt" (Default) von einem Lesefehler: ein Fehler wird
-// zurückgegeben statt still als Default zu gelten.
+// readSystemSettingBool is like getSystemSettingBool, but distinguishes "not
+// set" (default) from a read error: an error is
+// returned instead of silently counting as the default.
 func (h *Handler) readSystemSettingBool(key string, def bool) (bool, error) {
 	var setting models.SystemSetting
 	if err := h.DB.Where("key = ?", key).First(&setting).Error; err != nil {
@@ -26,36 +26,36 @@ func (h *Handler) readSystemSettingBool(key string, def bool) (bool, error) {
 	return setting.Value == "true", nil
 }
 
-// Systemeinstellungen: globale, erweiterbare Key/Value-Schalter.
-// Erster Schalter ist die Self-Service-Bestellung (öffentliche Route /order,
-//), zweiter der globale E-Mail-Versand. Konvention:
-// Ein fehlender Key bedeutet den jeweiligen Default - für beide Schalter "an",
-// damit bestehende Deployments unverändert bleiben und erst ein explizites
-// "false" die Funktion abschaltet.
+// System settings: global, extensible key/value switches.
+// The first switch is self-service ordering (public route /order,
+//), the second is global email sending. Convention:
+// A missing key means the respective default - "on" for both switches,
+// so that existing deployments remain unchanged and only an explicit
+// "false" turns the feature off.
 
 const (
-	// settingOrdersEnabled steuert, ob die Self-Service-Bestellung aktiv ist.
-	// Fehlt der Key, gilt der Default "an" (siehe getSystemSettingBool).
+	// settingOrdersEnabled controls whether self-service ordering is active.
+	// If the key is missing, the default "on" applies (see getSystemSettingBool).
 	settingOrdersEnabled = "orders.enabled"
-	// settingEmailEnabled schaltet den gesamten E-Mail-Versand.
-	// Fehlt der Key, gilt "an"; ausgewertet wird er zentral in deliverMail
-	// (smtp.go), der einzigen Stelle mit smtp.SendMail.
+	// settingEmailEnabled switches all email sending.
+	// If the key is missing, "on" applies; it is evaluated centrally in deliverMail
+	// (smtp.go), the only place with smtp.SendMail.
 	settingEmailEnabled = "email.enabled"
-	// settingSelfMonitorEnabled schaltet die automatische Selbstüberwachung der
-	// Systemseite. Fehlt der Key, gilt "aus"
-	// (Betreiber-Entscheidung): nur ein ausdrücklich gesetztes "an"
-	// schaltet sie ein.
+	// settingSelfMonitorEnabled switches the automatic self-monitoring of the
+	// system page. If the key is missing, "off" applies
+	// (operator decision): only an explicitly set "on"
+	// turns it on.
 	settingSelfMonitorEnabled = "selfmonitor.enabled"
-	// selfMonitorEnabledDefault ist die einzige Quelle dieses Defaults (Schalter-
-	// Tabelle und Monitor).
+	// selfMonitorEnabledDefault is the single source of this default (switch
+	// table and monitor).
 	selfMonitorEnabledDefault = false
 )
 
-// boolSetting beschreibt einen über GET/PUT /api/settings verwalteten
-// bool-Schalter: Key in der SystemSetting-Tabelle, Feldname im JSON-Vertrag
-// und Default bei fehlendem Key. adminBoolSettings ist die einzige
-// Stelle, an der ein neuer Schalter eingetragen wird - GET, PUT und Audit
-// laufen generisch darüber, statt pro Schalter kopiert zu werden.
+// boolSetting describes a bool switch managed via GET/PUT /api/settings:
+// key in the SystemSetting table, field name in the JSON contract
+// and default for a missing key. adminBoolSettings is the only
+// place where a new switch is registered - GET, PUT and audit
+// run generically over it instead of being copied per switch.
 type boolSetting struct {
 	key   string
 	field string
@@ -68,11 +68,11 @@ var adminBoolSettings = []boolSetting{
 	{key: settingSelfMonitorEnabled, field: "selfmonitor_enabled", def: selfMonitorEnabledDefault},
 }
 
-// getSystemSettingBool liest einen bool-Wert aus der SystemSetting-Tabelle.
-// Fehlt der Key (oder tritt ein DB-Fehler auf), wird der übergebene Default
-// zurückgegeben - so bleibt "Key fehlt ⇒ Default" die einzige
-// Quelle der Wahrheit und bestehende Deployments ohne Zeile verhalten sich
-// unverändert. Als "true" gilt ausschließlich der exakte Wert "true".
+// getSystemSettingBool reads a bool value from the SystemSetting table.
+// If the key is missing (or a DB error occurs), the passed default is
+// returned - so "key missing => default" remains the single
+// source of truth and existing deployments without a row behave
+// unchanged. Only the exact value "true" counts as "true".
 func (h *Handler) getSystemSettingBool(key string, def bool) bool {
 	var setting models.SystemSetting
 	if err := h.DB.Where("key = ?", key).First(&setting).Error; err != nil {
@@ -81,12 +81,12 @@ func (h *Handler) getSystemSettingBool(key string, def bool) bool {
 	return setting.Value == "true"
 }
 
-// setSystemSettingBool legt den Key an oder aktualisiert ihn (Upsert per
-// ON CONFLICT auf dem uniqueIndex key). Der Wert wird kanonisch als
-// "true"/"false" gespeichert, damit getSystemSettingBool deterministisch
-// vergleichen kann. Bewusst ein einzelnes Statement statt First+Save/Create -
-// das vermeidet eine Race zwischen Prüfung und Insert und einen toten
-// Fehler-Zweig für den ohnehin nie auftretenden Nicht-NotFound-Fehler.
+// setSystemSettingBool creates the key or updates it (upsert via
+// ON CONFLICT on the uniqueIndex key). The value is stored canonically as
+// "true"/"false" so that getSystemSettingBool can compare deterministically.
+// Deliberately a single statement instead of First+Save/Create -
+// this avoids a race between check and insert and a dead
+// error branch for the non-NotFound error that never occurs anyway.
 func (h *Handler) setSystemSettingBool(key string, value bool) error {
 	return h.DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "key"}},
@@ -94,7 +94,7 @@ func (h *Handler) setSystemSettingBool(key string, value bool) error {
 	}).Create(&models.SystemSetting{Key: key, Value: strconv.FormatBool(value)}).Error
 }
 
-// currentSettings liefert alle Admin-Schalter mit ihrem aktuellen Wert.
+// currentSettings returns all admin switches with their current value.
 func (h *Handler) currentSettings() gin.H {
 	out := gin.H{}
 	for _, s := range adminBoolSettings {
@@ -103,19 +103,19 @@ func (h *Handler) currentSettings() gin.H {
 	return out
 }
 
-// GetSettingsHandler liefert die (für die Admin-Oberfläche relevanten) globalen
-// Systemeinstellungen (orders_enabled, email_enabled). Die Antwort ist bewusst
-// ein Objekt (nicht ein nackter Bool), damit weitere Schalter additiv
-// dazukommen können, ohne die Vertragsform zu brechen.
+// GetSettingsHandler returns the global system settings (relevant for the
+// admin UI) (orders_enabled, email_enabled). The response is deliberately
+// an object (not a bare bool) so that further switches can be added
+// additively without breaking the contract shape.
 func (h *Handler) GetSettingsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.currentSettings())
 }
 
-// UpdateSettingsHandler setzt einen oder mehrere Schalter. Jedes
-// Feld ist optional (Pointer, damit "fehlt" von explizit false unterscheidbar
-// bleibt); gespeichert und auditiert werden nur die gesetzten Felder. Fehlen
-// alle bekannten Felder, wird der Request wie bisher mit 400 abgelehnt. Die
-// Antwort enthält den vollständigen aktuellen Stand aller Schalter.
+// UpdateSettingsHandler sets one or more switches. Each
+// field is optional (pointer, so that "missing" remains distinguishable from explicit false);
+// only the fields that are set are stored and audited. If
+// all known fields are missing, the request is rejected with 400 as before. The
+// response contains the complete current state of all switches.
 func (h *Handler) UpdateSettingsHandler(c *gin.Context) {
 	var req map[string]*bool
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -142,8 +142,8 @@ func (h *Handler) UpdateSettingsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.currentSettings())
 }
 
-// GetPublicOrdersEnabledHandler meldet ohne Auth, ob die Self-Service-Bestellung
-// aktiv ist (Landing-CTA und /order-Seite blenden sich danach aus). Vorbild:
+// GetPublicOrdersEnabledHandler reports without auth whether self-service ordering
+// is active (landing CTA and /order page hide themselves accordingly). Model:
 // GetPublicUiOverridesHandler (ui_override.go).
 func (h *Handler) GetPublicOrdersEnabledHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"enabled": h.getSystemSettingBool(settingOrdersEnabled, true)})

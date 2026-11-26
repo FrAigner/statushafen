@@ -12,8 +12,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Ohne "@" gibt es keinen lokalen Teil, den man für "+tag"-Varianten abgleichen
-// könnte: mailboxMatch fällt auf den exakten Vergleich zurück, ohne LIKE.
+// Without "@" there is no local part that could be matched for "+tag" variants:
+// mailboxMatch falls back to exact comparison, without LIKE.
 func TestMailboxMatch_WithoutAtSignMatchesExactly(t *testing.T) {
 	clause, args := mailboxMatch("  Kein-At ")
 	assert.Equal(t, "lower(email) = ?", clause)
@@ -26,10 +26,10 @@ func TestMailboxMatch_WithoutAtSignMatchesExactly(t *testing.T) {
 	assert.Equal(t, `opfer+%@example.com`, args[1])
 }
 
-// Eine gespeicherte Bestätigungsvorlage, die nicht (mehr) verwendbar ist - sie
-// lässt sich nicht parsen oder enthält keinen unbedingten Bestätigungslink -,
-// wird nicht verwendet: Es gilt der Standardtext, und das Log nennt weder
-// Vorlagentext noch Platzhalterwerte.
+// A stored confirmation template that is not (or no longer) usable - it
+// cannot be parsed or contains no unconditional confirmation link -
+// is not used: the default text applies, and the log names neither
+// template text nor placeholder values.
 func TestRenderSubscriptionConfirmTemplate_UnusableTemplateFallsBackToDefault(t *testing.T) {
 	h := NewHandler(testutils.SetupTestDB())
 	data := NotificationTemplateData{Title: "geheim-titel", ConfirmURL: "https://status.example.com/confirm/geheim-token", Language: "de"}
@@ -57,7 +57,7 @@ func TestRenderSubscriptionConfirmTemplate_UnusableTemplateFallsBackToDefault(t 
 		})
 	}
 
-	// Gegenprobe: mit unbedingtem Link wird die eigene Vorlage im Rahmen verwendet.
+	// Control case: with an unconditional link the custom template is used within the frame.
 	tmpl := &models.NotificationTemplate{Subject: "Betreff {{.Title}}", BodyHTML: `<a href="{{.ConfirmURL}}">Los</a>`}
 	subject, html := h.renderSubscriptionConfirmTemplate(tmpl, data, "DEFAULT-S", "DEFAULT-B")
 	assert.NotEqual(t, "DEFAULT-B", html)
@@ -65,8 +65,8 @@ func TestRenderSubscriptionConfirmTemplate_UnusableTemplateFallsBackToDefault(t 
 	assert.Contains(t, subject, "Betreff")
 }
 
-// Ergibt die Vorlage trotz Bestätigungslink einen leeren Text (hier: der Link
-// ist leer), wird der Standardtext gesendet statt einer Mail ohne Inhalt.
+// If the template yields an empty text despite a confirmation link (here: the link
+// is empty), the default text is sent instead of a mail without content.
 func TestRenderSubscriptionConfirmTemplate_EmptyRenderFallsBackToDefault(t *testing.T) {
 	h := NewHandler(testutils.SetupTestDB())
 	tmpl := &models.NotificationTemplate{Subject: "S", BodyHTML: `{{.ConfirmURL}}`}

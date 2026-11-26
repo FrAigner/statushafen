@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GET /api/auth/sso/login?slug=… ist der Einstieg ins Seiten-SSO für Besucher
-// einer privaten Seite. Die Auskunft GET /api/public/pages/:slug/sso nennt
-// ihnen Seiten-ID und SSO-Art nicht mehr; dieser Weg braucht sie nicht, der
-// Server wählt das Verfahren selbst.
+// GET /api/auth/sso/login?slug=… is the entry point into page SSO for visitors
+// of a private page. The lookup GET /api/public/pages/:slug/sso no longer tells
+// them the page ID and SSO type; this route does not need them, the
+// server picks the method itself.
 
 const notConfiguredRedirect = "http://localhost:5173/login?oidc_error=not_configured"
 
@@ -58,8 +58,8 @@ func TestSSOLoginBySlug_LegacySAMLColumnStartsNothing(t *testing.T) {
 	assert.Equal(t, notConfiguredRedirect, loc)
 }
 
-// Unbekannter Slug, Seite ohne SSO und Seite mit ausgeschaltetem SSO enden am
-// selben Ziel: Der Fehlerweg verrät nichts über die Seite.
+// Unknown slug, page without SSO and page with SSO disabled end up at the
+// same destination: the error path reveals nothing about the page.
 func TestSSOLoginBySlug_UnknownAndUnconfiguredPagesGetTheSameAnswer(t *testing.T) {
 	f := newOIDCFixture(t)
 	plain := models.StatusPage{Name: "Ohne SSO", Slug: "ohne-sso", IsPrivate: true}

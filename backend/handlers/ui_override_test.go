@@ -16,13 +16,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// UiTranslationOverride: globale (Global Admin) und
-// pro-Seite (Page Admin, nur eigene Seite) editierbare Overrides für
-// App-UI-Texte. Diese Tests bauen dieselbe Router-Struktur wie main.go auf
-// (AuthMiddleware + RequireGlobalAdmin/RequirePermission), analog zum
-// Vorbild statuspage_users_test.go, damit echte Rechte-Eskalationslücken
-// (fremde Seite, kein pages:write) tatsächlich geprüft werden statt nur
-// den Happy Path mit fest gemocktem Global-Admin-Kontext.
+// UiTranslationOverride: global (Global Admin) and
+// per-page (Page Admin, own page only) editable overrides for
+// app UI texts. These tests build the same router structure as main.go
+// (AuthMiddleware + RequireGlobalAdmin/RequirePermission), analogous to the
+// model statuspage_users_test.go, so that real privilege-escalation gaps
+// (foreign page, no pages:write) are actually checked instead of only
+// the happy path with a hard-mocked global-admin context.
 
 func newUiOverrideHarness(t *testing.T) (*gorm.DB, http.Handler) {
 	t.Helper()
@@ -178,7 +178,7 @@ func TestPageUiOverrides(t *testing.T) {
 	db.Create(&models.UserStatusPageRole{UserID: pageAdminUser.ID, StatusPageID: page.ID, RoleID: pageAdminRole.ID})
 	pageAdminToken, _ := middleware.GenerateToken(pageAdminUser.ID, pageAdminUser.Email, "", "", false)
 
-	// Editor ohne pages:write auf `page` - darf lesen, aber nicht schreiben.
+	// Editor without pages:write on `page` - may read but not write.
 	editorUser := models.User{Email: "editor@example.com"}
 	db.Create(&editorUser)
 	db.Create(&models.UserStatusPageRole{UserID: editorUser.ID, StatusPageID: page.ID, RoleID: editorRole.ID})
@@ -285,8 +285,8 @@ func TestPublicUiOverrides(t *testing.T) {
 	})
 }
 
-// Schlüssel mit Prototyp-Segmenten oder Sonderzeichen dürfen nie
-// gespeichert werden, sonst würden sie an alle Besucher ausgeliefert.
+// Keys with prototype segments or special characters must never be
+// stored, otherwise they would be delivered to all visitors.
 func TestUiOverrideRejectsUnsafeKeys(t *testing.T) {
 	db, r := newUiOverrideHarness(t)
 
@@ -328,12 +328,12 @@ func TestUiOverrideRejectsUnsafeKeys(t *testing.T) {
 	}
 }
 
-// "Speichern" einer Zeile mit leerem Override-Feld hat bisher ""
-// als globalen Override gespeichert - der Text (z. B. nav.profile) war danach
-// für alle Besucher leer. Ein leerer bzw. nur aus Leerzeichen bestehender Wert
-// wird jetzt mit 400 abgelehnt und darf einen bestehenden Override nicht
-// anfassen; Entfernen geht nur explizit per DELETE, und das wirkt strikt nur
-// auf genau (Scope, Seite, Sprache, Key).
+// "Save" of a row with an empty override field used to store ""
+// as the global override - the text (e.g. nav.profile) was then
+// empty for all visitors. An empty or whitespace-only value
+// is now rejected with 400 and must not touch an existing
+// override; removal works only explicitly via DELETE, and that acts strictly only
+// on exactly (scope, page, language, key).
 func TestUiOverrideEmptyValueAndDeleteScope(t *testing.T) {
 	db, r := newUiOverrideHarness(t)
 
@@ -375,7 +375,7 @@ func TestUiOverrideEmptyValueAndDeleteScope(t *testing.T) {
 		}
 	})
 
-	// Gleicher Key in allen Umfängen, damit jeder Übergriff auffällt.
+	// Same key in all scopes so that any overreach is noticed.
 	fixtures := []struct{ path, lang, value string }{
 		{globalPath, "de", "Global DE"},
 		{globalPath, "en", "Global EN"},

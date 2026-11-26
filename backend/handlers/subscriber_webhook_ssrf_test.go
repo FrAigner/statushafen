@@ -13,8 +13,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// TestIsBlockedWebhookIP prüft die Grundbausteine der SSRF-Filterung, die
-// sowohl validateWebhookURL als auch safeDialContext verwenden.
+// TestIsBlockedWebhookIP checks the basic building blocks of the SSRF filtering that
+// both validateWebhookURL and safeDialContext use.
 func TestIsBlockedWebhookIP(t *testing.T) {
 	blocked := []string{"127.0.0.1", "10.0.0.5", "192.168.1.1", "169.254.1.1", "0.0.0.0", "::1"}
 	for _, s := range blocked {
@@ -31,10 +31,10 @@ func TestIsBlockedWebhookIP(t *testing.T) {
 	}
 }
 
-// TestIsBlockedWebhookIP_SpecialPurpose (Security-Review): Die
-// IANA-Special-Purpose-Bereiche sind gesperrt (gilt für Webhooks und die
-// SAML-Metadaten gleichermaßen), jeweils erste und letzte Adresse, daneben
-// liegende öffentliche Adressen nicht.
+// TestIsBlockedWebhookIP_SpecialPurpose (security review): the
+// IANA special-purpose ranges are blocked (applies equally to webhooks and the
+// SAML metadata), in each case the first and last address, while adjacent
+// public addresses are not.
 func TestIsBlockedWebhookIP_SpecialPurpose(t *testing.T) {
 	for _, tc := range []struct {
 		ip      string
@@ -48,7 +48,7 @@ func TestIsBlockedWebhookIP_SpecialPurpose(t *testing.T) {
 		{"224.0.0.1", true}, {"239.255.255.255", true}, {"223.255.255.255", false},
 		{"ff02::1", true}, {"64:ff9b::808:808", true}, {"2002:c000:204::1", true},
 		{"2001:db8::1", true}, {"2001:4860:4860::8888", false},
-		// IPv4 in IPv6 gemappt zählt wie IPv4.
+		// IPv4 mapped into IPv6 counts like IPv4.
 		{"::ffff:100.64.0.1", true}, {"::ffff:8.8.8.8", false},
 	} {
 		if got := isBlockedWebhookIP(net.ParseIP(tc.ip)); got != tc.blocked {

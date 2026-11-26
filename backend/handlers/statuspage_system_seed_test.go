@@ -49,9 +49,9 @@ func TestSystemStatusPage_PubliclyReachableAndIsolated(t *testing.T) {
 		if page.Slug != database.SystemStatusPageSlug {
 			t.Errorf("Expected slug %q, got %q", database.SystemStatusPageSlug, page.Slug)
 		}
-		// die öffentliche Antwort enthält die
-		// Sichtbarkeits-Flags nicht mehr (öffentliches DTO), daher direkt
-		// am gespeicherten Datensatz prüfen.
+		// the public response no longer contains the
+		// visibility flags (public DTO), so check directly
+		// on the stored record.
 		var stored models.StatusPage
 		require.NoError(t, db.First(&stored, page.ID).Error)
 		if !stored.IsPublicIndexed || stored.IsPrivate {

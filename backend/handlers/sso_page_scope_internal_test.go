@@ -15,8 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// ssoScopeFixture: V hat Rollen auf den privaten Seiten A und B
-// und ist inzwischen Global Admin; die SSO-Sitzung gilt nur für Seite A.
+// ssoScopeFixture: V has roles on the private pages A and B
+// and has since become Global Admin; the SSO session applies only to page A.
 type ssoScopeFixture struct {
 	db           *gorm.DB
 	h            *Handler
@@ -42,7 +42,7 @@ func newSSOScopeFixture(t *testing.T) ssoScopeFixture {
 	return f
 }
 
-// ctx baut einen Request-Kontext für V, mit Seitenbezug scope (0 = ohne).
+// ctx builds a request context for V, with page scope scope (0 = none).
 func (f ssoScopeFixture) ctx(scope uint) (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -70,7 +70,7 @@ func TestSSOPageScope_PrivatePageChecks(t *testing.T) {
 	_, isAdmin := f.h.userTagsAndAdmin(c)
 	assert.False(t, isAdmin, "Seiten-SSO-Sitzung ist nie Global Admin")
 
-	// Ohne Seitenbezug wie bisher: Global Admin sieht alles.
+	// Without page scope as before: Global Admin sees everything.
 	plain, _ := f.ctx(0)
 	_, _, okB = f.h.checkPrivatePageAccess(plain, f.pageB)
 	assert.True(t, okB)
@@ -80,8 +80,8 @@ func TestSSOPageScope_PrivatePageChecks(t *testing.T) {
 	assert.True(t, isAdmin)
 }
 
-// Auto-Join (DefaultRoleID) darf einer Seiten-SSO-Sitzung keine Rolle auf
-// einer fremden Seite verschaffen.
+// Auto-join (DefaultRoleID) must not give a page SSO session a role on
+// a page that is not its own.
 func TestSSOPageScope_NoAutoJoinOnForeignPage(t *testing.T) {
 	f := newSSOScopeFixture(t)
 	viewer := models.Role{Name: "Viewer", Permissions: "incidents:read"}
@@ -115,7 +115,7 @@ func TestSSOPageScope_MeAndMyPages(t *testing.T) {
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &me))
 	assert.Equal(t, false, me["is_global_admin"])
 
-	// Ohne Seitenbezug: alle Seiten als Global Admin.
+	// Without page scope: all pages as Global Admin.
 	c, w = f.ctx(0)
 	f.h.GetMyPagesHandler(c)
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &pages))
@@ -126,7 +126,7 @@ func TestSSOPageScope_MeAndMyPages(t *testing.T) {
 	assert.Equal(t, true, me["is_global_admin"])
 }
 
-// Ohne Global Admin: die Rollenliste wird auf die SSO-Seite gefiltert.
+// Without Global Admin: the role list is filtered to the SSO page.
 func TestSSOPageScope_MyPagesFiltersRoles(t *testing.T) {
 	f := newSSOScopeFixture(t)
 	require.NoError(t, f.db.Model(&f.v).Update("is_global_admin", false).Error)

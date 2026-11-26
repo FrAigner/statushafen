@@ -20,29 +20,29 @@ import (
 	"time"
 )
 
-// Zentraler Versand an Google-Chat-Webhooks. Google Chat antwortet
-// bei Überlast mit 429 (ggf. Retry-After) bzw. 503 und erlaubt je Space nur
-// etwa eine Nachricht pro Sekunde. Alle vier Aufrufer (Test-Endpunkt,
-// Subscriber-Webhook, globaler Webhook, externe Vorfälle) laufen deshalb
-// durch postWebhook statt je einen eigenen Post auf webhookTestClient zu
-// kopieren. Der SSRF-Schutz bleibt unverändert, denn gesendet wird weiterhin
-// über webhookTestClient (safeDialContext).
+// Central dispatch to Google Chat webhooks. Google Chat responds
+// under overload with 429 (possibly Retry-After) or 503 and allows only
+// about one message per second per space. All four callers (test endpoint,
+// subscriber webhook, global webhook, external incidents) therefore go
+// through postWebhook instead of each copying its own post to webhookTestClient.
+// SSRF protection stays unchanged, because sending still happens
+// via webhookTestClient (safeDialContext).
 
-// webhookKind ist die Fehlerklasse eines Webhook-Versands.
+// webhookKind is the error class of a webhook delivery.
 type webhookKind int
 
 const (
 	// webhookOK: 2xx.
 	webhookOK webhookKind = iota
-	// webhookRateLimited: HTTP 429 (oder der lokale Limiter ist erschöpft).
+	// webhookRateLimited: HTTP 429 (or the local limiter is exhausted).
 	webhookRateLimited
-	// webhookTransient: 5xx, Netzfehler, Timeout - ein späterer Versuch kann klappen.
+	// webhookTransient: 5xx, network error, timeout - a later attempt may succeed.
 	webhookTransient
-	// webhookPermanent: 4xx außer 429 (und 3xx) - URL oder Key sind falsch.
+	// webhookPermanent: 4xx except 429 (and 3xx) - the URL or key is wrong.
 	webhookPermanent
 )
 
-// String liefert die Fehlerklasse fürs Log.
+// String returns the error class for the log.
 func (k webhookKind) String() string {
 	switch k {
 	case webhookOK:
@@ -56,35 +56,35 @@ func (k webhookKind) String() string {
 	}
 }
 
-// webhookMode steuert, ob postWebhook warten und wiederholen darf.
+// webhookMode controls whether postWebhook may wait and retry.
 type webhookMode int
 
 const (
-	// webhookModeNotify: Benachrichtigung im Hintergrund, darf im Rahmen der
-	// Obergrenzen warten und wiederholen.
+	// webhookModeNotify: background notification, may wait and retry within the
+	// upper limits.
 	webhookModeNotify webhookMode = iota
-	// webhookModeProbe: Test-Endpunkt, genau ein Versuch, nie warten.
+	// webhookModeProbe: test endpoint, exactly one attempt, never waits.
 	webhookModeProbe
 )
 
-// WebhookResult ist das typisierte Ergebnis von postWebhook. Es enthält nie
-// die URL.
+// WebhookResult is the typed result of postWebhook. It never contains
+// the URL.
 type WebhookResult struct {
 	Kind webhookKind
-	// Status ist der HTTP-Status des Ziels (0 bei Netzfehler/Timeout/lokaler Drosselung).
+	// Status is the HTTP status of the target (0 on network error/timeout/local throttling).
 	Status int
-	// RetryAfter: bei webhookRateLimited die Wartezeit laut Ziel (bzw. lokalem Limiter).
+	// RetryAfter: for webhookRateLimited, the wait time according to the target (or the local limiter).
 	RetryAfter time.Duration
-	// Attempts: Anzahl tatsächlich gesendeter Versuche.
+	// Attempts: number of attempts actually sent.
 	Attempts int
-	// Class: Kurzname der Fehlerursache fürs Log ("timeout", "network", "http_429" ...).
+	// Class: short name of the failure cause for the log ("timeout", "network", "http_429" ...).
 	Class string
 }
 
-// OK meldet, ob der Versand erfolgreich war.
+// OK reports whether the delivery succeeded.
 func (r WebhookResult) OK() bool { return r.Kind == webhookOK }
 
-// Err liefert einen URL-freien Fehler (für Audit-Texte) oder nil bei Erfolg.
+// Err returns a URL-free error (for audit texts) or nil on success.
 func (r WebhookResult) Err() error {
 	if r.OK() {
 		return nil
@@ -95,7 +95,7 @@ func (r WebhookResult) Err() error {
 	return fmt.Errorf("webhook %s", r.Class)
 }
 
-// RetryAfterSeconds rundet auf ganze Sekunden (mindestens 1).
+// RetryAfterSeconds rounds to whole seconds (at least 1).
 func (r WebhookResult) RetryAfterSeconds() int {
 	s := int(math.Ceil(r.RetryAfter.Seconds()))
 	if s < 1 {
@@ -106,20 +106,20 @@ func (r WebhookResult) RetryAfterSeconds() int {
 
 const (
 	webhookMaxAttempts = 3
-	// webhookMaxTotalWait: Obergrenze für die Summe aller Wartezeiten (Limiter
-	// und Retry) einer Benachrichtigung.
+	// webhookMaxTotalWait: upper limit for the sum of all wait times (limiter
+	// and retry) of one notification.
 	webhookMaxTotalWait = 30 * time.Second
 	webhookBackoffBase  = time.Second
-	// Limiter je URL: 1 Nachricht/Sekunde, Burst 2 (Google: ca. 1/s je Space).
+	// Limiter per URL: 1 message/second, burst 2 (Google: approx. 1/s per space).
 	webhookLimiterRate  = 1.0
 	webhookLimiterBurst = 2.0
-	// Speicherbegrenzung des Limiters.
+	// Memory bound of the limiter.
 	webhookLimiterMaxEntries = 1024
 	webhookLimiterTTL        = 10 * time.Minute
 	webhookMaxBodyDrain      = 1 << 20
 )
 
-// Injizierbar für Tests (keine echten Wartezeiten).
+// Injectable for tests (no real wait times).
 var (
 	webhookNow   = time.Now
 	webhookSleep = func(ctx context.Context, d time.Duration) error {
@@ -132,29 +132,29 @@ var (
 			return ctx.Err()
 		}
 	}
-	// webhookJitter streut eine Backoff-Wartezeit um +-25 %.
+	// webhookJitter spreads a backoff wait time by +-25 %.
 	webhookJitter = func(d time.Duration) time.Duration {
 		return time.Duration(float64(d) * (0.75 + rand.Float64()*0.5))
 	}
 	webhookLimiter = newWebhookRateLimiter(webhookLimiterRate, webhookLimiterBurst, webhookLimiterMaxEntries, webhookLimiterTTL)
 )
 
-// webhookKey ist der Schlüssel des Limiters: ein Hash, damit die URL (mit
-// key/token) nicht im Speicher des Limiters liegt.
+// webhookKey is the limiter key: a hash, so that the URL (with
+// key/token) is not held in the limiter's memory.
 func webhookKey(rawURL string) string {
 	sum := sha256.Sum256([]byte(rawURL))
 	return hex.EncodeToString(sum[:])
 }
 
-// webhookURLID ist die Kurzkennung fürs Log (8 Zeichen SHA-256). Gibt nichts
-// preis, das zur URL zurückführt.
+// webhookURLID is the short identifier for the log (8 characters of SHA-256). Reveals nothing
+// that leads back to the URL.
 func webhookURLID(rawURL string) string { return webhookKey(rawURL)[:8] }
 
-// webhookRateLimiter ist ein prozesslokaler Token Bucket je Webhook-URL mit
-// begrenztem Speicher (TTL + Obergrenze der Einträge).
+// webhookRateLimiter is a process-local token bucket per webhook URL with
+// bounded memory (TTL + upper limit on entries).
 type webhookRateLimiter struct {
 	mu         sync.Mutex
-	rate       float64 // Tokens pro Sekunde
+	rate       float64 // tokens per second
 	burst      float64
 	maxEntries int
 	ttl        time.Duration
@@ -170,9 +170,9 @@ func newWebhookRateLimiter(rate, burst float64, maxEntries int, ttl time.Duratio
 	return &webhookRateLimiter{rate: rate, burst: burst, maxEntries: maxEntries, ttl: ttl, buckets: map[string]*webhookBucket{}}
 }
 
-// reserve reserviert einen Token für key. Muss länger als maxWait gewartet
-// werden, wird nichts reserviert (ok=false, wait = nötige Wartezeit).
-// Sonst ok=true und wait = bis zum Senden zu wartende Zeit (0 = sofort).
+// reserve reserves a token for key. If it would have to wait longer than maxWait,
+// nothing is reserved (ok=false, wait = required wait time).
+// Otherwise ok=true and wait = time to wait before sending (0 = immediately).
 func (l *webhookRateLimiter) reserve(key string, now time.Time, maxWait time.Duration) (ok bool, wait time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -198,9 +198,9 @@ func (l *webhookRateLimiter) reserve(key string, now time.Time, maxWait time.Dur
 	return true, wait
 }
 
-// evictLocked räumt vor dem Anlegen eines Eintrags auf: abgelaufene (länger
-// als ttl unbenutzt) fliegen raus; ist die Obergrenze trotzdem erreicht, der
-// älteste.
+// evictLocked cleans up before an entry is created: expired entries (unused for longer
+// than ttl) are dropped; if the upper limit is still reached, the
+// oldest one.
 func (l *webhookRateLimiter) evictLocked(now time.Time) {
 	if len(l.buckets) < l.maxEntries {
 		return
@@ -221,8 +221,8 @@ func (l *webhookRateLimiter) evictLocked(now time.Time) {
 	}
 }
 
-// parseRetryAfter liest den Retry-After-Header (Sekunden oder HTTP-Datum).
-// ok=false, wenn er fehlt oder unlesbar ist.
+// parseRetryAfter reads the Retry-After header (seconds or HTTP date).
+// ok=false if it is missing or unreadable.
 func parseRetryAfter(v string, now time.Time) (time.Duration, bool) {
 	v = strings.TrimSpace(v)
 	if v == "" {
@@ -246,7 +246,7 @@ func parseRetryAfter(v string, now time.Time) (time.Duration, bool) {
 	return 0, false
 }
 
-// classifyWebhookResponse ordnet Status und Retry-After einer Fehlerklasse zu.
+// classifyWebhookResponse maps status and Retry-After to an error class.
 func classifyWebhookResponse(status int, retryAfter string, now time.Time) WebhookResult {
 	res := WebhookResult{Status: status, Class: "http_" + strconv.Itoa(status)}
 	switch {
@@ -264,8 +264,8 @@ func classifyWebhookResponse(status int, retryAfter string, now time.Time) Webho
 	return res
 }
 
-// classifyWebhookError ordnet einen Transportfehler ein. Der Fehlertext
-// enthält die URL und wird deshalb nie weitergegeben.
+// classifyWebhookError classifies a transport error. The error text
+// contains the URL and is therefore never passed on.
 func classifyWebhookError(err error) WebhookResult {
 	class := "network"
 	var ne net.Error
@@ -286,17 +286,17 @@ func postWebhookOnce(ctx context.Context, rawURL string, body []byte) WebhookRes
 		return classifyWebhookError(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	// Response-Größe begrenzen, siehe TestWebhookHandler.
+	// Limit the response size, see TestWebhookHandler.
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, webhookMaxBodyDrain))
 	return classifyWebhookResponse(resp.StatusCode, resp.Header.Get("Retry-After"), webhookNow())
 }
 
-// postWebhook sendet payload als JSON an rawURL und liefert das typisierte
-// Ergebnis. Im Modus webhookModeNotify wartet und wiederholt es bei 429/5xx/
-// Netzfehlern (max. webhookMaxAttempts Versuche, max. webhookMaxTotalWait
-// Wartezeit), bei Permanent nie. Im Modus webhookModeProbe gibt es genau
-// einen Versuch ohne Warten. Geloggt werden nur Statuscode, Fehlerklasse,
-// Versuch, Retry-After und eine Kurzkennung der URL - nie die URL selbst.
+// postWebhook sends payload as JSON to rawURL and returns the typed
+// result. In webhookModeNotify mode it waits and retries on 429/5xx/
+// network errors (max. webhookMaxAttempts attempts, max. webhookMaxTotalWait
+// wait time), never on Permanent. In webhookModeProbe mode there is exactly
+// one attempt without waiting. Only status code, error class,
+// attempt, Retry-After and a short URL identifier are logged - never the URL itself.
 func postWebhook(ctx context.Context, rawURL string, payload any, mode webhookMode) WebhookResult {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -306,7 +306,7 @@ func postWebhook(ctx context.Context, rawURL string, payload any, mode webhookMo
 	key := webhookKey(rawURL)
 	var waited time.Duration
 	var last WebhookResult
-	// Ohne Abbruchbedingung: nextWebhookDelay beendet spätestens beim letzten Versuch.
+	// No stop condition: nextWebhookDelay ends it at the latest on the last attempt.
 	for attempt := 1; ; attempt++ {
 		maxWait := webhookMaxTotalWait - waited
 		if mode == webhookModeProbe {
@@ -317,7 +317,7 @@ func postWebhook(ctx context.Context, rawURL string, payload any, mode webhookMo
 			slog.Warn(fmt.Sprintf("webhook rate limited, retry in %ds", int(math.Ceil(wait.Seconds()))),
 				"source", "local_limiter", "attempt", attempt, "url_id", id)
 			if attempt > 1 {
-				// Nach einem gesendeten Versuch gilt dessen Ergebnis, nicht der lokale Stau.
+				// After a sent attempt, its result applies, not the local backlog.
 				return last
 			}
 			return WebhookResult{Kind: webhookRateLimited, RetryAfter: wait, Class: "local_limit"}
@@ -352,7 +352,7 @@ func abortedWebhook(last WebhookResult, attempts int) WebhookResult {
 	return last
 }
 
-// nextWebhookDelay entscheidet, ob und nach welcher Wartezeit wiederholt wird.
+// nextWebhookDelay decides whether to retry and after what wait time.
 func nextWebhookDelay(res WebhookResult, attempt int, mode webhookMode, waited time.Duration) (time.Duration, bool) {
 	if mode == webhookModeProbe || res.Kind == webhookPermanent || attempt >= webhookMaxAttempts {
 		return 0, false
@@ -385,11 +385,11 @@ func logWebhookFailure(res WebhookResult, id string, attempt int, delay time.Dur
 	slog.Warn("webhook failed", attrs...)
 }
 
-// reportWebhookProblem legt für die Admins eine Nachricht in der Glocke an
-// bei Ratenlimit (429 bzw. lokaler Limiter) je Seite und Kanal,
-// bei dauerhafter Ablehnung (URL/Key falsch) je Abonnent. Übergeben werden nur
-// Kanal, Sekunden und Abonnenten-ID, nie die URL. Blockiert den Aufrufer nicht
-// und ist ohne Datenbank (Tests ohne DB) ein No-op.
+// reportWebhookProblem creates a message for the admins in the bell
+// on rate limiting (429 or local limiter) per page and channel,
+// on permanent rejection (wrong URL/key) per subscriber. Only
+// channel, seconds and subscriber ID are passed, never the URL. Does not block the caller
+// and is a no-op without a database (tests without DB).
 func (h *Handler) reportWebhookProblem(pageID, subscriberID uint, channel string, res WebhookResult) {
 	if h == nil || h.DB == nil || res.OK() || pageID == 0 {
 		return

@@ -23,30 +23,30 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Double-Opt-in für E-Mail-Abos.
+// Double opt-in for email subscriptions.
 //
-// Ein neues E-Mail-Abo startet als "pending" und wird erst über den Link in
-// der Bestätigungsmail aktiv. Sonst könnte jeder eine fremde Adresse
-// eintragen und dem Inhaber ungefragt Vorfall-Mails schicken lassen.
+// A new email subscription starts as "pending" and becomes active only via the link in
+// the confirmation mail. Otherwise anyone could register a foreign address
+// and have incident mails sent to its owner unasked.
 //
-// Entscheidung des Betreibers (vom 24.10.): Wer angemeldet
-// ist und mit der eigenen Konto-Adresse abonniert, überspringt die Bestätigung.
-// Konto-Adressen gelten als verifiziert: Sie entstehen über eine Einladung
-// durch einen Admin, über SSO (nur verifizierte Provider-Adressen, siehe
-// auth_sso.go) oder über die per Mail bestätigte Bestellung (page_order.go).
+// Operator decision (of 24.10.): whoever is signed in
+// and subscribes with their own account address skips the confirmation.
+// Account addresses count as verified: they arise via an invitation
+// by an admin, via SSO (only verified provider addresses, see
+// auth_sso.go) or via the order confirmed by mail (page_order.go).
 //
-// Webhook-Kanäle (google_chat) brauchen laut Vorgabe eine eigene Entscheidung
-// und bleiben deshalb vorerst ohne Bestätigung aktiv.
+// Webhook channels (google_chat) need a separate decision according to the specification
+// and therefore remain active without confirmation for now.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// subscriptionConfirmTTL: so lange gilt ein Bestätigungslink (wie orderTokenTTL).
+// subscriptionConfirmTTL: how long a confirmation link is valid (like orderTokenTTL).
 const subscriptionConfirmTTL = 24 * time.Hour
 
 const (
 	subscriptionPendingMessage = "Fast geschafft: Bitte bestätige dein Abo über den Link, den wir dir per E-Mail geschickt haben."
 	subscriptionActiveMessage  = "Erfolgreich abonniert"
-	// Default-Betreff je Versandsprache (Standardsprache der Seite,
-	// Subscriber haben keine gespeicherte Sprache).
+	// Default subject per sending language (default language of the page,
+	// subscribers have no stored language).
 	subscriptionConfirmSubjectPrefix   = "Bitte bestätige dein Abo für "
 	subscriptionConfirmSubjectPrefixEN = "Please confirm your subscription for "
 )
@@ -58,12 +58,12 @@ func subscriptionConfirmSubjectPrefixFor(lang string) string {
 	return subscriptionConfirmSubjectPrefixEN
 }
 
-// maxEmailAddressLength: längste zulässige Adresse (RFC 5321).
+// maxEmailAddressLength: longest permitted address (RFC 5321).
 const maxEmailAddressLength = 254
 
-// isPlainEmailAddress akzeptiert nur eine nackte Adresse ("a@b.example"),
-// keine Anzeigenamen-Form ("Name <a@b.example>"). Damit ist der gespeicherte
-// Wert direkt als Empfänger nutzbar und kann keine CR/LF enthalten.
+// isPlainEmailAddress accepts only a bare address ("a@b.example"),
+// not the display-name form ("Name <a@b.example>"). This makes the stored
+// value directly usable as a recipient and unable to contain CR/LF.
 func isPlainEmailAddress(s string) bool {
 	if len(s) > maxEmailAddressLength {
 		return false
@@ -72,9 +72,9 @@ func isPlainEmailAddress(s string) bool {
 	return err == nil && addr.Address == s
 }
 
-// Gmail-Domains: Gmail liefert googlemail.com wie gmail.com aus und ignoriert
-// Punkte im lokalen Teil. Nur für diese beiden Domains gilt die Punkt-Regel;
-// bei allen anderen Anbietern sind Punkte Teil der Adresse.
+// Gmail domains: Gmail delivers googlemail.com like gmail.com and ignores
+// dots in the local part. The dot rule applies only to these two domains;
+// for all other providers dots are part of the address.
 const (
 	gmailDomain       = "gmail.com"
 	googlemailDomain  = "googlemail.com"
@@ -83,14 +83,14 @@ const (
 	googlemailNoDots = "googlemailcom"
 )
 
-// mailboxKey ist der Schlüssel für Deduplizierung und das Limit der
-// Bestätigungsmails je Postfach: Unicode-NFKC, Kleinschreibung, Domain als
-// Punycode und ohne "+tag" im lokalen Teil ("Opfer+news@Example.com" ->
-// "opfer@example.com"). Bei gmail.com und googlemail.com zusätzlich ohne Punkte
-// im lokalen Teil und mit googlemail.com als gmail.com. Gespeichert und
-// angeschrieben wird weiter die eingegebene Adresse; der Schlüssel dient nur
-// dem Vergleich, damit Schreibvarianten derselben Mailbox nicht als fremde
-// Adressen durchgehen.
+// mailboxKey is the key for deduplication and the limit of
+// confirmation mails per mailbox: Unicode NFKC, lowercase, domain as
+// Punycode and without "+tag" in the local part ("Opfer+news@Example.com" ->
+// "opfer@example.com"). For gmail.com and googlemail.com additionally without dots
+// in the local part and with googlemail.com mapped to gmail.com. The address as entered
+// is still what is stored and mailed; the key serves only
+// for comparison, so that spelling variants of the same mailbox do not pass as foreign
+// addresses.
 func mailboxKey(email string) string {
 	e := strings.ToLower(norm.NFKC.String(strings.TrimSpace(email)))
 	at := strings.LastIndex(e, "@")
@@ -98,8 +98,8 @@ func mailboxKey(email string) string {
 		return e
 	}
 	local, domain := e[:at], e[at+1:]
-	// Unicode- und Punycode-Schreibweise derselben Domain werden gleich; was
-	// sich nicht wandeln lässt, bleibt in Kleinschreibung.
+	// Unicode and Punycode spellings of the same domain become equal; whatever
+	// cannot be converted stays lowercase.
 	if ascii, err := idna.Lookup.ToASCII(domain); err == nil && ascii != "" {
 		domain = ascii
 	}
@@ -117,11 +117,11 @@ func mailboxKey(email string) string {
 	return local + "@" + domain
 }
 
-// mailboxMatch liefert eine WHERE-Bedingung samt Argumenten, die alle
-// gespeicherten Schreibvarianten des Postfachs von email trifft (Groß-/
-// Kleinschreibung, "+tag", bei Gmail Punkte und googlemail.com). Gespeichert
-// ist die eingegebene Adresse; gleichwertige Unicode-Schreibweisen anderer
-// Eingaben sind in der Datenbank nicht auffindbar, nur die Eingabe selbst.
+// mailboxMatch returns a WHERE condition with arguments that matches all
+// stored spelling variants of the mailbox of email (case,
+// "+tag", for Gmail dots and googlemail.com). What is stored
+// is the address as entered; equivalent Unicode spellings of other
+// inputs cannot be found in the database, only the input itself.
 func mailboxMatch(email string) (string, []any) {
 	key := mailboxKey(email)
 	at := strings.LastIndex(key, "@")
@@ -131,8 +131,8 @@ func mailboxMatch(email string) (string, []any) {
 	local, domain := key[:at], key[at+1:]
 	esc := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`)
 	if domain == gmailDomain && !strings.Contains(local, ".") {
-		// Gespeichert sind Punkt-Varianten und beide Domains: Punkte entfallen
-		// im Vergleich, die Domain wird vorher fest geprüft (sonst träfe auch
+		// Stored are dot variants and both domains: dots are dropped
+		// in the comparison, the domain is checked strictly beforehand (otherwise
 		// "g.mail.com").
 		l := esc.Replace(local)
 		return `((lower(email) LIKE ? OR lower(email) LIKE ?) AND ` +
@@ -143,8 +143,8 @@ func mailboxMatch(email string) (string, []any) {
 	}
 	clause := `(lower(email) = ? OR lower(email) LIKE ? ESCAPE '\')`
 	args := []any{key, esc.Replace(local) + "+%@" + domain}
-	// Nicht-ASCII-Eingaben stehen roh in der Datenbank: ihre unveränderte
-	// Wiederholung bleibt dem Limit zugeordnet.
+	// Non-ASCII inputs are stored raw in the database: their unchanged
+	// repetition remains assigned to the limit.
 	if raw := strings.ToLower(strings.TrimSpace(email)); raw != key && !isASCII(raw) {
 		clause = `(lower(email) = ? OR lower(email) = ? OR lower(email) LIKE ? ESCAPE '\')`
 		args = []any{key, raw, args[1]}
@@ -161,14 +161,14 @@ func isASCII(s string) bool {
 	return true
 }
 
-// maxConfirmationMailsPerMailbox: So viele Bestätigungsmails gehen je Postfach
-// innerhalb der Gültigkeit eines Links (24 h) höchstens raus, seitenübergreifend.
+// maxConfirmationMailsPerMailbox: this many confirmation mails go out at most per mailbox
+// within the validity of a link (24 h), across pages.
 const maxConfirmationMailsPerMailbox = 3
 
-// confirmationMailBudgetExhausted zählt die noch gültigen wartenden Abos des
-// Postfachs über alle Seiten: Jedes steht für eine Bestätigungsmail der letzten
-// 24 Stunden. Ein Datenbankfehler gilt als erschöpft (fail closed: lieber keine
-// Mail als unbegrenzt viele).
+// confirmationMailBudgetExhausted counts the still-valid pending subscriptions of the
+// mailbox across all pages: each stands for a confirmation mail of the last
+// 24 hours. A database error counts as exhausted (fail closed: better no
+// mail than an unlimited number).
 func (h *Handler) confirmationMailBudgetExhausted(email string) bool {
 	clause, args := mailboxMatch(email)
 	var n int64
@@ -178,24 +178,24 @@ func (h *Handler) confirmationMailBudgetExhausted(email string) bool {
 	return err != nil || n >= maxConfirmationMailsPerMailbox
 }
 
-// isOwnAccountEmail: angemeldet (userID gesetzt) und die Abo-Adresse ist die
-// eigene Konto-Adresse (Groß-/Kleinschreibung egal).
+// isOwnAccountEmail: signed in (userID set) and the subscription address is the
+// own account address (case-insensitive).
 func isOwnAccountEmail(c *gin.Context, email string) bool {
 	return getUserID(c) != 0 && email != "" && strings.EqualFold(getEmail(c), email)
 }
 
-// hashSubscriptionToken: In der DB steht nur der SHA-256 des Tokens. Ein
-// schneller Hash genügt, da der Token 128 Bit Zufall hat (kein Passwort).
+// hashSubscriptionToken: only the SHA-256 of the token is stored in the DB. A
+// fast hash suffices because the token has 128 bits of randomness (not a password).
 func hashSubscriptionToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
 
-// prepareSubscriptionConfirmation setzt Status und Token-Felder eines (noch
-// nicht gespeicherten) Abos. Rückgabe: der Klartext-Token für den Mail-Link,
-// oder "", wenn keine Bestätigung nötig ist (Webhook-Kanal, eigene Adresse).
-// crypto/rand.Text liefert 128 Bit Zufall und kann (seit Go 1.24) nicht
-// fehlschlagen, deshalb gibt es hier keinen Fehlerpfad.
+// prepareSubscriptionConfirmation sets status and token fields of a (not yet
+// saved) subscription. Returns: the plaintext token for the mail link,
+// or "" if no confirmation is needed (webhook channel, own address).
+// crypto/rand.Text delivers 128 bits of randomness and (since Go 1.24) cannot
+// fail, hence there is no error path here.
 func prepareSubscriptionConfirmation(c *gin.Context, sub *models.Subscriber) string {
 	if sub.Channel != "email" || isOwnAccountEmail(c, sub.Email) {
 		sub.Status = models.SubscriberStatusActive
@@ -211,10 +211,10 @@ func prepareSubscriptionConfirmation(c *gin.Context, sub *models.Subscriber) str
 	return token
 }
 
-// respondSubscribed liefert die Antwort für ein angelegtes bzw. erneut
-// angefragtes Abo. Ein bereits wartendes Abo bekommt bewusst dieselbe
-// Antwort wie ein neues, damit nicht erkennbar ist, ob die Adresse schon
-// eingetragen wurde.
+// respondSubscribed returns the response for a created or re-requested
+// subscription. An already pending subscription deliberately gets the same
+// response as a new one, so it is not discernible whether the address has already
+// been registered.
 func respondSubscribed(c *gin.Context, sub models.Subscriber) {
 	msg := subscriptionActiveMessage
 	if sub.Status == models.SubscriberStatusPending {
@@ -223,17 +223,17 @@ func respondSubscribed(c *gin.Context, sub models.Subscriber) {
 	c.JSON(http.StatusOK, gin.H{"message": msg, "channel": sub.Channel, "status": sub.Status})
 }
 
-// handleExistingSubscription behandelt POST /api/subscribe für eine Adresse,
-// die auf der Seite schon ein Abo hat. Aktive Abos: dieselbe Antwort wie für
-// ein neues Abo (409 nur für die eigene Konto-Adresse). Wartende
-// Abos: Die eigene Konto-Adresse wird direkt aktiviert. Sonst gibt es nur
-// dann eine neue Mail, wenn der alte Link abgelaufen ist. So kann niemand
-// einem Fremden über wiederholtes Abonnieren beliebig viele Mails schicken.
+// handleExistingSubscription handles POST /api/subscribe for an address
+// that already has a subscription on the page. Active subscriptions: the same response as for
+// a new subscription (409 only for the own account address). Pending
+// subscriptions: the own account address is activated directly. Otherwise a new
+// mail is sent only if the old link has expired. This way nobody can
+// send a stranger arbitrarily many mails by subscribing repeatedly.
 func (h *Handler) handleExistingSubscription(c *gin.Context, req SubscribeRequest, sub models.Subscriber) {
 	if sub.Status != models.SubscriberStatusPending {
-		// Nur wer mit der eigenen Konto-Adresse angemeldet ist, erfährt, dass das
-		// Abo besteht (es ist seine Adresse, kein Orakel). Alle anderen bekommen
-		// dieselbe Antwort wie für ein neues Abo, ohne Mail und ohne Änderung.
+		// Only someone signed in with their own account address learns that the
+		// subscription exists (it is their address, no oracle). Everyone else gets
+		// the same response as for a new subscription, without mail and without change.
 		if req.Channel == "email" && isOwnAccountEmail(c, req.Email) {
 			c.JSON(http.StatusConflict, gin.H{"error": subscriberConflictMessage(req.Channel), "code": subscriberConflictCode(req.Channel)})
 			return
@@ -274,12 +274,12 @@ type confirmSubscriptionRequest struct {
 	Token string `json:"token" binding:"required"`
 }
 
-// ConfirmSubscriptionHandler (POST /api/public/subscribers/confirm) bestätigt
-// ein wartendes Abo per Token. Bewusst POST aus einem Button der Frontend-
-// Seite statt GET direkt aus der Mail: Mail-Gateways mit Link-Prefetching
-// würden den Einmal-Token sonst vor dem Klick verbrauchen (wie bei
-// ConfirmOrderHandler). Abgelaufener Token: 410, das unbestätigte Abo wird
-// dabei entfernt (Datensparsamkeit, die Adresse wurde nie bestätigt).
+// ConfirmSubscriptionHandler (POST /api/public/subscribers/confirm) confirms
+// a pending subscription by token. Deliberately POST from a button on the frontend
+// page rather than GET directly from the mail: mail gateways with link prefetching
+// would otherwise consume the one-time token before the click (as with
+// ConfirmOrderHandler). Expired token: 410, the unconfirmed subscription is
+// removed in the process (data minimization, the address was never confirmed).
 func (h *Handler) ConfirmSubscriptionHandler(c *gin.Context) {
 	var in confirmSubscriptionRequest
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -312,19 +312,19 @@ func (h *Handler) ConfirmSubscriptionHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Abonnement bestätigt", "slug": page.Slug})
 }
 
-// buildSubscriptionConfirmEmailHTML: Default-Body der Bestätigungsmail,
-// optisch wie die Bestellbestätigung (page_order.go). escPageName ist
-// bereits HTML-escaped.
+// buildSubscriptionConfirmEmailHTML: default body of the confirmation mail,
+// visually like the order confirmation (page_order.go). escPageName is
+// already HTML-escaped.
 func buildSubscriptionConfirmEmailHTML(lang, escPageName, confirmURL string) string {
-	// Versandsprache de, sonst en.
+	// Sending language de, otherwise en.
 	if lang != "de" {
 		return fmt.Sprintf(subscriptionConfirmEmailTemplateEN, escPageName, escPageName, confirmURL)
 	}
 	return fmt.Sprintf(subscriptionConfirmEmailTemplate, escPageName, escPageName, confirmURL)
 }
 
-// subscriptionConfirmEmailTemplateEN ist der englische Standardtext,
-// gebaut aus der deutschen Vorlage mit denselben Platzhaltern in derselben Reihenfolge.
+// subscriptionConfirmEmailTemplateEN is the English default text,
+// built from the German template with the same placeholders in the same order.
 var subscriptionConfirmEmailTemplateEN = strings.NewReplacer(
 	"Bitte bestätige dein Abo", "Please confirm your subscription",
 	"Jemand hat diese E-Mail-Adresse für Status-Benachrichtigungen von &quot;%s&quot; eingetragen. Benachrichtigungen erhältst du erst, wenn du das Abonnement bestätigst.",
@@ -334,8 +334,8 @@ var subscriptionConfirmEmailTemplateEN = strings.NewReplacer(
 	"This link is valid for 24 hours. If this was not you, simply ignore this email. Without confirmation you will not receive any further messages.",
 ).Replace(subscriptionConfirmEmailTemplate)
 
-// subscriptionConfirmEmailTemplate ohne Zeilenumbrüche: sendAlertEmail-
-// Muster, der CR/LF-Guard (hasHeaderInjectionChars) prüft auch den Body.
+// subscriptionConfirmEmailTemplate without line breaks (same pattern as sendAlertEmail):
+// the CR/LF guard (hasHeaderInjectionChars) also checks the body.
 var subscriptionConfirmEmailTemplate = strings.NewReplacer("\n", "").Replace(`<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f6f8;padding:32px 16px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden;">
     <div style="background:#4c6ef5;padding:20px 24px;">
@@ -350,10 +350,10 @@ var subscriptionConfirmEmailTemplate = strings.NewReplacer("\n", "").Replace(`<d
   </div>
 </div>`)
 
-// renderSubscriptionConfirmTemplate rendert eine eigene Bestätigungsvorlage in
-// einem festen Rahmen (Seitenname, Hinweis für Empfänger, die sich nicht
-// angemeldet haben). Eine gespeicherte Vorlage ohne unbedingten Bestätigungslink
-// oder mit Renderfehler wird nicht verwendet; es gilt der Standardtext.
+// renderSubscriptionConfirmTemplate renders a custom confirmation template in
+// a fixed frame (page name, notice for recipients who did not
+// sign up). A stored template without an unconditional confirmation link
+// or with a render error is not used; the default text applies.
 func (h *Handler) renderSubscriptionConfirmTemplate(tmpl *models.NotificationTemplate, data NotificationTemplateData, defSubject, defBody string) (string, string) {
 	if _, used, err := parseAllowedTemplateFields("body", tmpl.BodyHTML, MaxTemplateBodyLen); err != nil || !used["ConfirmURL"] {
 		slog.Error("Subscription confirmation template unusable, falling back to default", "template_id", tmpl.ID, "status_page_id", tmpl.StatusPageID)
@@ -366,9 +366,9 @@ func (h *Handler) renderSubscriptionConfirmTemplate(tmpl *models.NotificationTem
 	return subject, wrapSubscriptionConfirmFrame(data.Language, html.EscapeString(data.Title), inner)
 }
 
-// wrapSubscriptionConfirmFrame legt den festen Rahmen um den Text einer
-// eigenen Bestätigungsvorlage. Kopf und Fußzeile lassen sich nicht über die
-// Vorlage ändern.
+// wrapSubscriptionConfirmFrame puts the fixed frame around the text of a
+// custom confirmation template. Header and footer cannot be changed via the
+// template.
 func wrapSubscriptionConfirmFrame(lang, escPageName, inner string) string {
 	footer := `Falls du das nicht warst, ignoriere diese E-Mail einfach. Ohne Bestätigung bekommst du keine weiteren Nachrichten.`
 	if lang != "de" {
@@ -381,13 +381,13 @@ func wrapSubscriptionConfirmFrame(lang, escPageName, inner string) string {
 		`<p style="margin:20px 0 0;color:#8b95a3;font-size:12px;">` + footer + `</p></div></div></div>`
 }
 
-// queueSubscriptionConfirmation stößt den Versand der Bestätigungsmail im
-// Hintergrund an (siehe mail_queue.go), damit die Antwort an den Aufrufer weder
-// vom Mailserver noch davon abhängt, ob für die Adresse eine Mail rausgeht.
-// Ohne Token (keine Bestätigung nötig) passiert nichts.
+// queueSubscriptionConfirmation triggers sending the confirmation mail in the
+// background (see mail_queue.go), so that the response to the caller depends neither
+// on the mail server nor on whether a mail goes out for the address.
+// Without a token (no confirmation needed) nothing happens.
 //
-// Die Warteschlange begrenzt den Anteil je Seite und je Quell-IP-Gruppe, damit
-// eine einzelne Quelle sie nicht allein füllt.
+// The queue limits the share per page and per source IP group, so that
+// a single source cannot fill it alone.
 func (h *Handler) queueSubscriptionConfirmation(c *gin.Context, sub models.Subscriber, token string) {
 	if token == "" {
 		return
@@ -396,12 +396,12 @@ func (h *Handler) queueSubscriptionConfirmation(c *gin.Context, sub models.Subsc
 		mailPageKey(sub.StatusPageID), mailSourceKey(c.ClientIP()))
 }
 
-// sendSubscriptionConfirmation verschickt die Bestätigungsmail für ein
-// wartendes Abo (token != ""). Subject/Body kommen aus dem Template-System
-// (Kind subscription_confirm, Audience subscriber, Sprache de wie bei den
-// übrigen Subscriber-Mails), sonst aus dem Default. Ein Versandfehler lässt
-// das Abo bestehen und landet im Audit-Log (Muster: sendOrderConfirmationEmail).
-// Die Adresse ist vorher per isPlainEmailAddress geprüft.
+// sendSubscriptionConfirmation sends the confirmation mail for a
+// pending subscription (token != ""). Subject/body come from the template system
+// (kind subscription_confirm, audience subscriber, language de as with the
+// other subscriber mails), otherwise from the default. A send error leaves
+// the subscription in place and lands in the audit log (pattern: sendOrderConfirmationEmail).
+// The address has been checked beforehand via isPlainEmailAddress.
 func (h *Handler) sendSubscriptionConfirmation(sub models.Subscriber, token string) {
 	if token == "" {
 		return
@@ -413,7 +413,7 @@ func (h *Handler) sendSubscriptionConfirmation(sub models.Subscriber, token stri
 	frontendURL := getFrontendURL()
 	confirmURL := frontendURL + "/subscribe/confirm?token=" + url.QueryEscape(token)
 
-	// Vorlage/Text in der Sprache des Abonnenten, sonst der Seite.
+	// Template/text in the subscriber's language, otherwise the page's.
 	tmpl, lang := h.subscriberMailTemplate(page.ID, NotificationKindSubscriptionConfirm, sub.Language)
 	data := NotificationTemplateData{
 		Title:       page.Name,

@@ -24,7 +24,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// OIDC-Login je Statusseite gegen einen echten (Mock-)Anbieter.
+// OIDC login per status page against a real (mock) provider.
 
 type oidcFixture struct {
 	h    *Handler
@@ -95,8 +95,8 @@ func stateCookie(w *httptest.ResponseRecorder) *http.Cookie {
 	return nil
 }
 
-// startLogin ruft den Login-Start auf, merkt dem Mock-IdP Nonce und
-// PKCE-Challenge aus der Authorize-URL und liefert State und Cookie.
+// startLogin calls the login start, notes the mock IdP's nonce and
+// PKCE challenge from the authorize URL and returns state and cookie.
 func (f *oidcFixture) startLogin(t *testing.T) (string, *http.Cookie) {
 	t.Helper()
 	w := serveOIDC(f.h.OIDCLoginHandler, http.MethodGet, "/api/auth/oidc/login?"+f.pageQuery(), nil, 0)
@@ -135,8 +135,8 @@ func errorOf(t *testing.T, w *httptest.ResponseRecorder) string {
 	return body["error"]
 }
 
-// assertOIDCError: Fehler im Browser-Ablauf enden nicht mehr als
-// JSON, sondern als Redirect auf eine feste Frontend-Seite mit Fehlercode.
+// assertOIDCError: errors in the browser flow no longer end as
+// JSON, but as a redirect to a fixed frontend page with an error code.
 func assertOIDCError(t *testing.T, w *httptest.ResponseRecorder, path, code string) {
 	t.Helper()
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
@@ -150,8 +150,8 @@ func assertOIDCError(t *testing.T, w *httptest.ResponseRecorder, path, code stri
 	assert.Equal(t, url.Values{param: {code}}, loc.Query())
 }
 
-// jwtFromRedirect löst den Einmal-Code aus dem Frontend-Redirect ein und
-// liefert die Claims des ausgestellten Login-JWT.
+// jwtFromRedirect redeems the one-time code from the frontend redirect and
+// returns the claims of the issued login JWT.
 func jwtFromRedirect(t *testing.T, w *httptest.ResponseRecorder) *middleware.Claims {
 	t.Helper()
 	return jwtFromRedirectStatus(t, w, http.StatusTemporaryRedirect)
@@ -281,8 +281,8 @@ func TestOIDCProvider_RejectsPlainHTTP(t *testing.T) {
 	assert.ErrorIs(t, err, errOIDCInsecureIssuer)
 }
 
-// Der echte Client darf keine internen Adressen erreichen (SSRF-Schutz wie
-// bei Webhooks): Der Discovery-URL pflegt der Seiten-Admin.
+// The real client must not reach internal addresses (SSRF protection as
+// with webhooks): the discovery URL is maintained by the page admin.
 func TestDefaultOIDCHTTPClient_HasTimeout(t *testing.T) {
 	assert.Equal(t, 10*time.Second, defaultOIDCHTTPClient().Timeout)
 }
@@ -340,7 +340,7 @@ func TestOIDCCallback_LogsInLinkedUser(t *testing.T) {
 	assert.Equal(t, "erika@example.org", audit.ActorEmail)
 	assert.Equal(t, "provider=oidc page="+strconv.FormatUint(uint64(f.page.ID), 10), audit.Details)
 
-	// Cookie wird in jedem Fall gelöscht, der State ist verbraucht.
+	// The cookie is deleted in every case, the state is consumed.
 	gone := stateCookie(w)
 	require.NotNil(t, gone)
 	assert.Equal(t, -1, gone.MaxAge)
@@ -362,8 +362,8 @@ func TestOIDCCallback_StateIsSingleUse(t *testing.T) {
 
 func TestOIDCCallback_RejectsUnlinkedIdentity(t *testing.T) {
 	f := newOIDCFixture(t)
-	// Gleiche E-Mail wie das Konto: Eine Zuordnung über die E-Mail findet
-	// trotzdem nicht statt.
+	// Same email as the account: matching via email still
+	// does not happen.
 	f.idp.claims["email"] = "erika@example.org"
 	f.idp.claims["email_verified"] = true
 	state, ck := f.startLogin(t)
@@ -418,7 +418,7 @@ func TestOIDCCallback_RequestErrors(t *testing.T) {
 		state, ck := f.startLogin(t)
 		w := f.callback(state, "", ck)
 		assertOIDCError(t, w, "/login", "provider_denied")
-		// Der State ist trotzdem verbraucht.
+		// The state is consumed regardless.
 		var count int64
 		f.db.Model(&models.OIDCLoginState{}).Where("state = ?", state).Count(&count)
 		assert.Zero(t, count)
@@ -433,7 +433,7 @@ func TestOIDCCallback_RequestErrors(t *testing.T) {
 		other, _ := f.startLogin(t)
 		w := f.callback(state, "good-code", &http.Cookie{Name: oidcStateCookie, Value: other})
 		assertOIDCError(t, w, "/login", "state_invalid")
-		// Der State bleibt dabei unverbraucht.
+		// The state remains unconsumed in that case.
 		var count int64
 		f.db.Model(&models.OIDCLoginState{}).Where("state = ?", state).Count(&count)
 		assert.EqualValues(t, 1, count)
@@ -533,14 +533,14 @@ func TestOIDCLink_LinksIdentityAndLogsIn(t *testing.T) {
 	assert.Equal(t, f.user.ID, st.LinkUserID)
 
 	w = f.callback(state, "good-code", ck)
-	// Nach dem Verknüpfen zurück ins Profil (fester Wert, kein Ziel aus der Anfrage).
+	// After linking, back to the profile (fixed value, no target from the request).
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, "profile", loc.Query().Get("next"))
 	claims := jwtFromRedirect(t, w)
 
 	assert.Equal(t, f.user.ID, claims.UserID)
-	assert.Equal(t, f.page.ID, claims.SSOPageID) // auch nach Verknüpfung
+	assert.Equal(t, f.page.ID, claims.SSOPageID) // also after linking
 	var ident models.UserSSOIdentity
 	require.NoError(t, f.db.First(&ident).Error)
 	assert.Equal(t, f.user.ID, ident.UserID)
@@ -550,7 +550,7 @@ func TestOIDCLink_LinksIdentityAndLogsIn(t *testing.T) {
 	var audit models.AuditLog
 	require.NoError(t, f.db.Where("action = ?", "auth.sso_linked").First(&audit).Error)
 
-	// Danach klappt der normale Login ohne Verknüpfung.
+	// Afterwards the normal login without linking works.
 	state, ck = f.startLogin(t)
 	assert.Equal(t, f.user.ID, jwtFromRedirect(t, f.callback(state, "good-code", ck)).UserID)
 }
@@ -612,9 +612,9 @@ func TestOIDCLink_StartErrors(t *testing.T) {
 	})
 }
 
-// multiIssuerIdP bedient mehrere Issuer (Pfade) auf einem TLS-Server, damit ein
-// oidcHTTPClient alle erreicht. Je Pfad zählt er Discovery-Aufrufe; Pfade in
-// delay antworten erst nach der angegebenen Zeit, Pfade in failing mit 500.
+// multiIssuerIdP serves several issuers (paths) on one TLS server so that an
+// oidcHTTPClient reaches all of them. It counts discovery calls per path; paths in
+// delay answer only after the given time, paths in failing with 500.
 type multiIssuerIdP struct {
 	srv     *httptest.Server
 	mu      sync.Mutex
@@ -664,8 +664,8 @@ func (idp *multiIssuerIdP) hitsFor(path string) int {
 	return idp.hits[path]
 }
 
-// Review-Befund 1: Ein langsamer Anbieter darf Logins bei anderen,
-// schon gecachten Anbietern nicht blockieren.
+// Review finding 1: a slow provider must not block logins at other,
+// already cached providers.
 func TestOIDCProvider_SlowDiscoveryDoesNotBlockOtherIssuers(t *testing.T) {
 	idp := newMultiIssuerIdP(t)
 	idp.delay["/langsam"] = 2 * time.Second
@@ -680,14 +680,14 @@ func TestOIDCProvider_SlowDiscoveryDoesNotBlockOtherIssuers(t *testing.T) {
 		close(done)
 	}()
 	<-started
-	time.Sleep(200 * time.Millisecond) // langsame Discovery läuft sicher
+	time.Sleep(200 * time.Millisecond) // slow discovery is running
 
 	begin := time.Now()
 	_, err = oidcProviderFor(idp.srv.URL + "/gesund")
 	require.NoError(t, err)
 	assert.Less(t, time.Since(begin), 200*time.Millisecond)
 
-	// Auch eine frische Discovery eines weiteren Anbieters wartet nicht.
+	// A fresh discovery of another provider does not wait either.
 	begin = time.Now()
 	_, err = oidcProviderFor(idp.srv.URL + "/anderer")
 	require.NoError(t, err)
@@ -734,7 +734,7 @@ func TestOIDCProvider_CachesFailureBriefly(t *testing.T) {
 	assert.Equal(t, err1.Error(), err2.Error())
 	assert.Equal(t, 1, idp.hitsFor("/tot"))
 
-	// Nach Ablauf wird neu versucht, und ein wieder erreichbarer Anbieter geht.
+	// After expiry it is retried, and a provider that is reachable again works.
 	now = now.Add(time.Nanosecond)
 	idp.mu.Lock()
 	idp.failing["/tot"] = false
@@ -744,9 +744,9 @@ func TestOIDCProvider_CachesFailureBriefly(t *testing.T) {
 	assert.Equal(t, 2, idp.hitsFor("/tot"))
 }
 
-// Review-Befund 2: Den IdP einer Seite kontrolliert deren Admin. Ein Konto mit
-// Rolle auf einer anderen Seite darf sich deshalb weder über dieses SSO
-// verknüpfen noch anmelden, sonst erbte der Admin die Rechte der fremden Seite.
+// Review finding 2: a page's IdP is controlled by its admin. An account with a
+// role on another page must therefore neither link via this SSO
+// nor log in, otherwise the admin would inherit the foreign page's permissions.
 func (f *oidcFixture) addPageRole(t *testing.T, userID uint, pageSlug string) models.StatusPage {
 	t.Helper()
 	page := models.StatusPage{Name: "Fremde Seite " + pageSlug, Slug: pageSlug}
@@ -806,8 +806,8 @@ func TestOIDCLink_AllowsAccountWithRoleOnlyOnThisPage(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
-// Der zweite Cache-Check in discoverOIDCProvider fängt einen Aufruf ab, der
-// erst nach einem fertigen Vorgänger in singleflight landet: keine Discovery.
+// The second cache check in discoverOIDCProvider catches a call that
+// only lands in singleflight after a finished predecessor: no discovery.
 func TestDiscoverOIDCProvider_UsesFreshCacheEntry(t *testing.T) {
 	issuer := "https://cache-treffer.example.org"
 	want := oidcProviderEntry{err: errors.New("aus dem Cache"), expires: oidcNow().Add(time.Minute)}

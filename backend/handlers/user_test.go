@@ -29,9 +29,9 @@ func TestUserHandlers(t *testing.T) {
 	role := models.Role{Name: "Editor", Permissions: "incidents:write"}
 	db.Create(&role)
 
-	// Der Test macht den neuen User zeitweise zum Global Admin und
-	// stuft ihn wieder herab bzw. löscht ihn; ohne einen weiteren Global Admin
-	// wäre er der letzte (409).
+	// The test temporarily makes the new user a global admin and
+	// demotes or deletes them again; without another global admin
+	// they would be the last one (409).
 	db.Create(&models.User{Email: "other-admin@example.com", IsGlobalAdmin: true})
 
 	var createdUserID uint

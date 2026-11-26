@@ -2,5 +2,5 @@
 
 package handlers_test
 
-// Ohne Race-Detektor gelten die Zeitgrenzen unverändert.
+// Without the race detector the time limits apply unchanged.
 const raceZeitfaktor = 1

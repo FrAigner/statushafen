@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Das öffentliche Dashboard nennt die für die Seite aktivierten
-// Sprachen (Code, Eigenbezeichnung, Standard), damit der Sprachumschalter der
-// Statusseite alle anbietet und nicht nur die Oberflächensprachen de/en.
+// The public dashboard lists the languages enabled for the page
+// (code, native name, default), so that the status page's language switcher
+// offers all of them and not just the UI languages de/en.
 func TestPublicDashboard_ListetSeitenSprachen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	require.NoError(t, testutils.EnableTranslation(db))
@@ -59,15 +59,15 @@ func TestPublicDashboard_ListetSeitenSprachen(t *testing.T) {
 		{"code": "en", "name": "English", "is_default": false, "is_active": true},
 	}, get("sprachen"))
 
-	// Eine im Katalog deaktivierte Sprache bleibt für den Umschalter in der
-	// Liste, ist aber als is_active=false markiert (die Abo-Auswahlen blenden sie aus).
+	// A language deactivated in the catalog stays in the list for the
+	// switcher, but is marked is_active=false (the subscription selections hide it).
 	require.NoError(t, db.Model(&models.Language{}).Where("code = ?", "en").Update("is_active", false).Error)
 	assert.Contains(t, get("sprachen"), map[string]any{"code": "en", "name": "English", "is_default": false, "is_active": false})
 
-	// Nur die Sprachen der eigenen Seite.
+	// Only the languages of the page itself.
 	assert.Len(t, get("andere"), 1)
 
-	// Ohne gepflegte Sprachen: leere Liste (kein null), der Umschalter fällt zurück.
+	// Without maintained languages: empty list (not null), the switcher falls back.
 	empty := models.StatusPage{Name: "Leer", Slug: "leer"}
 	require.NoError(t, db.Create(&empty).Error)
 	assert.Equal(t, []map[string]any{}, get("leer"))

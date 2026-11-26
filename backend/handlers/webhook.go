@@ -12,9 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// generateWebhookToken erzeugt einen kryptografisch zufälligen, hex-kodierten
-// Token (32 Byte Entropie -> 64 Zeichen), der als eingehender Monitoring-
-// Webhook-Token pro Statusseite verwendet wird.
+// generateWebhookToken generates a cryptographically random, hex-encoded
+// token (32 bytes of entropy -> 64 characters), used as the incoming monitoring
+// webhook token per status page.
 func generateWebhookToken() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -23,11 +23,11 @@ func generateWebhookToken() (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-// POST /api/admin/pages/:page_id/webhook-token — erzeugt (oder erneuert) den
-// Webhook-Token einer Statusseite. Ein vorhandener Token wird dabei ungültig
-// (überschrieben); der Klartext-Token wird nur in dieser Antwort ausgeliefert.
-// In der Datenbank steht nur sein SHA-256-Hash (models.HashToken), er lässt sich
-// danach nicht mehr anzeigen.
+// POST /api/admin/pages/:page_id/webhook-token — creates (or renews) the
+// webhook token of a status page. An existing token becomes invalid in the process
+// (overwritten); the plaintext token is delivered only in this response.
+// The database holds only its SHA-256 hash (models.HashToken); it cannot be
+// displayed again afterwards.
 func (h *Handler) GenerateWebhookTokenHandler(c *gin.Context) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -54,14 +54,14 @@ func (h *Handler) GenerateWebhookTokenHandler(c *gin.Context) {
 	}
 
 	h.RecordAudit(c, "statuspage.webhook_token_generated", "config", "StatusPage", strconv.FormatUint(pageID, 10), page.Name, "")
-	// Der Klartext-Token wird bewusst nur hier zurückgegeben (analog zu z.B.
-	// GitHub Personal Access Tokens) - das Admin-UI muss ihn direkt anzeigen/
-	// kopieren lassen, danach ist er nicht mehr abrufbar.
+	// The plaintext token is deliberately returned only here (like e.g.
+	// GitHub personal access tokens) - the admin UI must show it and
+	// let it be copied directly; afterwards it can no longer be retrieved.
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
-// DELETE /api/admin/pages/:page_id/webhook-token — widerruft den aktuellen
-// Webhook-Token einer Statusseite (falls vorhanden).
+// DELETE /api/admin/pages/:page_id/webhook-token — revokes the current
+// webhook token of a status page (if present).
 func (h *Handler) RevokeWebhookTokenHandler(c *gin.Context) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -85,14 +85,14 @@ func (h *Handler) RevokeWebhookTokenHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Token widerrufen"})
 }
 
-// POST /api/webhooks/components/:component_id/status — eingehender
-// Monitoring-Webhook: setzt den Status einer Komponente, OHNE die
-// normale Session/JWT-Middleware zu durchlaufen. Authentifiziert wird
-// stattdessen per X-Webhook-Token-Header (oder alternativ ?token=... Query-
-// Param, für Monitoring-Tools, die keine Custom-Header setzen können) gegen
-// den für die zugehörige Statusseite hinterlegten Token. Nutzt dieselbe
-// Statuslogik (setComponentStatus) wie der authentifizierte Admin-Update-
-// Handler in component.go, um Validierung/Aggregation nicht zu duplizieren.
+// POST /api/webhooks/components/:component_id/status — incoming
+// Monitoring webhook: sets the status of a component WITHOUT passing through the
+// normal session/JWT middleware. Authentication happens
+// instead via the X-Webhook-Token header (or alternatively the ?token=... query
+// param, for monitoring tools that cannot set custom headers) against
+// the token stored for the associated status page. Uses the same
+// status logic (setComponentStatus) as the authenticated admin update
+// handler in component.go, to avoid duplicating validation/aggregation.
 func (h *Handler) ComponentStatusWebhookHandler(c *gin.Context) {
 	compID, err := strconv.ParseUint(c.Param("component_id"), 10, 32)
 	if err != nil {
@@ -100,9 +100,9 @@ func (h *Handler) ComponentStatusWebhookHandler(c *gin.Context) {
 		return
 	}
 
-	// Reihenfolge: erst Token, dann Existenz. Eine unbekannte ID (oder eine
-	// Komponente ohne Seite) antwortet exakt wie eine bekannte ID mit falschem
-	// Token, sonst ließen sich Komponenten-IDs ohne Token abtasten.
+	// Order: token first, then existence. An unknown ID (or a
+	// component without a page) answers exactly like a known ID with a wrong
+	// token, otherwise component IDs could be probed without a token.
 	var component models.Component
 	compRes := h.DB.Limit(1).Find(&component, compID)
 	if compRes.Error != nil {
@@ -126,10 +126,10 @@ func (h *Handler) ComponentStatusWebhookHandler(c *gin.Context) {
 	h.applyWebhookStatus(c, &component)
 }
 
-// webhookTokenValid prüft den mitgeschickten Token (Header, sonst Query)
-// konstant-zeitig gegen den gespeicherten Hash des Seiten-Tokens. Kein
-// hinterlegter Token (nie generiert oder widerrufen) sperrt den Endpunkt für
-// die Seite komplett; auch ein nicht umgestellter Klartextwert passt nie.
+// webhookTokenValid checks the supplied token (header, otherwise query)
+// in constant time against the stored hash of the page token. No
+// stored token (never generated or revoked) blocks the endpoint for
+// the page entirely; an unconverted plaintext value never matches either.
 func webhookTokenValid(c *gin.Context, pageTokenHash string) bool {
 	providedToken := c.GetHeader("X-Webhook-Token")
 	if providedToken == "" {
@@ -142,11 +142,11 @@ func respondComponentNotFound(c *gin.Context) {
 	c.JSON(http.StatusNotFound, gin.H{"error": "Component not found", "code": "component_not_found"})
 }
 
-// maxWebhookBody begrenzt den Body (nur {"status": ...} nötig).
+// maxWebhookBody limits the body (only {"status": ...} needed).
 const maxWebhookBody = 4 << 10
 
-// respondWebhookLookupFailed bricht bei einem Datenbankfehler ab (fail closed),
-// ohne etwas über Komponente oder Token preiszugeben.
+// respondWebhookLookupFailed aborts on a database error (fail closed),
+// without revealing anything about the component or token.
 func respondWebhookLookupFailed(c *gin.Context) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "code": "server_error"})
 }
@@ -155,23 +155,23 @@ func respondWebhookTokenInvalid(c *gin.Context) {
 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or missing webhook token", "code": "webhook_token_invalid"})
 }
 
-// POST /api/webhooks/component-slugs/:slug/status — wie
-// ComponentStatusWebhookHandler, adressiert die Komponente aber über ihre
-// Kennung. Die Statusseite kommt AUSSCHLIESSLICH aus dem Token
-// (Request liefert sie nie); die Kennung wird nur innerhalb dieser Seite
-// aufgelöst (je Seite eindeutig). Reihenfolge: erst Token, dann
-// Kennung — ein ungültiger Token gibt immer 401, egal ob die Kennung existiert
-// (keine Enumeration über fremde Seiten). Archivierte Komponenten bleiben
-// ansprechbar (wie beim ID-Weg), gelöschte nicht (404, kein Fallback).
-// Speichern, Historie und Audit laufen über applyWebhookStatus, also denselben
-// Pfad wie der ID-Weg.
+// POST /api/webhooks/component-slugs/:slug/status — like
+// ComponentStatusWebhookHandler, but addresses the component by its
+// identifier. The status page comes EXCLUSIVELY from the token
+// (the request never supplies it); the identifier is resolved only within this page
+// (unique per page). Order: token first, then
+// identifier — an invalid token always gives 401, whether or not the identifier exists
+// (no enumeration across other pages). Archived components remain
+// addressable (as with the ID route), deleted ones do not (404, no fallback).
+// Saving, history and audit go through applyWebhookStatus, i.e. the same
+// path as the ID route.
 func (h *Handler) ComponentStatusWebhookBySlugHandler(c *gin.Context) {
 	token := c.GetHeader("X-Webhook-Token")
 	if token == "" {
 		token = c.Query("token")
 	}
-	// Find statt First: ein Fehlversuch ist kein Fehler und soll keine
-	// "record not found"-Zeile im GORM-Log erzeugen.
+	// Find instead of First: a failed attempt is not an error and should not produce a
+	// "record not found" line in the GORM log.
 	var page models.StatusPage
 	if token == "" {
 		respondWebhookTokenInvalid(c)
@@ -183,8 +183,8 @@ func (h *Handler) ComponentStatusWebhookBySlugHandler(c *gin.Context) {
 		return
 	}
 
-	// Nur gültige Kennungen werden gesucht: eine leere Kennung träfe sonst
-	// eine Komponente ohne Slug (Altdaten); Format wie beim Anlegen.
+	// Only valid identifiers are looked up: an empty identifier would otherwise match
+	// a component without a slug (legacy data); format as when creating.
 	slug := c.Param("slug")
 	var component models.Component
 	if !models.ValidComponentSlug(slug) {
@@ -200,9 +200,9 @@ func (h *Handler) ComponentStatusWebhookBySlugHandler(c *gin.Context) {
 	h.applyWebhookStatus(c, &component)
 }
 
-// applyWebhookStatus liest den Status aus dem Body, setzt ihn über
-// setComponentStatus (Validierung, Transaktion, Statushistorie), schreibt den
-// Audit-Eintrag und antwortet. Gemeinsamer Teil beider Webhook-Wege.
+// applyWebhookStatus reads the status from the body, sets it via
+// setComponentStatus (validation, transaction, status history), writes the
+// audit entry and responds. Shared part of both webhook routes.
 func (h *Handler) applyWebhookStatus(c *gin.Context, component *models.Component) {
 	type StatusReq struct {
 		Status string `json:"status" binding:"required"`
@@ -219,8 +219,8 @@ func (h *Handler) applyWebhookStatus(c *gin.Context, component *models.Component
 	}
 
 	if err := setComponentStatus(h.DB, component, req.Status, models.StatusSourceWebhook); err != nil {
-		// Aufruf auf eine Gruppe ist ein Konfigurationsfehler des
-		// Monitorings; ablehnen (409), damit der Aufrufer es merkt.
+		// A call on a group is a configuration error of the
+		// monitoring; reject (409) so that the caller notices.
 		if errors.Is(err, errComponentIsGroup) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Component is a group; its status is derived from its children. Use a child component.", "code": "component_is_group"})
 			return

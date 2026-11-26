@@ -17,8 +17,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// mailboxKey ist der Schlüssel für Deduplizierung und das Limit je Postfach:
-// Groß-/Kleinschreibung und ein "+tag" im lokalen Teil sind kein anderes Postfach.
+// mailboxKey is the key for deduplication and the per-mailbox limit:
+// case and a "+tag" in the local part do not make a different mailbox.
 func TestMailboxKey(t *testing.T) {
 	cases := map[string]string{
 		"opfer@example.com":              "opfer@example.com",
@@ -27,8 +27,8 @@ func TestMailboxKey(t *testing.T) {
 		"opfer+1@example.com":            "opfer@example.com",
 		"Opfer+Newsletter+x@EXAMPLE.com": "opfer@example.com",
 		"opfer+@example.com":             "opfer@example.com",
-		"a.b@example.com":                "a.b@example.com", // Punkte sind providerabhängig, bleiben
-		"+x@example.com":                 "+x@example.com",  // leerer Rest: nicht kürzen
+		"a.b@example.com":                "a.b@example.com", // Dots are provider-dependent, stay
+		"+x@example.com":                 "+x@example.com",  // empty remainder: do not truncate
 		"ohne-at":                        "ohne-at",
 	}
 	for in, want := range cases {
@@ -36,10 +36,10 @@ func TestMailboxKey(t *testing.T) {
 	}
 }
 
-// Die öffentliche Anmeldung nimmt als Google-Chat-Ziel nur Webhooks von
-// chat.googleapis.com an (Port 443, Pfad /v1/spaces/…). Es gibt dafür keine
-// DNS-Auflösung und für jede Ablehnung denselben Code, damit weder interne
-// Hostnamen erkennbar sind noch der Server als Proxy für beliebige Ziele dient.
+// The public signup accepts as Google Chat target only webhooks from
+// chat.googleapis.com (port 443, path /v1/spaces/…). No DNS resolution
+// takes place and every rejection returns the same code, so internal
+// hostnames cannot be detected and the server does not serve as a proxy for arbitrary targets.
 func TestValidateSubscribeRequest_WebhookAllowlist(t *testing.T) {
 	orig := webhookLookupIP
 	t.Cleanup(func() { webhookLookupIP = orig })
@@ -67,18 +67,18 @@ func TestValidateSubscribeRequest_WebhookAllowlist(t *testing.T) {
 	}
 
 	rejected := []string{
-		"https://victim-api.example.net:8443/admin/api/v1/hooks?x=1", // fremder Host und Port
-		"https://victim-api.example.net/hook",                        // fremder Host
-		"https://chat.googleapis.com:8443/v1/spaces/AAAA/messages",   // falscher Port
-		"https://chat.googleapis.com/admin",                          // falscher Pfad
+		"https://victim-api.example.net:8443/admin/api/v1/hooks?x=1", // foreign host and port
+		"https://victim-api.example.net/hook",                        // foreign host
+		"https://chat.googleapis.com:8443/v1/spaces/AAAA/messages",   // wrong port
+		"https://chat.googleapis.com/admin",                          // wrong path
 		"https://chat.googleapis.com.evil.example/v1/spaces/A/messages",
 		"https://evilchat.googleapis.com/v1/spaces/A/messages",
-		"https://user:pw@chat.googleapis.com/v1/spaces/A/messages", // Zugangsdaten
+		"https://user:pw@chat.googleapis.com/v1/spaces/A/messages", // credentials
 		"https://chat.googleapis.com@evil.example/v1/spaces/A/messages",
-		"http://chat.googleapis.com/v1/spaces/A/messages", // kein https
-		"https://127.0.0.1/hook",                          // intern
-		"https://intern.example.test/hook",                // würde intern auflösen
-		"https://gibt-es-nicht.invalid/hook",              // nicht auflösbar
+		"http://chat.googleapis.com/v1/spaces/A/messages", // no https
+		"https://127.0.0.1/hook",                          // internal
+		"https://intern.example.test/hook",                // would resolve internally
+		"https://gibt-es-nicht.invalid/hook",              // not resolvable
 		"ftp://chat.googleapis.com/v1/spaces/A",
 		"nicht-eine-url",
 	}
@@ -92,12 +92,12 @@ func TestValidateSubscribeRequest_WebhookAllowlist(t *testing.T) {
 		assert.Equal(t, "webhook_url_invalid", c, "alle Ablehnungen müssen gleich aussehen")
 	}
 
-	// Pflichtfeld bleibt ein eigener Fehler, die E-Mail-Prüfung ist unberührt.
+	// The required field remains its own error; the email check is unaffected.
 	assert.Equal(t, "webhook_url_required", codeOf(check("")))
 }
 
-// HTTP-Ebene: intern auflösender und nicht auflösbarer Host ergeben dieselbe
-// Antwort (kein DNS-Orakel), es wird kein Abo angelegt.
+// HTTP level: an internally resolving and an unresolvable host give the same
+// response (no DNS oracle), no subscription is created.
 func TestSubscribeHandler_NoDNSOracleForWebhookHosts(t *testing.T) {
 	orig := webhookLookupIP
 	t.Cleanup(func() { webhookLookupIP = orig })
@@ -133,13 +133,13 @@ func TestSubscribeHandler_NoDNSOracleForWebhookHosts(t *testing.T) {
 	db.Model(&models.Subscriber{}).Count(&n)
 	assert.EqualValues(t, 0, n)
 
-	// Gegenprobe: ein echtes Google-Chat-Ziel wird ohne DNS-Auflösung akzeptiert.
+	// Control case: a real Google Chat target is accepted without DNS resolution.
 	ok := post("https://chat.googleapis.com/v1/spaces/AAAA1234/messages?key=k&token=t")
 	assert.Equal(t, http.StatusOK, ok.Code, ok.Body.String())
 }
 
-// Scheitert die Zählung, gilt das Kontingent als erschöpft (fail closed): lieber
-// keine Bestätigungsmail als unbegrenzt viele an eine fremde Mailbox.
+// If counting fails, the quota counts as exhausted (fail closed): better
+// no confirmation mail than an unlimited number to a foreign mailbox.
 func TestConfirmationMailBudgetExhausted_DBErrorFailsClosed(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

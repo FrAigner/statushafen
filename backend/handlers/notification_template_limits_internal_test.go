@@ -26,12 +26,12 @@ func TestLimitedWriter_AbortsAboveLimit(t *testing.T) {
 }
 
 func TestExecuteStringTemplate_OutputLimit(t *testing.T) {
-	// Der Platzhalter darf die Ausgabegrenze nicht durch Länge sprengen.
+	// The placeholder must not blow the output limit through its length.
 	data := NotificationTemplateData{Message: strings.Repeat("x", maxTemplateSubjectOutput+1)}
 	_, err := executeStringTemplate("subject", "{{.Message}}", data)
 	assert.Equal(t, "template_output_too_large", TemplateErrorCode(err))
 
-	// Gegenprobe: unter der Grenze wird gerendert.
+	// Control check: below the limit it is rendered.
 	out, err := executeStringTemplate("subject", "{{.Title}}", NotificationTemplateData{Title: "ok"})
 	require.NoError(t, err)
 	assert.Equal(t, "ok", out)
@@ -49,9 +49,9 @@ func TestRunWithTimeout_ReturnsCodedErrorWhenTooSlow(t *testing.T) {
 	assert.Equal(t, "schnell", s)
 }
 
-// Bereits gespeicherte, nach den neuen Regeln unzulässige Vorlagen dürfen den
-// Versand nicht unterbinden: es greift die Standardvorlage, und das Log nennt
-// weder den Vorlagentext noch Platzhalterwerte.
+// Templates that were already saved and are invalid under the new rules must not
+// block sending: the default template applies, and the log mentions
+// neither the template text nor placeholder values.
 func TestApplyNotificationTemplate_StoredForbiddenTemplateFallsBackWithoutLeak(t *testing.T) {
 	var buf bytes.Buffer
 	old := slog.Default()
@@ -78,8 +78,8 @@ func TestOutputLimitError_Message(t *testing.T) {
 	assert.Contains(t, outputLimitError{}.Error(), "limit")
 }
 
-// Eine leere Vorlage hat keinen Baum und ist gültig; es werden keine
-// Pflichtplatzhalter gemeldet.
+// An empty template has no tree and is valid; no
+// required placeholder is reported.
 func TestParseAllowedTemplateFields_EmptyTemplateIsValid(t *testing.T) {
 	tmpl, used, err := parseAllowedTemplateFields("body", "", MaxTemplateBodyLen)
 	require.NoError(t, err)
@@ -87,15 +87,15 @@ func TestParseAllowedTemplateFields_EmptyTemplateIsValid(t *testing.T) {
 	assert.Empty(t, used)
 }
 
-// checkTemplateNode wird vom Parser nie mit einem nil-Interface gerufen; die
-// Zusicherung hält fest, dass ein solcher Knoten als leer gilt, statt zu
+// checkTemplateNode is never called by the parser with a nil interface; the
+// assertion records that such a node counts as empty instead of
 // paniken.
 func TestCheckTemplateNode_NilNodeIsAccepted(t *testing.T) {
 	require.NoError(t, checkTemplateNode(nil, 0, map[string]bool{}))
 }
 
-// Fehler innerhalb einer Bedingung oder ihres Rumpfes werden gemeldet; Gegenprobe
-// ist jeweils die gleiche Form mit erlaubtem Inhalt.
+// Errors inside a condition or its body are reported; the control check
+// is in each case the same form with allowed content.
 func TestParseAllowedTemplate_RejectsForbiddenConstructsInsideConditions(t *testing.T) {
 	cases := []struct {
 		name, raw, wantCode string
@@ -120,16 +120,16 @@ func TestParseAllowedTemplate_RejectsForbiddenConstructsInsideConditions(t *test
 	require.NoError(t, err)
 }
 
-// Eine Bedingung ohne Befehl kann der Parser nicht erzeugen; checkTemplateCondition
-// lehnt sie trotzdem ab, falls ein Baum von Hand gebaut wird.
+// A condition without a command cannot be produced by the parser; checkTemplateCondition
+// rejects it anyway in case a tree is built by hand.
 func TestCheckTemplateCondition_RejectsMalformedPipes(t *testing.T) {
 	assert.Equal(t, "template_construct_not_allowed", TemplateErrorCode(checkTemplateCondition(nil)))
 	emptyCmd := &parse.PipeNode{Cmds: []*parse.CommandNode{{}}}
 	assert.Equal(t, "template_construct_not_allowed", TemplateErrorCode(checkTemplateCondition(emptyCmd)))
 }
 
-// Ein Fehler beim Ausführen (hier: Vergleich unterschiedlicher Typen) kommt als
-// gewöhnlicher Fehler zurück, nicht als Ausgabegrenze.
+// An error during execution (here: comparing different types) comes back as an
+// ordinary error, not as an output limit.
 func TestExecuteStringTemplate_ExecutionErrorIsReturned(t *testing.T) {
 	_, err := executeStringTemplate("subject", `{{if eq .Title 1}}x{{end}}`, NotificationTemplateData{Title: "t"})
 	require.Error(t, err)

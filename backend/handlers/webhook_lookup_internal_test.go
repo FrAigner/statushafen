@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ein Datenbankfehler beim Nachschlagen von Komponente oder Seite bricht den
-// Webhook ab (fail closed): 500, ohne Status zu ändern und ohne zu verraten,
-// ob die Komponente existiert.
+// A database error when looking up the component or page aborts the
+// webhook (fail closed): 500, without changing the status and without revealing
+// whether the component exists.
 func TestComponentStatusWebhook_DatenbankfehlerBrichtAb(t *testing.T) {
 	cases := map[string]string{"Komponente": "components", "Statusseite": "status_pages"}
 	for name, table := range cases {

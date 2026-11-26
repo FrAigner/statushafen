@@ -1,8 +1,8 @@
 package handlers_test
 
-// Der Set-Password-Link darf auch bei gleichzeitiger Einlösung nur einmal
-// gelten. SQLite serialisiert Schreiber und zeigt das nicht; deshalb ein
-// echtes Postgres (READ COMMITTED), nur mit MIGRATION_PG_TEST=1 (siehe
+// The set-password link must be valid only once even with concurrent
+// redemption. SQLite serializes writers and does not show this; hence a
+// real Postgres (READ COMMITTED), only with MIGRATION_PG_TEST=1 (see
 // startInvitationPostgres).
 
 import (

@@ -19,9 +19,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Statushistorie der Komponenten. Jeder Schreibpfad des
-// Komponentenstatus erzeugt genau einen Eintrag, keinen bei unverändertem
-// Status; die 90-Tage-Verfügbarkeit nutzt die Historie als Intervallquelle.
+// Status history of the components. Every write path of the
+// component status produces exactly one entry, none when the status is
+// unchanged; the 90-day availability uses the history as its interval source.
 
 func histOf(t *testing.T, db *gorm.DB, compID uint) []models.ComponentStatusChange {
 	t.Helper()
@@ -51,7 +51,7 @@ func TestStatusHistory_AdminUndWebhookSchreibenGenauEinenEintrag(t *testing.T) {
 	require.NoError(t, db.Create(&page).Error)
 	p := strconv.Itoa(int(page.ID))
 
-	// Anlegen mit Anfangsstatus: erster Eintrag (Quelle created, alter Status leer).
+	// Creating with an initial status: first entry (source created, old status empty).
 	w := putJSON(r, "POST", "/api/pages/"+p+"/components", map[string]any{"name": "API", "status": "partial_outage"})
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var comp models.Component
@@ -64,7 +64,7 @@ func TestStatusHistory_AdminUndWebhookSchreibenGenauEinenEintrag(t *testing.T) {
 
 	url := "/api/pages/" + p + "/components/" + strconv.Itoa(int(comp.ID))
 
-	// Statuswechsel per Admin: ein Eintrag, Quelle manual.
+	// Status change by admin: one entry, source manual.
 	require.Equal(t, http.StatusOK, putJSON(r, "PUT", url, map[string]any{"name": "API", "status": "major_outage"}).Code)
 	hist = histOf(t, db, comp.ID)
 	require.Len(t, hist, 2)
@@ -72,15 +72,15 @@ func TestStatusHistory_AdminUndWebhookSchreibenGenauEinenEintrag(t *testing.T) {
 	assert.Equal(t, "major_outage", hist[1].NewStatus)
 	assert.Equal(t, models.StatusSourceManual, hist[1].Source)
 
-	// Gleicher Status erneut (und Umbenennen): kein neuer Eintrag.
+	// Same status again (and renaming): no new entry.
 	require.Equal(t, http.StatusOK, putJSON(r, "PUT", url, map[string]any{"name": "API neu", "status": "major_outage"}).Code)
 	assert.Len(t, histOf(t, db, comp.ID), 2)
 
-	// Ungültiger Status: abgelehnt, nichts geschrieben.
+	// Invalid status: rejected, nothing written.
 	require.Equal(t, http.StatusBadRequest, putJSON(r, "PUT", url, map[string]any{"name": "API", "status": "kaputt"}).Code)
 	assert.Len(t, histOf(t, db, comp.ID), 2)
 
-	// Webhook: Quelle webhook, genau ein Eintrag; Wiederholung ohne Wechsel keiner.
+	// Webhook: source webhook, exactly one entry; a repeat without a change adds none.
 	hook := "/api/webhooks/components/" + strconv.Itoa(int(comp.ID)) + "/status"
 	post := func(status string) int {
 		body, _ := json.Marshal(map[string]string{"status": status})
@@ -99,7 +99,7 @@ func TestStatusHistory_AdminUndWebhookSchreibenGenauEinenEintrag(t *testing.T) {
 	assert.Equal(t, "major_outage", hist[2].OldStatus)
 	assert.Equal(t, "operational", hist[2].NewStatus)
 
-	// Gruppen haben keine Historie, auch nicht beim Anlegen/Umbenennen.
+	// Groups have no history, not even on create/rename.
 	w = putJSON(r, "POST", "/api/pages/"+p+"/components", map[string]any{"name": "Gruppe", "is_group": true})
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	var grp models.Component
@@ -108,8 +108,8 @@ func TestStatusHistory_AdminUndWebhookSchreibenGenauEinenEintrag(t *testing.T) {
 	assert.Empty(t, histOf(t, db, grp.ID))
 }
 
-// Transaktionssicherheit des Admin-Pfads: scheitert der Historieneintrag,
-// bleibt der Status unverändert und die Antwort ist ein Fehler.
+// Transaction safety of the admin path: if the history entry fails,
+// the status stays unchanged and the response is an error.
 func TestStatusHistory_AdminPfadRolltBeiHistorienfehlerZurueck(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -170,15 +170,15 @@ func TestStatusHistory_ImportSchreibtAnfangsstatus(t *testing.T) {
 	assert.Equal(t, "operational", hist[0].NewStatus)
 }
 
-// ---- Verfügbarkeit ----
+// ---- Availability ----
 
 func (e *availEnv) change(comp uint, to string, at *time.Time) {
 	e.t.Helper()
 	require.NoError(e.t, e.db.Create(&models.ComponentStatusChange{ComponentID: comp, NewStatus: to, ChangedAt: *at}).Error)
 }
 
-// Die Lücke: ein per Webhook/von Hand gesetzter Ausfall ohne Vorfall
-// erscheint in der Verfügbarkeit, mit dem Status der Historie.
+// The gap: an outage set via webhook/by hand without an incident
+// appears in the availability, with the status from the history.
 func TestAvailability_StatushistorieOhneVorfall(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("hist", false)
@@ -202,7 +202,7 @@ func TestAvailability_StatushistorieOhneVorfall(t *testing.T) {
 	}
 }
 
-// Überlappung mit einem Vorfall: der schlimmste Status zählt, nichts doppelt.
+// Overlap with an incident: the worst status counts, nothing is counted twice.
 func TestAvailability_StatushistorieUeberlapptVorfall(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("ueber", false)
@@ -213,13 +213,13 @@ func TestAvailability_StatushistorieUeberlapptVorfall(t *testing.T) {
 
 	_, resp := e.get("/api/public/pages/ueber/availability?include=components")
 	d := day(t, resp.Components[0].Days, "2026-10-20")
-	// 04-08 degraded (4 h x 0,3) + 08-12 major (4 h x 1,0) = 5,2 h.
+	// 04-08 degraded (4 h x 0.3) + 08-12 major (4 h x 1.0) = 5.2 h.
 	assert.Equal(t, int64(5.2*3600), d.DowntimeSeconds)
 	assert.Equal(t, "major_outage", d.Status)
 }
 
-// Ein vor dem Fenster begonnener Ausfall läuft über den Fensterbeginn hinein
-// (letzter Eintrag davor ist der Ausgangsstatus).
+// An outage that began before the window extends into the start of the window
+// (the last entry before it is the initial status).
 func TestAvailability_StatushistorieAusgangsstatusVorDemFenster(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("basis", false)
@@ -237,7 +237,7 @@ func TestAvailability_StatushistorieAusgangsstatusVorDemFenster(t *testing.T) {
 	assert.Equal(t, "operational", day(t, days, "2026-10-04").Status)
 }
 
-// Mandantentrennung: Historie einer fremden Seite fließt nie ein.
+// Tenant separation: history of another page never flows in.
 func TestAvailability_StatushistorieFremdeSeiteUndVersteckte(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("eigen", false)
@@ -266,8 +266,8 @@ func TestAvailability_StatushistorieLesefehlerIst500(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-// Historienfehler beim Anlegen: kein halb angelegter Zustand (Transaktion), der
-// Vorfall einer laufenden Wartung wird trotz Fehlers beim Statussetzen angelegt.
+// History error on create: no half-created state (transaction); the
+// incident of an ongoing maintenance is created despite the error when setting the status.
 func TestStatusHistory_HistorienfehlerBeimAnlegen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -313,22 +313,22 @@ func TestStatusHistory_ImportMitHistorienfehlerIst500(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// Der Ausgangsstatus ist der Eintrag mit dem neuesten changed_at,
-// nicht der mit der höchsten ID (nachträglich eingefügte ältere Zeile).
+// The initial status is the entry with the latest changed_at,
+// not the one with the highest ID (older row inserted afterwards).
 func TestAvailability_StatushistorieAusgangsstatusNachZeitNichtNachID(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("zeitid", false)
 	web := e.comp(p.ID, "Web", "operational", nil)
 	neu := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
 	alt := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
-	e.change(web.ID, "partial_outage", &neu) // kleinere ID, neuere Zeit
-	e.change(web.ID, "operational", &alt)    // größere ID, ältere Zeit
+	e.change(web.ID, "partial_outage", &neu) // smaller ID, newer time
+	e.change(web.ID, "operational", &alt)    // larger ID, older time
 	_, resp := e.get("/api/public/pages/zeitid/availability?include=components")
 	assert.Equal(t, "partial_outage", day(t, resp.Components[0].Days, "2026-08-01").Status)
 }
 
-// Webhook-Flattern (86.400 Wechsel in 3 Tagen) darf den
-// öffentlichen Endpunkt nicht lahmlegen (vorher ca. 6,5 s CPU je Komponente).
+// Webhook flapping (86,400 changes in 3 days) must not
+// paralyze the public endpoint (previously about 6.5 s CPU per component).
 func TestAvailability_StatushistorieFlatternBleibtSchnell(t *testing.T) {
 	e := newAvailEnv(t)
 	p := e.page("flatter", false)

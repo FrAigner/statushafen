@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Formatierte Nachrichten. Dieser Test deckt die Längengrenze
-// (5.000 Zeichen, Code message_too_long) an allen Stellen ab, an denen eine
-// Nachricht gespeichert wird.
+// Formatted messages. This test covers the length limit
+// (5,000 characters, code message_too_long) at all places where a
+// message is stored.
 
 const (
 	msgAtLimit   = 5000
@@ -104,7 +104,7 @@ func TestMessageLength_AllEntryPoints(t *testing.T) {
 			status, out := doJSON(t, r, e.method, e.url, adminTok, e.body(strings.Repeat("ä", msgOverLimit)))
 			assert.Equal(t, http.StatusBadRequest, status, "%v", out)
 			assert.Equal(t, "message_too_long", out["code"], "%v", out)
-			// An der Grenze (5.000 Zeichen, auch Mehrbyte-Zeichen) wird nicht wegen der Länge abgelehnt.
+			// At the limit (5,000 characters, also multi-byte characters) it is not rejected because of length.
 			status, out = doJSON(t, r, e.method, e.url, adminTok, e.body(strings.Repeat("ä", msgAtLimit)))
 			assert.NotEqual(t, "message_too_long", out["code"], "%v", out)
 			assert.Less(t, status, 500)

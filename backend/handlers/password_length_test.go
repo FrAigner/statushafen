@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Passwörter über 72 Byte liefen früher in einen leeren bcrypt-Hash, den die
-// Handler als Erfolg meldeten (Konto ohne Passwort, Bestelllink verbraucht).
-// Jetzt lehnt die Validierung sie mit password_too_long ab.
+// Passwords over 72 bytes used to run into an empty bcrypt hash, which the
+// handlers reported as success (account without password, order link consumed).
+// Now validation rejects them with password_too_long.
 
 func TestUserCreate_PasswordTooLongRejected(t *testing.T) {
 	db, r := newInputValidationRouter(t)
@@ -24,7 +24,7 @@ func TestUserCreate_PasswordTooLongRejected(t *testing.T) {
 	requireErrorCode(t, w.Body.Bytes(), "password_too_long")
 	assert.Zero(t, count(db, &models.User{}, "email = ?", "lang@example.com"), "kein Konto bei zu langem Passwort")
 
-	// Gegenprobe: genau 72 Byte gehen, auch mit Mehrbyte-Zeichen (36 x "ä").
+	// Control case: exactly 72 bytes work, also with multi-byte characters (36 x "ä").
 	for i, pw := range []string{strings.Repeat("a", 72), strings.Repeat("ä", 36)} {
 		w = doStatusPageRequest(r, "POST", "/api/users", map[string]any{"email": "ok" + itoa(uint(i)) + "@example.com", "password": pw})
 		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
@@ -66,7 +66,7 @@ func TestSetOrderPassword_TooLongKeepsLinkUsable(t *testing.T) {
 	require.NoError(t, db.First(&user, user.ID).Error)
 	assert.Empty(t, user.PasswordHash)
 
-	// Gegenprobe: mit passendem Passwort funktioniert derselbe Link danach.
+	// Control case: with a matching password the same link works afterwards.
 	w = doStatusPageRequest(r, "POST", "/api/public/orders/set-password", map[string]any{"token": "link-lang-72", "password": strings.Repeat("a", 72)})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, db.First(&user, user.ID).Error)

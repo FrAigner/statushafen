@@ -14,29 +14,29 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Endpunkte für den Frontend-Einstieg ins Seiten-SSO:
-//   - GET /api/public/pages/:slug/sso meldet nur, ob OIDC aktiv ist
-//     (Knopf „Mit SSO anmelden“ auf Login- und Statusseite),
-//   - GET/DELETE /api/me/sso zeigt und löst die eigenen Verknüpfungen,
-//   - POST /api/admin/pages/:page_id/sso/test startet die Testanmeldung
+// Endpoints for the frontend entry into page SSO:
+//   - GET /api/public/pages/:slug/sso only reports whether OIDC is active
+//     (the "Sign in with SSO" button on the login and status page),
+//   - GET/DELETE /api/me/sso shows and removes the user's own links,
+//   - POST /api/admin/pages/:page_id/sso/test starts the test login
 //     (test_login_enabled).
 
-// GetPublicOIDCHandler — GET /api/public/pages/:slug/sso (öffentlich).
-// Liefert bewusst nur oidc_enabled und die Seiten-ID für den
-// Login-Link, keine Discovery-URL, Client-ID oder sonstige Konfiguration.
-// Eine private Seite nennt Seiten-ID und SSO-Art nur Berechtigten (Rolle oder
-// Global Admin); alle anderen bekommen dieselbe 404-Antwort wie bei einer
-// fehlenden Seite, sonst ließe sich anonym erkennen, welche Slugs private Seiten
-// sind und welches SSO sie nutzen. Den Einstieg für Besucher einer privaten
-// Seite bietet GET /api/auth/sso/login?slug=… (SSOLoginBySlugHandler).
+// GetPublicOIDCHandler — GET /api/public/pages/:slug/sso (public).
+// Deliberately returns only oidc_enabled and the page ID for the
+// login link, no discovery URL, client ID or other configuration.
+// A private page reveals page ID and SSO kind only to authorized users (role or
+// global admin); everyone else gets the same 404 response as for a
+// missing page, otherwise one could anonymously tell which slugs are private pages
+// and which SSO they use. The entry point for visitors of a private
+// page is GET /api/auth/sso/login?slug=… (SSOLoginBySlugHandler).
 func (h *Handler) GetPublicOIDCHandler(c *gin.Context) {
 	var page models.StatusPage
 	if err := h.DB.Where(slugWhereClause, c.Param("slug")).First(&page).Error; err != nil {
 		respondPageNotVisible(c)
 		return
 	}
-	// Ohne den Auto-Join-Nebeneffekt von checkPrivatePageAccess: Eine reine
-	// Auskunft soll keine Rolle vergeben.
+	// Without the auto-join side effect of checkPrivatePageAccess: a pure
+	// status query must not assign a role.
 	if page.IsPrivate && !h.userHasRoleOnPrivatePage(c, page.ID) {
 		respondPageNotVisible(c)
 		return
@@ -45,14 +45,14 @@ func (h *Handler) GetPublicOIDCHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"oidc_enabled": active, "page_id": page.ID})
 }
 
-// SSOLoginBySlugHandler — GET /api/auth/sso/login?slug=… (öffentlich,
-// rate-limitiert). Einstieg ins Seiten-SSO für Besucher, denen die Seite ihre
-// Seiten-ID und SSO-Art nicht nennt (private Seite ohne Berechtigung, siehe
-// GetPublicOIDCHandler). Eine unbekannte Seite, eine Seite ohne SSO und ein Slug-Parameter
-// ohne Wert enden alle in derselben Fehlerweiterleitung (not_configured). Wer die
-// Adresse für einen Slug aufruft und zum Anbieter geleitet wird, erfährt damit
-// nur, dass die Seite SSO nutzt; das ist der Mindestumfang, den eine Anmeldung
-// braucht.
+// SSOLoginBySlugHandler — GET /api/auth/sso/login?slug=… (public,
+// rate-limited). Entry into page SSO for visitors to whom the page does not reveal its
+// page ID and SSO kind (private page without authorization, see
+// GetPublicOIDCHandler). An unknown page, a page without SSO and an empty slug parameter
+// all end in the same error redirect (not_configured). Anyone who
+// calls the address for a slug and is redirected to the provider thereby learns
+// only that the page uses SSO; that is the minimum a login
+// needs.
 func (h *Handler) SSOLoginBySlugHandler(c *gin.Context) {
 	if h.moveLoginToBaseHost(c) {
 		return
@@ -80,16 +80,16 @@ func (h *Handler) beginSSOBySlug(c *gin.Context) (string, *oidcError) {
 	return "", errOIDCNotConfigured
 }
 
-// oidcConfigComplete: Ohne Discovery-URL, Client-ID und Secret kann kein
-// Ablauf beim Anbieter starten.
+// oidcConfigComplete: without discovery URL, client ID and secret no
+// flow can be started at the provider.
 func oidcConfigComplete(cfg models.StatusPageSSOConfig) bool {
 	return cfg.OIDCDiscoveryURL != "" && cfg.OIDCClientID != "" && cfg.OIDCClientSecret != ""
 }
 
-// testOIDCConfig lädt die Konfiguration für eine Testanmeldung. Anders als der
-// Login braucht sie kein oidc_enabled, damit ein Admin die Einrichtung vor dem
-// Einschalten prüfen kann; dafür muss test_login_enabled gesetzt sein (Feld
-// „Test-Login erlauben“, im Live-Betrieb abschaltbar).
+// testOIDCConfig loads the configuration for a test login. Unlike the
+// login it does not need oidc_enabled, so an admin can check the setup before
+// enabling it; instead test_login_enabled must be set (field
+// "Allow test login", can be switched off in live operation).
 func (h *Handler) testOIDCConfig(pageID uint64) (models.StatusPageSSOConfig, *oidcError) {
 	var cfg models.StatusPageSSOConfig
 	if err := h.DB.Where("status_page_id = ?", pageID).First(&cfg).Error; err != nil {
@@ -105,9 +105,9 @@ func (h *Handler) testOIDCConfig(pageID uint64) (models.StatusPageSSOConfig, *oi
 }
 
 // StartSSOTestHandler — POST /api/admin/pages/:page_id/sso/test (pages:write
-// auf der Seite). Liefert die Authorize-URL als JSON wie OIDCLinkHandler. Der
-// Callback prüft Code, ID-Token und Nonce wie beim Login, legt aber weder eine
-// Sitzung noch eine Verknüpfung an und meldet das Ergebnis an die SSO-Seite.
+// on the page). Returns the authorize URL as JSON like OIDCLinkHandler. The
+// callback checks code, ID token and nonce as in the login, but creates neither a
+// session nor a link and reports the result to the SSO page.
 func (h *Handler) StartSSOTestHandler(c *gin.Context) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -157,8 +157,8 @@ type mySSOResponse struct {
 	Linkable   []mySSOLinkable `json:"linkable"`
 }
 
-// GetMySSOHandler — GET /api/me/sso. Eigene Verknüpfungen und die Seiten, die
-// das Konto noch verknüpfen darf.
+// GetMySSOHandler — GET /api/me/sso. The user's own links and the pages that
+// the account may still link.
 func (h *Handler) GetMySSOHandler(c *gin.Context) {
 	var user models.User
 	if err := h.DB.First(&user, getUserID(c)).Error; err != nil {
@@ -172,8 +172,8 @@ func (h *Handler) GetMySSOHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, resp)
 		return
 	}
-	// LEFT JOIN: Auch die Verknüpfung einer inzwischen gelöschten Seite bleibt
-	// sichtbar und lösbar.
+	// LEFT JOIN: even the link of a since-deleted page remains
+	// visible and removable.
 	h.DB.Table("user_sso_identities AS i").
 		Select("i.id, i.status_page_id, p.name AS page_name, i.protocol, i.email, i.created_at, i.issuer").
 		Joins("LEFT JOIN status_pages p ON p.id = i.status_page_id AND p.deleted_at IS NULL").
@@ -232,11 +232,11 @@ func (h *Handler) linkableSSOPages(userID uint) []mySSOLinkable {
 	return out
 }
 
-// linkablePageScope bildet die Regeln aus OIDCLinkHandler ab (Global Admins
-// fallen schon vorher raus): Mit Rolle auf genau einer Seite nur diese, mit
-// Rollen auf mehreren keine (hasRoleOnOtherPage träfe immer). Ohne Rolle nur
-// öffentliche, gelistete Seiten, damit die Liste keine privaten oder
-// ungelisteten Seitennamen verrät.
+// linkablePageScope mirrors the rules from OIDCLinkHandler (global admins
+// are already excluded earlier): with a role on exactly one page only that one, with
+// roles on several none (hasRoleOnOtherPage would always match). Without a role only
+// public, listed pages, so the list does not reveal private or
+// unlisted page names.
 func (h *Handler) linkablePageScope(userID uint) func(*gorm.DB) *gorm.DB {
 	var rolePages []uint
 	h.DB.Model(&models.UserStatusPageRole{}).Where("user_id = ?", userID).Distinct().Pluck("status_page_id", &rolePages)
@@ -251,8 +251,8 @@ func (h *Handler) linkablePageScope(userID uint) func(*gorm.DB) *gorm.DB {
 	}
 }
 
-// DeleteMySSOHandler — DELETE /api/me/sso/:id. Löst eine eigene Verknüpfung;
-// fremde und unbekannte IDs sind gleichermaßen 404.
+// DeleteMySSOHandler — DELETE /api/me/sso/:id. Removes one of the user's own links;
+// foreign and unknown IDs alike yield 404.
 func (h *Handler) DeleteMySSOHandler(c *gin.Context) {
 	var user models.User
 	if err := h.DB.First(&user, getUserID(c)).Error; err != nil {

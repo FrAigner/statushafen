@@ -13,13 +13,13 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Die vier Aufrufer von postWebhook (Test-Endpunkt, Subscriber-
-// Webhook, globaler Webhook, externe Vorfälle) reagieren auf 429/503/4xx wie
-// beschrieben. Vor dem Fix beantwortete der Test-Endpunkt jeden Fehler mit
-// 500 ohne Code, und die Benachrichtigungen versuchten es nie ein zweites Mal.
+// The four callers of postWebhook (test endpoint, subscriber
+// webhook, global webhook, external incidents) react to 429/503/4xx as
+// described. Before the fix, the test endpoint answered every error with
+// 500 without a code, and the notifications never tried a second time.
 
-// useTLSWebhookClient lässt webhookTestClient dem TLS-Zertifikat des
-// httptest-Servers vertrauen. Der Dialer bleibt safeDialContext (SSRF-Schutz).
+// useTLSWebhookClient lets webhookTestClient trust the TLS certificate of the
+// httptest server. The dialer stays safeDialContext (SSRF protection).
 func useTLSWebhookClient(t *testing.T, srv *httptest.Server) {
 	t.Helper()
 	orig := webhookTestClient
@@ -71,7 +71,7 @@ func TestTestWebhookHandler_AntwortenJeFehlerklasse(t *testing.T) {
 			}))
 			t.Cleanup(srv.Close)
 			useTLSWebhookClient(t, srv)
-			// Die Test-URL hat https; 127.0.0.1 ist per Test-Ausnahme erlaubt.
+			// The test URL uses https; 127.0.0.1 is allowed by a test exception.
 			status, body := callTestWebhook(t, srv.URL+"/hook")
 			if status != tc.wantStatus {
 				t.Fatalf("Status = %d (%v), erwartet %d", status, body, tc.wantStatus)

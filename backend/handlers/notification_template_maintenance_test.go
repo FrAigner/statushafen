@@ -8,11 +8,11 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Wartungsfenster-Actions müssen genauso wie Incidents auf
-// Custom-Templates ziehen. Deckt die Erweiterung von resolveIncidentKind
-// ab (MAINTENANCE_STARTED -> maintenance_started) und stellt gleichzeitig
-// sicher, dass ein fehlendes Custom-Template die bisherige Default-Mail
-// unverändert lässt (Verifikationskriterium).
+// Maintenance window actions must pick up
+// custom templates just like incidents do. Covers the extension of resolveIncidentKind
+// (MAINTENANCE_STARTED -> maintenance_started) and at the same time ensures
+// that a missing custom template leaves the previous default mail
+// unchanged (verification criterion).
 
 func TestDispatchNotifications_MaintenanceCustomTemplate_IsUsed(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "maint-custom-page", "maint-custom-admin@example.com")

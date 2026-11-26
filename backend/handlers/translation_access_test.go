@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// die Translation-Endpunkte liefen über globale IDs
-// (incident_id/component_id/notice_id) ohne status_page_id-Join. Wer die ID
-// eines Kind-Objekts einer privaten Statusseite kannte/erriet, bekam dessen
-// Translations trotzdem, ohne Rolle auf der Seite.
+// the translation endpoints ran over global IDs
+// (incident_id/component_id/notice_id) without a status_page_id join. Whoever knew or guessed the ID
+// of a child object of a private status page received its
+// translations anyway, without a role on the page.
 func TestTranslationEndpointsRespectIsPrivate(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -51,9 +51,9 @@ func TestTranslationEndpointsRespectIsPrivate(t *testing.T) {
 	db.Create(&models.UserStatusPageRole{UserID: outsider.ID, StatusPageID: otherPage.ID, RoleID: role.ID})
 	outsiderToken, _ := middleware.GenerateToken(outsider.ID, outsider.Email, "", "", false)
 
-	// StatusPageID zeigt bewusst auf keine existierende Seite (verwaiste
-	// Daten) - deckt den "page not found"-Zweig ab, den ein aufgeräumtes
-	// Datenmodell praktisch nie erreicht, den der Code aber trotzdem prüft.
+	// StatusPageID deliberately points to no existing page (orphaned
+	// data) - covers the "page not found" branch, which a tidied-up
+	// data model practically never reaches but which the code checks anyway.
 	const missingPageID = 999999
 	orphanIncident := models.Incident{StatusPageID: missingPageID, Title: "Orphan", Message: "m", Status: "investigating"}
 	db.Create(&orphanIncident)

@@ -8,9 +8,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Ratenlimit und dauerhafte Ablehnung eines Webhooks erscheinen in
-// der Glocke der Admins (Nachrichtencenter). Vor der Verdrahtung
-// wurde der Fehler nur geloggt; niemand erfuhr davon.
+// Rate limit and permanent rejection of a webhook appear in
+// the admins' bell (message center). Before the wiring,
+// the error was only logged; nobody learned of it.
 
 type glockeFixture struct {
 	h   *Handler
@@ -42,7 +42,7 @@ func (f glockeFixture) nachrichten(t *testing.T, kind string) []models.AdminNoti
 
 func TestWebhookGlocke_RatenlimitErzeugtNachricht(t *testing.T) {
 	newWebhookEnv(t)
-	srv, _ := sequenceServer(t, []fakeResp{{429, "60"}}) // länger als das Wartebudget: sofort aufgeben
+	srv, _ := sequenceServer(t, []fakeResp{{429, "60"}}) // longer than the wait budget: give up immediately
 	f := newGlockeFixture(t, srv.URL+"/geheim?key=GEHEIM&token=GEHEIM")
 
 	f.h.notifySubscriberGoogleChat(notifyCtx(), f.sub)
@@ -68,7 +68,7 @@ func TestWebhookGlocke_AblehnungErzeugtNachrichtJeAbonnent(t *testing.T) {
 	f := newGlockeFixture(t, srv.URL+"/geheim?key=GEHEIM")
 
 	f.h.notifySubscriberGoogleChat(notifyCtx(), f.sub)
-	f.h.notifySubscriberGoogleChat(notifyCtx(), f.sub) // zweiter Versand: zusammengefasst
+	f.h.notifySubscriberGoogleChat(notifyCtx(), f.sub) // second send: aggregated
 
 	n := f.nachrichten(t, AdminNotifWebhookRejected)
 	if len(n) != 1 || n[0].Count < 2 {

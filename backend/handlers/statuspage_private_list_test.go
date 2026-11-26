@@ -32,8 +32,8 @@ func listPublicSlugs(t *testing.T, r http.Handler) []string {
 	return slugs
 }
 
-// Eine private Seite darf nie in der öffentlichen Seitenliste
-// erscheinen, auch wenn IsPublicIndexed (Altbestand, Seed-Default) true ist.
+// A private page must never appear in the public page list,
+// even if IsPublicIndexed (legacy data, seed default) is true.
 func TestGetPublicPagesHandler_ExcludesPrivatePages(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -49,8 +49,8 @@ func TestGetPublicPagesHandler_ExcludesPrivatePages(t *testing.T) {
 	}
 }
 
-// Beim Speichern mit IsPrivate wird IsPublicIndexed erzwungen
-// auf false (Update und Create), sonst bliebe der alte Wert stehen.
+// When saving with IsPrivate, IsPublicIndexed is forced
+// to false (update and create), otherwise the old value would remain.
 func TestStatusPageSave_PrivateForcesNotIndexed(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -100,8 +100,8 @@ func TestStatusPageSave_PrivateForcesNotIndexed(t *testing.T) {
 	})
 }
 
-// Schlägt das explizite Setzen von is_public_indexed=false beim
-// Anlegen einer privaten Seite fehl, antwortet Create mit 500.
+// If explicitly setting is_public_indexed=false fails when
+// creating a private page, Create responds with 500.
 func TestCreateStatusPageHandler_PrivateIndexUpdateErrorReturns500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -121,8 +121,8 @@ func TestCreateStatusPageHandler_PrivateIndexUpdateErrorReturns500(t *testing.T)
 	requireStatusCode(t, w, http.StatusInternalServerError)
 }
 
-// Schlägt die Abfrage fehl (hier: Tabelle fehlt), antwortet die
-// Liste mit 500 statt mit einer leeren oder halben Antwort.
+// If the query fails (here: table missing), the
+// list responds with 500 instead of an empty or partial response.
 func TestGetPublicPagesHandler_DBErrorReturns500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

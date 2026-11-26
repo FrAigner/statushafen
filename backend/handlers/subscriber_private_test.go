@@ -15,17 +15,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Ein anonymes Abo auf eine private Statusseite lieferte über
-// das Subscriber-Token im Mail-Link dauerhaften Lesezugriff auf das
-// Dashboard. Abos auf privaten Seiten sind nur noch für eingeloggte Nutzer
-// mit Rolle auf der Seite (oder Global Admins) erlaubt, sonst 404 wie beim
-// Dashboard - die Existenz der Seite wird nicht verraten.
+// An anonymous subscription to a private status page gave permanent read
+// access to the dashboard via the subscriber token in the mail link.
+// Subscriptions to private pages are now only allowed for logged-in users
+// with a role on the page (or Global Admins), otherwise 404 as with the
+// dashboard - the existence of the page is not revealed.
 func TestSubscribe_PrivatePage(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Simuliert OptionalAuthMiddleware: der Header steht für einen gültigen
-	// Login des Users mit dieser ID.
+	// Simulates OptionalAuthMiddleware: the header stands for a valid
+	// login of the user with this ID.
 	r.POST("/api/subscribe", func(c *gin.Context) {
 		if uid := c.GetHeader("X-Test-User"); uid != "" {
 			id, _ := strconv.ParseUint(uid, 10, 32)

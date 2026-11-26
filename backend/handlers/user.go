@@ -12,13 +12,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const preloadUserStatusPageRolesRole = "UserStatusPageRoles.Role"
 
-// userResponse hängt die zugewiesenen Tags an (Ersatz für das
-// frühere AllowedCountries-Feld) - analog zu IncidentResponse/Components in
-// incident.go, damit das Admin-Frontend die aktuelle Tag-Zuweisung anzeigen
-// und im Bearbeiten-Formular vorbefüllen kann.
+// userResponse attaches the assigned tags (replacement for the
+// former AllowedCountries field) - analogous to IncidentResponse/Components in
+// incident.go, so that the admin frontend can display the current tag assignment
+// and prefill it in the edit form.
 type userResponse struct {
 	models.User
 	Tags []models.Tag `json:"Tags"`
@@ -73,8 +73,8 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	// User-Tags sind bewusst nur global gültig, nie an eine Statusseite
-	// gebunden - AllowedCountries war schon immer seitenübergreifend.
+	// User tags are deliberately global only, never bound to a status page
+	// - AllowedCountries was always cross-page.
 	tags, err := h.resolveGlobalTagsByIDs(req.TagIDs)
 	if err != nil {
 		respondCoded(c, http.StatusBadRequest, err)
@@ -118,7 +118,7 @@ func (h *Handler) CreateUserHandler(c *gin.Context) {
 	})
 
 	if err != nil {
-		if isUniqueViolation(err) { // gleiche Antwort wie die Vorabprüfung
+		if isUniqueViolation(err) { // same response as the pre-check
 			c.JSON(http.StatusBadRequest, gin.H{"error": "User with this email already exists", "code": "email_taken"})
 			return
 		}
@@ -139,11 +139,11 @@ type UpdateUserReq struct {
 	PageRoles     []PageRoleInput `json:"page_roles"`
 }
 
-// replaceUserPageRoles löscht die bestehenden UserStatusPageRole-Zeilen eines
-// Users (Hard Delete, um Duplikate/unübersichtliche DB zu vermeiden) und legt
-// die neu übergebenen an. Ausgelagert aus UpdateUserHandler, damit dessen
-// kognitive Komplexität die SonarCloud-Grenze (go:S3776) nicht überschreitet.
-// Das Ergebnis meldet, ob sich die Zuordnung (Seite, Rolle) tatsächlich geändert hat.
+// replaceUserPageRoles deletes the existing UserStatusPageRole rows of a
+// user (hard delete, to avoid duplicates/a cluttered DB) and creates
+// the newly passed ones. Extracted from UpdateUserHandler so that its
+// cognitive complexity does not exceed the SonarCloud limit (go:S3776).
+// The result reports whether the assignment (page, role) actually changed.
 func replaceUserPageRoles(tx *gorm.DB, userID uint, pageRoles []PageRoleInput) (bool, error) {
 	pageRoles = dedupePageRoleInputs(pageRoles)
 	var before []models.UserStatusPageRole
@@ -154,8 +154,8 @@ func replaceUserPageRoles(tx *gorm.DB, userID uint, pageRoles []PageRoleInput) (
 	if err := tx.Unscoped().Where("user_id = ?", userID).Delete(&models.UserStatusPageRole{}).Error; err != nil {
 		return false, err
 	}
-	// Seiten, auf denen die Mitgliedschaft endet, verlieren auch
-	// die Seiten-SSO-Verknüpfung des Kontos.
+	// Pages where the membership ends also lose
+	// the account's page SSO link.
 	var dropped []models.UserStatusPageRole
 	for _, b := range before {
 		if !slices.ContainsFunc(pageRoles, func(pr PageRoleInput) bool { return pr.RoleID != 0 && pr.StatusPageID == b.StatusPageID }) {
@@ -187,8 +187,8 @@ func replaceUserPageRoles(tx *gorm.DB, userID uint, pageRoles []PageRoleInput) (
 	return changed, nil
 }
 
-// pageRolesDiffer vergleicht die bestehenden Seitenrollen mit der neuen
-// Zuordnung; Einträge ohne Rolle (RoleID 0) zählen als nicht vorhanden.
+// pageRolesDiffer compares the existing page roles with the new
+// assignment; entries without a role (RoleID 0) count as not present.
 func pageRolesDiffer(before []models.UserStatusPageRole, after []PageRoleInput) bool {
 	type pair struct{ page, role uint }
 	old := map[pair]bool{}
@@ -208,23 +208,23 @@ func pageRolesDiffer(before []models.UserStatusPageRole, after []PageRoleInput) 
 	return n != len(old)
 }
 
-// bumpTokenVersion erhöht users.token_version und macht damit alle bisher
-// ausgestellten Login-Tokens des Kontos ungültig (siehe middleware.checkSession).
-// UpdateColumn lässt updated_at unberührt und löst keine Hooks aus.
+// bumpTokenVersion increments users.token_version, thereby invalidating all
+// previously issued login tokens of the account (see middleware.checkSession).
+// UpdateColumn leaves updated_at untouched and triggers no hooks.
 func bumpTokenVersion(tx *gorm.DB, userID uint) error {
 	return tx.Model(&models.User{}).Where("id = ?", userID).
 		UpdateColumn("token_version", gorm.Expr("token_version + 1")).Error
 }
 
-// applyUserUpdate persistiert die Felder-Updates, die Seiten-Rollen und die
-// Tags eines Users in einer Transaktion.
-// adminChanged: Global-Admin-Flag wurde geändert. Passwortwechsel und geänderte
-// Global-Admin-Rechte widerrufen die Tokens des Kontos. Seitenrollen nicht: sie
-// werden bei jeder Anfrage aus der Datenbank gelesen und wirken sofort.
+// applyUserUpdate persists the field updates, the page roles and the
+// tags of a user in one transaction.
+// adminChanged: global-admin flag was changed. A password change and changed
+// global-admin rights revoke the account's tokens. Page roles do not: they
+// are read from the database on every request and take effect immediately.
 func (h *Handler) applyUserUpdate(user *models.User, req UpdateUserReq, tags []models.Tag, adminChanged bool) error {
 	return h.DB.Transaction(func(tx *gorm.DB) error {
-		// Benutzerzeile zuerst sperren; ein gleichzeitig gelöschtes
-		// Konto ergibt ErrRecordNotFound (404) statt einer Rolle am Konto.
+		// Lock the user row first; a concurrently deleted
+		// account yields ErrRecordNotFound (404) instead of a role on the account.
 		if err := lockLiveUser(tx, user.ID); err != nil {
 			return err
 		}
@@ -267,7 +267,7 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid fields", "code": "invalid_request"})
 		return
 	}
-	// leer = Passwort unverändert, sonst gilt die Mindestlänge.
+	// empty = password unchanged, otherwise the minimum length applies.
 	if req.Password != "" && (rejectDisabledPasswordLogin(c) || rejectInvalidPassword(c, req.Password)) {
 		return
 	}
@@ -284,8 +284,8 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 	}
 
 	wasGlobalAdmin := user.IsGlobalAdmin
-	// sich selbst bzw. dem letzten Global Admin die Rechte zu
-	// entziehen, sperrte die Plattformverwaltung aus.
+	// Removing the rights from oneself or from the last global admin
+	// would lock out platform administration.
 	if code := h.adminChangeConflict(c, user, false, wasGlobalAdmin && !req.IsGlobalAdmin); code != "" {
 		abortAdminChangeConflict(c, code)
 		return
@@ -302,7 +302,7 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 	}
 
 	if err := h.applyUserUpdate(&user, req, tags, wasGlobalAdmin != req.IsGlobalAdmin); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) { // Konto inzwischen gelöscht
+		if errors.Is(err, gorm.ErrRecordNotFound) { // Account has been deleted in the meantime
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found", "code": "user_not_found"})
 			return
 		}
@@ -316,8 +316,8 @@ func (h *Handler) UpdateUserHandler(c *gin.Context) {
 
 	h.DB.Preload("Role").Preload("UserStatusPageRoles").Preload(preloadUserStatusPageRolesRole).First(&user, user.ID)
 	h.RecordAudit(c, "user.updated", "user", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, "")
-	// sicherheitsrelevante Teiländerungen als eigene Aktionen,
-	// damit sie im Audit-Log filterbar sind statt in user.updated aufzugehen.
+	// Security-relevant partial changes as separate actions,
+	// so that they are filterable in the audit log instead of being folded into user.updated.
 	if req.Password != "" {
 		h.RecordAudit(c, "user.password_changed", "user", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, "")
 	}
@@ -339,26 +339,26 @@ func (h *Handler) DeleteUserHandler(c *gin.Context) {
 		return
 	}
 
-	// Selbstlöschung und Löschen des letzten Global Admins mit
-	// 409 und Fehlercode statt 400 ohne Code (und per ID statt per E-Mail).
+	// Self-deletion and deletion of the last global admin with
+	// 409 and error code instead of 400 without a code (and by ID instead of by email).
 	if code := h.adminChangeConflict(c, user, true, user.IsGlobalAdmin); code != "" {
 		abortAdminChangeConflict(c, code)
 		return
 	}
 
-	// Seitenrollen des Benutzers mit entfernen (Soft-Delete löst kein
-	// FK-OnDelete aus), atomar mit dem Löschen des Benutzers.
+	// Also remove the user's page roles (soft delete triggers no
+	// FK OnDelete), atomically with deleting the user.
 	if err := h.DB.Transaction(func(tx *gorm.DB) error {
-		// Einladungen weg und Benutzerzeile gesperrt, BEVOR Rollen
-		// entfernt werden (gleichzeitiges Annehmen, siehe lockAccountForDeletion).
+		// Invitations removed and user row locked BEFORE roles
+		// are removed (concurrent acceptance, see lockAccountForDeletion).
 		if err := lockAccountForDeletion(tx, user); err != nil {
 			return err
 		}
 		if err := tx.Unscoped().Where("user_id = ?", user.ID).Delete(&models.UserStatusPageRole{}).Error; err != nil {
 			return err
 		}
-		// Tags und SSO-Verknüpfungen räumt – wie me_delete – auch der
-		// Admin-Pfad auf, sonst bleiben sie als Waisen stehen.
+		// Tags and SSO links are also cleaned up by the admin path,
+		// as in me_delete, otherwise they remain as orphans.
 		if err := tx.Unscoped().Where("user_id = ?", user.ID).Delete(&models.UserTag{}).Error; err != nil {
 			return err
 		}
