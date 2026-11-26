@@ -36,9 +36,9 @@ var (
 	// referenceFixtures are files whose tests deliberately use reference numbers as
 	// test data (e.g. 3-digit hex colors in comments).
 	referenceFixtures = map[string]bool{
-		"frontend/src/hexColors.test.js":              true,
-		"frontend/src/patternsCss.test.js":            true,
-		"frontend/src/publicDesign4a.test.js":         true,
+		"frontend/src/hexColors.test.ts":              true,
+		"frontend/src/patternsCss.test.ts":            true,
+		"frontend/src/publicDesign4a.test.ts":         true,
 		"frontend/src/test-support/noInlineStyles.ts": true,
 		"backend/sql_concat_guard_test.go":            true,
 		"backend/repo_hygiene_test.go":                true,

@@ -1,0 +1,137 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import i18n from './index'
+import { flatten, unflatten, applyGlobalOverrides, applyPageOverrides, clearPageOverrides } from './overrides'
+
+function jsonResponse(body: unknown, status = 200) {
+  return { ok: status < 400, status, json: async () => body }
+}
+
+describe('flatten/unflatten', () => {
+  it('flatten wandelt verschachtelte Objekte in "dotted" Key-Value-Paare um', () => {
+    const nested = { nav: { items: { sso: 'SSO Konfiguration' } }, common: { save: 'Speichern' } }
+    expect(flatten(nested)).toEqual({ 'nav.items.sso': 'SSO Konfiguration', 'common.save': 'Speichern' })
+  })
+
+  it('unflatten ist die Umkehrung von flatten (Rundtrip)', () => {
+    const nested = { nav: { items: { sso: 'SSO Konfiguration', users: 'Benutzer' } }, common: { save: 'Speichern' } }
+    expect(unflatten(flatten(nested))).toEqual(nested)
+  })
+
+  it('unflatten verschmutzt Object.prototype nicht', () => {
+    const result = unflatten({ '__proto__.polluted': 'yes', 'a.constructor.prototype.x': 'yes', 'nav.sso': 'SSO' })
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined()
+    expect(({} as Record<string, unknown>).x).toBeUndefined()
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype)
+    expect(result).toEqual({ nav: { sso: 'SSO' } })
+  })
+
+  it('unflatten verwirft Schlüssel mit constructor-/prototype-Segment komplett', () => {
+    expect(unflatten({ constructor: 'x', prototype: 'y', 'a.prototype': 'z', 'ok.key': 'v' })).toEqual({ ok: { key: 'v' } })
+  })
+
+  it('unflatten verwirft einen Präfix-Schlüssel, statt den Teilbaum zu überschreiben (Review-Befund 1)', () => {
+    expect(unflatten({ 'nav.items.sso': 'SSO', 'nav.items.users': 'U', nav: 'x' })).toEqual({
+      nav: { items: { sso: 'SSO', users: 'U' } },
+    })
+    expect(unflatten({ 'nav.items.sso': 'SSO', 'nav.items': 'x' })).toEqual({ nav: { items: { sso: 'SSO' } } })
+  })
+
+  it('unflatten ist unabhängig von der Reihenfolge der Einträge', () => {
+    expect(unflatten({ 'nav.items': 'x', 'nav.items.sso': 'SSO' })).toEqual({ nav: { items: { sso: 'SSO' } } })
+    expect(unflatten({ nav: 'x', 'nav.items.sso': 'SSO' })).toEqual({ nav: { items: { sso: 'SSO' } } })
+  })
+
+  it('unflatten behält Schlüssel mit gemeinsamem Textpräfix, der kein Pfadpräfix ist', () => {
+    expect(unflatten({ nav: 'x', navigation: 'y', 'nav2.a': 'z' })).toEqual({ nav: 'x', navigation: 'y', nav2: { a: 'z' } })
+  })
+})
+
+describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () => {
+  const originalNavSso = i18n.global.getLocaleMessage('de').adminNav.items.sso
+
+  beforeEach(() => {
+    i18n.global.locale.value = 'de'
+  })
+
+  afterEach(async () => {
+    // Reset the layers so that tests do not influence each other.
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}))
+    await applyGlobalOverrides('de')
+    clearPageOverrides('de')
+    vi.restoreAllMocks()
+  })
+
+  it('wendet einen globalen Override auf die i18n-Nachrichten an, ohne andere Keys zu verändern', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Mein SSO' }))
+
+    await applyGlobalOverrides('de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Mein SSO')
+    // An untouched key keeps the bundle default.
+    expect(i18n.global.t('common.save')).not.toBe('')
+  })
+
+  it('fällt bei Netzwerkfehler auf den Bundle-Default zurück, statt zu werfen', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('Netzwerkfehler'))
+
+    await expect(applyGlobalOverrides('de')).resolves.not.toThrow()
+    expect(i18n.global.t('adminNav.items.sso')).toBe(originalNavSso)
+  })
+
+  it('Seiten-Override gewinnt gegen einen globalen Override für denselben Key (Präzedenz Bundle < global < Seite)', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Globaler Text')
+
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Seiten-Text' }))
+    await applyPageOverrides(1, 'de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Seiten-Text')
+  })
+
+  it('clearPageOverrides entfernt nur die Seiten-Ebene, globaler Override bleibt bestehen', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Seiten-Text' }))
+    await applyPageOverrides(1, 'de')
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Seiten-Text')
+
+    clearPageOverrides('de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Globaler Text')
+  })
+
+  it('verwirft globale Overrides bei einer Fehlerantwort und behält den Bundle-Default', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ 'adminNav.items.sso': 'Fehler' }) })
+
+    await applyGlobalOverrides('de')
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe(originalNavSso)
+  })
+
+  it('lässt die Nachrichten unverändert, wenn es für die Sprache keine Texte gibt', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Unbekannt' }))
+    const before = i18n.global.getLocaleMessage('qq')
+
+    await expect(applyGlobalOverrides('qq')).resolves.toBeUndefined()
+
+    expect(i18n.global.getLocaleMessage('qq')).toEqual(before)
+    expect(i18n.global.t('adminNav.items.sso')).toBe(originalNavSso)
+  })
+
+  it('fällt bei einem Fehler der Seiten-Overrides auf die globale Ebene zurück, statt zu werfen', async () => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Globaler Text' }))
+    await applyGlobalOverrides('de')
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({ 'adminNav.items.sso': 'Seiten-Text' }))
+    await applyPageOverrides(1, 'de')
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    global.fetch = vi.fn().mockRejectedValue(new Error('Netzwerkfehler'))
+
+    await expect(applyPageOverrides(1, 'de')).resolves.toBeUndefined()
+
+    expect(i18n.global.t('adminNav.items.sso')).toBe('Globaler Text')
+  })
+})

@@ -1,7 +1,7 @@
 # Screenreader-Prüfung (manuell)
 
 axe prüft automatisch, was sich am Markup und an den gerenderten Farben ablesen lässt
-(vitest: `src/test-support/axe.js`, Browser: `frontend/e2e/a11y.spec.js`, hell und dunkel). Ob eine
+(vitest: `src/test-support/axe.ts`, Browser: `frontend/e2e/a11y.spec.ts`, hell und dunkel). Ob eine
 Seite mit Screenreader tatsächlich bedienbar ist, zeigt nur ein Durchgang von Hand. Diese Liste vor
 größeren UI-Änderungen (neue View, neues Formular, neuer Dialog) und vor einem Release einmal
 abarbeiten.
@@ -65,4 +65,4 @@ Abo verwalten, Login, Admin-Übersicht, eine Admin-Liste (z. B. Vorfälle), ein 
 
 Funde als Ticket anlegen: Seite, Screenreader/Browser/System, Schritte, erwartete
 und tatsächliche Ansage. Was sich automatisieren lässt (fehlender Name, falsche Rolle), zusätzlich
-als Regel bzw. Testfall in `e2e/a11y.spec.js` oder den vitest-axe-Tests nachziehen.
+als Regel bzw. Testfall in `e2e/a11y.spec.ts` oder den vitest-axe-Tests nachziehen.

@@ -42,7 +42,7 @@ im Compose-Profil `sso`. Ohne das Profil startet er nicht mit.
    Im Formular des Mocks wird „username“ zum `sub`-Claim (bei jeder Anmeldung gleich wählen),
    im Textfeld lassen sich weitere Claims als JSON setzen, z. B. `{"name": "Erika"}`.
 
-Der Playwright-Spec `frontend/e2e/sso-oidc.spec.js` spielt das komplett über die Oberfläche
+Der Playwright-Spec `frontend/e2e/sso-oidc.spec.ts` spielt das komplett über die Oberfläche
 durch (eigene Seite und eigenes Konto, Verknüpfen im Profil, Anmelden über die Statusseite,
 Sitzung prüfen, Fehlerseite bei nicht verknüpfter Identität) und überspringt sich,
 wenn der Mock nicht erreichbar ist: `cd frontend && npx playwright test sso-oidc`

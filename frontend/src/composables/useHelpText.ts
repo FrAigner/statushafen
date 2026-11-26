@@ -19,7 +19,7 @@ import i18n from '../i18n'
 // text: v-help then attaches neither listeners nor aria-describedby (no empty
 // tooltip, no reference to a missing element). In DEV and tests a warning
 // appears so the gap is noticed. The coverage test
-// (src/views/helpCoverage.test.js) enforces completeness for finished pages.
+// (src/views/helpCoverage.test.ts) enforces completeness for finished pages.
 //
 // Deliberately via i18n.global instead of useI18n(): v-help and the tooltip
 // layer run outside a component setup (directive and a separate render()

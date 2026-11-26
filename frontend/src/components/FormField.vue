@@ -14,7 +14,7 @@
     </FormField>
 
   - The asterisk only comes from the presentation, never from the label text
-    (rule, i18n/requiredMarker.test.js); it is hidden from
+    (rule, i18n/requiredMarker.test.ts); it is hidden from
     screen readers, `required` on the field announces it.
   - An error replaces the hint, sits in a role="alert" line and sets
     aria-invalid; both lines are linked to the field via aria-describedby.

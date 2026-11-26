@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 // In the full test run v8 reports the getter line of this import as not
 // executed (the lazy-loading test loads the view without rendering; same in
-// AdminLanguages, AdminUsers and others), although AdminSSO.test.js renders it.
+// AdminLanguages, AdminUsers and others), although AdminSSO.test.ts renders it.
 /* v8 ignore next */
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
