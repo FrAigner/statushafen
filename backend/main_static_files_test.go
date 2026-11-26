@@ -206,6 +206,15 @@ func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 			t.Errorf("staticFileFor(%q) lehnt eine Datei im Ordner ab", url)
 		}
 	}
+	// The link is resolved before anything is opened, so the file actually served is
+	// the checked target, not the link.
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := staticFileFor(root, "/alias.txt"); got != filepath.Join(realRoot, "echt.txt") {
+		t.Errorf("staticFileFor(/alias.txt) = %q, want the resolved target", got)
+	}
 }
 
 // Error paths: an unresolvable folder or path counts as outside.
