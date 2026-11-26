@@ -195,10 +195,15 @@ export interface PageInvitation {
   ExpiresAt?: string
 }
 
-/** Response of the custom domain endpoints (PUT .../custom-domain, POST .../custom-domain/verify). */
+/** Response of the custom domain endpoints (GET/PUT .../custom-domain, POST .../custom-domain/verify). */
 export interface CustomDomainResponse {
+  custom_domain?: string
   custom_domain_status: string
   cname_target: string
+  /** Registrable domain itself (example.org): DNS allows no CNAME there. */
+  apex_domain?: boolean
+  /** Only after a successful check: the domain already reaches the CNAME target. */
+  points_to_target?: boolean
   txt_record_value?: string
   custom_domain_checked_at?: string | null
   custom_domain_check_error?: string

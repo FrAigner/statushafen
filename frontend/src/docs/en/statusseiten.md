@@ -103,12 +103,15 @@ unavailable" with a link to the login. Joining happens as before on the first re
 Enter the desired domain under "Custom Domain", for example `status.acme.example`. Two DNS
 records are needed afterwards:
 
-1. A **CNAME** of the domain pointing to the displayed target host (default
-   `edge.example.com`).
+1. A **CNAME** of the domain pointing to the target host the form shows. It is the same for the
+   whole installation, whatever domain you enter (`CUSTOM_DOMAIN_CNAME_TARGET`, otherwise
+   `edge.<host of FRONTEND_URL>`).
 2. As proof of ownership, a **TXT record** of the form `statushafen-verify=<token>`. The form
-   shows the exact value after saving.
+   shows the exact value after saving, and again when reopened while the proof is missing.
 
-Then click "Verify DNS". The state of the domain is shown next to it:
+Then click "Verify DNS". The TXT record is checked. If it is there, the domain counts as verified;
+if it does not point to the target host yet, the form says so (a CNAME can take a while to spread).
+The state of the domain is shown next to it:
 
 - "Pending",
 - "Verified" (waiting for the first request via the domain) and
@@ -121,6 +124,9 @@ per user; beyond that the interface reports that too many requests were made.
 
 - Only valid hostnames in lowercase are accepted (no trailing dot, no wildcard, no IP address;
   international names in Punycode).
+- An **apex domain** such as `example.org` cannot have a CNAME. It needs an ALIAS/ANAME record or
+  "CNAME flattening" at the DNS provider, or use a subdomain such as `status.example.org`. The form
+  points this out for apex domains.
 - Entering a domain does not reserve it: several pages can enter the same domain, and the page that
   **verifies it first via the TXT record** wins.
 - If the domain is already verified or active on another page, verifying fails with the message

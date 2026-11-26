@@ -2549,6 +2549,25 @@ paths:
   /api/admin/pages/{page_id}/custom-domain:
     parameters:
       - $ref: "#/components/parameters/PageId"
+    get:
+      tags: [Admin – Pages]
+      operationId: getCustomDomain
+      summary: Custom Domain der Seite mit CNAME-Ziel
+      description: >-
+        Liefert das CNAME-Ziel der Installation (auch bevor eine Domain gespeichert ist), ob die
+        Domain eine Hauptdomain ist (`apex_domain`: dort ist kein CNAME erlaubt) und, solange der
+        TXT-Nachweis offen ist (`pending`, `check_failed`), den erwarteten TXT-Wert.
+      x-required-permission: pages:read
+      responses:
+        "200":
+          description: Zustand der Custom Domain.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CustomDomainState" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     put:
       tags: [Admin – Pages]
       operationId: setCustomDomain
@@ -2611,6 +2630,11 @@ paths:
                     properties:
                       verified: { type: boolean }
                       message: { type: string }
+                      points_to_target:
+                        type: boolean
+                        description: >-
+                          Nur bei erfolgreicher Prüfung: Die Domain zeigt bereits auf das CNAME-Ziel (CNAME oder
+                          dieselben Adressen wie das Ziel). Ein `false` hält die Verifizierung nicht auf.
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -5065,6 +5089,7 @@ components:
         cname_target: { type: string }
         verification_token: { type: string }
         txt_record_value: { type: string, description: Wert des anzulegenden TXT-Eintrags. }
+        apex_domain: { type: boolean, description: "Hauptdomain (z. B. example.org): kein CNAME möglich, ALIAS/ANAME, CNAME-Flattening oder eine Subdomain nötig." }
     SSOConfig:
       type: object
       properties:

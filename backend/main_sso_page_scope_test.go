@@ -139,6 +139,7 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"DELETE /api/admin/pages/:page_id":                                                     ssoPageRoute,
 	"POST /api/admin/pages/:page_id/webhook-token":                                         ssoPageRoute,
 	"DELETE /api/admin/pages/:page_id/webhook-token":                                       ssoPageRoute,
+	"GET /api/admin/pages/:page_id/custom-domain":                                          ssoPageRoute,
 	"PUT /api/admin/pages/:page_id/custom-domain":                                          ssoPageRoute,
 	"DELETE /api/admin/pages/:page_id/custom-domain":                                       ssoPageRoute,
 	"POST /api/admin/pages/:page_id/custom-domain/verify":                                  ssoPageRoute,

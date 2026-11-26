@@ -725,6 +725,92 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('#webhook-token-display').exists()).toBe(false)
   })
 
+  // The CNAME target comes from the backend before anything is saved (it used to be guessed as
+  // edge.<app domain> or edge.example.com), the TXT value reappears when the form is reopened,
+  // apex domains get a hint, and a successful check says whether the domain already points to the target.
+  describe('custom domain DNS hints', () => {
+    const domainRouter = ({ info, verify } = {}) => {
+      const base = makeFetchRouter()
+      return vi.fn(async (url, options = {}) => {
+        const method = options.method || 'GET'
+        if (method === 'GET' && /\/custom-domain$/.test(url)) {
+          return info ? jsonResponse(info) : jsonResponse({ error: 'kaputt' }, 500)
+        }
+        if (method === 'POST' && /\/custom-domain\/verify$/.test(url)) return jsonResponse(verify)
+        return base(url, options)
+      })
+    }
+
+    it('shows the real CNAME target and the open TXT value when the form opens', async () => {
+      const fetchImpl = domainRouter({ info: { cname_target: 'edge.statushafen.test', custom_domain: 'status.beta.example', custom_domain_status: 'pending', apex_domain: false, txt_record_value: 'statushafen-verify=open' } })
+      const { wrapper } = await mountPages({ fetchImpl })
+      await rowAction(wrapper, 1, 'Bearbeiten')
+      await flushPromises()
+      expect(fetchImpl).toHaveBeenCalledWith('/api/admin/pages/2/custom-domain', expect.anything())
+      const desc = wrapper.find('[data-test="custom-domain-desc"]')
+      expect(desc.text()).toContain('edge.statushafen.test')
+      expect(wrapper.text()).toContain('statushafen-verify=open')
+      expect(wrapper.find('[data-test="apex-domain-hint"]').exists()).toBe(false)
+    })
+
+    it('ignores a late answer for a page that is no longer open', async () => {
+      const base = makeFetchRouter()
+      let answerBeta
+      const fetchImpl = vi.fn(async (url, options = {}) => {
+        const method = options.method || 'GET'
+        if (method === 'GET' && /\/pages\/2\/custom-domain$/.test(url)) {
+          return new Promise(resolve => { answerBeta = () => resolve(jsonResponse({ cname_target: 'edge.beta.test', custom_domain_status: 'pending', txt_record_value: 'beta-txt' })) })
+        }
+        if (method === 'GET' && /\/pages\/1\/custom-domain$/.test(url)) {
+          return jsonResponse({ cname_target: 'edge.acme.test', custom_domain_status: '' })
+        }
+        return base(url, options)
+      })
+      const { wrapper } = await mountPages({ fetchImpl })
+      await rowAction(wrapper, 1, 'Bearbeiten')
+      await rowAction(wrapper, 0, 'Bearbeiten')
+      await flushPromises()
+      answerBeta()
+      await flushPromises()
+      expect(wrapper.find('[data-test="custom-domain-desc"]').text()).toContain('edge.acme.test')
+      expect(wrapper.text()).not.toContain('beta-txt')
+    })
+
+    it('does not guess a target when it cannot be loaded', async () => {
+      const { wrapper } = await mountPages({ fetchImpl: domainRouter() })
+      await rowAction(wrapper, 1, 'Bearbeiten')
+      await flushPromises()
+      const desc = wrapper.find('[data-test="custom-domain-desc"]')
+      expect(desc.text()).not.toContain('edge.')
+      expect(desc.text()).toContain('…')
+    })
+
+    it('warns about apex domains', async () => {
+      const fetchImpl = domainRouter({ info: { cname_target: 'edge.statushafen.test', custom_domain: 'beta.example', custom_domain_status: 'pending', apex_domain: true } })
+      const { wrapper } = await mountPages({ fetchImpl })
+      await rowAction(wrapper, 1, 'Bearbeiten')
+      await flushPromises()
+      expect(wrapper.find('[data-test="apex-domain-hint"]').text()).toContain('CNAME')
+    })
+
+    it('says after a successful check whether the domain points to the target yet', async () => {
+      const info = { cname_target: 'edge.statushafen.test', custom_domain: 'status.beta.example', custom_domain_status: 'pending', apex_domain: false }
+      for (const [points, shown] of [[false, true], [true, false]]) {
+        const fetchImpl = domainRouter({ info, verify: { custom_domain_status: 'verified', verified: true, points_to_target: points, apex_domain: false, cname_target: 'edge.statushafen.test', message: 'ok', verified_at: '2026-11-26T10:00:00Z' } })
+        const { wrapper } = await mountPages({ fetchImpl })
+        await rowAction(wrapper, 1, 'Bearbeiten')
+        await flushPromises()
+        await wrapper.findAll('button').find(b => b.text().includes('DNS verifizieren')).trigger('click')
+        await flushPromises()
+        const warning = wrapper.find('[data-test="domain-not-pointing"]')
+        expect(warning.exists(), `points_to_target=${points}`).toBe(shown)
+        if (shown) expect(warning.text()).toContain('edge.statushafen.test')
+        wrapper.unmount()
+        activeWrapper = null
+      }
+    })
+  })
+
   it('speichert und verifiziert eine Custom Domain', async () => {
     const fetchMock = vi.fn(async (url, options = {}) => {
       const method = options.method || 'GET'

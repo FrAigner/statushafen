@@ -419,6 +419,7 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	// Custom-domain management: own endpoints instead of part of the
 	// generic statusPageWritableFields bind, see the comment there. Setting,
 	// Removing and verifying change the page (pages:update).
+	guarded(authGroup, http.MethodGet, "/admin/pages/:page_id/custom-domain", need("pages", permissions.Read), h.GetCustomDomainHandler)
 	guarded(authGroup, http.MethodPut, "/admin/pages/:page_id/custom-domain", need("pages", permissions.Update), h.SetCustomDomainHandler)
 	guarded(authGroup, http.MethodDelete, "/admin/pages/:page_id/custom-domain", need("pages", permissions.Update), h.DeleteCustomDomainHandler)
 	guarded(authGroup, http.MethodPost, "/admin/pages/:page_id/custom-domain/verify", need("pages", permissions.Update), handlers.CustomDomainVerifyLimit(), h.VerifyCustomDomainHandler)
