@@ -8,6 +8,7 @@ import {
   SECTION_IDS,
   DOC_SOURCES,
   slugify,
+  stripTags,
   byLocaleAndSlug,
   renderMarkdown,
   extractTitle,
@@ -399,6 +400,14 @@ describe('Hilfsfunktionen', () => {
       './de/Gross_Schreibung.md': 'x',
       './readme.md': 'y',
     })).toEqual({ de: { faq: 'de-faq', vorfaelle: 'de-v' }, en: { faq: 'en-faq' } })
+  })
+
+  it('stripTags entfernt Tags bis kein Tag mehr übrig ist, lässt Text und offene Klammern stehen', () => {
+    expect(stripTags('a <b>fett</b> c')).toBe('a fett c')
+    expect(stripTags('<<b>x')).toBe('x')
+    expect(stripTags('<scr<b>ipt>x')).toBe('ipt>x')
+    expect(stripTags('x < y')).toBe('x < y')
+    expect(stripTags('')).toBe('')
   })
 
   it('slugify schreibt Umlaute aus und entfernt Sonderzeichen', () => {

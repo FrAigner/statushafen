@@ -20,7 +20,14 @@ export function expectNoInlineStyles(wrapper: BaseWrapper<Node>, testFileUrl: st
   expect(own.map(el => el.html().slice(0, 120))).toEqual([])
 
   const source = readFileSync(resolve(dirname(fileURLToPath(testFileUrl)), viewFile), 'utf-8')
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '')
+  // Template comments are removed until none is left, so that removing one cannot uncover another.
+  let withoutHtmlComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  let previous: string
+  do {
+    previous = withoutHtmlComments
+    withoutHtmlComments = withoutHtmlComments.replace(/<!--[\s\S]*?-->/g, '')
+  } while (withoutHtmlComments !== previous)
+  const code = withoutHtmlComments
     .replace(/(^|\s)\/\/.*$/gm, '$1') // JS line comments (they contain reference numbers like #496)
   expect(code).not.toMatch(/\sstyle="/)
   expect(code).not.toMatch(/:style=/)

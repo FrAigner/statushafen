@@ -72,13 +72,24 @@ export const DOC_SOURCES = byLocaleAndSlug(
   import.meta.glob<string>('./*/*.md', { query: '?raw', import: 'default', eager: true })
 )
 
+// Removes HTML tags. Repeats until nothing changes, so that removing one tag can never leave another
+// one behind; for this pattern a single pass is already final, so the result is the same either way.
+export function stripTags(html: string): string {
+  let text = html
+  let previous: string
+  do {
+    previous = text
+    text = text.replace(/<[^>]*>/g, '')
+  } while (text !== previous)
+  return text
+}
+
 // Heading IDs for anchors (/docs/vorfaelle#status-ablauf). Umlauts are
 // spelled out, so that the anchors are readable and usable in URLs without escaping.
 export function slugify(text: unknown): string {
-  return String(text)
+  return stripTags(String(text)
     .toLowerCase()
-    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
-    .replace(/<[^>]*>/g, '')
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss'))
     .replace(/&[a-z]+;/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -96,7 +107,7 @@ export function renderMarkdown(markdown: string | null | undefined): { html: str
     renderer: {
       heading({ tokens, depth }) {
         const html = this.parser.parseInline(tokens)
-        const text = html.replace(/<[^>]*>/g, '')
+        const text = stripTags(html)
         const base = slugify(text) || 'abschnitt'
         const n = used.get(base) || 0
         used.set(base, n + 1)
