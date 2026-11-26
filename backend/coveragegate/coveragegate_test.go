@@ -415,3 +415,46 @@ func TestCompareBaseline_FrontendToleranz(t *testing.T) {
 			CompareBaseline(base, Baseline{GoStatements: 69.99, FrontendLines: 93.5, FrontendBranches: 83.75}, 1))
 	})
 }
+
+// Translating or rewording Go comments is no untested code: a changed line whose
+// code (comments stripped) is unchanged, or which holds only a comment, does not count.
+// Real code changes, other file types and lines the Go scanner cannot read still count.
+func TestParseDiff_GoCommentOnlyChangesDoNotCount(t *testing.T) {
+	d := "+++ b/backend/main.go\n" +
+		// Same-size replacement: comment line, trailing comment, code change.
+		"@@ -10,3 +10,3 @@ func main() {\n" +
+		"-\t// Startet den Worker.\n" +
+		"-\tdefer start()() // siehe Doku\n" +
+		"-\tx := 1\n" +
+		"+\t// Starts the worker.\n" +
+		"+\tdefer start()() // see the doc\n" +
+		"+\tx := 2\n" +
+		// Different sizes: an added comment-only line and an added code line.
+		"@@ -20,0 +21,3 @@ func main() {\n" +
+		"+\t// new comment\n" +
+		"+\n" +
+		"+\ty := x\n" +
+		// A line the scanner cannot read counts (conservative).
+		"@@ -30 +33 @@ func main() {\n" +
+		"-\ts := \"alt\n" +
+		"+\ts := \"neu\n" +
+		"+++ b/frontend/src/a.ts\n" +
+		"@@ -1 +1 @@\n" +
+		"-// alt\n" +
+		"+// new\n"
+	changed, err := ParseDiff(strings.NewReader(d))
+	require.NoError(t, err)
+	require.Equal(t, ChangedLines{
+		"backend/main.go":   {12: true, 23: true, 33: true},
+		"frontend/src/a.ts": {1: true},
+	}, changed)
+}
+
+func TestParseDiff_GoContextLinesKeepCounting(t *testing.T) {
+	// With context lines (not used by CI, which diffs with -U0) the whole new range
+	// still counts, except lines that hold only a comment.
+	d := "+++ b/x.go\n@@ -1,3 +1,3 @@\n a := 1\n-// alt\n+// neu\n b := 2\n"
+	changed, err := ParseDiff(strings.NewReader(d))
+	require.NoError(t, err)
+	require.Equal(t, ChangedLines{"x.go": {1: true, 3: true}}, changed)
+}
