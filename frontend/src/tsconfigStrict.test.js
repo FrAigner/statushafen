@@ -151,7 +151,7 @@ describe('TypeScript migration (phase 2)', () => {
     const vue = files.filter((f) => f.endsWith('.vue'))
     expect(vue.length).toBeGreaterThan(0)
     const withoutTs = vue.filter((f) => {
-      const scripts = readFileSync(resolve(frontend, f), 'utf-8').match(/<script\b[^>]*>/g) ?? []
+      const scripts = readFileSync(resolve(frontend, f), 'utf-8').match(/<script\b[^>]*>/gi) ?? []
       return scripts.length === 0 || scripts.some((tag) => !/\blang="ts"/.test(tag))
     })
     expect(withoutTs).toEqual([])
