@@ -6,9 +6,9 @@ import i18n, {
 import { applyGlobalOverrides } from './overrides'
 import { useLanguage } from '../composables/useLanguage'
 
-// Teil 1: Eine neue Datei locales/<code>.json wird ohne Codeänderung als
-// Oberflächensprache erkannt und beim Wechsel nachgeladen. Die Fixture-Sprache "zz"
-// ersetzt eine echte Datei (echte weitere Sprachen kommen mit).
+// Part 1: a new file locales/<code>.json is recognized as a UI language
+// without a code change and loaded lazily on switching. The fixture language "zz"
+// stands in for a real file (real further languages come along).
 const ZZ = { common: { save: 'ZZ-Speichern' }, nav: { items: { home: 'ZZ-Start' } } }
 
 function mountLanguage() {
@@ -60,13 +60,13 @@ describe('Nachladbare Oberflächensprachen', () => {
     expect(i18n.global.locale.value).toBe('zz')
     expect(i18n.global.t('common.save')).toBe('ZZ-Speichern')
     expect(i18n.global.t('nav.items.home')).toBe('ZZ-Start')
-    // fehlende Schlüssel fallen weiter auf die Standardtexte zurück
+    // missing keys still fall back to the default texts
     expect(i18n.global.t('common.cancel')).toBe(i18n.global.t('common.cancel', {}, { locale: 'de' }))
   })
 
   it('wendet globale Overrides auf den nachgeladenen Texten an', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, json: async () => ({ 'common.save': 'Eigener Text' }) })
-    // frische Sprache, deren Texte noch nicht geladen sind (zz ist durch frühere Tests geladen)
+    // a fresh language whose texts are not loaded yet (zz is loaded by earlier tests)
     registerLocale('zt', async () => ({ default: ZZ }))
     expect(isLocaleLoaded('zt')).toBe(false)
     await applyGlobalOverrides('zt')

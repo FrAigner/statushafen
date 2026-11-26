@@ -3,16 +3,16 @@ import de from './locales/de.json'
 import en from './locales/en.json'
 import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from '../test-support/templateScan'
 
-// Im Screenshot stand „Name * *“. Ursache: Das i18n-Label trug
-// den Pflichtstern schon im Text („Name *“), und sit-onyx hängt an
-// `required`-Felder seinen eigenen Marker (.onyx-required-marker::after,
-// content "*") an. Ergebnis: zwei Sterne. Betroffen waren 23 Labels in
-// sieben Views (Vorfälle, Wartung, Ankündigungen, Vorlagen, Abonnenten, …).
+// The screenshot showed "Name * *". Cause: the i18n label already carried
+// the required asterisk in the text ("Name *"), and sit-onyx appends its own
+// marker to `required` fields (.onyx-required-marker::after,
+// content "*"). Result: two asterisks. 23 labels in seven views were
+// affected (incidents, maintenance, notices, templates, subscribers, …).
 //
-// Regel ab jetzt: Den Stern setzt ausschließlich die Darstellung, nie der
-// Text. Für sit-onyx-Felder macht das `required`. Native Felder mit eigenem
-// <label for> bekommen am Label die Klasse `onyx-required-marker`, damit der
-// Stern gleich aussieht und aus derselben Quelle kommt.
+// Rule from now on: only the presentation sets the asterisk, never the
+// text. For sit-onyx fields `required` does that. Native fields with their own
+// <label for> get the class `onyx-required-marker` on the label, so that the
+// asterisk looks the same and comes from the same source.
 
 const LOCALES = { de, en }
 
@@ -20,7 +20,7 @@ function requiredOnyxLabels() {
   const found = []
   for (const [file, src] of Object.entries(vueSources)) {
     for (const tag of startTags(templatePart(src))) {
-      // FormField (Stufe 3) setzt den Stern ebenfalls selbst.
+      // FormField (stage 3) also sets the asterisk itself.
       if (!(tag.name.startsWith('Onyx') || tag.name === 'FormField') || !('required' in tag.attrs)) continue
       const key = i18nKeyOf(tag.attrs[':label'])
       if (key) found.push({ file, key })
@@ -29,7 +29,7 @@ function requiredOnyxLabels() {
   return found
 }
 
-// Native Paare <label for="x">{{ t('k') }}</label> + <input id="x" required>.
+// Native pairs <label for="x">{{ t('k') }}</label> + <input id="x" required>.
 function requiredNativeLabels() {
   const found = []
   for (const [file, src] of Object.entries(vueSources)) {
@@ -63,19 +63,19 @@ describe('Pflichtstern', () => {
     expect(offenders).toEqual([])
   })
 
-  // Die Wartungs-Zeitfelder trugen den Stern bisher im Text. Seit Stufe 4b
-  // setzt FormField ihn; sie müssen als Pflichtfelder erkannt
-  // bleiben, sonst geht die Kennzeichnung verloren. Native Pflichtfelder ohne
-  // jeden Marker.
+  // The maintenance time fields used to carry the asterisk in the text. Since stage 4b
+  // FormField sets it; they must still be recognized as required
+  // fields, otherwise the marking gets lost. Native required fields without
+  // any marker.
   it('die Wartungs-Zeitfelder sind als required-FormField gekennzeichnet', () => {
     const keys = requiredOnyxLabels().map(f => f.key)
     expect(keys).toContain('maintenance.fieldStart')
     expect(keys).toContain('maintenance.fieldEnd')
   })
 
-  // Rest: Login, Bestellung, Passwort setzen und Konto löschen
-  // nutzen native Felder. Jedes native Pflichtfeld mit <label for> trägt die
-  // Marker-Klasse (Stern aus der Darstellung) und aria-required am Feld.
+  // Remainder: login, ordering, setting a password and deleting the account
+  // use native fields. Every native required field with <label for> carries the
+  // marker class (asterisk from the presentation) and aria-required on the field.
   it('native Pflichtfelder haben Marker-Klasse am Label und aria-required am Feld', () => {
     const offenders = []
     for (const [file, src] of Object.entries(vueSources)) {

@@ -1,48 +1,48 @@
-// Formatierte Texte (eingeschränktes Markdown) für Nachrichten und
-// Beschreibungen. Gespeichert wird der Markdown-String; hier wird er für die
-// Anzeige in bereinigtes HTML gewandelt (renderRichText) bzw. in Klartext für
-// Listen und Suche (markdownToPlainText).
+// Formatted texts (restricted Markdown) for messages and descriptions.
+// The Markdown string is what gets stored; here it is turned into sanitized
+// HTML for display (renderRichText) or into plain text for lists and search
+// (markdownToPlainText).
 //
-// Schutz in zwei Schichten, jede für sich ausreichend:
-//  1. marked bekommt Tokenizer/Renderer, die Roh-HTML, Bilder, Überschriften,
-//     Tabellen und Trennlinien NIE als Markup ausgeben, sondern als sichtbaren,
-//     maskierten Text (Altdaten mit `#` oder `|` am Zeilenanfang bleiben
-//     lesbar). Links gibt der Renderer nur für https: aus.
-//  2. DOMPurify mit FESTER, enger Whitelist (kein USE_PROFILES wie in
-//     docs/index.js, das für Repo-eigene Doku bewusst weit ist).
-// marked ist exakt gepinnt (package.json "18.1.1", docs.test.js prüft das).
+// Protection in two layers, each sufficient on its own:
+//  1. marked gets tokenizers/renderers that NEVER output raw HTML, images,
+//     headings, tables and horizontal rules as markup, but as visible, escaped
+//     text (legacy data with `#` or `|` at the start of a line stays
+//     readable). The renderer only outputs links for https:.
+//  2. DOMPurify with a FIXED, tight allowlist (no USE_PROFILES as in
+//     docs/index.ts, which is deliberately broad for the repo's own docs).
+// marked is pinned exactly (package.json "18.1.1", docs.test.js checks that).
 import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 export const RICH_TEXT_MAX_LENGTH = 5000
 
-// marked braucht bei pathologischen Eingaben (`*a_` wiederholt,
-// `*`..`a`..`*`) quadratische Zeit (5.000 Zeichen rund 0,4 s, 15.000 Zeichen
-// bis 9 s; Altdaten dürfen so lang sein). Darüber, bzw. wenn ein einzelner
-// Absatz (Block zwischen Leerzeilen) zu lang ist, steht der Text unverändert
-// als maskierter Klartext da (nichts wird abgeschnitten).
-// Dieselben Grenzen gelten im Backend (richtext.MaxRenderLen und
-// MaxBlockLen, Mail): Seite und Mail formatieren denselben Text gleich.
-// Beide liegen nicht unter den erlaubten 5.000 Zeichen, erlaubte Texte (auch
-// eine lange Liste ohne Leerzeile) werden also immer formatiert. Die Grenzen
-// zählen Zeichen (Unicode-Codepoints) wie das Backend (Runen). Der gemeinsame
-// Test liest backend/richtext/testdata/parity.json.
+// On pathological input (`*a_` repeated, `*`..`a`..`*`) marked needs
+// quadratic time (5,000 characters about 0.4 s, 15,000 characters up to
+// 9 s; legacy data may be that long). Above the limit, or when a single
+// paragraph (block between blank lines) is too long, the text is shown
+// unchanged as escaped plain text (nothing is cut off).
+// The same limits apply in the backend (richtext.MaxRenderLen and
+// MaxBlockLen, mail): page and mail format the same text the same way.
+// Neither is below the allowed 5,000 characters, so allowed texts (even
+// a long list without a blank line) are always formatted. The limits
+// count characters (Unicode code points) like the backend (runes). The shared
+// test reads backend/richtext/testdata/parity.json.
 export const RICH_TEXT_MAX_RENDER_LENGTH = 8000
 export const RICH_TEXT_MAX_BLOCK_LENGTH = RICH_TEXT_MAX_LENGTH
-// Zwischenspeicher je Text (Suche rendert sonst bei jedem Tastendruck alle
-// Vorfälle neu): LRU mit Obergrenze. Schlüssel sind die Rohtexte; Altdaten
-// können mehrere MB lang sein, deshalb werden nur Texte bis
-// RICH_TEXT_CACHE_MAX_KEY_LENGTH Zeichen gemerkt.
-// Render-Budget: Jeder Text für sich ist begrenzt, doch viele teure Texte auf
-// einer Seite (bis zu 200 offene Vorfälle) summieren sich zu Sekunden
-// Blockierzeit. Neues Formatieren kostet richTextRenderCost(Text): Zeichen plus
-// ein Anteil aus Länge mal Zahl der Formatierzeichen (die quadratische
-// Laufzeit von marked entsteht aus vielen offenen `*`, `_`, `>`, `[`); das
-// Budget füllt sich mit fester Rate wieder auf. Ist es leer, erscheint der Text unformatiert als maskierter
-// Klartext (vollständig, nichts abgeschnitten) und wird nicht gemerkt, sodass
-// er später formatiert wird. Normale Vorfälle (einige hundert Zeichen) kosten
-// wenig: mehrere hundert passen ins Budget, aber nur wenige Texte mit 5.000
-// pathologischen Zeichen (je ca. 0,3 s).
+// Cache per text (otherwise the search re-renders all incidents on every
+// keystroke): LRU with an upper bound. Keys are the raw texts; legacy data
+// can be several MB long, so only texts up to
+// RICH_TEXT_CACHE_MAX_KEY_LENGTH characters are remembered.
+// Render budget: each text on its own is bounded, but many expensive texts on
+// one page (up to 200 open incidents) add up to seconds of blocking time.
+// Formatting a new text costs richTextRenderCost(text): characters plus
+// a share of length times the number of formatting characters (marked's
+// quadratic run time comes from many open `*`, `_`, `>`, `[`); the
+// budget refills at a fixed rate. When it is empty, the text appears unformatted as escaped
+// plain text (complete, nothing cut off) and is not remembered, so that
+// it gets formatted later. Normal incidents (a few hundred characters) cost
+// little: several hundred fit into the budget, but only a few texts with 5,000
+// pathological characters (about 0.3 s each).
 export const RICH_TEXT_RENDER_BUDGET = 60000
 export const RICH_TEXT_RENDER_REFILL_PER_SECOND = 6000
 export const RICH_TEXT_CACHE_SIZE = 500
@@ -50,21 +50,21 @@ export const RICH_TEXT_CACHE_MAX_KEY_LENGTH = 20000
 
 const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'code', 'blockquote']
 const ALLOWED_ATTR = ['href', 'start']
-// Nur https mit Host; Zugangsdaten in der URL (https://nutzer@host) lehnt
-// isHttpsUrl schon vorher ab, hier die zweite Schicht für den Sanitizer.
+// Only https with a host; credentials in the URL (https://nutzer@host) are
+// already rejected by isHttpsUrl, this is the second layer for the sanitizer.
 const ALLOWED_URI_REGEXP = /^https:\/\/[^\s/@]+(?:[/?#]|$)/i
 
-const escapeHtml = (s) => String(s)
+const escapeHtml = (s: unknown): string => String(s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
-// Unterstützte Syntax wird ausgewertet, alles andere steht als Text da.
-const literal = (raw) => `<p>${escapeHtml(String(raw).trim()).replace(/\n/g, '<br>')}</p>`
+// Supported syntax is evaluated, everything else is shown as text.
+const literal = (raw: unknown): string => `<p>${escapeHtml(String(raw).trim()).replace(/\n/g, '<br>')}</p>`
 
-// Klartext als HTML (nur maskiert, keine Formatierung) für RichText mit `plain`.
-export const plainTextToHtml = (text) => escapeHtml(text ?? '')
+// Plain text as HTML (only escaped, no formatting) for RichText with `plain`.
+export const plainTextToHtml = (text: unknown): string => escapeHtml(text ?? '')
 
-export function isHttpsUrl(href) {
+export function isHttpsUrl(href: string): boolean {
   try {
     const u = new URL(href)
     return u.protocol === 'https:' && u.hostname !== '' && u.username === '' && u.password === ''
@@ -78,11 +78,11 @@ const marked = new Marked({
   breaks: true,
   async: false,
   tokenizer: {
-    // Diese Blöcke gehören nicht zur Teilmenge. undefined schaltet den
-    // Tokenizer ab (false hieße: Standard); die Zeilen bleiben dann normaler
-    // Text, Altdaten mit `#` oder `|` am Zeilenanfang behalten ihr Aussehen und
-    // ihre Zeilenumbrüche. Eingerückter Code (Leerzeichen am Zeilenanfang) ist
-    // für Altdaten überraschend.
+    // These blocks are not part of the subset. undefined switches the
+    // tokenizer off (false would mean: default); the lines then stay normal
+    // text, and legacy data with `#` or `|` at the start of a line keeps its look and
+    // its line breaks. Indented code (spaces at the start of a line) is
+    // surprising for legacy data.
     code() { return undefined },
     heading() { return undefined },
     lheading() { return undefined },
@@ -98,19 +98,19 @@ const marked = new Marked({
     link({ href, text, raw, tokens }) {
       const inner = this.parser.parseInline(tokens)
       if (isHttpsUrl(href)) return `<a href="${escapeHtml(href)}">${inner}</a>`
-      // Kein https: nie ein Link. Ausgeschriebene Links zeigen "Text (Ziel)",
-      // automatisch erkannte Adressen (www., mailto) nur den Text.
+      // No https: never a link. Written-out links show "text (target)",
+      // automatically detected addresses (www., mailto) only the text.
       return raw.startsWith('[') ? `${inner} (${escapeHtml(href)})` : escapeHtml(text)
     },
   },
 })
 
 const purify = DOMPurify(window)
-// Eigene Instanz: Der Hook gilt nur hier und nicht für die Doku-Seite oder die
-// Mail-Vorschau, die DOMPurify.sanitize mit eigener Konfiguration nutzen.
+// Own instance: the hook applies only here and not to the docs page or the
+// mail preview, which use DOMPurify.sanitize with their own configuration.
 purify.addHook('afterSanitizeAttributes', (node) => {
-  // `start` nur auf <ol> und nur als Zahl (Liste beginnt z. B. bei 3).
-  if (node.hasAttribute('start') && !(node.tagName === 'OL' && /^\d{1,9}$/.test(node.getAttribute('start')))) {
+  // `start` only on <ol> and only as a number (the list starts e.g. at 3).
+  if (node.hasAttribute('start') && !(node.tagName === 'OL' && /^\d{1,9}$/.test(node.getAttribute('start') as string))) {
     node.removeAttribute('start')
   }
   if (node.tagName === 'A') {
@@ -123,33 +123,33 @@ const SANITIZE_CONFIG = {
   ALLOWED_TAGS,
   ALLOWED_ATTR,
   ALLOWED_URI_REGEXP,
-  // `start` ist kein URI: ohne diese Angabe prüft DOMPurify den Wert gegen ALLOWED_URI_REGEXP.
+  // `start` is not a URI: without this, DOMPurify checks the value against ALLOWED_URI_REGEXP.
   ADD_URI_SAFE_ATTR: ['start'],
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
 }
 
-// Mehr als `max` Zeichen (Codepoints)? Bricht nach max + 1 Zeichen ab.
-const exceeds = (str, max) => {
+// More than `max` characters (code points)? Stops after max + 1 characters.
+const exceeds = (str: string, max: number): boolean => {
   if (str.length <= max) return false
   const it = str[Symbol.iterator]()
   for (let n = 0; n <= max; n++) if (it.next().done) return false
   return true
 }
 
-const tooCostly = (src) => {
+const tooCostly = (src: string): boolean => {
   const text = src.replace(/\r\n?/g, '\n')
   return exceeds(text, RICH_TEXT_MAX_RENDER_LENGTH)
     || text.split(/\n[^\S\n]*\n/).some(block => exceeds(block, RICH_TEXT_MAX_BLOCK_LENGTH))
 }
 
 const FORMAT_CHARS = /[*_`>~[\]]/g
-export const richTextRenderCost = (text) => text.length + ((text.match(FORMAT_CHARS)?.length ?? 0) * text.length) / 1500
+export const richTextRenderCost = (text: string): number => text.length + ((text.match(FORMAT_CHARS)?.length ?? 0) * text.length) / 1500
 
 let renderBudget = RICH_TEXT_RENDER_BUDGET
 let renderBudgetAt = performance.now()
 
-// Füllt das Budget nach der verstrichenen Zeit auf (höchstens bis zum Maximum).
+// Refills the budget according to the elapsed time (at most up to the maximum).
 const refillRenderBudget = () => {
   const now = performance.now()
   const elapsed = Math.max(0, now - renderBudgetAt)
@@ -157,13 +157,13 @@ const refillRenderBudget = () => {
   renderBudget = Math.min(RICH_TEXT_RENDER_BUDGET, renderBudget + (elapsed / 1000) * RICH_TEXT_RENDER_REFILL_PER_SECOND)
 }
 
-export function resetRichTextBudget() {
+export function resetRichTextBudget(): void {
   renderBudget = RICH_TEXT_RENDER_BUDGET
   renderBudgetAt = performance.now()
 }
 
-// Verbraucht das Budget für einen neuen Text; false, wenn es nicht reicht.
-const spendRenderBudget = (text) => {
+// Spends the budget for a new text; false if it is not enough.
+const spendRenderBudget = (text: string): boolean => {
   refillRenderBudget()
   const cost = richTextRenderCost(text)
   if (cost > renderBudget) return false
@@ -171,63 +171,66 @@ const spendRenderBudget = (text) => {
   return true
 }
 
-export function memoize(fn) {
-  const cache = new Map()
-  const memoized = (key) => {
+export type Memoized<R> = ((key: string) => R) & { has: (key: string) => boolean }
+
+export function memoize<R>(fn: (key: string) => R): Memoized<R> {
+  const cache = new Map<string, R>()
+  const memoized = (key: string): R => {
     if (key.length > RICH_TEXT_CACHE_MAX_KEY_LENGTH) return fn(key)
     if (cache.has(key)) {
-      // LRU: Treffer wandert ans Ende, verdrängt wird der am längsten ungenutzte.
-      const hit = cache.get(key)
+      // LRU: a hit moves to the end; the least recently used one is evicted.
+      const hit = cache.get(key) as R
       cache.delete(key)
       cache.set(key, hit)
       return hit
     }
     const value = fn(key)
-    if (cache.size >= RICH_TEXT_CACHE_SIZE) cache.delete(cache.keys().next().value)
+    if (cache.size >= RICH_TEXT_CACHE_SIZE) cache.delete(cache.keys().next().value as string)
     cache.set(key, value)
     return value
   }
-  memoized.has = (key) => cache.has(key)
+  memoized.has = (key: string) => cache.has(key)
   return memoized
 }
 
-// Rendert Markdown zu bereinigtem HTML. Nur für v-html in RichText.vue.
-// Das Ergebnis enthält keine Zeilenumbrüche (Absätze und <br> trennen schon),
-// damit white-space: pre-wrap im umgebenden Layout keine Leerzeilen erzeugt.
-export const renderRichText = (markdown) => {
+// Renders Markdown to sanitized HTML. Only for v-html in RichText.vue.
+// The result contains no line breaks (paragraphs and <br> separate already),
+// so that white-space: pre-wrap in the surrounding layout creates no blank lines.
+export const renderRichText = (markdown: unknown): string => {
   const src = String(markdown ?? '')
-  // Gemerkte Texte kosten nichts; neue brauchen Budget, sonst Klartext (nicht gemerkt).
+  // Remembered texts cost nothing; new ones need budget, otherwise plain text (not remembered).
   if (src.trim() === '' || renderCached.has(src)) return renderCached(src)
   return spendRenderBudget(src) ? renderCached(src) : literal(src)
 }
 
-const renderCached = memoize((src) => {
+const renderCached = memoize((src: string): string => {
   if (src.trim() === '') return ''
-  // Fail-closed: Wo DOMPurify kein DOM findet (isSupported false), liefert
-  // sanitize() seine Eingabe unverändert zurück; dann lieber Klartext.
+  // Fail-closed: where DOMPurify finds no DOM (isSupported false), sanitize()
+  // returns its input unchanged; plain text is preferable then.
   if (!purify.isSupported || tooCostly(src)) return literal(src)
-  // Tief verschachtelte Zitate (`>>>>...`) lassen marked mit RangeError (Aufrufstapel)
-  // scheitern; ein Fehler im Render würde sonst die ganze öffentliche Seite leeren.
-  // Dann lieber der Text als maskierter Klartext.
+  // Deeply nested quotes (`>>>>...`) make marked fail with a RangeError (call stack);
+  // an error in rendering would otherwise empty the whole public page.
+  // The text as escaped plain text is preferable then.
   try {
-    return purify.sanitize(marked.parse(src), SANITIZE_CONFIG).replace(/\n/g, '')
+    // async: false above: parse returns a string.
+    return purify.sanitize(marked.parse(src) as string, SANITIZE_CONFIG).replace(/\n/g, '')
   } catch {
     return literal(src)
   }
 })
 
-// Klartext für Listen und Suche: ohne Markdown-Zeichen, Listen als "- " bzw.
-// "1. ", Links als "Text (Adresse)" (wie das Backend, richtext.ToPlainText).
-export const markdownToPlainText = (markdown) => plainCached(String(markdown ?? ''))
+// Plain text for lists and search: without Markdown characters, lists as "- " or
+// "1. ", links as "text (address)" (like the backend, richtext.ToPlainText).
+export const markdownToPlainText = (markdown: unknown): string => plainCached(String(markdown ?? ''))
 
-const plainCached = memoize((src) => {
+const plainCached = memoize((src: string): string => {
   const html = renderRichText(src)
   if (html === '') return ''
   const body = new DOMParser().parseFromString(html, 'text/html').body
   return blocksToText(body).trim()
 })
 
-function inlineToText(node) {
+function inlineToText(node: Node): string {
   let out = ''
   for (const child of node.childNodes) {
     if (child.nodeType === 3) {
@@ -236,7 +239,7 @@ function inlineToText(node) {
       out += '\n'
     } else if (child.nodeName === 'A') {
       const text = inlineToText(child)
-      const href = child.getAttribute('href')
+      const href = (child as Element).getAttribute('href')
       out += text === href ? href : `${text} (${href})`
     } else {
       out += (child.nodeName === 'P' && out !== '' ? '\n' : '') + inlineToText(child)
@@ -245,16 +248,17 @@ function inlineToText(node) {
   return out
 }
 
-function blocksToText(root) {
-  const parts = []
-  // childNodes statt children: Mit einem unvollständigen DOM (happy-dom in Tests)
-  // fehlen die <p>, dann stehen Textknoten direkt im body.
+function blocksToText(root: Node): string {
+  const parts: string[] = []
+  // childNodes instead of children: with an incomplete DOM (happy-dom in tests)
+  // the <p> are missing, and text nodes then sit directly in the body.
   for (const el of root.childNodes) {
     if (el.nodeType === 3) {
-      parts.push(el.textContent.trim())
+      parts.push((el.textContent as string).trim())
     } else if (el.nodeName === 'UL' || el.nodeName === 'OL') {
-      const first = Number(el.getAttribute('start') ?? 1) // der Sanitizer lässt nur Ziffern durch
-      const lines = [...el.children].map((li, i) =>
+      const list = el as Element
+      const first = Number(list.getAttribute('start') ?? 1) // the sanitizer only lets digits through
+      const lines = [...list.children].map((li, i) =>
         `${el.nodeName === 'OL' ? `${first + i}. ` : '- '}${inlineToText(li).trim().replace(/\n/g, '\n  ')}`)
       parts.push(lines.join('\n'))
     } else if (el.nodeName === 'BLOCKQUOTE') {

@@ -1,37 +1,40 @@
-// Kontrast nach WCAG 2.1 (relative Leuchtdichte, 1.4.3) für Farben,
-// die nicht aus unseren Design-Tokens kommen, sondern vom Admin gesetzt werden
-// (Branding je Statusseite: PrimaryColor, SecondaryColor). Die Tokens selbst
-// sind passend gewählt; eine frei gewählte Markenfarbe kann aber zu hell oder
-// zu dunkel sein (der Standard #4c6ef5 trägt weiße Schrift nur mit 4,3:1).
-// ensureContrast verschiebt eine solche Farbe in kleinen Schritten zu Schwarz
-// bzw. Weiß, bis sie das Verhältnis erreicht; passende Farben bleiben exakt.
+// Contrast per WCAG 2.1 (relative luminance, 1.4.3) for colours that do
+// not come from our design tokens but are set by the admin (branding per
+// status page: PrimaryColor, SecondaryColor). The tokens themselves are chosen
+// to fit; a freely chosen brand colour can however be too light or too dark
+// (the default #4c6ef5 carries white text only at 4.3:1).
+// ensureContrast shifts such a colour in small steps towards black or white
+// until it reaches the ratio; fitting colours stay exactly as they are.
+
+/** An sRGB colour as [r, g, b] with channels 0..255 (fractional while mixing). */
+export type Rgb = number[]
 
 const HEX = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i
 
-export function parseHex(value) {
+export function parseHex(value: unknown): Rgb | null {
   const m = HEX.exec(String(value).trim())
   if (!m) return null
-  let hex = m[1]
+  let hex = m[1] as string
   if (hex.length === 3) hex = hex.split('').map(c => c + c).join('')
   return [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16))
 }
 
-export function toHex(rgb) {
+export function toHex(rgb: Rgb): string {
   return '#' + rgb.map(c => Math.round(c).toString(16).padStart(2, '0')).join('')
 }
 
-function channel(c) {
+function channel(c: number): number {
   const s = c / 255
   // Stryker disable next-line EqualityOperator: kein 8-Bit-Wert trifft 0,04045 exakt
   return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
 }
 
-export function luminance(rgb) {
-  const [r, g, b] = rgb.map(channel)
+export function luminance(rgb: Rgb): number {
+  const [r, g, b] = rgb.map(channel) as [number, number, number]
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-export function contrastRatio(a, b) {
+export function contrastRatio(a: Rgb, b: Rgb): number {
   const la = luminance(a)
   const lb = luminance(b)
   // Stryker disable next-line EqualityOperator: bei Gleichheit liefern beide Zweige dasselbe
@@ -41,20 +44,20 @@ export function contrastRatio(a, b) {
 
 const STEPS = 20
 
-// Mischt color schrittweise (je 5 %) mit Schwarz (heller Gegenpart) bzw. Weiß
-// (dunkler Gegenpart), bis jeder Gegenpart in against mindestens minRatio
-// erreicht; spätestens kommt Schwarz bzw. Weiß zurück. Ungültige Eingaben
-// kommen unverändert zurück, damit das Branding nie ganz wegfällt.
-export function ensureContrast(color, against, minRatio = 4.5) {
+// Mixes color step by step (5 % each) with black (light counterpart) or white
+// (dark counterpart) until every counterpart in against reaches at least
+// minRatio; at the latest black or white comes back. Invalid inputs come
+// back unchanged, so that the branding never disappears entirely.
+export function ensureContrast(color: string, against: string | readonly string[], minRatio = 4.5): string {
   const rgb = parseHex(color)
   const backgrounds = (Array.isArray(against) ? against : [against]).map(parseHex)
-  // Eine leere Liste fällt ohne eigene Prüfung durch: every() ist dann true.
+  // An empty list passes without a check of its own: every() is true then.
   if (!rgb || backgrounds.includes(null)) return color
-  const enough = c => backgrounds.every(bg => contrastRatio(c, bg) >= minRatio)
+  const enough = (c: Rgb) => backgrounds.every(bg => contrastRatio(c, bg as Rgb) >= minRatio)
   if (enough(rgb)) return color
-  // 0,18 ist etwa die Leuchtdichte, ab der Schwarz mehr Kontrast hat als Weiß.
+  // 0.18 is roughly the luminance above which black has more contrast than white.
   // Stryker disable next-line EqualityOperator: kein Hintergrund trifft 0,18 exakt
-  const target = luminance(backgrounds[0]) > 0.18 ? 0 : 255
+  const target = luminance(backgrounds[0] as Rgb) > 0.18 ? 0 : 255
   // Stryker disable next-line EqualityOperator: Schritt 20 ist die reine Zielfarbe, die danach ohnehin zurückkommt
   for (let step = 1; step < STEPS; step++) {
     const mixed = rgb.map(c => c + (target - c) * (step / STEPS))

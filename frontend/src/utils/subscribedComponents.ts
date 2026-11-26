@@ -1,18 +1,18 @@
-// Umwandlung zwischen dem kommaseparierten SubscribedComponentIDs-String
-// (Wire-Format der Subscriber-API, leer = alle Komponenten) und der
-// Array-Form, die das Komponenten-Multi-Select im Formular braucht.
-export function idsFromCsv(csv) {
+// Conversion between the comma-separated SubscribedComponentIDs string
+// (wire format of the subscriber API, empty = all components) and the
+// array form the component multi-select in the form needs.
+export function idsFromCsv(csv: string | null | undefined): string[] {
   return (csv || '').split(',').filter(Boolean)
 }
 
-export function csvFromIds(ids) {
+export function csvFromIds(ids: readonly (string | number)[] | null | undefined): string {
   return (ids || []).join(',')
 }
 
-// Komponentennamen für die Tabellen-Anzeige statt roher IDs.
-// Unbekannte IDs (z.B. eine inzwischen gelöschte Komponente) fallen auf die
-// rohe ID zurück, statt sie stillschweigend zu verschlucken.
-export function componentLabelsFromCsv(csv, components, allLabel = 'alle') {
+// Component names for the table display instead of raw IDs.
+// Unknown IDs (e.g. a component deleted in the meantime) fall back to the
+// raw ID instead of silently swallowing it.
+export function componentLabelsFromCsv(csv: string | null | undefined, components: readonly { ID: number | string; Name: string }[], allLabel = 'alle'): string {
   const ids = idsFromCsv(csv)
   if (ids.length === 0) return allLabel
   return ids

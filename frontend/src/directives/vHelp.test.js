@@ -7,8 +7,8 @@ import { HELP_HIDE_DELAY_MS, HELP_SHOW_DELAY_MS, activeHelp, helpRegistry, toolt
 import { useAuth } from '../composables/useAuth'
 import { axe } from '../test-support/axe'
 
-// Hilfe per v-help direkt am Feld/Button, erst nach Verweilen,
-// abschaltbar pro Benutzer.
+// Help via v-help directly on the field/button, only after resting,
+// can be switched off per user.
 
 let wrapper = null
 const helpKey = ref('components.name')
@@ -83,7 +83,7 @@ describe('v-help', () => {
     expect(visible()).toBe(false)
     expect(tip.textContent).toContain('Der Anzeigename des Dienstes')
     expect([...tip.querySelectorAll('.help-tooltip__heading')].map(h => h.textContent)).toEqual(['Was: ', 'Auswirkung: ', 'Beispiel: '])
-    // Kein ⓘ-Symbol: v-help fügt keine eigenen Bedienelemente hinzu.
+    // No ⓘ icon: v-help adds no controls of its own.
     expect(wrapper.findAll('button')).toHaveLength(4)
   })
 
@@ -153,7 +153,7 @@ describe('v-help', () => {
     await nextTick()
     expect(visible('components.save')).toBe(false)
 
-    // Noch über dem Button: erneutes Hover-Ereignis öffnet nicht.
+    // Still over the button: a repeated hover event does not open.
     pointer(el('.save'), 'pointerenter')
     await wait(HELP_SHOW_DELAY_MS)
     expect(visible('components.save')).toBe(false)
@@ -200,7 +200,7 @@ describe('v-help', () => {
     expect(visible()).toBe(true)
     expect(document.activeElement).toBe(input())
 
-    // Fokus wandert innerhalb des Elements: bleibt offen.
+    // Focus moves within the element: stays open.
     el('.field label').dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: input() }))
     await nextTick()
     expect(visible()).toBe(true)
@@ -280,7 +280,7 @@ describe('v-help', () => {
     expect(input().getAttribute('aria-describedby')).toBe('help-components-name')
     expect(tooltip()).not.toBeNull()
 
-    // Ausschalten bei offenem Tooltip schließt ihn und räumt auf.
+    // Switching off with an open tooltip closes it and cleans up.
     pointer(el('.save'), 'pointerenter')
     await wait(HELP_SHOW_DELAY_MS)
     const remove = vi.spyOn(document, 'removeEventListener')
@@ -439,7 +439,7 @@ describe('tooltipPosition', () => {
   it('darüber, wenn unten kein Platz ist; passt beides nicht: unten', () => {
     expect(tooltipPosition({ left: 400, top: 700, width: 24, bottom: 724 }, size, viewport).top).toBe('594px')
     expect(tooltipPosition({ left: 400, top: 50, width: 24, bottom: 74 }, { width: 200, height: 300 }, { width: 1000, height: 200 }).top).toBe('80px')
-    // Genau passend unten (Grenzfall <=).
+    // Fits exactly below (edge case <=).
     expect(tooltipPosition({ left: 400, top: 600, width: 24, bottom: 686 }, size, viewport).top).toBe('692px')
   })
 })

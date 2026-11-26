@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { INVITATION_TOKEN_KEY, readInvitationToken, storeInvitationToken, clearInvitationToken } from './invitationToken'
 
-// Einladungs-Token nur in sessionStorage, jeder Zugriff abgesichert.
+// Invitation token only in sessionStorage, every access guarded.
 describe('invitationToken', () => {
   afterEach(() => {
     vi.unstubAllGlobals()

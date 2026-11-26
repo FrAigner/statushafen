@@ -1,19 +1,21 @@
-// Stufe 4c: Felder in FormField haben dynamische IDs (useId).
-// Tests finden sie über den Text ihres <label>, so wie es auch Nutzer und
-// Screenreader tun, statt über aria-label-Attribute der Onyx-Stubs.
-export function fieldByLabel(wrapper, text) {
+// Stage 4c: fields in FormField have dynamic IDs (useId).
+// Tests find them by the text of their <label>, as users and screen readers
+// do too, instead of via aria-label attributes of the Onyx stubs.
+import type { BaseWrapper, DOMWrapper } from '@vue/test-utils'
+
+export function fieldByLabel(wrapper: BaseWrapper<Node>, text: string): DOMWrapper<Element> {
   const label = wrapper.findAll('label').find(l => l.text() === text)
   if (!label) throw new Error(`Kein Label "${text}" gefunden`)
   return wrapper.find(`[id="${label.attributes('for')}"]`)
 }
 
-export const hasLabel = (wrapper, text) => wrapper.findAll('label').some(l => l.text() === text)
+export const hasLabel = (wrapper: BaseWrapper<Node>, text: string): boolean => wrapper.findAll('label').some(l => l.text() === text)
 
-// Öffnet den QuickStatus (Listbox-Button) und wählt die Option mit dem Text.
-export async function chooseQuickStatus(button, optionText) {
+// Opens the QuickStatus (listbox button) and picks the option with the text.
+export async function chooseQuickStatus(button: DOMWrapper<Element>, optionText: string): Promise<void> {
   await button.trigger('click')
-  const options = button.element.closest('.quick-status').querySelectorAll('[role="option"]')
-  const option = [...options].find(o => o.textContent.trim() === optionText)
+  const options = (button.element.closest('.quick-status') as Element).querySelectorAll<HTMLElement>('[role="option"]')
+  const option = [...options].find(o => (o.textContent as string).trim() === optionText)
   if (!option) throw new Error(`Keine Option "${optionText}"`)
   option.click()
 }

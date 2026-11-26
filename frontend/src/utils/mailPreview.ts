@@ -1,12 +1,12 @@
-// Vorschau einer Mail-Vorlage in der Admin-Oberfläche. Die Vorlage stammt von
-// einem Seiten-Admin und wird anderen Admins (mit höherer Berechtigung) im
-// eingeloggten Kontext angezeigt. Ohne enge Allowlist ließe sich dort eine
-// Phishing-Maske einblenden (Formular, Passwortfeld, Overlay per CSS).
+// Preview of a mail template in the admin UI. The template comes from a page
+// admin and is shown to other admins (with higher permissions) in the
+// logged-in context. Without a tight allowlist, a phishing mask could be
+// overlaid there (form, password field, overlay via CSS).
 //
-// Erlaubt ist das, was Mails brauchen: Text-, Listen- und Tabellen-Markup,
-// Links (https, http, mailto) und Inline-Style mit Darstellungsangaben.
-// Formulare, Eingabefelder, Bilder, Style-Blöcke, Frames, SVG usw. fallen weg,
-// ebenso positionierende CSS-Angaben und alles, was Ressourcen nachlädt.
+// Allowed is what mails need: text, list and table markup, links (https,
+// http, mailto) and inline style with presentational declarations.
+// Forms, input fields, images, style blocks, frames, SVG etc. are dropped,
+// as are positioning CSS declarations and anything that loads resources.
 import DOMPurify from 'dompurify'
 
 const ALLOWED_TAGS = [
@@ -17,9 +17,9 @@ const ALLOWED_TAGS = [
 const ALLOWED_ATTR = ['href', 'style', 'colspan', 'rowspan', 'align', 'start']
 const ALLOWED_URI_REGEXP = /^(?:https?:|mailto:)/i
 
-// Erlaubte CSS-Eigenschaften (Darstellung innerhalb des eigenen Kastens). Nicht
-// dabei: position, top/left/right/bottom/inset, z-index, float, transform,
-// Viewport-Größen, background-image, content, behavior u. Ä.
+// Allowed CSS properties (presentation within the template's own box). Not
+// included: position, top/left/right/bottom/inset, z-index, float, transform,
+// viewport sizes, background-image, content, behavior and the like.
 const ALLOWED_CSS = new Set([
   'color', 'background', 'background-color', 'font', 'font-family', 'font-size', 'font-weight', 'font-style',
   'line-height', 'letter-spacing', 'text-align', 'text-decoration', 'text-transform', 'white-space',
@@ -29,13 +29,13 @@ const ALLOWED_CSS = new Set([
   'border-style', 'border-radius', 'border-collapse', 'width', 'max-width', 'min-width', 'height',
   'display', 'vertical-align', 'overflow-wrap', 'word-break',
 ])
-// Werte, die nachladen, Skript ausführen oder die Größe des Viewports nutzen.
+// Values that load resources, run script or use the viewport size.
 const FORBIDDEN_CSS_VALUE = /url\s*\(|expression|javascript:|@import|\\|\b-?\d*\.?\d+(?:vw|vh|vmin|vmax)\b|!important/i
-// Anzeigearten, die den Kasten verlassen oder Interaktion vortäuschen könnten.
+// Display types that could leave the box or fake interaction.
 const ALLOWED_DISPLAY = new Set(['block', 'inline', 'inline-block', 'table', 'table-cell', 'table-row', 'none'])
 
-export function filterStyle(style) {
-  const kept = []
+export function filterStyle(style: unknown): string {
+  const kept: string[] = []
   for (const decl of String(style).split(';')) {
     const idx = decl.indexOf(':')
     if (idx < 1) continue
@@ -43,14 +43,14 @@ export function filterStyle(style) {
     const value = decl.slice(idx + 1).trim()
     if (!ALLOWED_CSS.has(prop) || !value || FORBIDDEN_CSS_VALUE.test(value)) continue
     if (prop === 'display' && !ALLOWED_DISPLAY.has(value.toLowerCase())) continue
-    // `background:` mit Bild-Funktionen ist oben durch url( ausgeschlossen;
-    // Verläufe sind kein Problem, laden aber ebenfalls nichts nach.
+    // `background:` with image functions is excluded above via url(;
+    // gradients are no problem and do not load anything either.
     kept.push(`${prop}:${value}`)
   }
   return kept.join(';')
 }
 
-// Eigene Instanz: Der Hook gilt nur hier.
+// Own instance: the hook applies only here.
 const purify = DOMPurify(window)
 purify.addHook('afterSanitizeAttributes', (node) => {
   if (node.hasAttribute && node.hasAttribute('style')) {
@@ -62,7 +62,7 @@ purify.addHook('afterSanitizeAttributes', (node) => {
     node.setAttribute('target', '_blank')
     node.setAttribute('rel', 'noopener noreferrer nofollow')
   }
-  if (node.hasAttribute && node.hasAttribute('start') && !(node.tagName === 'OL' && /^\d{1,9}$/.test(node.getAttribute('start')))) {
+  if (node.hasAttribute && node.hasAttribute('start') && !(node.tagName === 'OL' && /^\d{1,9}$/.test(node.getAttribute('start') as string))) {
     node.removeAttribute('start')
   }
 })
@@ -76,8 +76,8 @@ const CONFIG = {
   ALLOW_ARIA_ATTR: false,
 }
 
-// sanitizeMailPreview liefert bereinigtes HTML für v-html in der Vorschau.
-export function sanitizeMailPreview(html) {
+// sanitizeMailPreview returns sanitized HTML for v-html in the preview.
+export function sanitizeMailPreview(html: unknown): string {
   if (!html) return ''
   return purify.sanitize(String(html), CONFIG)
 }

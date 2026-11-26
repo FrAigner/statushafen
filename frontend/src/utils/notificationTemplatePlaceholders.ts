@@ -1,15 +1,14 @@
-// einzige Datenquelle der Platzhalter für Benachrichtigungs-
-// Templates. Die aufklappbare Liste „Verfügbare Platzhalter“ und die
-// Autovervollständigung beim Tippen von `{` in AdminNotificationTemplates.vue
-// lesen beide hieraus, damit ein neuer Platzhalter nur an einer Stelle
-// ergänzt werden muss. `name` ist der Feldname im Go-Template
-// (`{{.Name}}`), `descKey` der i18n-Schlüssel der Beschreibung.
+// The only data source of the placeholders for notification templates.
+// The collapsible "Available placeholders" list and the autocompletion when
+// typing `{` in AdminNotificationTemplates.vue both read from here, so that a
+// new placeholder only has to be added in one place. `name` is the field name
+// in the Go template (`{{.Name}}`), `descKey` the i18n key of the description.
 export const NOTIFICATION_TEMPLATE_PLACEHOLDERS = [
   { name: 'Title', descKey: 'notificationTemplates.placeholders.title' },
   { name: 'IncidentTitle', descKey: 'notificationTemplates.placeholders.incidentTitleAlias' },
   { name: 'Level', descKey: 'notificationTemplates.placeholders.level' },
   { name: 'Message', descKey: 'notificationTemplates.placeholders.message' },
-  // formatierte Nachricht als fertiges, bereinigtes Mail-HTML.
+  // Formatted message as finished, sanitized mail HTML.
   { name: 'MessageHTML', descKey: 'notificationTemplates.placeholders.messageHtml' },
   { name: 'Status', descKey: 'notificationTemplates.placeholders.status' },
   { name: 'StatusLabel', descKey: 'notificationTemplates.placeholders.statusLabel' },
@@ -19,9 +18,9 @@ export const NOTIFICATION_TEMPLATE_PLACEHOLDERS = [
   { name: 'Language', descKey: 'notificationTemplates.placeholders.language' },
   { name: 'FrontendURL', descKey: 'notificationTemplates.placeholders.frontendUrl' },
   { name: 'UnsubscribeURL', descKey: 'notificationTemplates.placeholders.unsubscribeUrl' },
-  // nur in der Bestätigungsmail des Double-Opt-in belegt.
+  // Only set in the double opt-in confirmation mail.
   { name: 'ConfirmURL', descKey: 'subscribeConfirm.templatePlaceholderConfirmUrl' },
-  // Meldungen externer Quellen: nur dort belegt.
+  // Notifications of external sources: only set there.
   { name: 'SourceName', descKey: 'notificationTemplates.placeholders.sourceName' },
   { name: 'SourceURL', descKey: 'notificationTemplates.placeholders.sourceUrl' },
   { name: 'FromAddress', descKey: 'notificationTemplates.placeholders.fromAddress' },

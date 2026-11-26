@@ -1,16 +1,16 @@
-// Sprachoptionen für die Benachrichtigungs-Templates: nur der
-// Sprachname, ohne erklärenden Klammerzusatz. Dient als Fallback, solange
-// für eine Statusseite noch kein echter Sprachkatalog konfiguriert ist
-// - AdminNotificationTemplates.vue zieht die tatsächlich
-// aktivierten Sprachen stattdessen dynamisch aus useContentLanguages.
+// Language options for the notification templates: only the language name,
+// without an explanatory suffix in parentheses. Serves as the fallback while
+// a status page has no real language catalogue configured yet
+// - AdminNotificationTemplates.vue takes the actually enabled
+// languages dynamically from useContentLanguages instead.
 export const languageOptions = [
   { label: 'Englisch', value: 'en' },
   { label: 'Deutsch', value: 'de' },
 ]
 
-// Audience-Optionen (Stage 5 der Mehrsprachigkeit): lösen die
-// vorherige Konvention auf, bei der die Zielgruppe implizit über
-// Language=en ("staff") bzw. Language=de ("subscriber") codiert war.
+// Audience options (stage 5 of multilingual support): they replace the
+// previous convention where the audience was implicitly encoded via
+// Language=en ("staff") or Language=de ("subscriber").
 export const audienceOptions = [
   { label: 'Intern (Staff)', value: 'staff' },
   { label: 'Abonnenten (Subscriber)', value: 'subscriber' },

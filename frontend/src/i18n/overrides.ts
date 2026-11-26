@@ -1,27 +1,35 @@
 import { ref } from 'vue'
 import i18n, { getBaseMessages, isLocaleLoaded, loadLocaleMessages } from './index'
+import type { LocaleMessages } from './index'
 import { useApi } from '../composables/useApi'
 
-// UI-Übersetzungs-Overrides: Admin-editierbare
-// Overrides für App-UI-Texte, ohne Code-Deploy. Merge-Reihenfolge
-// Bundle < globaler Override < Seiten-Override, bei jeder Änderung komplett
-// neu berechnet und per setLocaleMessage() (voller Ersatz statt
-// mergeLocaleMessage) angewendet - inkrementelles Mergen böte keine saubere
-// Möglichkeit, beim Seitenwechsel nur die Overrides der vorherigen Seite
-// wieder zu entfernen.
+// UI translation overrides: admin-editable overrides for app UI texts,
+// without a code deploy. Merge order bundle < global override < page override,
+// recomputed completely on every change and applied via setLocaleMessage()
+// (full replacement instead of mergeLocaleMessage) - incremental merging would
+// offer no clean way to remove only the previous page's overrides again when
+// switching pages.
 
-// Modul-Scope-Singleton-State, analog zum Muster in useTenant.js.
-const globalOverrides = ref({})
-const pageOverrides = ref({})
+/** Flat map of dotted key paths to texts, e.g. { "nav.items.sso": "SSO" }. */
+export type FlatMessages = Record<string, unknown>
 
-// flatten wandelt ein verschachteltes Nachrichten-Objekt (wie de.json/
-// en.json) in eine flache Map von "dotted" Key-Pfaden auf Werte um, z.B.
+/** Nested message object as vue-i18n expects it. */
+export interface NestedMessages {
+  [key: string]: unknown
+}
+
+// Module-scope singleton state, analogous to the pattern in useTenant.ts.
+const globalOverrides = ref<FlatMessages>({})
+const pageOverrides = ref<FlatMessages>({})
+
+// flatten turns a nested message object (like de.json/en.json) into a flat
+// map of "dotted" key paths to values, e.g.
 // { nav: { items: { sso: "SSO" } } } -> { "nav.items.sso": "SSO" }.
-export function flatten(obj, prefix = '') {
-  return Object.entries(obj).reduce((acc, [key, value]) => {
+export function flatten(obj: object, prefix = ''): FlatMessages {
+  return Object.entries(obj).reduce<FlatMessages>((acc, [key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      Object.assign(acc, flatten(value, path))
+      Object.assign(acc, flatten(value as object, path))
     } else {
       acc[path] = value
     }
@@ -29,22 +37,22 @@ export function flatten(obj, prefix = '') {
   }, {})
 }
 
-// unflatten ist die Umkehrung von flatten - baut aus einer flachen
-// "dotted"-Key-Map wieder das verschachtelte Nachrichten-Objekt, das
-// vue-i18n als messages erwartet.
+// unflatten is the inverse of flatten - it rebuilds from a flat
+// "dotted" key map the nested message object that vue-i18n expects as
+// messages.
 //
-// Pfade mit __proto__/constructor/prototype-Segment werden
-// verworfen, sonst würde ein bösartiger Override Object.prototype
-// verschmutzen.
+// Paths with a __proto__/constructor/prototype segment are
+// dropped, otherwise a malicious override would pollute
+// Object.prototype.
 const FORBIDDEN_PARTS = new Set(['__proto__', 'constructor', 'prototype'])
 
 //
-// Review-Befund 1: Ein Schlüssel, der Pfadpräfix eines anderen Schlüssels
-// ist (z. B. "nav" neben "nav.items.sso"), würde den Teilbaum ersetzen
-// bzw. ein Blatt in ein Objekt verwandeln. Solche Präfix-Einträge werden
-// reihenfolgeunabhängig verworfen, die tieferen Schlüssel bleiben.
-export function unflatten(flatMap) {
-  const result = {}
+// Review finding 1: a key that is the path prefix of another key
+// (e.g. "nav" next to "nav.items.sso") would replace the subtree or
+// turn a leaf into an object. Such prefix entries are dropped
+// regardless of order; the deeper keys stay.
+export function unflatten(flatMap: FlatMessages): NestedMessages {
+  const result: NestedMessages = {}
   const paths = Object.keys(flatMap)
   for (const [path, value] of Object.entries(flatMap)) {
     if (paths.some((other) => other.startsWith(`${path}.`))) continue
@@ -52,29 +60,31 @@ export function unflatten(flatMap) {
     if (parts.some((part) => FORBIDDEN_PARTS.has(part))) continue
     let node = result
     for (let i = 0; i < parts.length - 1; i++) {
-      if (!node[parts[i]] || typeof node[parts[i]] !== 'object') {
-        node[parts[i]] = {}
+      const part = parts[i] as string
+      if (!node[part] || typeof node[part] !== 'object') {
+        node[part] = {}
       }
-      node = node[parts[i]]
+      node = node[part] as NestedMessages
     }
-    node[parts.at(-1)] = value
+    node[parts.at(-1) as string] = value
   }
   return result
 }
 
-function recomputeAndApply(locale) {
+function recomputeAndApply(locale: string): void {
   const base = getBaseMessages(locale)
   if (!base) return
   const merged = { ...flatten(base), ...globalOverrides.value, ...pageOverrides.value }
-  i18n.global.setLocaleMessage(locale, unflatten(merged))
+  // The bundle texts with overrides on top: still the shape of the bundle.
+  i18n.global.setLocaleMessage(locale, unflatten(merged) as LocaleMessages)
 }
 
-// applyGlobalOverrides lädt die globalen Overrides (öffentlicher Endpunkt,
-// keine Auth nötig - auch anonyme Besucher sollen die global angepassten
-// Texte sehen) und wendet sie an. Schlägt der Request fehl, bleibt es beim
-// Bundle-Default statt die App am Start zu blockieren.
-export async function applyGlobalOverrides(locale) {
-  // Nachladbare Oberflächensprache: Texte vor dem Anwenden laden.
+// applyGlobalOverrides loads the global overrides (public endpoint,
+// no auth needed - anonymous visitors should see the globally customized
+// texts too) and applies them. If the request fails, the bundle default
+// stays instead of blocking the app at startup.
+export async function applyGlobalOverrides(locale: string): Promise<void> {
+  // Lazily loadable UI language: load the texts before applying.
   if (!isLocaleLoaded(locale)) await loadLocaleMessages(locale)
   try {
     const res = await fetch(`/api/public/ui-overrides?language_code=${encodeURIComponent(locale)}`)
@@ -85,13 +95,13 @@ export async function applyGlobalOverrides(locale) {
   recomputeAndApply(locale)
 }
 
-// applyPageOverrides lädt die Overrides einer einzelnen Statusseite (Auth
-// nötig, über useApi()) - wird ausschließlich aufgerufen, während der Nutzer
-// im Admin-Bereich genau dieser Seite unterwegs ist (siehe AdminLayout.vue).
-export async function applyPageOverrides(pageId, locale) {
+// applyPageOverrides loads the overrides of a single status page (auth
+// needed, via useApi()) - only called while the user is in the admin area of
+// exactly this page (see AdminLayout.vue).
+export async function applyPageOverrides(pageId: number | string, locale: string): Promise<void> {
   const { apiFetch } = useApi()
   try {
-    const res = await apiFetch(`/api/pages/${pageId}/ui-overrides?language_code=${encodeURIComponent(locale)}`)
+    const res = await apiFetch<FlatMessages | null>(`/api/pages/${pageId}/ui-overrides?language_code=${encodeURIComponent(locale)}`)
     pageOverrides.value = res || {}
   } catch {
     pageOverrides.value = {}
@@ -99,9 +109,9 @@ export async function applyPageOverrides(pageId, locale) {
   recomputeAndApply(locale)
 }
 
-// clearPageOverrides entfernt nur die Seiten-Ebene (z.B. beim Verlassen des
-// Admin-Bereichs) - globale Overrides und Bundle-Default bleiben unberührt.
-export function clearPageOverrides(locale) {
+// clearPageOverrides removes only the page layer (e.g. when leaving the
+// admin area) - global overrides and the bundle default stay untouched.
+export function clearPageOverrides(locale: string): void {
   pageOverrides.value = {}
   recomputeAndApply(locale)
 }

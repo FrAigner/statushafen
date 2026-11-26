@@ -1,22 +1,22 @@
-// Redesign Stufe 3: Tastaturlogik des Listbox-Buttons
-// (QuickStatus) als kleine, einzeln testbare Funktionen, nach dem
-// ARIA-Muster „Select-Only Combobox“. Der Fokus bleibt auf dem Button, die
-// aktive Option wird über aria-activedescendant angezeigt.
+// Redesign stage 3: keyboard logic of the listbox button
+// (QuickStatus) as small, individually testable functions, following the
+// ARIA "Select-Only Combobox" pattern. Focus stays on the button; the
+// active option is indicated via aria-activedescendant.
 
-// Tasten, die am geschlossenen Button die Liste öffnen.
-export function isOpenKey(key) {
+// Keys that open the list on the closed button.
+export function isOpenKey(key: string): boolean {
   return key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' '
 }
 
-// Tasten, die in der offenen Liste die aktive Option übernehmen.
-export function isSelectKey(key) {
+// Keys that pick the active option in the open list.
+export function isSelectKey(key: string): boolean {
   return key === 'Enter' || key === ' '
 }
 
-// Neuer aktiver Index zu einer Navigationstaste; null, wenn die Taste nicht
-// navigiert. Die Liste springt nicht von Ende zu Anfang (kein Umbruch), damit
-// man bei einer Statusliste nicht versehentlich „Großstörung“ erreicht.
-export function nextActiveIndex(current, key, length) {
+// New active index for a navigation key; null if the key does not
+// navigate. The list does not jump from end to start (no wrap-around), so that
+// one does not accidentally reach "major outage" in a status list.
+export function nextActiveIndex(current: number, key: string, length: number): number | null {
   if (length < 1) return null
   const last = length - 1
   if (key === 'ArrowDown') return Math.min(current + 1, last)

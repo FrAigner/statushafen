@@ -1,35 +1,45 @@
-// löst die Matrix ab: Berechtigungs-Matrix für
-// Rollen. Zeilen sind die Tabs der Navigation (utils/permissions.js
-// RESOURCES), Spalten die Aktionen C R U D. Das Modell bleibt ein Array der
-// Rechte-Strings (v-model); fremde Einträge (z. B. admin_dashboard oder vom
-// Backend gelieferte, hier unbekannte Rechte) bleiben beim Bearbeiten erhalten.
+// Replaces the matrix: permission matrix for roles.
+// Rows are the tabs of the navigation (utils/permissions.ts
+// RESOURCES), columns the actions C R U D. The model stays an array of
+// permission strings (v-model); foreign entries (e.g. admin_dashboard or
+// permissions delivered by the backend that are unknown here) are kept while editing.
 //
-// Regeln: Anlegen, Ändern und Löschen schließen Lesen ein. Wer eine dieser
-// Aktionen setzt, setzt Lesen automatisch mit; wer Lesen entzieht, entzieht
-// auch die drei anderen (sonst bliebe ein Recht stehen, das ohne Lesen nicht
-// nutzbar ist).
+// Rules: create, update and delete include read. Whoever sets one of these
+// actions sets read automatically too; whoever revokes read also revokes the
+// other three (otherwise a permission would remain that is not usable
+// without read).
 
 import { ACTIONS, perm, normalizePermissions } from './permissions'
+import type { PermissionAction, PermissionList } from './permissions'
+
+/** State of a group of checkboxes: basis for checked/indeterminate. */
+export type MatrixState = 'all' | 'some' | 'none'
+
+export interface PermissionSummaryRow {
+  resource: string
+  actions: PermissionAction[]
+  letters: string
+}
 
 export const MATRIX_ACTIONS = ACTIONS
-const IMPLIES_READ = ['create', 'update', 'delete']
+const IMPLIES_READ: string[] = ['create', 'update', 'delete']
 
-// Kürzel der Spaltenköpfe.
-export const ACTION_ABBREVIATION = { create: 'C', read: 'R', update: 'U', delete: 'D' }
+// Abbreviations of the column headers.
+export const ACTION_ABBREVIATION: Record<PermissionAction, string> = { create: 'C', read: 'R', update: 'U', delete: 'D' }
 
-// Steht die Aktion in der Zelle an? Lesen gilt auch, wenn nur Anlegen,
-// Ändern oder Löschen gesetzt ist (Implikation).
-export function isOn(model, resource, action) {
+// Is the action on in the cell? Read also counts if only create,
+// update or delete is set (implication).
+export function isOn(model: readonly string[], resource: string, action: string): boolean {
   if (model.includes(perm(resource, action))) return true
   return action === 'read' && IMPLIES_READ.some(a => model.includes(perm(resource, a)))
 }
 
-function without(model, perms) {
+function without(model: readonly string[], perms: readonly string[]): string[] {
   return model.filter(p => !perms.includes(p))
 }
 
-// Setzt oder entzieht eine Aktion einer Ressource samt Folgen für Lesen.
-export function setCell(model, resource, action, enabled) {
+// Sets or revokes an action of a resource including the consequences for read.
+export function setCell(model: readonly string[], resource: string, action: string, enabled: boolean): string[] {
   const target = perm(resource, action)
   if (enabled) {
     const add = [target]
@@ -42,40 +52,40 @@ export function setCell(model, resource, action, enabled) {
   return without(model, [target])
 }
 
-// Eine Aktion für mehrere Ressourcen (Spaltenschalter).
-export function setColumn(model, resources, action, enabled) {
-  return resources.reduce((acc, resource) => setCell(acc, resource, action, enabled), model)
+// One action for several resources (column toggle).
+export function setColumn(model: readonly string[], resources: readonly string[], action: string, enabled: boolean): string[] {
+  return resources.reduce<string[]>((acc, resource) => setCell(acc, resource, action, enabled), model as string[])
 }
 
-// Alle Aktionen einer Ressource (Zeilenschalter).
-export function setRow(model, resource, enabled) {
-  return ACTIONS.reduce((acc, action) => setCell(acc, resource, action, enabled), model)
+// All actions of a resource (row toggle).
+export function setRow(model: readonly string[], resource: string, enabled: boolean): string[] {
+  return ACTIONS.reduce<string[]>((acc, action) => setCell(acc, resource, action, enabled), model as string[])
 }
 
-// 'all' | 'some' | 'none' – Grundlage für checked/indeterminate der Schalter.
-export function stateOf(flags) {
+// 'all' | 'some' | 'none' – basis for checked/indeterminate of the toggles.
+export function stateOf(flags: readonly boolean[]): MatrixState {
   const on = flags.filter(Boolean).length
   if (on === 0) return 'none'
   return on === flags.length ? 'all' : 'some'
 }
 
-export const rowState = (model, resource) => stateOf(ACTIONS.map(a => isOn(model, resource, a)))
-export const columnState = (model, resources, action) => stateOf(resources.map(r => isOn(model, r, action)))
-export const matrixState = (model, resources) => stateOf(resources.flatMap(r => ACTIONS.map(a => isOn(model, r, a))))
+export const rowState = (model: readonly string[], resource: string): MatrixState => stateOf(ACTIONS.map(a => isOn(model, resource, a)))
+export const columnState = (model: readonly string[], resources: readonly string[], action: string): MatrixState => stateOf(resources.map(r => isOn(model, r, action)))
+export const matrixState = (model: readonly string[], resources: readonly string[]): MatrixState => stateOf(resources.flatMap(r => ACTIONS.map(a => isOn(model, r, a))))
 
-// Sonderrechte (z. B. admin_dashboard): einzeln an/aus.
-export function setStandalone(model, key, enabled) {
+// Special permissions (e.g. admin_dashboard): individually on/off.
+export function setStandalone(model: readonly string[], key: string, enabled: boolean): string[] {
   if (!enabled) return without(model, [key])
-  return model.includes(key) ? model : [...model, key]
+  return model.includes(key) ? model as string[] : [...model, key]
 }
 
-// Kompakte Darstellung einer Rolle für die Liste: je Ressource die gesetzten
-// Aktionen als Buchstaben ("CRUD", "R", "RU" ...) in Reihenfolge der
-// Navigation, danach Sonderrechte. Lesen steht auch dann, wenn nur Anlegen,
-// Ändern oder Löschen vergeben ist.
-export function summarizePermissions(list, resources) {
+// Compact representation of a role for the list: per resource the set
+// actions as letters ("CRUD", "R", "RU" ...) in the order of the
+// navigation, then special permissions. Read is shown even if only create,
+// update or delete is granted.
+export function summarizePermissions(list: PermissionList, resources: readonly string[]): { rows: PermissionSummaryRow[]; special: string[] } {
   const model = normalizePermissions(list)
-  const rows = []
+  const rows: PermissionSummaryRow[] = []
   for (const resource of resources) {
     const actions = ACTIONS.filter(a => isOn(model, resource, a))
     if (actions.length) {

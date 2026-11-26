@@ -2,20 +2,20 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { vueSources, templatePart, startTags } from '../test-support/templateScan'
 import { installFormValidationGuard } from './formValidation'
 
-// Der Screenshot zeigte „Fülle dieses Feld aus.“ schon beim Hover
-// über ein leeres Pflichtfeld, mitten in den neuen Hilfe-Tooltips. Ursache:
-// Chromium und Firefox zeigen bei einem ungültigen Formularfeld ohne
-// title-Attribut die native Validierungsmeldung als Hover-Tooltip an (Blink:
-// InputType::DefaultToolTip liefert ValidationMessage(), außer das Formular
-// hat `novalidate`). sit-onyx setzt an seinen Inputs kein title (nur bei
-// hideLabel), also greift der Browser-Default. Ein leeres title="" hilft in
-// Chromium nicht, weil ein leerer Titel dort wieder auf den Default fällt.
+// The screenshot showed "Fülle dieses Feld aus." already on hover
+// over an empty required field, in the middle of the new help tooltips. Cause:
+// for an invalid form field without a title attribute, Chromium and Firefox show
+// the native validation message as a hover tooltip (Blink:
+// InputType::DefaultToolTip returns ValidationMessage(), unless the form
+// has `novalidate`). sit-onyx sets no title on its inputs (only with
+// hideLabel), so the browser default applies. An empty title="" does not help in
+// Chromium, because an empty title falls back to the default there.
 //
-// Lösung an der Wurzel: Jedes <form> bekommt `novalidate` (das schaltet den
-// Hover-Hinweis ab), und ein globaler Submit-Wächter (App.vue) holt die
-// Pflichtfeld-Prüfung beim Absenden zurück: checkValidity(), bei Fehlern
-// reportValidity() und das Submit-Event stoppen, bevor der @submit-Handler
-// der View läuft.
+// Fix at the root: every <form> gets `novalidate` (that switches off the
+// hover hint), and a global submit guard (App.vue) brings back the
+// required-field check on submit: checkValidity(), and on errors
+// reportValidity() and stopping the submit event before the view's @submit
+// handler runs.
 
 describe('Formulare ohne nativen Hover-Hinweis', () => {
   it('jedes <form> im Frontend hat novalidate', () => {

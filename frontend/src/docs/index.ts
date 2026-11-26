@@ -1,21 +1,36 @@
-// Eingebaute Dokumentation unter /docs.
+// Built-in documentation under /docs.
 //
-// Die Inhalte liegen als Markdown im Repo (src/docs/<sprache>/<abschnitt>.md),
-// damit Doku und App EINE Quelle haben und Änderungen an Funktionen im selben
-// PR wie die Doku landen. Vite bindet die Dateien per ?raw als Text ein; sie
-// landen im (lazy geladenen) Chunk der Doku-Seite, nicht im Start-Bundle.
+// The content lives as Markdown in the repo (src/docs/<language>/<section>.md),
+// so that docs and app have ONE source and changes to features land in the same
+// PR as the docs. Vite includes the files as text via ?raw; they end up in the
+// (lazily loaded) chunk of the docs page, not in the start bundle.
 //
-// Gerendert wird mit marked (exakt gepinnt) und das Ergebnis IMMER durch
-// DOMPurify geschickt: Die Markdown-Dateien stammen zwar aus dem Repo, aber
-// marked lässt Roh-HTML durch, und ein versehentliches <script> oder onerror
-// in einer Doku-Datei darf nie ausgeführt werden.
+// Rendering uses marked (pinned exactly) and the result is ALWAYS sent through
+// DOMPurify: the Markdown files do come from the repo, but marked passes raw
+// HTML through, and an accidental <script> or onerror in a docs file must
+// never execute.
 import { Marked } from 'marked'
 import DOMPurify from 'dompurify'
 
-// Reihenfolge der Navigation. Die Slugs sind sprachunabhängig (deutsch), damit
-// ein Deep-Link wie /docs/vorfaelle in beiden Sprachen auf denselben Abschnitt
-// zeigt. Titel kommen aus der ersten Überschrift der jeweiligen Datei.
-export const SECTION_IDS = [
+/** Markdown text per locale and section slug. */
+export type DocSources = Record<string, Record<string, string>>
+
+export interface DocHeading {
+  id: string
+  text: string
+  depth: number
+}
+
+export interface DocSection {
+  markdown: string
+  locale: string
+  fallback: boolean
+}
+
+// Order of the navigation. The slugs are language independent (German), so that
+// a deep link like /docs/vorfaelle points to the same section in both languages.
+// Titles come from the first heading of the respective file.
+export const SECTION_IDS: string[] = [
   'was-ist-statushafen',
   'erste-schritte',
   'statusseiten',
@@ -41,24 +56,25 @@ export const SECTION_IDS = [
 
 export const DOCS_DEFAULT_LOCALE = 'de'
 
-export function byLocaleAndSlug(modules) {
-  const out = {}
+export function byLocaleAndSlug(modules: Record<string, string>): DocSources {
+  const out: DocSources = {}
   for (const [path, text] of Object.entries(modules)) {
     const m = path.match(/\/([a-z]{2})\/([a-z0-9-]+)\.md$/)
     if (!m) continue
-    out[m[1]] ??= {}
-    out[m[1]][m[2]] = text
+    const [, locale, slug] = m as unknown as [string, string, string]
+    out[locale] ??= {}
+    out[locale][slug] = text
   }
   return out
 }
 
 export const DOC_SOURCES = byLocaleAndSlug(
-  import.meta.glob('./*/*.md', { query: '?raw', import: 'default', eager: true })
+  import.meta.glob<string>('./*/*.md', { query: '?raw', import: 'default', eager: true })
 )
 
-// Überschriften-IDs für Anker (/docs/vorfaelle#status-ablauf). Umlaute werden
-// ausgeschrieben, damit die Anker lesbar und in URLs ohne Escaping nutzbar sind.
-export function slugify(text) {
+// Heading IDs for anchors (/docs/vorfaelle#status-ablauf). Umlauts are
+// spelled out, so that the anchors are readable and usable in URLs without escaping.
+export function slugify(text: unknown): string {
   return String(text)
     .toLowerCase()
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
@@ -68,13 +84,13 @@ export function slugify(text) {
     .replace(/^-+|-+$/g, '')
 }
 
-// Rendert Markdown zu bereinigtem HTML und liefert die Überschriften (Ebene 2
-// und 3) für das Inhaltsverzeichnis. Jeder Aufruf nutzt eine eigene
-// Marked-Instanz, damit die ID-Zählung für doppelte Überschriften nicht über
-// Abschnitte hinweg weiterläuft.
-export function renderMarkdown(markdown) {
-  const headings = []
-  const used = new Map()
+// Renders Markdown to sanitized HTML and returns the headings (levels 2
+// and 3) for the table of contents. Each call uses its own Marked instance,
+// so that the ID counting for duplicate headings does not continue across
+// sections.
+export function renderMarkdown(markdown: string | null | undefined): { html: string; headings: DocHeading[] } {
+  const headings: DocHeading[] = []
+  const used = new Map<string, number>()
   const marked = new Marked({ gfm: true })
   marked.use({
     renderer: {
@@ -90,27 +106,28 @@ export function renderMarkdown(markdown) {
       },
     },
   })
-  const raw = marked.parse(markdown || '')
+  // Without async extensions marked.parse returns synchronously.
+  const raw = marked.parse(markdown || '') as string
   const html = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
   return { html, headings }
 }
 
-// Erste Überschrift einer Markdown-Datei als Abschnittstitel.
-export function extractTitle(markdown) {
+// First heading of a Markdown file as the section title.
+export function extractTitle(markdown: string | null | undefined): string {
   const m = (markdown || '').match(/^#\s+(.+)$/m)
-  return m ? m[1].trim() : ''
+  return m ? (m[1] as string).trim() : ''
 }
 
-// Markdown ohne die erste Überschrift: Die Seite setzt den Titel selbst, damit
-// das Inhaltsverzeichnis zwischen Titel und Text stehen kann.
-export function stripTitle(markdown) {
+// Markdown without the first heading: the page sets the title itself, so that
+// the table of contents can sit between title and text.
+export function stripTitle(markdown: string | null | undefined): string {
   return (markdown || '').replace(/^#\s+.+$/m, '')
 }
 
-// Liefert den Abschnitt in der gewünschten Sprache. Fehlt er dort, wird die
-// deutsche Fassung genommen und `fallback` gesetzt, damit die Seite einen
-// Hinweis zeigen kann.
-export function resolveSection(slug, locale, sources = DOC_SOURCES) {
+// Returns the section in the requested language. If it is missing there, the
+// German version is used and `fallback` is set, so that the page can show a
+// notice.
+export function resolveSection(slug: string, locale: string, sources: DocSources = DOC_SOURCES): DocSection | null {
   const own = sources[locale]?.[slug]
   if (own) return { markdown: own, locale, fallback: false }
   const base = sources[DOCS_DEFAULT_LOCALE]?.[slug]
@@ -118,8 +135,8 @@ export function resolveSection(slug, locale, sources = DOC_SOURCES) {
   return null
 }
 
-// Volltext ohne Markdown-Syntax für die einfache Suche in der Navigation.
-export function plainText(markdown) {
+// Full text without Markdown syntax for the simple search in the navigation.
+export function plainText(markdown: string | null | undefined): string {
   return (markdown || '')
     .replace(/```[a-z]*/g, ' ')
     .replace(/[#*_`>|[\]()-]/g, ' ')

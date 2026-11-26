@@ -3,7 +3,7 @@ import { createI18n } from 'vue-i18n'
 import de from './locales/de.json'
 import en from './locales/en.json'
 
-// Rekursiv alle Blatt-Keys als Punkt-Pfade sammeln, z.B. "admin.users.title".
+// Recursively collect all leaf keys as dot paths, e.g. "admin.users.title".
 function flattenKeys(obj, prefix = '') {
   return Object.entries(obj).flatMap(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key
@@ -14,10 +14,10 @@ function flattenKeys(obj, prefix = '') {
   })
 }
 
-// Guard-Test (Batch 0, Übersetzungs-Rollout): stellt sicher, dass de.json und
-// en.json exakt dieselben Keys haben - ein fehlender englischer Key fällt
-// sonst still auf den deutschen Fallback zurück (fallbackLocale: 'de') statt
-// den Build/CI sichtbar scheitern zu lassen.
+// Guard test (batch 0, translation rollout): makes sure that de.json and
+// en.json have exactly the same keys - a missing English key would otherwise
+// silently fall back to the German fallback (fallbackLocale: 'de') instead of
+// making the build/CI fail visibly.
 describe('i18n locale key parity', () => {
   it('de.json und en.json haben identische Key-Mengen', () => {
     const deKeys = flattenKeys(de).sort()
@@ -30,11 +30,11 @@ describe('i18n locale key parity', () => {
     expect(missingInDe, `Keys fehlen in de.json: ${missingInDe.join(', ')}`).toEqual([])
   })
 
-  // Guard gegen unescapte vue-i18n-Sonderzeichen (v.a. "@" - löst "Invalid
-  // linked format" aus, siehe Bugfix in admin.subscribers.emailPlaceholder
-  // & Co.): jede Message muss sich für beide Locales fehlerfrei kompilieren
-  // und rendern lassen, statt erst beim tatsächlichen Aufruf in einer View
-  // zur Laufzeit zu krachen.
+  // Guard against unescaped vue-i18n special characters (especially "@" - triggers "Invalid
+  // linked format", see the bugfix in admin.subscribers.emailPlaceholder
+  // & co.): every message must compile and render without errors for both locales,
+  // instead of only crashing at runtime when it is actually used
+  // in a view.
   it('jede Message kompiliert ohne Fehler (z.B. unescapte "@"-Zeichen)', () => {
     const i18n = createI18n({ legacy: false, locale: 'de', fallbackLocale: 'de', messages: { de, en } })
     const params = Object.fromEntries(
@@ -55,7 +55,7 @@ describe('i18n locale key parity', () => {
   })
 })
 
-// Die Profilseite darf keinen internen Entwicklerhinweis zeigen.
+// The profile page must not show an internal developer note.
 const FORBIDDEN = {
   de: /Issue|#|Minimal|vorerst/i,
   en: /Issue|#|Minimal|for now/i,
@@ -71,7 +71,7 @@ describe('profile.description', () => {
     expect(text).not.toMatch(FORBIDDEN[name])
   })
 
-  // Das Verbotsmuster muss auch Wortvarianten wie „Minimalprofil“ erkennen.
+  // The forbidden pattern must also catch word variants like "Minimalprofil".
   it.each([
     ['de', 'Minimalprofil'],
     ['de', 'Minimale Seite'],
@@ -86,9 +86,9 @@ describe('profile.description', () => {
   })
 })
 
-// "Mein Abo laden" (entfernter Knopf) und "Abo-Einstellungen"
-// (alter Begriff im Benutzermenü) dürfen in keiner der beiden Locale-Dateien
-// mehr vorkommen; der Einstieg heißt überall einheitlich "Abonnement
+// "Mein Abo laden" (removed button) and "Abo-Einstellungen"
+// (old term in the user menu) must no longer appear in either locale
+// file; the entry point is uniformly called "Abonnement
 // verwalten" (de) / "Manage subscription" (en).
 describe('Abonnement-Begriffe', () => {
   it.each([
@@ -100,9 +100,9 @@ describe('Abonnement-Begriffe', () => {
     expect(JSON.stringify(messages)).not.toContain(forbidden)
   })
 
-  // im Text immer "Abonnement", auch in Lade- und Fehlermeldungen
-  // (z. B. Abbestellen, Abonnieren auf der Statusseite). \b trennt "Abo" von
-  // "Abonnement"/"Abonnenten", erkennt aber "Abo-..." und "Abo ...".
+  // in the text always "Abonnement", also in loading and error messages
+  // (e.g. unsubscribing, subscribing on the status page). \b separates "Abo" from
+  // "Abonnement"/"Abonnenten", but catches "Abo-..." and "Abo ...".
   it('de.json verwendet nirgends die Kurzform "Abo"', () => {
     const leftovers = JSON.stringify(de).match(/[^"]*\bAbos?\b[^"]*/g) ?? []
     expect(leftovers).toEqual([])
@@ -112,18 +112,18 @@ describe('Abonnement-Begriffe', () => {
     ['de', de, 'Abonnement verwalten'],
     ['en', en, 'Manage subscription'],
   ])('%s: Bereichsüberschrift und Benutzermenü verwenden einheitlich "%s"', (_name, messages, unified) => {
-    // 4a: den zweiten Knopf im Abonnieren-Kasten gibt es nicht mehr
+    // 4a: the second button in the subscribe box no longer exists
     expect(messages.statusPage.editSubscriptionButton).toBeUndefined()
     expect(messages.components.subscriptionManager.editSectionTitle).toBe(unified)
     expect(messages.layout.public.subscriptionSettings).toBe(unified)
   })
 })
 
-// Branding: Das Platzhalter-Branding der Vorlage ("Onyx Status
-// Enterprise" bzw. "Status Enterprise CMS") wurde durch den echten Produktnamen
-// "Statushafen" ersetzt. Dieser Guard verhindert, dass die alten Platzhalter
-// über Merges oder künftige Übersetzungs-Batches unbemerkt zurückkehren, und
-// sichert zugleich ab, dass der Hero-Subtitle den neuen Namen führt.
+// Branding: the template's placeholder branding ("Onyx Status
+// Enterprise" or "Status Enterprise CMS") was replaced by the real product name
+// "Statushafen". This guard prevents the old placeholders from
+// coming back unnoticed through merges or future translation batches, and
+// at the same time ensures that the hero subtitle carries the new name.
 describe('Branding Statushafen', () => {
   it.each([
     ['de.json', de, 'Onyx Status Enterprise'],
@@ -142,8 +142,8 @@ describe('Branding Statushafen', () => {
   })
 })
 
-// Der Titel der Vorfallsseite mischte Deutsch und Englisch („Vorfälle (Incidents)“);
-// alle übrigen Admin-Titel sind einsprachig.
+// The title of the incidents page mixed German and English ("Vorfälle (Incidents)");
+// all other admin titles are monolingual.
 describe('Seitentitel Vorfälle', () => {
   it('de.json: incidents.title ist rein deutsch', () => {
     expect(de.incidents.title).toBe('Vorfälle')
@@ -151,10 +151,10 @@ describe('Seitentitel Vorfälle', () => {
   })
 })
 
-// In deutschen Texten steht durchgängig „Vorfall“/„Vorfälle“, nicht „Incident(s)“
-// („Offene Incidents“, „Incident-Detail →“ …). Schlüsselnamen, Platzhalter, englische Texte und
-// Code bleiben unberührt; geprüft werden nur die Werte der de.json.
-// Allowlist: Pfade, in denen „Incident“ bewusst stehen darf (Eigennamen, API-Feldnamen).
+// German texts consistently say "Vorfall"/"Vorfälle", not "Incident(s)"
+// ("Offene Incidents", "Incident-Detail →" …). Key names, placeholders, English texts and
+// code stay untouched; only the values of de.json are checked.
+// Allowlist: paths in which "Incident" may deliberately appear (proper names, API field names).
 const INCIDENT_ALLOWLIST = []
 
 function leafValues(obj, prefix = '') {
@@ -169,7 +169,7 @@ describe('Begriff Vorfall statt Incident', () => {
   it('de.json: kein Wert enthält „Incident“ (außer Allowlist)', () => {
     const offenders = leafValues(de)
       .filter(([path]) => !INCIDENT_ALLOWLIST.includes(path))
-      // Platzhalter wie {incidents} oder {{.IncidentTitle}} sind keine sichtbaren Texte.
+      // Placeholders like {incidents} or {{.IncidentTitle}} are not visible texts.
       .filter(([, value]) => /incident/i.test(value.replace(/\{\{?[^}]*\}\}?/g, '')))
       .map(([path, value]) => `${path}: ${value}`)
     expect(offenders).toEqual([])

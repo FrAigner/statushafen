@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { ssoMockRequired, ssoMockSkipReason } from './ssoMockGate'
 
-// Der Nachtjob e2e-sso-nachts.yml setzt E2E_REQUIRE_SSO_MOCK=1, damit
-// frontend/e2e/sso-oidc.spec.js dort nie still übersprungen wird.
+// The nightly job e2e-sso-nachts.yml sets E2E_REQUIRE_SSO_MOCK=1, so that
+// frontend/e2e/sso-oidc.spec.js is never silently skipped there.
 describe('ssoMockRequired', () => {
   it('ist nur bei E2E_REQUIRE_SSO_MOCK=1 gesetzt', () => {
     expect(ssoMockRequired({ E2E_REQUIRE_SSO_MOCK: '1' })).toBe(true)

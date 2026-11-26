@@ -1,5 +1,5 @@
-// happy-dom ist für DOMPurify zu unvollständig (siehe
-// AdminNotificationTemplates.test.js): Die Bereinigung würde dort nicht greifen.
+// happy-dom is too incomplete for DOMPurify (see
+// AdminNotificationTemplates.test.js): the sanitizing would not take effect there.
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest'
 import { existsSync, statSync } from 'node:fs'
@@ -19,10 +19,10 @@ import { NOTIFICATION_TEMPLATE_PLACEHOLDERS } from '../utils/notificationTemplat
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
 
-// Inhalte und Rendering der eingebauten Dokumentation.
+// Content and rendering of the built-in documentation.
 
 describe('Doku-Inhalte', () => {
-  // Die Hilfeseite nannte Abonnent, Ankündigung und Wartung als "ohne Chip".
+  // The help page named subscriber, notice and maintenance as "without chip".
   it('audit-log nennt jede Kategorie der Filter-Chips in beiden Sprachen', () => {
     const cats = ['Auth', 'Incident', 'Config', 'User', 'Subscriber', 'Notice', 'Maintenance', 'System']
     for (const [loc, messages] of [['de', de], ['en', en]]) {
@@ -37,8 +37,8 @@ describe('Doku-Inhalte', () => {
   })
 
 
-  // Review B1: Die Verdichtung der Statushistorie löscht nie einen Ausfall; die Hilfe darf
-  // keine falsche Abweichung („höchstens 30 s je Eintrag“, „ein Eintrag mit dem Endstand“) versprechen.
+  // Review B1: compacting the status history never deletes an outage; the help must not
+  // promise a false deviation ("at most 30 s per entry", "one entry with the final state").
   it('Verfügbarkeits-Hilfe beschreibt die pessimistische Verdichtung (zwei Einträge je Fenster)', () => {
     const de = DOC_SOURCES.de['oeffentliche-statusseite']
     const en = DOC_SOURCES.en['oeffentliche-statusseite']
@@ -52,7 +52,7 @@ describe('Doku-Inhalte', () => {
     expect(en).toContain('history_truncated')
   })
 
-  // Eine Rolle je Konto und Seite, letzter Owner, SSO-Verknüpfung beim Entfernen.
+  // One role per account and page, last owner, SSO link on removal.
   it('Seitenbenutzer-Hilfe nennt letzten Owner und SSO-Verknüpfung; Fehlercode ist übersetzt', () => {
     for (const [loc, messages] of [['de', de], ['en', en]]) {
       for (const page of ['statusseiten', 'benutzer-und-rollen']) {
@@ -74,9 +74,9 @@ describe('Doku-Inhalte', () => {
     }
   })
 
-  // Englisch darf fehlen (Fallback mit Hinweis), soll aber für alle
-  // Abschnitte vorliegen. Fehlt eine Datei, muss resolveSection den Fallback
-  // melden, damit die Seite den Hinweis zeigt.
+  // English may be missing (fallback with notice), but should exist for all
+  // sections. If a file is missing, resolveSection must report the fallback,
+  // so that the page shows the notice.
   it('jeder Abschnitt hat englischen Inhalt oder liefert den deutschen Fallback mit Hinweis', () => {
     for (const id of SECTION_IDS) {
       const r = resolveSection(id, 'en')
@@ -101,7 +101,7 @@ describe('Doku-Inhalte', () => {
     }
   })
 
-  // Die Platzhalter-Tabelle muss mit der Liste im Editor übereinstimmen.
+  // The placeholder table must match the list in the editor.
   it('Mail-Templates nennen jeden Platzhalter des Editors, in beiden Sprachen', () => {
     for (const locale of ['de', 'en']) {
       const md = DOC_SOURCES[locale]['mail-templates']
@@ -111,9 +111,9 @@ describe('Doku-Inhalte', () => {
     }
   })
 
-  // Interne Links (/docs/<abschnitt>#<anker>) müssen in jeder Sprache auf
-  // einen existierenden Abschnitt und eine existierende Überschrift zeigen;
-  // die Anker entstehen aus den (sprachabhängigen) Überschriften.
+  // Internal links (/docs/<section>#<anchor>) must point in every language to
+  // an existing section and an existing heading;
+  // the anchors come from the (language-dependent) headings.
   it('alle internen Doku-Links zeigen auf vorhandene Abschnitte und Anker', () => {
     const broken = []
     for (const locale of Object.keys(DOC_SOURCES)) {
@@ -130,10 +130,10 @@ describe('Doku-Inhalte', () => {
   })
 })
 
-// Seitenaufbau der Doku. Die Seite setzt den Titel selbst (h1 aus der
-// ersten Überschrift der Datei); darunter dürfen nur h2/h3 stehen, ohne Sprung
-// (kein h2 -> h4), sonst bricht die Gliederung für Screenreader und das
-// Inhaltsverzeichnis. Zeilen in Code-Blöcken (Shell-Kommentare mit #) zählen nicht.
+// Page structure of the docs. The page sets the title itself (h1 from the
+// first heading of the file); below it only h2/h3 may appear, without a jump
+// (no h2 -> h4), otherwise the outline breaks for screen readers and the
+// table of contents. Lines in code blocks (shell comments with #) do not count.
 describe('Seitenaufbau der Doku', () => {
   const headingLevels = (md) => {
     let inFence = false
@@ -189,8 +189,8 @@ describe('Seitenaufbau der Doku', () => {
   })
 })
 
-// Jede Aussage unten war in der Doku falsch oder veraltet und ist
-// inzwischen korrigiert; die Tests halten das fest.
+// Every statement below was wrong or outdated in the docs and has
+// since been corrected; the tests pin that down.
 describe('Korrigierte Doku-Aussagen', () => {
   const text = (loc, id) => DOC_SOURCES[loc][id].replace(/\s+/g, ' ')
 
@@ -202,7 +202,7 @@ describe('Korrigierte Doku-Aussagen', () => {
     }
   })
 
-  // Der Editor ist da; die Hilfe darf ihn nicht mehr als „später“ ankündigen.
+  // The editor exists; the help must no longer announce it as "later".
   it('Formatierte Texte: beschreibt den Editor, nennt ihn nicht mehr „später“', () => {
     expect(text('de', 'formatierte-texte')).toContain('Werkzeugleiste')
     expect(text('de', 'formatierte-texte')).toContain('Vorschau')
@@ -215,8 +215,8 @@ describe('Korrigierte Doku-Aussagen', () => {
   it('Ankündigungen: Formatierung statt „Markdown wird nicht dargestellt“ und die Ankündigung steht nicht "oben"', () => {
     expect(text('de', 'ankuendigungen')).not.toMatch(/Markdown ist erlaubt|oben auf der Statusseite/)
     expect(text('en', 'ankuendigungen')).not.toMatch(/Markdown is allowed|top of the status page/)
-    // Seit der Umstellung werden Nachrichten formatiert (eingeschränktes Markdown); die
-    // alte Aussage „Markdown wird nicht dargestellt“ wäre jetzt falsch.
+    // Since the switch, messages are formatted (restricted Markdown); the
+    // old statement "Markdown is not rendered" would now be wrong.
     expect(text('de', 'ankuendigungen')).not.toContain('Markdown wird nicht dargestellt')
     expect(text('en', 'ankuendigungen')).not.toContain('Markdown is not rendered')
     expect(text('de', 'ankuendigungen')).toContain('/docs/formatierte-texte')
@@ -316,8 +316,8 @@ describe('resolveSection', () => {
   })
 })
 
-// Der Schweregrad eines offenen Vorfalls bestimmt den angezeigten
-// Komponentenstatus (nicht mehr pauschal "Beeinträchtigt"); die Hilfe sagt das.
+// The severity of an open incident determines the displayed
+// component status (no longer a blanket "degraded"); the help says so.
 describe('Doku: offener Vorfall und Komponentenstatus', () => {
   it('Vorfälle und FAQ nennen den Schweregrad statt pauschal "Beeinträchtigt"', () => {
     expect(DOC_SOURCES.de.vorfaelle).toMatch(/mit dem Status seines Schweregrads/)
@@ -328,7 +328,7 @@ describe('Doku: offener Vorfall und Komponentenstatus', () => {
     expect(DOC_SOURCES.en.faq).toMatch(/status of its severity/)
     expect(DOC_SOURCES.de.vorfaelle).not.toMatch(/mindestens als „Beeinträchtigt“/)
     expect(DOC_SOURCES.en.vorfaelle).not.toMatch(/at least as "Degraded Performance"/)
-    // Nachbesserung: Komponenten-Seite und FAQ-Überschrift nicht mehr pauschal "Beeinträchtigt".
+    // Follow-up fix: components page and FAQ heading no longer a blanket "degraded".
     expect(DOC_SOURCES.de['komponenten-und-tags']).toMatch(/Status seines Schweregrads/)
     expect(DOC_SOURCES.de['komponenten-und-tags']).not.toMatch(/mindestens „Beeinträchtigt“/)
     expect(DOC_SOURCES.en['komponenten-und-tags']).toMatch(/status of its severity/)
@@ -365,7 +365,7 @@ describe('renderMarkdown', () => {
     expect(html).toContain('<a href="/docs/faq">Link</a>')
   })
 
-  // XSS: marked lässt Roh-HTML durch, DOMPurify muss es entfernen.
+  // XSS: marked passes raw HTML through, DOMPurify must remove it.
   it('entfernt Skripte, Event-Handler und javascript:-Links', () => {
     const md = [
       '# Titel',
@@ -430,7 +430,7 @@ describe('Hilfsfunktionen', () => {
     expect(plainText(undefined)).toBe('')
   })
 
-  // Review Ein fehlendes Metrik-Verzeichnis bei gesetztem Job ist ein Fehlschlag.
+  // Review: a missing metrics directory with the job set is a failure.
   it('Selbstüberwachung beschreibt das Verhalten bei fehlendem Metrik-Verzeichnis', () => {
     const de = DOC_SOURCES.de.selbstueberwachung
     const en = DOC_SOURCES.en.selbstueberwachung
@@ -438,7 +438,7 @@ describe('Hilfsfunktionen', () => {
     expect(de).not.toContain('zeigen die Komponente nicht als gestört')
     expect(en).toContain('metrics directory')
     expect(en).not.toContain('do not show the')
-    // Re-Review: alle Audit-Aktionen des Monitors sind dokumentiert, die Frist ist präzise.
+    // Re-review: all audit actions of the monitor are documented, the deadline is precise.
     for (const action of ['component_failed', 'incident_opened', 'component_recovered', 'component_released']) {
       expect(de).toContain(`selfmonitor.${action}`)
       expect(en).toContain(`selfmonitor.${action}`)
@@ -447,8 +447,8 @@ describe('Hilfsfunktionen', () => {
     expect(en).toContain('25 to 30')
   })
 
-  // Seit der Umstellung gibt der Monitor eigene Störungen beim Abschalten frei (releaseAll).
-  // verschobene Komponenten werden nicht mehr angefasst.
+  // Since the switch, the monitor releases its own outages when switched off (releaseAll).
+  // Moved components are no longer touched.
   it('Selbstüberwachung: Abschalten gibt eigene Störungen frei, verschobene Komponenten bleiben unangetastet', () => {
     const de = DOC_SOURCES.de.selbstueberwachung
     const en = DOC_SOURCES.en.selbstueberwachung
@@ -467,9 +467,9 @@ describe('Hilfsfunktionen', () => {
   })
 })
 
-// Screenshots liegen unter public/docs-img/<sprache>/ (eigener Pfad, kollidiert nicht mit der
-// SPA-Route /docs). Jedes Bild muss existieren, einen Alternativtext haben, klein bleiben und
-// zur Sprache der Seite passen.
+// Screenshots live under public/docs-img/<language>/ (own path, does not collide with the
+// SPA route /docs). Every image must exist, have an alt text, stay small and
+// match the language of the page.
 describe('Screenshots in der Doku', () => {
   const images = (md) => [...md.matchAll(/!\[([^\]]*)\]\(([^)\s]+)\)/g)].map(([, alt, src]) => ({ alt, src }))
 

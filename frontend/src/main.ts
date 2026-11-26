@@ -16,8 +16,8 @@ app.config.errorHandler = (err, instance, info) => {
   console.error('VUE GLOBAL ERROR:', err, 'INFO:', info)
 }
 
-// sit-onyx-eigene Strings (Validierungsmeldungen, Breadcrumb-Labels etc.)
-// folgen sonst immer 'en-US', unabhängig von der App-Sprache.
+// sit-onyx's own strings (validation messages, breadcrumb labels etc.)
+// would otherwise always follow 'en-US', regardless of the app language.
 const ONYX_LOCALE_MAP = { de: 'de-DE', en: 'en-US' }
 app.use(createOnyx({
   i18n: {
@@ -28,9 +28,9 @@ app.use(createOnyx({
 app.use(router)
 app.use(i18n)
 
-// Globale UI-Text-Overrides vor dem ersten Render
-// laden, damit angepasste Texte sofort erscheinen statt erst nach einem
-// kurzen Flackern des Bundle-Defaults. Schlägt der Request fehl, mountet die
-// App trotzdem mit den Bundle-Defaults (siehe applyGlobalOverrides).
+// Load the global UI text overrides before the first render, so that
+// customized texts appear immediately instead of only after a brief flicker
+// of the bundle default. If the request fails, the app still mounts with the
+// bundle defaults (see applyGlobalOverrides).
 await applyGlobalOverrides(i18n.global.locale.value).catch(() => {})
 app.mount('#app')

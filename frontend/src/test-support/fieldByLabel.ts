@@ -1,9 +1,11 @@
-// Redesign Stufe 4b: Formularfelder in Component-Tests über ihre
-// sichtbare Beschriftung finden (Label -> for -> Feld), wie ein Mensch bzw.
-// Screenreader sie findet; kein Verlass auf CSS-Klassen oder aria-label der
-// Onyx-Stubs. Gibt den Wrapper des Feldes zurück. Wirft, wenn das Label fehlt
-// oder nicht mit einem Feld verbunden ist (das wäre selbst ein Fehler).
-export function fieldByLabel(wrapper, text) {
+// Redesign stage 4b: find form fields in component tests by their
+// visible label (label -> for -> field), the way a human or a screen reader
+// finds them; no reliance on CSS classes or aria-label of the Onyx stubs.
+// Returns the field's wrapper. Throws if the label is missing or not
+// connected to a field (that would be a bug in itself).
+import type { BaseWrapper, DOMWrapper } from '@vue/test-utils'
+
+export function fieldByLabel(wrapper: BaseWrapper<Node>, text: string): DOMWrapper<Element> {
   const label = wrapper.findAll('label').find(l => l.text() === text)
   if (!label) throw new Error(`Kein Label "${text}" gefunden`)
   const id = label.attributes('for')

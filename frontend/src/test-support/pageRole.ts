@@ -1,18 +1,20 @@
 import { useAuth } from '../composables/useAuth'
 import { useTenant } from '../composables/useTenant'
+import type { AuthUser, MyPage } from '../types/api'
 
-// hasPerm wertet wie das Backend nur die Rolle auf der aktiven
-// Statusseite aus. Tests, die Rechte über `permissions` vorgeben, melden den
-// Nutzer deshalb mit genau diesen Rechten als Seitenrolle der aktiven Seite
-// an (Standard: Seite 1). Global Admins brauchen keine Seitenrolle.
-export function setAuthAsPageRole(token, user = {}) {
+// Like the backend, hasPerm only evaluates the role on the active
+// status page. Tests that specify permissions via `permissions` therefore sign
+// the user in with exactly these permissions as the page role of the active page
+// (default: page 1). Global admins need no page role.
+export function setAuthAsPageRole(token: string, user: AuthUser = {}): void {
   const { setAuth } = useAuth()
   const { activeTenantId, setActiveTenant, myPages, setMyPages } = useTenant()
   setAuth(token, user)
   const id = activeTenantId.value || 1
   setActiveTenant(id)
   const Permissions = user.permissions || ''
-  // Bereits gesetzte Seitennamen bleiben erhalten (Brotkrumen-Tests).
+  // Page names already set are kept (breadcrumb tests).
   const known = myPages.value.find(p => String(p.ID) === String(id))
-  setMyPages([{ ID: Number(id), ...known, Permissions }])
+  // Tests only need ID and Permissions; the remaining page fields stay as they were (or absent).
+  setMyPages([{ ID: Number(id), ...known, Permissions } as MyPage])
 }

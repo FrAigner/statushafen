@@ -9,10 +9,10 @@ describe('router beforeEach guard', () => {
     global.fetch = vi.fn()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    // Router ist ein Singleton, dessen Zustand über Tests hinweg besteht - ein
-    // Push auf dieselbe Route wie im vorigen Test wäre eine "duplicated
-    // navigation" und würde die Guard gar nicht erst erneut ausführen. Daher
-    // vor jedem Test auf eine neutrale Route zurücksetzen.
+    // The router is a singleton whose state persists across tests - a
+    // push to the same route as in the previous test would be a "duplicated
+    // navigation" and would not even run the guard again. Hence reset to a
+    // neutral route before every test.
     await router.push('/')
   })
 
@@ -58,8 +58,8 @@ describe('router beforeEach guard', () => {
     expect(router.currentRoute.value.fullPath).toBe('/login')
   })
 
-  // Kein Weiterleiten ins Leere mehr. Die Route nennt ihr Recht (meta.permission),
-  // AdminLayout zeigt ohne Leserecht „Keine Berechtigung“ (siehe AdminLayout.test.js).
+  // No more redirecting into nowhere. The route names its permission (meta.permission);
+  // without read permission AdminLayout shows "no permission" (see AdminLayout.test.js).
   it('lässt einen eingeloggten Nicht-Global-Admin auf der Adresse, nennt aber das nötige Recht', async () => {
     useAuth().setAuth('jwt-123', { is_global_admin: false })
 
@@ -114,7 +114,7 @@ describe('router beforeEach guard', () => {
     expect(localStorage.getItem('jwt_token')).toBeNull()
   })
 
-  // Eine 401 von Caddys Basic Auth sagt nichts über das App-Token.
+  // A 401 from Caddy's basic auth says nothing about the app token.
   it('loggt bei einer Basic-Auth-401 der Token-Verifizierung nicht aus', async () => {
     const { token } = useAuth()
     token.value = 'valid-token'

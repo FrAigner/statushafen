@@ -1,28 +1,35 @@
-// einzige Stelle im Frontend, die festlegt, welche Vorfall-Status
-// als „behoben“ gelten. Alles andere ist offen und gehört auf der öffentlichen
-// Statusseite unter „Aktuelle Vorfälle“:
+// The only place in the frontend that decides which incident statuses count
+// as "resolved". Everything else is open and belongs under "Current incidents"
+// on the public status page:
 //
-//   offen:   investigating, identified, monitoring (Vorfälle),
-//            in_progress (laufende Wartung) und unbekannte Rohwerte
-//   behoben: resolved (Vorfälle und Wartungen); der Altwert completed ist per Migration
-//            auf resolved umgestellt
+//   open:     investigating, identified, monitoring (incidents),
+//             in_progress (running maintenance) and unknown raw values
+//   resolved: resolved (incidents and maintenances); the legacy value completed was
+//             migrated to resolved
 //
-// Geplante, noch nicht gestartete Wartungen (scheduled) sind weder aktuell
-// noch behoben, sie stehen in einer eigenen Sektion (isUpcomingMaintenance).
-// Unbekannte Status zählen bewusst als offen: Ein Vorfall verschwindet nur
-// dann aus „Aktuelle Vorfälle“, wenn er nachweislich behoben ist.
-export const RESOLVED_INCIDENT_STATUSES = Object.freeze(['resolved'])
+// Scheduled maintenances that have not started yet (scheduled) are neither current
+// nor resolved; they live in a section of their own (isUpcomingMaintenance).
+// Unknown statuses deliberately count as open: an incident only disappears
+// from "Current incidents" once it is demonstrably resolved.
+import type { StatusLevel } from './status'
 
-export const isResolvedStatus = (status) => RESOLVED_INCIDENT_STATUSES.includes(status)
+export interface IncidentStatusMeta {
+  level: StatusLevel | null
+  labelKey: string | null
+}
 
-export const isUpcomingMaintenance = (incident) => incident.IsMaintenance && incident.Status === 'scheduled'
+export const RESOLVED_INCIDENT_STATUSES: readonly string[] = Object.freeze(['resolved'])
 
-// 4a: Vorfall-Status in der Darstellung der Statusseite. Die
-// Stufe benennt Form/Farbe von StatusBadge (utils/status.js), der Schlüssel den
-// Text. Untersuchung ist die schwerste Stufe (Großstörung), Beobachtung die
-// leichteste offene (beeinträchtigt); Wartung bekommt die Wartungsform.
-// Unbekannte Rohwerte bleiben neutral (Stufe null) und zeigen den Rohwert.
-const INCIDENT_STATUS_META = Object.freeze({
+export const isResolvedStatus = (status: string): boolean => RESOLVED_INCIDENT_STATUSES.includes(status)
+
+export const isUpcomingMaintenance = (incident: { IsMaintenance?: boolean; Status: string }) => incident.IsMaintenance && incident.Status === 'scheduled'
+
+// 4a: incident status as presented on the status page. The
+// level names shape/colour of StatusBadge (utils/status.js), the key the
+// text. Investigating is the most severe level (major outage), monitoring the
+// mildest open one (degraded); maintenance gets the maintenance shape.
+// Unknown raw values stay neutral (level null) and show the raw value.
+const INCIDENT_STATUS_META: Readonly<Record<string, IncidentStatusMeta>> = Object.freeze({
   investigating: { level: 'major', labelKey: 'incidentDetail.statusInvestigating' },
   identified: { level: 'partial', labelKey: 'incidentDetail.statusIdentified' },
   monitoring: { level: 'degraded', labelKey: 'incidentDetail.statusMonitoring' },
@@ -31,5 +38,5 @@ const INCIDENT_STATUS_META = Object.freeze({
   in_progress: { level: 'maintenance', labelKey: 'statusPage.statusInProgress' },
 })
 
-export const incidentStatusMeta = (status) =>
-  (Object.hasOwn(INCIDENT_STATUS_META, status) ? INCIDENT_STATUS_META[status] : { level: null, labelKey: null })
+export const incidentStatusMeta = (status: string | null | undefined): IncidentStatusMeta =>
+  (Object.hasOwn(INCIDENT_STATUS_META, status as PropertyKey) ? INCIDENT_STATUS_META[status as string] as IncidentStatusMeta : { level: null, labelKey: null })

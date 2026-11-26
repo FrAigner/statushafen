@@ -54,7 +54,7 @@ describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () =>
   })
 
   afterEach(async () => {
-    // Layer zurücksetzen, damit Tests einander nicht beeinflussen.
+    // Reset the layers so that tests do not influence each other.
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({}))
     await applyGlobalOverrides('de')
     clearPageOverrides('de')
@@ -67,7 +67,7 @@ describe('applyGlobalOverrides / applyPageOverrides / clearPageOverrides', () =>
     await applyGlobalOverrides('de')
 
     expect(i18n.global.t('adminNav.items.sso')).toBe('Mein SSO')
-    // Unberührter Key bleibt beim Bundle-Default.
+    // An untouched key keeps the bundle default.
     expect(i18n.global.t('common.save')).not.toBe('')
   })
 

@@ -1,60 +1,85 @@
-// 4a: Darstellung der 90-Tage-Verfügbarkeit
+// 4a: presentation of the 90-day availability
 // (GET /api/public/pages/{slug}/availability, docs/api/openapi.yaml).
-// Reine Funktionen, damit die Zuordnung getestet und nicht in Templates
-// verteilt ist.
+// Pure functions, so that the mapping is tested and not spread across
+// templates.
 
-// Tagesstatus des Backends -> Stufe/Text. `no_data` (Tage vor Anlage der Seite)
-// ist bewusst neutral grau und behauptet weder Betrieb noch Ausfall; unbekannte
-// Werte werden genauso behandelt.
-const DAY_META = Object.freeze({
+export type AvailabilityLevel = 'ok' | 'deg' | 'part' | 'major' | 'maint' | 'none'
+
+export interface AvailabilityDayMeta {
+  level: AvailabilityLevel
+  labelKey: string
+}
+
+/** One day of the availability response. */
+export interface AvailabilityDay {
+  date: string
+  status: string
+  [key: string]: unknown
+}
+
+/** Response of GET /api/public/pages/{slug}/availability (only the part the view relies on). */
+export interface AvailabilityResponse {
+  days: AvailabilityDay[]
+  [key: string]: unknown
+}
+
+export interface DurationParts {
+  key: string
+  params: Record<string, number>
+}
+
+// Daily status of the backend -> level/text. `no_data` (days before the page was
+// created) is deliberately neutral grey and claims neither operation nor outage;
+// unknown values are treated the same way.
+const DAY_META: Readonly<Record<string, AvailabilityDayMeta>> = Object.freeze({
   operational: { level: 'ok', labelKey: 'status.operational' },
   degraded_performance: { level: 'deg', labelKey: 'status.degradedPerformance' },
-  // Schweregrad im Verlauf (Backend: impact der externen Meldung bzw. Gewichtung).
+  // Severity in the history (backend: impact of the external report or weighting).
   partial_outage: { level: 'part', labelKey: 'status.partialOutage' },
   major_outage: { level: 'major', labelKey: 'status.majorOutage' },
   under_maintenance: { level: 'maint', labelKey: 'status.maintenance' },
 })
-const NO_DATA = Object.freeze({ level: 'none', labelKey: 'availability.noData' })
+const NO_DATA: AvailabilityDayMeta = Object.freeze({ level: 'none', labelKey: 'availability.noData' })
 
-export const availabilityDayMeta = (status) =>
-  (Object.hasOwn(DAY_META, status) ? DAY_META[status] : NO_DATA)
+export const availabilityDayMeta = (status: string | null | undefined): AvailabilityDayMeta =>
+  (Object.hasOwn(DAY_META, status as PropertyKey) ? DAY_META[status as string] as AvailabilityDayMeta : NO_DATA)
 
-// Prozentzahl für die Anzeige. null (keine Daten) ergibt null, damit nie „0 %“
-// oder „100 %“ erfunden wird. Es wird abgeschnitten statt gerundet: 99,996 %
-// darf nicht als „100,00 %“ erscheinen, wenn es Ausfallzeit gab.
-// Ein Formatter je Sprache: eine Seite zeichnet 90 Tage je Komponente, ein
-// neuer Intl-Formatter je Aufruf kostete in PageLayoutList Sekunden (Review-Befund 4).
-const numberFormats = new Map()
-const numberFormat = (locale) => {
+// Percentage for display. null (no data) yields null, so that "0 %" or
+// "100 %" is never invented. It truncates instead of rounding: 99.996 %
+// must not appear as "100.00 %" if there was downtime.
+// One formatter per language: a page draws 90 days per component, and a
+// new Intl formatter per call cost seconds in PageLayoutList (review finding 4).
+const numberFormats = new Map<string | undefined, Intl.NumberFormat>()
+const numberFormat = (locale: string | undefined): Intl.NumberFormat => {
   if (!numberFormats.has(locale)) {
     numberFormats.set(locale, new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
   }
-  return numberFormats.get(locale)
+  return numberFormats.get(locale) as Intl.NumberFormat
 }
 
-export const formatAvailability = (value, locale) => {
+export const formatAvailability = (value: unknown, locale: string | undefined): string | null => {
   if (typeof value !== 'number' || Number.isNaN(value)) return null
   const truncated = Math.floor(value * 100) / 100
   return numberFormat(locale).format(truncated) + ' %'
 }
 
-// UTC-Tag („2026-10-29“) als lokalisiertes Datum, ebenfalls mit einem Formatter
-// je Sprache. Mittag UTC, damit die Zeitzone des Browsers den Tag nicht verschiebt.
-const dayFormats = new Map()
-export const formatDay = (isoDate, locale) => {
+// UTC day ("2026-10-29") as a localized date, also with one formatter
+// per language. Noon UTC, so that the browser's time zone does not shift the day.
+const dayFormats = new Map<string | undefined, Intl.DateTimeFormat>()
+export const formatDay = (isoDate: string, locale: string | undefined): string => {
   if (!dayFormats.has(locale)) {
     dayFormats.set(locale, new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }))
   }
-  return dayFormats.get(locale).format(new Date(`${isoDate}T12:00:00Z`))
+  return (dayFormats.get(locale) as Intl.DateTimeFormat).format(new Date(`${isoDate}T12:00:00Z`))
 }
 
-// Prüft die Antwort so weit, dass die Ansicht sie gefahrlos zeichnen kann.
-// Alles andere gilt als „keine Verfügbarkeitsdaten“ (Balken entfallen).
-export const parseAvailability = (res) => (res && Array.isArray(res.days) && res.days.length > 0 ? res : null)
+// Checks the response far enough that the view can draw it safely.
+// Everything else counts as "no availability data" (bars are omitted).
+export const parseAvailability = (res: unknown): AvailabilityResponse | null => (res && Array.isArray((res as AvailabilityResponse).days) && (res as AvailabilityResponse).days.length > 0 ? res as AvailabilityResponse : null)
 
-// Dauer für den Tooltip als Schlüssel + Parameter für vue-i18n: „2 h 5 min“,
-// „45 min“, unter einer Minute „< 1 min“. Negative oder ungültige Werte zählen als 0.
-export const durationParts = (seconds) => {
+// Duration for the tooltip as key + parameters for vue-i18n: "2 h 5 min",
+// "45 min", below one minute "< 1 min". Negative or invalid values count as 0.
+export const durationParts = (seconds: unknown): DurationParts => {
   const total = typeof seconds === 'number' && seconds > 0 ? Math.floor(seconds) : 0
   const minutes = Math.floor(total / 60)
   if (minutes < 1) return { key: 'availability.durationLessThanMinute', params: {} }

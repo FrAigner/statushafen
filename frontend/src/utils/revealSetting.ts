@@ -7,11 +7,11 @@ const HIGHLIGHT_MS = 2500
 const CONTAINER = '.form-field, .checkbox-row, .form-group, .setting, section, fieldset'
 const FOCUSABLE = 'input:not([type="hidden"]), select, textarea, button, [tabindex]:not([tabindex="-1"])'
 
-function findTarget(id, fallbackId) {
+function findTarget(id: string, fallbackId?: string): HTMLElement | null {
   return document.getElementById(id) ?? (fallbackId ? document.getElementById(fallbackId) : null)
 }
 
-function waitForTarget(id, fallbackId, timeout, interval) {
+function waitForTarget(id: string, fallbackId: string | undefined, timeout: number, interval: number): Promise<HTMLElement | null> {
   return new Promise(resolve => {
     const started = Date.now()
     const poll = () => {
@@ -24,9 +24,9 @@ function waitForTarget(id, fallbackId, timeout, interval) {
   })
 }
 
-function focusTarget(el) {
+function focusTarget(el: HTMLElement): HTMLElement {
   if (el.matches(FOCUSABLE)) return el
-  const inner = el.querySelector(FOCUSABLE)
+  const inner = el.querySelector<HTMLElement>(FOCUSABLE)
   if (inner) return inner
   el.setAttribute('tabindex', '-1')
   return el
@@ -34,10 +34,16 @@ function focusTarget(el) {
 
 const prefersReducedMotion = () => typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export async function revealSetting(id, { fallbackId, timeout = 4000, interval = 50 } = {}) {
+export interface RevealSettingOptions {
+  fallbackId?: string
+  timeout?: number
+  interval?: number
+}
+
+export async function revealSetting(id: string, { fallbackId, timeout = 4000, interval = 50 }: RevealSettingOptions = {}): Promise<HTMLElement | null> {
   const el = await waitForTarget(id, fallbackId, timeout, interval)
   if (!el) return null
-  const container = el.matches(CONTAINER) ? el : (el.closest(CONTAINER) ?? el)
+  const container = el.matches(CONTAINER) ? el : (el.closest<HTMLElement>(CONTAINER) ?? el)
   el.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' })
   focusTarget(el).focus({ preventScroll: true })
   container.classList.add(HIGHLIGHT_CLASS)

@@ -1,4 +1,5 @@
 import { effectScope, h, render, watch } from 'vue'
+import type { EffectScope, ObjectDirective } from 'vue'
 import HelpTooltipLayer from '../components/HelpTooltipLayer.vue'
 import { helpDomId, helpTextFor } from '../composables/useHelpText'
 import { helpTooltipsEnabled } from '../composables/useHelpTooltips'
@@ -6,52 +7,65 @@ import {
   activeHelp, helpRegistry, hideHelp, hideHelpFor, scheduleHide, scheduleShow, cancelHide, cancelShow,
 } from './helpTooltipState'
 
-// v-help="'bereich.feld'" hängt die Hilfe (Was / Auswirkung /
-// Beispiel aus help.<bereich>.<feld>) direkt an ein Feld oder einen Button,
-// ohne eigenes ⓘ-Symbol (Rückmeldung zum ersten Pilot: zu viele Symbole).
+// v-help="'area.field'" attaches the help (what / effect /
+// example from help.<area>.<field>) directly to a field or a button,
+// without its own ⓘ icon (feedback from the first pilot: too many icons).
 //
-// Verhalten:
-// - Maus (und Stift) bleibt HELP_SHOW_DELAY_MS auf dem Element: Hilfe
-//   erscheint. Verlassen vorher bricht ab. Danach Verlassen schließt
-//   verzögert, Hineinfahren in den Tooltip hält ihn offen.
-// - Tastatur: Fokus per Tab öffnet nach derselben Verzögerung, der Fokus
-//   bleibt, wo er ist. Fokus per Maus/Klick öffnet nicht.
-// - Nie im Weg: Tippen (keydown/input) im Element und Klicken/Drücken
-//   schließen die Hilfe bzw. verhindern das Öffnen; nach einem Klick bleibt
-//   sie aus, bis der Zeiger das Element verlassen hat. Escape schließt.
-// - Touch: keine Hilfe (Entscheidung im PR). Ohne Hover gäbe es nur
-//   Antippen (stört jede Bedienung) oder langes Drücken, das in Feldern die
-//   Textauswahl bzw. das Kontextmenü auslöst. Pointer-Events mit
-//   pointerType "touch" werden deshalb ignoriert.
-// - aria-describedby: zeigt am bedienbaren Element auf den Tooltip, solange
-//   die Hilfe eingeschaltet ist. Sitzt v-help auf einer sit-onyx-Komponente,
-//   ist das Element ihr Wurzelknoten (Label + Feld); beschrieben werden die
-//   Felder bzw. Buttons darin. Eine Gruppe (role="group") wird selbst
-//   beschrieben.
-// - Ausgeschaltet (useHelpTooltips): keine Listener, kein aria-describedby,
-//   keine Tooltip-Ebene im DOM.
+// Behaviour:
+// - Mouse (and pen) rests HELP_SHOW_DELAY_MS on the element: the help
+//   appears. Leaving earlier cancels. Leaving afterwards closes with a
+//   delay; moving into the tooltip keeps it open.
+// - Keyboard: focus via Tab opens after the same delay; the focus
+//   stays where it is. Focus via mouse/click does not open.
+// - Never in the way: typing (keydown/input) in the element and clicking/pressing
+//   close the help or prevent it from opening; after a click it stays
+//   off until the pointer has left the element. Escape closes.
+// - Touch: no help (decision in the PR). Without hover there would only be
+//   tapping (disturbs every interaction) or long-pressing, which in fields
+//   triggers text selection or the context menu. Pointer events with
+//   pointerType "touch" are therefore ignored.
+// - aria-describedby: points from the operable element to the tooltip while
+//   the help is switched on. If v-help sits on a sit-onyx component, the
+//   element is its root node (label + field); the fields or buttons inside
+//   are described. A group (role="group") is described itself.
+// - Switched off (useHelpTooltips): no listeners, no aria-describedby,
+//   no tooltip layer in the DOM.
 
 const CONTROLS = 'input:not([type="hidden"]), select, textarea, button'
 const STATE = Symbol('v-help')
 
-/* ── Ebene und globale Listener, nur solange Elemente Hilfe haben ── */
+type Handlers = Record<string, (event: Event) => void>
+
+interface HelpState {
+  el: HelpElement
+  key: string
+  attached: boolean
+  suppressed: boolean
+  targets: Element[]
+  handlers: Handlers
+  scope: EffectScope
+}
+
+type HelpElement = HTMLElement & { [STATE]?: HelpState }
+
+/* ── Layer and global listeners, only while elements have help ── */
 
 let attachedCount = 0
-let layerHost = null
+let layerHost: HTMLDivElement | null = null
 let keyboardModality = false
 
-function onGlobalKeydown(event) {
+function onGlobalKeydown(event: KeyboardEvent): void {
   keyboardModality = true
   if (event.key === 'Escape') hideHelp()
 }
 
-function onGlobalPointerdown(event) {
+function onGlobalPointerdown(event: PointerEvent): void {
   keyboardModality = false
   const active = activeHelp.value
-  if (active && !document.getElementById(helpDomId(active.key))?.contains(event.target)) hideHelp()
+  if (active && !document.getElementById(helpDomId(active.key))?.contains(event.target as Node | null)) hideHelp()
 }
 
-function ensureLayer() {
+function ensureLayer(): void {
   if (layerHost?.isConnected) return
   if (layerHost) render(null, layerHost)
   layerHost = document.createElement('div')
@@ -60,7 +74,7 @@ function ensureLayer() {
   render(h(HelpTooltipLayer), layerHost)
 }
 
-function acquire(key) {
+function acquire(key: string): void {
   helpRegistry.set(key, (helpRegistry.get(key) ?? 0) + 1)
   if (attachedCount++ === 0) {
     document.addEventListener('keydown', onGlobalKeydown, true)
@@ -69,54 +83,54 @@ function acquire(key) {
   ensureLayer()
 }
 
-function release(key) {
-  const left = helpRegistry.get(key) - 1
+function release(key: string): void {
+  const left = (helpRegistry.get(key) as number) - 1
   if (left > 0) helpRegistry.set(key, left)
   else helpRegistry.delete(key)
   if (--attachedCount > 0) return
   document.removeEventListener('keydown', onGlobalKeydown, true)
   document.removeEventListener('pointerdown', onGlobalPointerdown, true)
   hideHelp()
-  render(null, layerHost)
-  layerHost.remove()
+  render(null, layerHost as HTMLDivElement)
+  ;(layerHost as HTMLDivElement).remove()
   layerHost = null
 }
 
 /* ── aria-describedby ── */
 
-function describedTargets(el) {
+function describedTargets(el: HTMLElement): Element[] {
   if (el.matches(CONTROLS) || el.getAttribute('role') === 'group') return [el]
   const inner = [...el.querySelectorAll(CONTROLS)]
   return inner.length ? inner : [el]
 }
 
-function setDescribedBy(target, id, on) {
+function setDescribedBy(target: Element, id: string, on: boolean): void {
   const ids = (target.getAttribute('aria-describedby') || '').split(/\s+/).filter(token => token && token !== id)
   if (on) ids.push(id)
   if (ids.length) target.setAttribute('aria-describedby', ids.join(' '))
   else target.removeAttribute('aria-describedby')
 }
 
-function describe(state, on) {
+function describe(state: HelpState, on: boolean): void {
   const id = helpDomId(state.key)
   state.targets.forEach(target => setDescribedBy(target, id, false))
   state.targets = on ? describedTargets(state.el) : []
   state.targets.forEach(target => setDescribedBy(target, id, true))
 }
 
-/* ── Listener am Element ── */
+/* ── Listeners on the element ── */
 
-function elementHandlers(state) {
+function elementHandlers(state: HelpState): Handlers {
   const { el } = state
   const close = () => hideHelpFor(el)
   return {
-    pointerenter(event) {
-      if (event.pointerType === 'touch' || state.suppressed) return
+    pointerenter(event: Event) {
+      if ((event as PointerEvent).pointerType === 'touch' || state.suppressed) return
       scheduleShow(state.key, el)
       if (activeHelp.value?.anchor === el) cancelHide()
     },
-    pointerleave(event) {
-      if (event.pointerType === 'touch') return
+    pointerleave(event: Event) {
+      if ((event as PointerEvent).pointerType === 'touch') return
       state.suppressed = false
       cancelShow(el)
       if (activeHelp.value?.anchor === el) scheduleHide()
@@ -128,17 +142,17 @@ function elementHandlers(state) {
     focusin() {
       if (keyboardModality) scheduleShow(state.key, el)
     },
-    focusout(event) {
-      if (!el.contains(event.relatedTarget)) close()
+    focusout(event: Event) {
+      if (!el.contains((event as FocusEvent).relatedTarget as Node | null)) close()
     },
-    keydown(event) {
-      if (event.key !== 'Escape') close()
+    keydown(event: Event) {
+      if ((event as KeyboardEvent).key !== 'Escape') close()
     },
     input: close,
   }
 }
 
-function attach(state) {
+function attach(state: HelpState): void {
   if (state.attached || !helpTextFor(state.key)) return
   state.attached = true
   state.handlers = elementHandlers(state)
@@ -147,7 +161,7 @@ function attach(state) {
   describe(state, true)
 }
 
-function detach(state) {
+function detach(state: HelpState): void {
   if (!state.attached) return
   state.attached = false
   for (const [type, handler] of Object.entries(state.handlers)) state.el.removeEventListener(type, handler)
@@ -156,27 +170,27 @@ function detach(state) {
   release(state.key)
 }
 
-export const vHelp = {
+export const vHelp: ObjectDirective<HelpElement, string> = {
   mounted(el, binding) {
-    const state = { el, key: binding.value, attached: false, suppressed: false, targets: [], handlers: {}, scope: effectScope(true) }
+    const state: HelpState = { el, key: binding.value, attached: false, suppressed: false, targets: [], handlers: {}, scope: effectScope(true) }
     el[STATE] = state
     state.scope.run(() => {
       watch(helpTooltipsEnabled, on => (on ? attach(state) : detach(state)), { immediate: true })
     })
   },
   updated(el, binding) {
-    const state = el[STATE]
+    const state = el[STATE] as HelpState
     if (binding.value !== state.key) {
       detach(state)
       state.key = binding.value
       if (helpTooltipsEnabled.value) attach(state)
     } else if (state.attached) {
-      // Komponenten wie OnyxSelect können ihr Feld neu erzeugen.
+      // Components like OnyxSelect can recreate their field.
       describe(state, true)
     }
   },
   beforeUnmount(el) {
-    const state = el[STATE]
+    const state = el[STATE] as HelpState
     state.scope.stop()
     detach(state)
   },

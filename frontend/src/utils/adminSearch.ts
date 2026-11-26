@@ -9,12 +9,48 @@
 //   open      'activePage': open the edit form of the active status page (?edit=<id>)
 //   fallbackId  target to use when `id` only shows after a toggle (e.g. private page options)
 import { NAV_GROUPS } from './adminNav'
+import type { NavGroup, NavItem } from './adminNav'
+import type { TranslateFn } from '../types/i18n'
+
+export interface SettingDef {
+  id: string
+  route: string
+  labelKey: string
+  keywords: string[]
+  open?: 'activePage'
+  fallbackId?: string
+}
+
+export type SearchEntryKind = 'page' | 'setting' | 'doc'
+
+/** Navigation target of an entry: a path, or a location with query (vue-router RouteLocationRaw). */
+export type SearchEntryTarget = string | { path: string; query?: Record<string, string> }
+
+export interface SearchEntry {
+  kind: SearchEntryKind
+  key: string
+  label: string
+  context: string
+  to: SearchEntryTarget
+  icon?: string
+  targetId?: string
+  fallbackId?: string
+  keywords: string[]
+}
+
+/** A docs entry as docsSearchIndex builds it; kind and keywords are filled in by buildSearchIndex. */
+export type DocSearchInput = Omit<SearchEntry, 'kind' | 'keywords'> & { kind?: string; keywords?: string[] }
+
+export interface SearchGroup {
+  kind: SearchEntryKind
+  entries: SearchEntry[]
+}
 
 const PAGES = '/admin/pages'
 const SSO = '/admin/sso'
 const SYSTEM = '/admin/system-settings'
 
-export const SETTINGS = [
+export const SETTINGS: SettingDef[] = [
   // Status page (edit form of the active page)
   { id: 'page-name', route: PAGES, open: 'activePage', labelKey: 'statusPages.fieldName', keywords: ['titel', 'title'] },
   { id: 'page-slug', route: PAGES, open: 'activePage', labelKey: 'statusPages.fieldSlug', keywords: ['url', 'adresse', 'address', 'subdomain', 'pfad', 'path'] },
@@ -53,12 +89,12 @@ export const SETTINGS = [
 
 const NAV_ITEMS = NAV_GROUPS.flatMap(group => group.items)
 
-export function navItemForPath(path) {
+export function navItemForPath(path: string): NavItem | null {
   return NAV_ITEMS.find(item => item.to === path) ?? null
 }
 
 // Lowercase, fold diacritics (ü -> u, ß -> ss) and collapse whitespace.
-export function normalize(text) {
+export function normalize(text: unknown): string {
   return String(text)
     .toLowerCase()
     .replace(/ß/g, 'ss')
@@ -70,18 +106,23 @@ export function normalize(text) {
 
 // Builds all entries for the current language. `canSee(navItem)` is the nav's
 // visibility rule; entries on a route without a nav item (profile) are open to all.
-export function buildSearchIndex({ t, canSee, activePageId = null, docs = [] }) {
-  const pages = NAV_ITEMS.filter(canSee).map(item => ({
+export function buildSearchIndex({ t, canSee, activePageId = null, docs = [] }: {
+  t: TranslateFn
+  canSee: (item: NavItem) => boolean
+  activePageId?: number | string | null
+  docs?: readonly DocSearchInput[]
+}): SearchEntry[] {
+  const pages = NAV_ITEMS.filter(canSee).map((item): SearchEntry => ({
     kind: 'page',
     key: item.to,
     label: t(`adminNav.items.${item.labelKey}`),
-    context: t(`adminNav.groups.${NAV_GROUPS.find(g => g.items.includes(item)).key}`),
+    context: t(`adminNav.groups.${(NAV_GROUPS.find(g => g.items.includes(item)) as NavGroup).key}`),
     to: item.to,
     icon: item.icon,
     keywords: [],
   }))
 
-  const settings = SETTINGS.flatMap(setting => {
+  const settings = SETTINGS.flatMap((setting): SearchEntry[] => {
     const navItem = navItemForPath(setting.route)
     if (navItem && !canSee(navItem)) return []
     const to = setting.open === 'activePage' && activePageId != null
@@ -99,14 +140,14 @@ export function buildSearchIndex({ t, canSee, activePageId = null, docs = [] }) 
     }]
   })
 
-  return [...pages, ...settings, ...docs.map(doc => ({ keywords: [], ...doc, kind: 'doc' }))]
+  return [...pages, ...settings, ...docs.map((doc): SearchEntry => ({ keywords: [], ...doc, kind: 'doc' }))]
 }
 
-const GROUP_ORDER = ['page', 'setting', 'doc']
+const GROUP_ORDER: SearchEntryKind[] = ['page', 'setting', 'doc']
 
 // Lower is better: label starts with the query, label contains it, a label
 // word starts with a token, anything else (context/keywords only).
-function score(entry, query, tokens) {
+function score(entry: SearchEntry, query: string, tokens: string[]): number {
   const label = normalize(entry.label)
   if (label.startsWith(query)) return 0
   if (label.includes(query)) return 1
@@ -117,7 +158,7 @@ function score(entry, query, tokens) {
 }
 
 // All query tokens must occur in label, context or keywords.
-export function searchIndex(entries, rawQuery, { limit = 8 } = {}) {
+export function searchIndex(entries: readonly SearchEntry[], rawQuery: string, { limit = 8 }: { limit?: number } = {}): SearchGroup[] {
   const query = normalize(rawQuery)
   if (!query) return []
   const tokens = query.split(' ')
@@ -128,6 +169,6 @@ export function searchIndex(entries, rawQuery, { limit = 8 } = {}) {
     .sort((a, b) => a.score - b.score || a.order - b.order)
 
   return GROUP_ORDER
-    .map(kind => ({ kind, entries: hits.filter(h => h.entry.kind === kind).slice(0, limit).map(h => h.entry) }))
+    .map((kind): SearchGroup => ({ kind, entries: hits.filter(h => h.entry.kind === kind).slice(0, limit).map(h => h.entry) }))
     .filter(group => group.entries.length > 0)
 }

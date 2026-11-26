@@ -1,36 +1,37 @@
-// axe-core-Prüfung für Component-Tests.
+// axe-core check for component tests.
 //
-// Nutzung:
+// Usage:
 //   const wrapper = mount(Comp, { global: { plugins: [i18n] } })
 //   expect(await axe(wrapper)).toHaveNoViolations()
 //
-// Übergeben werden kann ein VTU-Wrapper oder ein DOM-Element. Beim Wrapper
-// wird der Mount-Container geprüft, damit Komponenten mit mehreren
-// Wurzelknoten (Fragmente) vollständig erfasst werden. axe braucht den
-// Baum im Dokument (z. B. für <label for>); ein ohne attachTo gemounteter
-// Baum wird deshalb für die Dauer der Prüfung an document.body gehängt und
-// danach wieder gelöst, damit bestehende Tests ihren Mount nicht ändern
-// müssen. Per Teleport ausgelagerte Inhalte liegen außerhalb des Containers
-// und werden nicht mitgeprüft.
+// Either a VTU wrapper or a DOM element can be passed. For a wrapper the
+// mount container is checked, so that components with several root nodes
+// (fragments) are covered completely. axe needs the tree in the document
+// (e.g. for <label for>); a tree mounted without attachTo is therefore
+// attached to document.body for the duration of the check and detached
+// again afterwards, so that existing tests do not have to change their mount.
+// Content moved out via Teleport lies outside the container and is not
+// checked.
 //
-// Warum nur ausgewählte Regeln statt des vollen WCAG-Satzes:
-// - Die Tests laufen in happy-dom ohne Layout und ohne CSS. Regeln, die
-//   gerenderte Farben, Größen oder Sichtbarkeit brauchen (color-contrast,
-//   target-size, scrollable-region-focusable), liefern dort nur Rauschen
-//   oder gar nichts. Kontrast muss weiter im Browser geprüft werden.
-// - Gemountet wird meist eine einzelne View ohne App-Rahmen. Seitenregeln
+// Why only selected rules instead of the full WCAG set:
+// - The tests run in happy-dom without layout and without CSS. Rules that
+//   need rendered colours, sizes or visibility (color-contrast,
+//   target-size, scrollable-region-focusable) only produce noise there
+//   or nothing at all. Contrast still has to be checked in the browser.
+// - Usually a single view without the app frame is mounted. Page rules
 //   (region, landmark-*, page-has-heading-one, document-title, html-has-lang,
-//   bypass) treffen deshalb jedes Fragment und gehören in einen E2E-Lauf.
-// - sit-onyx ist in vielen Tests durch src/test-support/onyxStubs.js ersetzt.
-//   Die Stubs bilden nur die Beschriftung nach (label -> aria-label bzw.
-//   Button-Text), nicht onyx' internes Markup. Geprüft wird damit, ob unsere
-//   Views den Komponenten eine Beschriftung mitgeben; onyx' eigenes Markup
-//   ist Sache der Bibliothek. Strukturregeln wie nested-interactive oder
-//   list/listitem würden an den Stubs Funde erzeugen, die es im echten
-//   Markup nicht gibt (oder umgekehrt übersehen) und bleiben deshalb aus.
-// Übrig bleiben die Regeln, um die es geht: Namen für Buttons,
-// Links, Bilder und Formularfelder sowie gültige ARIA-Attribute.
+//   bypass) would therefore hit every fragment and belong in an E2E run.
+// - sit-onyx is replaced by src/test-support/onyxStubs.ts in many tests.
+//   The stubs only mimic the labelling (label -> aria-label or button
+//   text), not onyx' internal markup. What is checked is whether our
+//   views give the components a label; onyx' own markup is the library's
+//   business. Structural rules like nested-interactive or list/listitem
+//   would produce findings on the stubs that do not exist in the real
+//   markup (or miss them the other way round) and therefore stay off.
+// What remains are the rules that matter: names for buttons,
+// links, images and form fields as well as valid ARIA attributes.
 import axeCore from 'axe-core'
+import type { Result } from 'axe-core'
 import { expect } from 'vitest'
 
 export const A11Y_RULES = [
@@ -58,14 +59,14 @@ export const A11Y_RULES = [
   'duplicate-id-aria',
 ]
 
-function topAncestor(node) {
+function topAncestor(node: Node): Node {
   let root = node
   while (root.parentNode) root = root.parentNode
   return root
 }
 
-export async function axe(target) {
-  const element = target.element ? (target.element.parentElement || target.element) : target
+export async function axe(target: { element: Node } | Element): Promise<Result[]> {
+  const element = 'element' in target && target.element ? ((target.element.parentElement || target.element) as Element) : target as Element
   const root = topAncestor(element)
   const detached = root !== document
   if (detached) document.body.appendChild(root)
@@ -76,15 +77,15 @@ export async function axe(target) {
     })
     return result.violations
   } finally {
-    if (detached) root.remove()
+    if (detached) (root as ChildNode).remove()
   }
 }
 
-// Je Regel nur die ersten Knoten zeigen: Listen wie die 90 Verfügbarkeits-
-// balken erzeugen sonst seitenlange Meldungen mit identischem Markup.
+// Show only the first nodes per rule: lists like the 90 availability bars
+// would otherwise produce pages of messages with identical markup.
 const MAX_NODES = 3
 
-export function formatViolations(violations) {
+export function formatViolations(violations: Result[]): string {
   return violations
     .map(v => {
       const shown = v.nodes.slice(0, MAX_NODES).map(n => `  ${n.html}`)
@@ -96,7 +97,7 @@ export function formatViolations(violations) {
 }
 
 expect.extend({
-  toHaveNoViolations(violations) {
+  toHaveNoViolations(violations: Result[]) {
     const pass = violations.length === 0
     return {
       pass,

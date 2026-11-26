@@ -1,14 +1,18 @@
-// Test-Helfer für den gemeinsamen Bestätigungsdialog (ersetzt vi.stubGlobal('confirm', ...)).
-//   const confirm = stubConfirm(true)          // Dialog antwortet "Bestätigt"
-//   expect(confirm).toHaveBeenCalledWith('Text der Rückfrage')   // Mock sieht nur den Text
-//   confirm.lastOptions                                          // volle Optionen (Titel, Beschriftung, danger)
-// Die Stellen rufen den Dialog dadurch ohne Layout-Einbindung auf; stubConfirm wird nach jedem Test
-// in vitestSetup.js zurückgesetzt.
+// Test helper for the shared confirmation dialog (replaces vi.stubGlobal('confirm', ...)).
+//   const confirm = stubConfirm(true)          // the dialog answers "confirmed"
+//   expect(confirm).toHaveBeenCalledWith('Text der Rückfrage')   // the mock only sees the text
+//   confirm.lastOptions                                          // full options (title, label, danger)
+// The call sites thereby open the dialog without the layout; stubConfirm is reset after every test
+// in vitestSetup.ts.
 import { vi } from 'vitest'
+import type { Mock } from 'vitest'
 import { setConfirmHandler } from '../composables/useConfirm'
+import type { ConfirmOptions } from '../composables/useConfirm'
 
-export function stubConfirm(answer) {
-  const fn = vi.fn(() => answer)
+export type ConfirmStub = Mock<(message?: string) => boolean> & { lastOptions?: ConfirmOptions }
+
+export function stubConfirm(answer: boolean): ConfirmStub {
+  const fn: ConfirmStub = vi.fn((_message?: string) => answer)
   setConfirmHandler((opts) => {
     fn.lastOptions = opts
     return fn(opts.message)

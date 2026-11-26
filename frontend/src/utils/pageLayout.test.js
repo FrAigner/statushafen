@@ -42,7 +42,7 @@ describe('overallStatus', () => {
   })
 })
 
-// 4a: Gesamtstatus oben mit Wartung als eigenem Zustand.
+// 4a: overall status at the top with maintenance as a state of its own.
 describe('pageOverallStatus', () => {
   const ok = [{ Status: 'operational' }]
   const running = { IsMaintenance: true, Status: 'in_progress' }

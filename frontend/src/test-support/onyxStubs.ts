@@ -1,10 +1,12 @@
-// Wiederverwendbare @vue/test-utils-Stubs für die sit-onyx-Formkomponenten,
-// die in mehreren Admin-Views (AdminIncidents.vue, AdminSubscribers.vue, ...)
-// gleich verwendet werden. Sie sind hier bewusst gestubbt statt echt gemountet:
-// OnyxSelect bringt im multiple-Modus eigene Flyout-/Positionierungslogik mit
-// (Teleport, ResizeObserver, floating-ui-artige Berechnungen), die für die
-// jeweiligen View-Tests irrelevant ist - der SUT ist die CRUD-Logik der View,
-// nicht sit-onyx' Interna.
+// Reusable @vue/test-utils stubs for the sit-onyx form components that
+// are used the same way in several admin views (AdminIncidents.vue,
+// AdminSubscribers.vue, ...). They are deliberately stubbed here instead of
+// mounted for real: in multiple mode OnyxSelect brings its own flyout/positioning
+// logic (Teleport, ResizeObserver, floating-ui-like calculations), which is
+// irrelevant for the respective view tests - the SUT is the view's CRUD logic,
+// not sit-onyx' internals.
+import { defineComponent } from 'vue'
+
 export const OnyxButtonStub = {
   props: ['label', 'disabled', 'mode', 'color'],
   template: '<button :disabled="disabled">{{ label }}</button>',
@@ -22,24 +24,24 @@ export const OnyxTextareaStub = {
   template: '<textarea :aria-label="label" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 }
 
-export const OnyxSelectStub = {
-  // "multiple" muss als typisiertes Boolean-Prop deklariert sein, sonst
-  // castet Vue das wertlose Attribut `multiple` (ohne :multiple="true") nicht
-  // zu `true`, sondern lässt es als leeren, falsy String durch - v-if="multiple"
-  // würde dann nie greifen.
+export const OnyxSelectStub = defineComponent({
+  // "multiple" must be declared as a typed Boolean prop, otherwise Vue does
+  // not cast the valueless attribute `multiple` (without :multiple="true")
+  // to `true` but passes it through as an empty, falsy string - v-if="multiple"
+  // would then never apply.
   props: {
     modelValue: {}, options: { type: Array, default: () => [] }, multiple: { type: Boolean, default: false },
     required: { type: Boolean, default: false }, label: {}, placeholder: {},
-    // wie beim echten OnyxSelect am bedienbaren Element statt am
-    // Wurzel-<div> (Hilfe-Tooltips, helpCoverage.test.js).
+    // As with the real OnyxSelect, on the operable element instead of the
+    // root <div> (help tooltips, helpCoverage.test.js).
     ariaDescribedby: { type: String, default: undefined },
   },
   emits: ['update:modelValue'],
-  // Die Beschriftung sitzt am bedienbaren Element wie beim echten
-  // OnyxSelect (dort per <label for>), nicht an einem rollenlosen <div> -
-  // axe meldet aria-label auf einem <div> ohne Rolle (aria-prohibited-attr)
-  // und ein <select> ohne Namen (select-name). Im multiple-Modus fasst eine
-  // benannte Gruppe die Checkboxen zusammen.
+  // The label sits on the operable element as with the real OnyxSelect
+  // (there via <label for>), not on a role-less <div> - axe reports
+  // aria-label on a <div> without a role (aria-prohibited-attr) and a
+  // <select> without a name (select-name). In multiple mode a named group
+  // bundles the checkboxes.
   template: `
     <div class="onyx-select-stub" :role="multiple ? 'group' : undefined" :aria-label="multiple ? label : undefined" :aria-describedby="multiple ? ariaDescribedby : undefined">
       <template v-if="multiple">
@@ -54,13 +56,13 @@ export const OnyxSelectStub = {
       </select>
     </div>`,
   methods: {
-    toggle(value) {
-      const current = this.modelValue || []
+    toggle(value: unknown) {
+      const current = (this.modelValue || []) as unknown[]
       const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value]
       this.$emit('update:modelValue', next)
     },
   },
-}
+})
 
 export const OnyxCheckboxStub = {
   props: {

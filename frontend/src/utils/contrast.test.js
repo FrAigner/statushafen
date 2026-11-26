@@ -63,7 +63,7 @@ describe('ensureContrast', () => {
     for (const bg of ['#161b22', '#21262d']) {
       expect(contrastRatio(parseHex(fixed), parseHex(bg))).toBeGreaterThanOrEqual(4.5)
     }
-    // Nur gegen den dunkleren Grund reichen weniger Mischschritte.
+    // Against the darker background alone, fewer mixing steps suffice.
     expect(ensureContrast('#5e6c84', ['#161b22'])).toBe('#7e899d')
   })
 

@@ -1,61 +1,84 @@
-// GET /api/pages/:id/components liefert einen Baum (oberste Ebene,
-// Unterkomponenten in Children). Die Admin-Seiten haben nur die oberste Ebene
-// gelesen, Unterkomponenten waren dort weder sichtbar noch wählbar. Diese
-// Helfer machen daraus eine flache Liste in Baumreihenfolge (Eltern vor ihren
-// Kindern, Geschwister in der Reihenfolge des Backends) mit Einrückungstiefe.
-// Flach statt rekursiv gerendert, damit Tabellen und Auswahlen sowie die
-// Namenssuche per ID (find) ohne eigene Rekursion auskommen.
-export const flattenComponentTree = (nodes, depth = 0) =>
-  (nodes || []).flatMap(n => [{ ...n, depth }, ...flattenComponentTree(n.Children, depth + 1)])
+// GET /api/pages/:id/components returns a tree (top level, subcomponents
+// in Children). The admin pages used to read only the top level, so
+// subcomponents were neither visible nor selectable there. These helpers turn
+// it into a flat list in tree order (parents before their children, siblings
+// in the backend's order) with an indentation depth.
+// Rendered flat instead of recursively, so that tables and selects as well as
+// the name lookup by ID (find) get by without recursion of their own.
 
-// Einrückung je Ebene. Ein Geviertleerzeichen (U+2003) statt normaler
-// Leerzeichen, weil HTML diese nicht zusammenfasst - die Einrückung bleibt im
-// Auswahl-Flyout sichtbar.
+/** A tree node as the components endpoint sends it. */
+export interface ComponentTreeNode {
+  ID: number
+  Name: string
+  Children?: ComponentTreeNode[] | null
+  ArchivedAt?: string | null
+  [key: string]: unknown
+}
+
+/** A node of the flattened tree: the node itself plus its depth (0 = top level). */
+export type FlatComponent<T extends ComponentTreeNode = ComponentTreeNode> = T & { depth: number }
+
+export interface ComponentOption {
+  label: string
+  value: string
+}
+
+export const flattenComponentTree = <T extends ComponentTreeNode>(nodes: readonly T[] | null | undefined, depth = 0): FlatComponent<T>[] =>
+  (nodes || []).flatMap(n => [{ ...n, depth }, ...flattenComponentTree(n.Children as T[] | null | undefined, depth + 1)])
+
+// Indentation per level. An em space (U+2003) instead of normal spaces,
+// because HTML does not collapse it - the indentation stays visible in the
+// select flyout.
 const INDENT = ' '
 
-// Optionen für OnyxSelect aus der flachen Liste: Name eingerückt nach Tiefe.
-// Archivierte Komponenten (ArchivedAt) werden nicht mehr zur Auswahl
-// angeboten (Vorfälle, Wartungen, Vorlagen, Abonnenten, Gruppe); keepIds hält
-// bereits gewählte (z. B. die aktuelle Eltern-Gruppe) trotzdem in der Auswahl.
-export const componentOptions = (flat, keepIds = []) =>
+// Options for OnyxSelect from the flat list: name indented by depth.
+// Archived components (ArchivedAt) are no longer offered for selection
+// (incidents, maintenances, templates, subscribers, group); keepIds keeps
+// already chosen ones (e.g. the current parent group) in the selection anyway.
+export const componentOptions = (flat: readonly { ID: number | string; Name: string; depth?: number; ArchivedAt?: string | null }[] | null | undefined, keepIds: readonly (number | string)[] | null = []): ComponentOption[] =>
   (flat || []).filter(c => !c.ArchivedAt || (keepIds || []).some(k => String(k) === String(c.ID))).map(c => ({ label: INDENT.repeat(c.depth || 0) + c.Name, value: String(c.ID) }))
 
-// Komponentenseite nach Richtung C: Gruppen sind einklappbar, die
-// Suche zeigt Treffer samt ihrer Eltern. Beides arbeitet auf der flachen Liste
-// (Baumreihenfolge, `depth`): Die Nachfahren eines Eintrags sind die direkt
-// folgenden Einträge mit größerer Tiefe.
+// Components page following direction C: groups are collapsible, the
+// search shows hits together with their parents. Both work on the flat list
+// (tree order, `depth`): the descendants of an entry are the directly
+// following entries with greater depth.
 
-// IDs aller Nachfahren des Eintrags mit der ID `id` (leer, wenn er keine hat
-// oder fehlt).
-export const descendantIds = (flat, id) => {
+interface FlatEntry {
+  ID: number
+  depth: number
+}
+
+// IDs of all descendants of the entry with the ID `id` (empty if it has none
+// or is missing).
+export const descendantIds = (flat: readonly FlatEntry[], id: number): number[] => {
   const start = flat.findIndex(c => c.ID === id)
   if (start === -1) return []
-  const ids = []
-  for (let i = start + 1; i < flat.length && flat[i].depth > flat[start].depth; i++) ids.push(flat[i].ID)
+  const ids: number[] = []
+  for (let i = start + 1; i < flat.length && (flat[i] as FlatEntry).depth > (flat[start] as FlatEntry).depth; i++) ids.push((flat[i] as FlatEntry).ID)
   return ids
 }
 
-// Sichtbare Zeilen der Liste. Mit Suchbegriff: Einträge, deren Text passt,
-// samt aller Vorfahren (damit der Treffer im Baum steht); eingeklappte Gruppen
-// zählen dann nicht, sonst wäre ein Treffer in einer zugeklappten Gruppe
-// unauffindbar. Ohne Suchbegriff: Nachfahren eingeklappter Gruppen entfallen.
-// `textOf(c)` liefert den durchsuchbaren Text eines Eintrags.
-export const visibleComponents = (flat, { query = '', collapsed = new Set(), textOf }) => {
+// Visible rows of the list. With a search term: entries whose text matches,
+// together with all ancestors (so that the hit sits in the tree); collapsed groups
+// do not count then, otherwise a hit in a collapsed group would be
+// impossible to find. Without a search term: descendants of collapsed groups are omitted.
+// `textOf(c)` returns the searchable text of an entry.
+export const visibleComponents = <T extends FlatEntry>(flat: readonly T[], { query = '', collapsed = new Set<number>(), textOf }: { query?: string; collapsed?: ReadonlySet<number>; textOf: (c: T) => string }): T[] => {
   const needle = query.trim().toLowerCase()
   if (needle) {
-    const keep = new Set()
+    const keep = new Set<number>()
     flat.forEach((c, i) => {
       if (!textOf(c).toLowerCase().includes(needle)) return
       keep.add(c.ID)
       let depth = c.depth
       for (let j = i - 1; j >= 0 && depth > 0; j--) {
-        if (flat[j].depth < depth) { keep.add(flat[j].ID); depth = flat[j].depth }
+        if ((flat[j] as T).depth < depth) { keep.add((flat[j] as T).ID); depth = (flat[j] as T).depth }
       }
     })
     return flat.filter(c => keep.has(c.ID))
   }
-  const rows = []
-  let hiddenBelow = null
+  const rows: T[] = []
+  let hiddenBelow: number | null = null
   for (const c of flat) {
     if (hiddenBelow !== null && c.depth > hiddenBelow) continue
     hiddenBelow = collapsed.has(c.ID) ? c.depth : null

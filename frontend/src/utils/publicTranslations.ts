@@ -1,36 +1,80 @@
-// Übersetzungen auf der öffentlichen Statusseite.
-// Der Server liefert in einer Antwort (GET /api/public/pages/{slug}/translations,
-// docs/api/openapi.yaml) je Objekt die bestätigten Texte in der Sprache des
-// Besuchers, Rückfall Standardsprache der Seite; fehlt ein Objekt, gilt das
-// Original. Hier stehen nur reine Funktionen: Abruf und Anwenden auf die Daten.
-// Alle Texte sind Klartext und werden von Vue als Text gerendert (nie als HTML).
+// Translations on the public status page.
+// The server delivers in one response (GET /api/public/pages/{slug}/translations,
+// docs/api/openapi.yaml) per object the confirmed texts in the visitor's
+// language, falling back to the page's default language; if an object is
+// missing, the original applies. Only pure functions live here: fetching and
+// applying to the data. All texts are plain text and are rendered by Vue as
+// text (never as HTML).
+import type { ApiFetch } from '../composables/useApi'
+import type { ApiError } from '../types/api'
 
-const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+/** Translated texts of one object: title (name/title) and text (description/message). */
+export interface TranslatedText {
+  title?: string
+  text?: string
+}
 
-// Prüft die Antwort so weit, dass sie gefahrlos angewendet werden kann; alles
-// andere gilt als „keine Übersetzungen“ (null), die Seite zeigt dann das Original.
-export const parsePublicTranslations = (res) => {
+/** Translated texts per object ID. */
+export type TranslationMap = Record<string, TranslatedText>
+
+export interface PublicTranslations {
+  language: string
+  components: TranslationMap
+  incidents: TranslationMap
+  notices: TranslationMap
+}
+
+interface LocalizableTreeNode {
+  ID: number
+  Name?: string
+  Description?: string
+  Children?: LocalizableTreeNode[] | null
+}
+
+interface LocalizableComponentRef {
+  ID: number
+  Name?: string
+}
+
+interface LocalizableIncident {
+  ID: number
+  Title?: string
+  Message?: string
+  Components?: LocalizableComponentRef[] | null
+}
+
+interface LocalizableNotice {
+  ID: number
+  Title?: string
+  Message?: string
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+// Checks the response far enough that it can be applied safely; everything
+// else counts as "no translations" (null), and the page then shows the original.
+export const parsePublicTranslations = (res: unknown): PublicTranslations | null => {
   if (!isPlainObject(res) || !isPlainObject(res.components) || !isPlainObject(res.incidents) || !isPlainObject(res.notices)) {
     return null
   }
-  return { language: res.language || '', components: res.components, incidents: res.incidents, notices: res.notices }
+  return { language: (res.language as string) || '', components: res.components as TranslationMap, incidents: res.incidents as TranslationMap, notices: res.notices as TranslationMap }
 }
 
-// Ruft eine sprachabhängige öffentliche Antwort ab. Ist die Sprache des Besuchers
-// bei der Seite nicht aktiv, antwortet der Server mit 400; dann folgt ein zweiter
-// Abruf ohne `lang` (Standardsprache der Seite). Jeder andere Fehler ergibt null:
-// Übersetzungen sind eine Zugabe und dürfen die Seite nie blockieren.
-const fetchWithLangFallback = async (apiFetch, path, lang, token, parse) => {
-  const build = (l) => {
-    const params = []
+// Fetches a language-dependent public response. If the visitor's language is
+// not active on the page, the server answers with 400; then a second fetch
+// without `lang` follows (the page's default language). Any other error yields null:
+// translations are an extra and must never block the page.
+const fetchWithLangFallback = async <R>(apiFetch: ApiFetch, path: string, lang: string | null | undefined, token: unknown, parse: (res: unknown) => R): Promise<R | null> => {
+  const build = (l: string | null | undefined) => {
+    const params: string[] = []
     if (l) params.push(`lang=${encodeURIComponent(l)}`)
-    if (token) params.push(`token=${encodeURIComponent(token)}`)
+    if (token) params.push(`token=${encodeURIComponent(token as string)}`)
     return `${path}${params.length ? `?${params.join('&')}` : ''}`
   }
   try {
     return parse(await apiFetch(build(lang), { expectedStatuses: [400] }))
   } catch (err) {
-    if (err?.status !== 400 || !lang) return null
+    if ((err as ApiError | null | undefined)?.status !== 400 || !lang) return null
   }
   try {
     return parse(await apiFetch(build(''), { expectedStatuses: [400] }))
@@ -39,67 +83,68 @@ const fetchWithLangFallback = async (apiFetch, path, lang, token, parse) => {
   }
 }
 
-export const fetchPublicTranslations = (apiFetch, slug, lang, token) =>
+export const fetchPublicTranslations = (apiFetch: ApiFetch, slug: string, lang: string | null | undefined, token?: unknown): Promise<PublicTranslations | null> =>
   fetchWithLangFallback(apiFetch, `/api/public/pages/${slug}/translations`, lang, token, parsePublicTranslations)
 
-// Updates eines Vorfalls. Die Antwort (GET .../incidents/{id}/update-translations)
-// trägt je Update-ID den bestätigten Text in der Sprache des Besuchers (Rückfall
-// Standardsprache); alles andere gilt als „keine Übersetzungen“ (leere Map).
-const parseUpdateTranslations = (res) => (isPlainObject(res) && isPlainObject(res.updates) ? res.updates : {})
+// Updates of an incident. The response (GET .../incidents/{id}/update-translations)
+// carries per update ID the confirmed text in the visitor's language (falling back
+// to the default language); everything else counts as "no translations" (empty map).
+const parseUpdateTranslations = (res: unknown): Record<string, unknown> => (isPlainObject(res) && isPlainObject(res.updates) ? res.updates : {})
 
-export const fetchPublicUpdateTranslations = async (apiFetch, slug, incidentId, lang, token) =>
+export const fetchPublicUpdateTranslations = async (apiFetch: ApiFetch, slug: string, incidentId: number | string, lang: string | null | undefined, token?: unknown): Promise<Record<string, unknown>> =>
   (await fetchWithLangFallback(apiFetch, `/api/public/pages/${slug}/incidents/${incidentId}/update-translations`, lang, token, parseUpdateTranslations)) ?? {}
 
-// Timeline-Einträge ({ id, message, … }) mit dem übersetzten Text; ohne Eintrag
-// in der Map (oder bei leerem Text) bleibt das Original. Gleiche Liste zurück,
-// wenn nichts zu übersetzen ist.
-export const localizeUpdates = (list, map) => {
+// Timeline entries ({ id, message, … }) with the translated text; without an entry
+// in the map (or with an empty text) the original stays. The same list comes back
+// if there is nothing to translate.
+export const localizeUpdates = <L extends readonly { id: number | string; message?: string }[] | null | undefined>(list: L, map: unknown): L => {
   if (!Array.isArray(list) || !isPlainObject(map) || Object.keys(map).length === 0) return list
-  return list.map((u) => {
+  return (list as NonNullable<L>).map((u) => {
     const text = map[String(u.id)]
     return typeof text === 'string' && text.trim() !== '' ? { ...u, message: text } : u
-  })
+  }) as unknown as L
 }
 
-// Leerer Text einer Übersetzung lässt das Original stehen.
-const pick = (original, translated) => (typeof translated === 'string' && translated.trim() !== '' ? translated : original)
+// An empty translated text leaves the original in place.
+const pick = <O>(original: O, translated: unknown): O | string => (typeof translated === 'string' && translated.trim() !== '' ? translated : original)
 
-const entry = (map, id) => (isPlainObject(map) ? map[String(id)] : undefined)
+const entry = (map: unknown, id: number | string): TranslatedText | undefined => (isPlainObject(map) ? map[String(id)] as TranslatedText | undefined : undefined)
 
-// Komponenten und Gruppen im Baum: Name (title) und Beschreibung (text).
-export const localizeTree = (nodes, map) => {
+// Components and groups in the tree: name (title) and description (text).
+export const localizeTree = <L extends readonly LocalizableTreeNode[] | null | undefined>(nodes: L, map: unknown): L => {
   if (!Array.isArray(nodes) || !isPlainObject(map) || Object.keys(map).length === 0) return nodes
-  const out = nodes.map((n) => {
+  const list = nodes as readonly LocalizableTreeNode[]
+  const out = list.map((n) => {
     const tr = entry(map, n.ID)
     const children = n.Children?.length ? localizeTree(n.Children, map) : n.Children
     if (!tr && children === n.Children) return n
     return { ...n, Name: pick(n.Name, tr?.title), Description: pick(n.Description, tr?.text), Children: children }
   })
-  // Gleiche Identität, wenn nichts übersetzt wurde (spart Neuberechnungen).
-  return out.every((o, idx) => o === nodes[idx]) ? nodes : out
+  // Same identity if nothing was translated (saves recomputations).
+  return out.every((o, idx) => o === list[idx]) ? nodes : out as unknown as L
 }
 
-// Vorfälle: Titel und Erstmeldung; die betroffenen Komponenten (i.Components)
-// tragen die übersetzten Namen. Die Updates des Vorfalls übersetzt localizeUpdates.
-export const localizeIncidents = (list, translations) => {
+// Incidents: title and initial message; the affected components (i.Components)
+// carry the translated names. localizeUpdates translates the incident's updates.
+export const localizeIncidents = <L extends readonly LocalizableIncident[] | null | undefined>(list: L, translations: PublicTranslations | null | undefined): L => {
   if (!Array.isArray(list) || !translations) return list
   const { incidents, components } = translations
-  return list.map((i) => {
+  return (list as readonly LocalizableIncident[]).map((i) => {
     const tr = entry(incidents, i.ID)
     const comps = (i.Components || []).map((c) => {
       const ct = entry(components, c.ID)
       return ct ? { ...c, Name: pick(c.Name, ct.title) } : c
     })
-    if (!tr && comps.every((c, idx) => c === i.Components[idx])) return i
+    if (!tr && comps.every((c, idx) => c === (i.Components as LocalizableComponentRef[])[idx])) return i
     return { ...i, Title: pick(i.Title, tr?.title), Message: pick(i.Message, tr?.text), ...(i.Components ? { Components: comps } : {}) }
-  })
+  }) as unknown as L
 }
 
-// Ankündigungen: Titel und Meldung.
-export const localizeNotices = (list, map) => {
+// Notices: title and message.
+export const localizeNotices = <L extends readonly LocalizableNotice[] | null | undefined>(list: L, map: unknown): L => {
   if (!Array.isArray(list) || !isPlainObject(map)) return list
-  return list.map((n) => {
+  return (list as readonly LocalizableNotice[]).map((n) => {
     const tr = entry(map, n.ID)
     return tr ? { ...n, Title: pick(n.Title, tr.title), Message: pick(n.Message, tr.text) } : n
-  })
+  }) as unknown as L
 }

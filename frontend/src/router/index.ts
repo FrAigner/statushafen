@@ -1,19 +1,34 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import { useAuth } from '../composables/useAuth'
 import { isBasicAuthChallenge } from '../composables/useApi'
 import { safeReturnTo } from '../utils/safeReturnTo'
+import type { AuthUser } from '../types/api'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** The route (and its children) needs a signed-in user. */
+    requiresAuth?: boolean
+    /** Start page of the admin area: AdminLayout leads to the first readable tab. */
+    home?: boolean
+    /** Permission needed to read the page (`<resource>:read`, see utils/adminNav.ts). */
+    permission?: string
+    /** Only global admins may open the page. */
+    globalOnly?: boolean
+    /** Base path of the docs links when the docs are shown inside the admin frame. */
+    docsBase?: string
+  }
+}
 
-// Layouts bleiben eager: praktisch jede Route braucht ohnehin eines der beiden
-// (zielt auf die - deutlich größeren - View-Komponenten ab).
+// Layouts stay eager: practically every route needs one of the two anyway
+// (this targets the - considerably larger - view components).
 import PublicLayout from '../layouts/PublicLayout.vue'
 import AdminLayout from '../layouts/AdminLayout.vue'
 
-// Alle Admin- und Public-Views per dynamischem import() statt statischem
-// Top-Level-Import geladen: Vite erzeugt daraus pro View einen
-// eigenen Chunk, der erst beim tatsächlichen Aufruf der Route nachgeladen
-// wird, statt den kompletten Admin-Bereich in den initialen Bundle
-// aufzunehmen.
+// All admin and public views are loaded via dynamic import() instead of a static
+// top-level import: Vite creates a separate chunk per view from it, which
+// is only loaded when the route is actually visited, instead of putting the
+// complete admin area into the initial bundle.
 const PublicRoot = () => import('../views/public/PublicRoot.vue')
 const StatusPage = () => import('../views/public/StatusPage.vue')
 const Unsubscribe = () => import('../views/public/Unsubscribe.vue')
@@ -52,7 +67,7 @@ const AdminUiTranslations = () => import('../views/admin/AdminUiTranslations.vue
 const AdminSystemSettings = () => import('../views/admin/AdminSystemSettings.vue')
 const AdminHome = () => import('../views/admin/AdminHome.vue')
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     component: PublicLayout,
@@ -61,9 +76,9 @@ const routes = [
     ]
   },
   {
-    // Host-unabhängiger Zugriffsweg auf Mandanten-Statusseiten (z.B. für
-    // Deployments ohne eigene Wildcard-Domain, wo Subdomains wie
-    // "acme.<host>" nicht verfügbar sind).
+    // Host-independent access path to tenant status pages (e.g. for
+    // deployments without their own wildcard domain, where subdomains like
+    // "acme.<host>" are not available).
     path: '/status/:slug',
     component: PublicLayout,
     children: [
@@ -71,8 +86,8 @@ const routes = [
     ]
   },
   {
-    // Self-Service-Unsubscribe-Link aus Benachrichtigungsmails,
-    // authentifiziert per signiertem ?token= statt Login.
+    // Self-service unsubscribe link from notification mails,
+    // authenticated via a signed ?token= instead of a login.
     path: '/unsubscribe',
     component: PublicLayout,
     children: [
@@ -80,7 +95,7 @@ const routes = [
     ]
   },
   {
-    // Double-Opt-in-Link aus der Bestätigungsmail eines E-Mail-Abos.
+    // Double opt-in link from the confirmation mail of an email subscription.
     path: '/subscribe/confirm',
     component: PublicLayout,
     children: [
@@ -88,7 +103,7 @@ const routes = [
     ]
   },
   {
-    // Einladungslink auf eine Statusseite (annehmen/ablehnen).
+    // Invitation link to a status page (accept/decline).
     path: '/invitation',
     component: PublicLayout,
     children: [
@@ -96,9 +111,9 @@ const routes = [
     ]
   },
   {
-    // Self-Service-Bestellung neuer Statusseiten ("Eingangstor"-
-    // Homepage) - Ablauf: Formular -> Email-Bestätigung -> Passwort setzen,
-    // siehe handlers/page_order.go im Backend für den vollständigen Flow.
+    // Self-service ordering of new status pages ("gateway"
+    // homepage) - flow: form -> email confirmation -> set password,
+    // see handlers/page_order.go in the backend for the complete flow.
     path: '/order',
     component: PublicLayout,
     children: [
@@ -108,9 +123,9 @@ const routes = [
     ]
   },
   {
-    // Eingebaute Dokumentation, öffentlich (normaler SPA-Pfad,
-    // daher keine eigene Basic-Auth-Ausnahme in Caddy nötig). Ein Abschnitt je
-    // Unterseite, /docs zeigt den ersten.
+    // Built-in documentation, public (normal SPA path, so no separate
+    // basic auth exception in Caddy is needed). One section per
+    // subpage; /docs shows the first.
     path: '/docs',
     component: PublicLayout,
     children: [
@@ -125,7 +140,7 @@ const routes = [
     ]
   },
   {
-    // SSO Callback – kein Layout nötig
+    // SSO callback – no layout needed
     path: '/auth/sso-callback',
     component: SSOCallback
   },
@@ -134,14 +149,14 @@ const routes = [
     component: AdminLayout,
     meta: { requiresAuth: true },
     children: [
-      // Startseite des Admin-Bereichs. AdminLayout führt (meta.home) zum
-      // ersten Tab, den der Nutzer lesen darf, oder zeigt „Keine Berechtigung“.
+      // Start page of the admin area. AdminLayout leads (meta.home) to the
+      // first tab the user may read, or shows "no permission".
       { path: '', component: AdminHome, meta: { home: true } },
-      // meta.permission nennt das Recht, das die Seite zum Lesen
-      // braucht (`<ressource>:read` des Tabs, siehe utils/adminNav.js). Fehlt es,
-      // zeigt AdminLayout die Seite „Keine Berechtigung“ statt der View (keine
-      // API-Aufrufe, keine Weiterleitung). Globale Ressourcen (overview, users, ...)
-      // sind nur für Global Admins lesbar, das regelt useAuth.hasPerm.
+      // meta.permission names the permission the page needs for reading
+      // (`<resource>:read` of the tab, see utils/adminNav.ts). If it is missing,
+      // AdminLayout shows the "no permission" page instead of the view (no
+      // API calls, no redirect). Global resources (overview, users, ...)
+      // are only readable for global admins; useAuth.hasPerm handles that.
       { path: 'overview', component: AdminOverview, meta: { permission: 'overview:read' } },
       { path: 'monitoring', component: AdminMonitoring, meta: { permission: 'monitoring:read' } },
       { path: 'pages', component: AdminStatusPages, meta: { permission: 'pages:read', globalOnly: true } },
@@ -158,28 +173,28 @@ const routes = [
       { path: 'users', component: AdminUsers, meta: { permission: 'users:read' } },
       { path: 'roles', component: AdminRoles, meta: { permission: 'roles:read' } },
       { path: 'tags', component: AdminTags, meta: { permission: 'tags:read' } },
-      // Sprachverwaltung: Ein Seiten-Admin ohne Global-Admin-Rechte
-      // muss die Sprachen seiner eigenen Statusseite aktivieren können. Der
-      // global-admin-only-Teil (Sprachkatalog anlegen/bearbeiten) blendet sich
-      // innerhalb der Komponente selbst per isGlobalAdmin aus.
+      // Language management: a page admin without global admin rights
+      // must be able to enable the languages of their own status page. The
+      // global-admin-only part (create/edit the language catalogue) hides itself
+      // inside the component via isGlobalAdmin.
       { path: 'languages', component: AdminLanguages, meta: { permission: 'languages:read' } },
-      // props: true, sonst kommt :incidentId usw. nicht als Prop
-      // in der View an und sie lädt `…/undefined`.
+      // props: true, otherwise :incidentId etc. does not arrive as a prop
+      // in the view and it loads `…/undefined`.
       { path: 'incidents/:incidentId/translations', component: AdminIncidentTranslations, props: true, meta: { permission: 'incidents:read' } },
       { path: 'components/:componentId/translations', component: AdminComponentTranslations, props: true, meta: { permission: 'components:read' } },
       { path: 'notices/:noticeId/translations', component: AdminGeneralNoticeTranslations, props: true, meta: { permission: 'notices:read' } },
-      // SSO je Statusseite: `sso:read` auf der Seite.
+      // SSO per status page: `sso:read` on the page.
       { path: 'sso', component: AdminSSO, meta: { permission: 'sso:read' } },
-      // UI-Übersetzungs-Editor: ein Seiten-Admin muss die
-      // UI-Texte seiner eigenen Seite überschreiben können. Der global-admin-only
-      // Scope blendet sich innerhalb der Komponente per isGlobalAdmin aus.
+      // UI translation editor: a page admin must be able to override the
+      // UI texts of their own page. The global-admin-only scope hides itself
+      // inside the component via isGlobalAdmin.
       { path: 'ui-translations', component: AdminUiTranslations, meta: { permission: 'ui_translations:read' } },
-      // Systemeinstellungen: erste globale Plattform-Einstellung
-      // (Self-Service-Bestellung an/aus).
+      // System settings: first global platform setting
+      // (self-service ordering on/off).
       { path: 'system-settings', component: AdminSystemSettings, meta: { permission: 'system_settings:read' } },
-      // Minimale Profilseite - für alle eingeloggten User, nicht
-      // nur Global Admins, da hier (vorerst nur) die eigene UI-Sprache
-      // eingestellt wird.
+      // Minimal profile page - for all signed-in users, not only
+      // global admins, since this is where (for now only) one's own UI language
+      // is set.
       { path: 'profile', component: ProfileView },
       // The docs inside the admin frame (sidebar link "Documentation"): same page as /docs,
       // every docs link stays below this base. Login only, no extra permission.
@@ -203,14 +218,14 @@ router.beforeEach(async (to, from, next) => {
       const apiBase = import.meta.env.VITE_API_URL || ''
       // Direct fetch to avoid circular dependency in useApi inside guard
       const res = await fetch(`${apiBase}/api/me`, {
-        // X-Auth-Token statt Authorization (dort steht Caddys Basic Auth)
+        // X-Auth-Token instead of Authorization (that one carries Caddy's basic auth)
         headers: { 'X-Auth-Token': token.value }
       })
-      // Caddys Basic-Auth-401 sagt nichts über das App-Token.
+      // Caddy's basic auth 401 says nothing about the app token.
       if ((res.status === 401 && !isBasicAuthChallenge(res)) || res.status === 403) {
         logout()
       } else if (res.ok) {
-        const data = await res.json()
+        const data = await res.json() as AuthUser
         setAuth(token.value, data)
       } else {
         console.warn(`Verifizierungs-Serverfehler: Status ${res.status}`)

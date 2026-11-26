@@ -1,12 +1,25 @@
-// Navigation des Admin-Bereichs als Daten. Jeder Tab ist eine
-// Ressource des Rechtemodells (utils/permissions.js); Layout, Router-Metadaten,
-// Startseite nach dem Login und die Rollen-Matrix lesen alle von hier, damit
-// Tabs, Rechte und Beschriftungen nicht auseinanderlaufen.
+// Navigation of the admin area as data. Every tab is a resource of the
+// permission model (utils/permissions.ts); layout, router metadata, the start
+// page after login and the role matrix all read from here, so that tabs,
+// permissions and labels do not drift apart.
 //
-// `resource: null` = kein Recht nötig (Doku). `labelKey` zeigt auf
-// adminNav.items.<key> in den Sprachdateien.
+// `resource: null` = no permission needed (docs). `labelKey` points to
+// adminNav.items.<key> in the locale files.
 
-export const NAV_GROUPS = [
+export interface NavItem {
+  resource: string | null
+  to: string
+  icon: string
+  labelKey: string
+  globalOnly?: boolean
+}
+
+export interface NavGroup {
+  key: string
+  items: NavItem[]
+}
+
+export const NAV_GROUPS: NavGroup[] = [
   {
     key: 'operations',
     items: [
@@ -31,8 +44,8 @@ export const NAV_GROUPS = [
   {
     key: 'management',
     items: [
-      // Die Liste aller Statusseiten ist plattformweit (GET /api/pages: Global Admin); die
-      // Rechte pages:* gelten für die eigene Seite (Seitenbenutzer, Domain, Webhook), nicht für den Tab.
+      // The list of all status pages is platform-wide (GET /api/pages: global admin); the
+      // pages:* permissions apply to one's own page (page users, domain, webhook), not to the tab.
       { resource: 'pages', to: '/admin/pages', icon: 'globe', labelKey: 'pages', globalOnly: true },
       { resource: 'users', to: '/admin/users', icon: 'user', labelKey: 'users' },
       { resource: 'roles', to: '/admin/roles', icon: 'key', labelKey: 'roles' },
@@ -52,10 +65,10 @@ export const NAV_GROUPS = [
   },
 ]
 
-// Der erste Tab, den hasPerm lesen darf (Startseite nach dem Login, Ziel auf der
-// „Keine Berechtigung“-Seite). Die Doku zählt nicht: Sie ist keine Admin-Seite.
-// null, wenn nichts erlaubt ist.
-export function firstAllowedItem(hasPerm, isGlobalAdmin = false) {
+// The first tab hasPerm may read (start page after login, target on the
+// "no permission" page). The docs do not count: they are not an admin page.
+// null if nothing is allowed.
+export function firstAllowedItem(hasPerm: (perm: string) => boolean, isGlobalAdmin = false): NavItem | null {
   for (const group of NAV_GROUPS) {
     for (const item of group.items) {
       if (item.resource && (!item.globalOnly || isGlobalAdmin) && hasPerm(`${item.resource}:read`)) return item
