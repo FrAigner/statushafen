@@ -5,9 +5,9 @@ import i18n from '../../i18n'
 import Unsubscribe from './Unsubscribe.vue'
 import { axe } from '../../test-support/axe'
 
-// Die Seite beendet das Abo erst nach Klick per
-// POST. Vorher feuerte sie beim Mounten einen GET, der direkt löschte -
-// Link-Scanner/Prefetcher beendeten so Abos ungewollt.
+// The page ends the subscription only after a click via
+// POST. Previously it fired a GET on mount that deleted directly -
+// link scanners/prefetchers ended subscriptions unintentionally that way.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -44,7 +44,7 @@ describe('Unsubscribe', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Kein Abbestell-Token in diesem Link gefunden.')
     expect(wrapper.find('.btn-unsubscribe').exists()).toBe(false)
-    // Stufe 4e: Der Fehler wird Screenreadern als Alert angesagt.
+    // Stage 4e: the error is announced to screen readers as an alert.
     expect(wrapper.find('[role="alert"]').text()).toContain('Kein Abbestell-Token')
   })
 

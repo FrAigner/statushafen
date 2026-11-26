@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import StatusPage from './StatusPage.vue'
 import LandingPage from './LandingPage.vue'
@@ -7,29 +7,29 @@ import { appBaseDomains } from '../../utils/appDomains'
 
 const { apiFetch } = useApi()
 
-const slug = ref(null)
+const slug = ref<string | null>(null)
 const isResolvingCustomDomain = ref(false)
 
-// PaaS-Basis-Domains, bei denen die erste Subdomain-Ebene der App-Name des
-// Deployments ist (z.B. "statushafen-xxxx.onrender.com"), nicht ein
-// Mandanten-Slug. Auf solchen Hosts greift die Mandanten-Erkennung nur über
-// den host-unabhängigen Pfad /status/:slug.
+// PaaS base domains where the first subdomain level is the app name of the
+// deployment (e.g. "statushafen-xxxx.onrender.com"), not a
+// tenant slug. On such hosts tenant detection only works via
+// the host-independent path /status/:slug.
 const PLATFORM_DOMAINS = ['onrender.com', 'vercel.app', 'netlify.app', 'herokuapp.com']
 
-// Subdomains der eigenen Basisdomain, die NIE ein Mandanten-Slug sein können,
-// weil sie bereits anderweitig belegt sind.
+// Subdomains of the own base domain that can NEVER be a tenant slug,
+// because they are already taken otherwise.
 const RESERVED_SUBDOMAINS = new Set(['www', 'staging'])
 
-function isPlatformHost(host) {
+function isPlatformHost(host: string) {
   return PLATFORM_DOMAINS.some(domain => host.endsWith(`.${domain}`))
 }
 
-// Eigene Basis-Domain(s) der Anwendung (VITE_APP_BASE_DOMAINS): sub.<eine dieser
-// Domains> ist immer ein Mandanten-Slug per Subdomain-Konvention, siehe unten. Alles
-// andere (z.B. "status.kundenfirma.de") ist eine potenzielle Custom Domain
-// und wird per Backend-Lookup aufgelöst statt per Namensheuristik geraten. Ohne
-// konfigurierte Basisdomain gibt es keine Subdomain-Konvention.
-function isOwnBaseDomain(host) {
+// The application's own base domain(s) (VITE_APP_BASE_DOMAINS): sub.<one of these
+// domains> is always a tenant slug by subdomain convention, see below. Everything
+// else (e.g. "status.kundenfirma.de") is a potential custom domain
+// and is resolved by a backend lookup instead of guessed by a name heuristic. Without
+// a configured base domain there is no subdomain convention.
+function isOwnBaseDomain(host: string) {
   return appBaseDomains().some(base => host === base || host.endsWith(`.${base}`))
 }
 
@@ -37,27 +37,27 @@ onMounted(async () => {
   const host = window.location.hostname
   const parts = host.split('.')
 
-  // Einfache Logik: wenn localhost oder 127.0.0.1, dann kein slug, es sei denn es ist sub.localhost
-  // In Produktion: sub.domain.com -> parts.length >= 3
+  // Simple logic: localhost or 127.0.0.1 means no slug, unless it is sub.localhost
+  // In production: sub.domain.com -> parts.length >= 3
   if (host === 'localhost' || host === '127.0.0.1') {
     slug.value = null
   } else if (host.endsWith('localhost') && parts.length > 1) {
-    slug.value = parts[0]
+    slug.value = parts[0] as string
   } else if (isPlatformHost(host)) {
     slug.value = null
   } else if (isOwnBaseDomain(host)) {
-    // "staging" ist reserviert: staging.<basedomain> ist die Staging-Umgebung
-    // der App selbst, keine Mandanten-Subdomain - sonst
-    // versucht die App, eine Statusseite mit Slug "staging" zu laden, die es
-    // nie geben wird, und zeigt statt der Startseite einen Ladefehler.
-    slug.value = parts.length >= 3 && !RESERVED_SUBDOMAINS.has(parts[0]) ? parts[0] : null
+    // "staging" is reserved: staging.<basedomain> is the staging environment
+    // of the app itself, not a tenant subdomain - otherwise
+    // the app tries to load a status page with slug "staging" that will
+    // never exist, and shows a load error instead of the landing page.
+    slug.value = parts.length >= 3 && !RESERVED_SUBDOMAINS.has(parts[0] as string) ? parts[0] as string : null
   } else {
-    // Weder Plattform- noch eigene Basis-Domain -> mögliche Custom Domain
-    // Auflösung läuft über den Server, da hier keine
-    // Namenskonvention greift (z.B. "status.kundenfirma.de").
+    // Neither a platform nor an own base domain -> possible custom domain.
+    // Resolution runs via the server, since no naming
+    // convention applies here (e.g. "status.kundenfirma.de").
     isResolvingCustomDomain.value = true
     try {
-      const resp = await apiFetch(`/api/public/resolve-domain?host=${encodeURIComponent(host)}`)
+      const resp = await apiFetch<{ slug?: string }>(`/api/public/resolve-domain?host=${encodeURIComponent(host)}`)
       slug.value = resp.slug || null
     } catch {
       slug.value = null

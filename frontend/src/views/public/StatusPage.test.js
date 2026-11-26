@@ -63,9 +63,9 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// Antwortet je nach URL, damit Reihenfolge und Anzahl der Requests (Dashboard,
-// Verfügbarkeit, Updates der aktuellen Vorfälle, Verlauf-Dialog) keine Rolle spielen.
-// availability: null => 404 (Balken entfallen); detail: Antwort für /incidents/:id.
+// Answers by URL, so the order and number of requests (dashboard,
+// availability, updates of the current incidents, history dialog) do not matter.
+// availability: null => 404 (bars are left out); detail: answer for /incidents/:id.
 function routedFetch({ dashboard = dashboardFixture(), availability = null, detail = { updates: [] }, detailError = null } = {}) {
   return vi.fn(async (url) => {
     if (url.includes('/availability')) return availability ? jsonResponse(availability) : jsonResponse({}, 404)
@@ -79,7 +79,7 @@ function routedFetch({ dashboard = dashboardFixture(), availability = null, deta
 }
 const dashboardCalls = (fetchMock) => fetchMock.mock.calls.filter(([url]) => url.includes('/dashboard'))
 
-// Abschnitte der Seite (4a) per Überschrift statt per CSS-Klasse.
+// Sections of the page (4a) by heading instead of CSS class.
 const section = (w, id) => w.find(`section[aria-labelledby="${id}"]`)
 const currentSection = (w) => section(w, 'sp-current-heading')
 const currentCards = (w) => currentSection(w).findAll('.sp-incident')
@@ -120,9 +120,9 @@ describe('StatusPage', () => {
     revealEditAboMock = vi.fn()
     refreshMock = vi.fn()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() would otherwise fall back to 'en'
+    // in the test environment (happy-dom navigator.language === 'en-US').
     i18n.global.locale.value = 'de'
   })
 
@@ -142,7 +142,7 @@ describe('StatusPage', () => {
     expect(wrapper.findAll('.component-tree-node-stub')).toHaveLength(2)
   })
 
-  // Sprachen der Seite für den Umschalter im Kopf.
+  // Languages of the page for the switcher in the header.
   it('gibt die Sprachen der Seite aus dem Dashboard an den Umschalter und leert sie beim Verlassen', async () => {
     const languages = [{ code: 'de', name: 'Deutsch', is_default: true }, { code: 'hr', name: 'Hrvatski', is_default: false }]
     const { pageLanguages } = usePublicPageLanguages()
@@ -182,7 +182,7 @@ describe('StatusPage', () => {
       expect(wrapper.find('.sp-hero').exists()).toBe(true)
       expect(wrapper.find('.pl-overall').exists()).toBe(false)
       expect(wrapper.findAll('.pl-card')).toHaveLength(2)
-      // Gesamtbalken + je ein Balken für die beiden Blätter (Gruppe „Web“ hat keinen).
+      // Overall bar + one bar each for the two leaves (group "Web" has none).
       expect(wrapper.findAll('.avail__day')).toHaveLength(90 * 3)
       expect(wrapper.find('.pl-timeline').text()).toContain('API down')
       expect(fetchMock).toHaveBeenCalledWith('/api/public/pages/acme/availability?include=components', expect.anything())
@@ -237,11 +237,11 @@ describe('StatusPage', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/public/pages/acme/dashboard?token=tok123', expect.anything())
   })
 
-  // Regressionstest Zustand D: der Subscriber-Token im Link
-  // gewährt nur Lesezugriff auf eine private Seite (useAuth bleibt
-  // ausgeloggt) - die neue Abo-Zustandslogik (A/B/C) darf diesen Zugriffsweg
-  // nicht brechen; die Seite lädt normal und zeigt wie bei Zustand A nur
-  // "Jetzt abonnieren", ohne Verwalten-Knopf oder Fehlermeldung.
+  // Regression test state D: the subscriber token in the link
+  // grants only read access to a private page (useAuth stays
+  // logged out) - the new subscription state logic (A/B/C) must not break this
+  // access path; the page loads normally and, as in state A, only shows
+  // "Jetzt abonnieren", without a manage button or error message.
   it('Zustand D (Token-Link): Seite bleibt funktional, Abo-Zustandslogik bricht den Zugriff nicht', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(dashboardFixture()))
     const { wrapper } = await mountStatusPage({ routePath: '/status/acme?token=tok123', fetchImpl: fetchMock })
@@ -261,8 +261,8 @@ describe('StatusPage', () => {
     expect(wrapper.find('a[href^="/login"]').exists()).toBe(true)
   })
 
-  // Eine private Seite ohne Berechtigung antwortet wie eine fehlende Seite mit 404.
-  // Der Zustand muss beides abdecken und den Weg zur Anmeldung offen lassen.
+  // A private page without permission answers like a missing page with 404.
+  // The state must cover both and keep the way to the login open.
   it('zeigt bei 404 denselben Zustand mit Login-Link und neutralem Text', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ code: 'page_not_found' }, 404))
@@ -284,8 +284,8 @@ describe('StatusPage', () => {
     expect(wrapper.find('.private-error-state a.oidc-login-btn').attributes('href')).toBe('/api/auth/sso/login?slug=acme&return_to=%2Fstatus%2Facme')
   })
 
-  // SSO-Knopf der Seite direkt im privaten Fehlerzustand, und der
-  // Login-Link gibt die Seite weiter, damit die Login-Seite ihn ebenfalls zeigt.
+  // The page's SSO button directly in the private error state, and the
+  // login link passes the page on, so the login page shows it as well.
   it('offers page SSO in the private error state and returns to this page afterwards', async () => {
     const fetchMock = vi.fn(async (url) => (url.endsWith('/sso')
       ? jsonResponse({ oidc_enabled: true, page_id: 1 })
@@ -353,7 +353,7 @@ describe('StatusPage', () => {
     it('hellt die Sekundärfarbe im Dunkelmodus auf und folgt dem Themewechsel', async () => {
       theme.value = 'dark'
       const { wrapper } = await mountBranded({ PrimaryColor: '', SecondaryColor: '#5e6c84' })
-      // #7e899d erreichte auf der Hero-Tönung (--ok-soft dunkel, #132a1e) nur 4,32:1.
+      // #7e899d reached only 4.32:1 on the hero tint (--ok-soft dark, #132a1e).
       const dark = wrapper.find('.content-area').attributes('style')
       expect(dark).toBe('--text-secondary: #8691a3;')
       for (const bg of BRAND_SECONDARY_BACKGROUNDS.dark) {
@@ -367,7 +367,7 @@ describe('StatusPage', () => {
     })
 
     it('prüft hell gegen Panel und Hover-Fläche, nicht nur gegen Weiß', async () => {
-      // #6b778c hält auf Weiß 4,5:1, auf #f0f1f3 nicht.
+      // #6b778c holds 4.5:1 on white, not on #f0f1f3.
       const { wrapper } = await mountBranded({ SecondaryColor: '#6b778c' })
       expect(wrapper.find('.content-area').attributes('style')).toBe('--text-secondary: #606b7e;')
     })
@@ -407,16 +407,16 @@ describe('StatusPage', () => {
     })
 
     it('zeigt bis zur Schwelle (8 Einträge inkl. „Alle“) alle Chips ohne Mehr-anzeigen-Knopf', async () => {
-      const { wrapper } = await mountMany(7) // 7 + ZZ + Alle = 9 -> über Schwelle
+      const { wrapper } = await mountMany(7) // 7 + ZZ + all = 9 -> above the threshold
       expect(wrapper.find('.tag-more').exists()).toBe(true)
       wrapper.unmount()
-      const { wrapper: w2 } = await mountMany(6) // 6 + ZZ + Alle = 8 -> an der Schwelle
+      const { wrapper: w2 } = await mountMany(6) // 6 + ZZ + all = 8 -> at the threshold
       expect(w2.find('.tag-more').exists()).toBe(false)
       expect(regionChips(w2)).toHaveLength(8)
     })
 
     it('klappt über der Schwelle ein, zeigt „Mehr anzeigen (n)“ und klappt per Knopf auf und zu', async () => {
-      const { wrapper } = await mountMany(12) // 13 Regionen
+      const { wrapper } = await mountMany(12) // 13 regions
       expect(regionChips(wrapper)).toEqual(['Alle', 'R00', 'R01', 'R02', 'R03', 'R04', 'R05'])
       const more = wrapper.find('.tag-more')
       expect(more.text()).toBe('Mehr anzeigen (7)')
@@ -487,7 +487,7 @@ describe('StatusPage', () => {
 
     expect(wrapper.text()).toContain('Geplante Wartungsarbeiten')
     expect(wrapper.text()).toContain('Geplantes Upgrade')
-    // Der Maintenance-Incident darf nicht zusätzlich in "Aktuelle Vorfälle" auftauchen
+    // The maintenance incident must not additionally appear in "Aktuelle Vorfälle"
     const currentIncidentCards = currentCards(wrapper)
     expect(currentIncidentCards).toHaveLength(1)
     expect(currentIncidentCards[0].text()).toContain('API down')
@@ -505,8 +505,8 @@ describe('StatusPage', () => {
   })
 
   describe('Status-Filter auf Vorfälle', () => {
-    // Die Kopien in Components tragen absichtlich den manuell gesetzten Status
-    // 'operational': maßgeblich ist der (effektive) Status aus dem Baum.
+    // The copies in Components deliberately carry the manually set status
+    // 'operational': what counts is the (effective) status from the tree.
     const comp = (ID) => ({ ID, Name: `C${ID}`, Status: 'operational' })
     const inc = (ID, Status, ids, extra = {}) => ({
       ID, Title: `Vorfall ${ID}`, Message: 'm', Status, IsMaintenance: false,
@@ -570,8 +570,8 @@ describe('StatusPage', () => {
     })
 
     it('zeigt den passenden Vorfall unter „Aktuelle Vorfälle“ statt des Leerzustands (Fehlerbild: Vorfall fehlte trotz betroffener Komponente)', async () => {
-      // dashboardFixture: „API down“ betrifft API; ist API beeinträchtigt,
-      // muss der Vorfall beim Chip „Beeinträchtigt“ sichtbar bleiben.
+      // dashboardFixture: "API down" affects API; if API is degraded,
+      // the incident must stay visible with the chip "Beeinträchtigt".
       const fx = dashboardFixture()
       fx.components[0].Status = 'degraded_performance'
       fx.incidents[0].Components = [{ ID: 10, Name: 'API', Status: 'operational' }]
@@ -636,8 +636,8 @@ describe('StatusPage', () => {
       }
     })
 
-    // 4a: Die „Alles im grünen Bereich“-Karte entfällt, der Gesamtstatus
-    // oben sagt es (Form + Text), und ohne offenen Vorfall gibt es keinen Abschnitt.
+    // 4a: the "all systems operational" card is gone, the overall status
+    // at the top says it (shape + text), and without an open incident there is no section.
     it('zeigt ohne offene Vorfälle keinen Abschnitt „Aktuelle Vorfälle“, der Gesamtstatus sagt „in Ordnung“', async () => {
       const { wrapper } = await mountWith([inc(1, 'resolved'), inc(2, 'resolved')])
       expect(wrapper.find('.all-clear-card').exists()).toBe(false)
@@ -712,7 +712,7 @@ describe('StatusPage', () => {
     const moreButton = (w) => w.find('[data-test="load-more-incidents"]')
     const listCalls = (fetchMock) => fetchMock.mock.calls.filter(([url]) => url.includes('/incidents?'))
 
-    // Dashboard liefert 2 behobene und meldet weitere; die Liste liefert die nächsten.
+    // The dashboard delivers 2 resolved incidents and reports more; the list delivers the next ones.
     const fetchWith = ({ more = true, older = [resolved(3, '2026-05-01T10:00:00Z')], listError = false } = {}) => vi.fn(async (url) => {
       if (url.includes('/availability')) return jsonResponse({}, 404)
       if (url.includes('/incidents?')) {
@@ -744,7 +744,7 @@ describe('StatusPage', () => {
         '/api/pages/1/incidents?is_maintenance=any&state=resolved&limit=50&offset=2',
       ])
       expect(pastTitles(wrapper)).toEqual(['Alt 1', 'Alt 2', 'Alt 3'])
-      // weniger als eine volle Seite: nichts mehr zu holen
+      // less than a full page: nothing more to fetch
       expect(moreButton(wrapper).exists()).toBe(false)
     })
 
@@ -810,9 +810,9 @@ describe('StatusPage', () => {
       await flushPromises()
 
       expect(listCalls(fetchMock).map(([url]) => url)).toEqual([
-        '/api/pages/1/incidents?is_maintenance=any&state=resolved&limit=50&offset=2', // zwei behobene, der offene zählt nicht
+        '/api/pages/1/incidents?is_maintenance=any&state=resolved&limit=50&offset=2', // two resolved ones, the open one does not count
       ])
-      // Alt 2 liegt schon im Dashboard und erscheint nicht ein zweites Mal.
+      // Old 2 is already in the dashboard and does not appear a second time.
       expect(pastTitles(wrapper).filter(t => t === 'Alt 2')).toHaveLength(1)
       expect(pastTitles(wrapper)).toContain('Alt 3')
     })
@@ -838,7 +838,7 @@ describe('StatusPage', () => {
 
       await moreButton(wrapper).trigger('click')
       expect(moreButton(wrapper).attributes('disabled')).toBeDefined()
-      expect(wrapper.find('[data-test="load-more-error"]').exists()).toBe(false) // beim neuen Versuch weg
+      expect(wrapper.find('[data-test="load-more-error"]').exists()).toBe(false) // gone on the new attempt
       release()
       await flushPromises()
       expect(moreButton(wrapper).attributes('disabled')).toBeUndefined()
@@ -854,13 +854,13 @@ describe('StatusPage', () => {
         dashboardLoads += 1
         return jsonResponse(dashboardFixture({
           incidents: [resolved(1, '2026-07-01T10:00:00Z')],
-          incidents_more: dashboardLoads === 1, // spätere Dashboards melden nichts mehr
+          incidents_more: dashboardLoads === 1, // later dashboards report nothing more
         }))
       })
       const { wrapper } = await mountStatusPage({ fetchImpl: fetchMock })
       await moreButton(wrapper).trigger('click')
       await flushPromises()
-      expect(moreButton(wrapper).exists()).toBe(true) // volle Seite: weitere möglich
+      expect(moreButton(wrapper).exists()).toBe(true) // full page: more possible
 
       await vi.advanceTimersByTimeAsync(60000)
       await flushPromises()
@@ -1160,16 +1160,16 @@ describe('StatusPage', () => {
     })
     const { wrapper } = await mountStatusPage({ fetchImpl: fetchMock })
 
-    // Im Abschnitt „Aktuelle Vorfälle“ liegt der Investigating-Incident.
+    // The section "Aktuelle Vorfälle" holds the investigating incident.
     await currentCards(wrapper)[0].find('.incident-history-btn').trigger('click')
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledWith('/api/pages/1/incidents/100', expect.anything())
-    // Das History-Modal wird via <Teleport to="body"> gerendert und liegt
-    // damit außerhalb des von wrapper.find() durchsuchten Baums.
+    // The history modal is rendered via <Teleport to="body"> and thus lives
+    // outside the tree searched by wrapper.find().
     const body = new DOMWrapper(document.body)
     const rows = body.findAll('.tl-row')
-    // zusätzlich die Erstmeldung als ältester Eintrag.
+    // plus the initial report as the oldest entry.
     expect(rows).toHaveLength(3)
     expect(rows[0].text()).toContain('Behoben')
     expect(rows[1].text()).toContain('Untersuchung')
@@ -1244,7 +1244,7 @@ describe('StatusPage', () => {
         { ...base, ID: 1, Title: 'Nachgetragen', Status: 'resolved', StartedAt: '2026-10-02T08:00:00Z' },
         { ...base, ID: 2, Title: 'Neu', Status: 'investigating' },
       ])
-      // der behobene Vorfall steht im Verlauf, der offene als Karte.
+      // The resolved incident is in the history, the open one as a card.
       const past = wrapper.find('.past-incident')
       expect(past.text()).toContain(fmt('2026-10-02T08:00:00Z'))
       expect(past.text()).not.toContain(fmt('2026-10-22T01:06:00Z'))
@@ -1293,7 +1293,7 @@ describe('StatusPage', () => {
       expect(wrapper.vm.activeIncidents.map(i => i.ID)).toEqual([3])
     })
 
-    // 4a: Farbe und Form kommen aus Klassen (Stufe des Status), nicht aus Inline-Styles.
+    // 4a: colour and shape come from classes (level of the status), not from inline styles.
     it.each([
       ['scheduled', 'maintenance'], ['in_progress', 'maintenance'], ['resolved', 'operational'],
       ['investigating', 'major'], ['identified', 'partial'], ['monitoring', 'degraded'],
@@ -1326,7 +1326,7 @@ describe('StatusPage', () => {
       ])
       const badge = currentCards(wrapper)[0].find('.sp-incident-head .st-badge')
       expect(badge.text()).toBe('foo_bar')
-      // Unbekannte Status bekommen keine Statusfarbe, sondern die neutrale Darstellung.
+      // Unknown statuses get no status colour but the neutral rendering.
       expect(badge.classes()).toContain('st-badge--unknown')
       const rows = await openHistory(wrapper)
       expect(rows[0].find('.st-badge').text()).toBe('foo_bar')
@@ -1412,8 +1412,8 @@ describe('StatusPage', () => {
       expect(wrapper.find('.subscribe-no-sub').classes()).not.toContain('error')
     })
 
-    // 4a: „Abonnement verwalten“ gibt es nur einmal, im SubscriptionManager.
-    // Der Knopf im Abonnieren-Kasten (früher ein zweiter, gleichlautender) entfällt.
+    // 4a: "Abonnement verwalten" exists only once, in the SubscriptionManager.
+    // The button in the subscribe box (formerly a second one with the same label) is gone.
     it('C: eingeloggt mit Abonnement zeigt im Kasten nur "Jetzt abonnieren", Verwalten gibt es nur im Manager', async () => {
       useAuth().setAuth('jwt-1', { email: 'a@x.de' })
       const { wrapper } = await mountStatusPage()
@@ -1453,13 +1453,13 @@ describe('StatusPage', () => {
     i18n.global.locale.value = 'en'
     const { wrapper } = await mountStatusPage()
 
-    // Wartungsfenster-Zeitraum (formatMaintenanceWindow) - Startzeit im
-    // englischen Format statt "1. August 2026".
+    // Maintenance window period (formatMaintenanceWindow) - start time in
+    // English format instead of "1. August 2026".
     const maintenanceCard = maintenanceCards(wrapper)[0]
     const expectedStart = new Date('2026-08-01T10:00:00Z').toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
     expect(maintenanceCard.text()).toContain(expectedStart)
 
-    // Incident-Zeitstempel (inline toLocaleString ohne Optionen).
+    // Incident timestamp (inline toLocaleString without options).
     const incidentCard = currentCards(wrapper)[0]
     const expectedIncidentTime = new Date('2026-07-01T10:00:00Z').toLocaleString('en-US')
     expect(incidentCard.text()).toContain(expectedIncidentTime)
@@ -1511,7 +1511,7 @@ describe('StatusPage', () => {
     expect(modal).not.toBeNull()
     expect(await axe(modal)).toHaveNoViolations()
   })
-  // ===== Redesign 4a: Gesamtstatus oben, Vorfall mit Zeitleiste, 90-Tage-Balken =====
+  // ===== Redesign 4a: overall status at the top, incident with timeline, 90-day bars =====
   describe('Redesign 4a: Aufbau der Seite', () => {
     const comps = (...statuses) => statuses.map((Status, i) => ({ ID: 20 + i, Name: `K${i}`, Status, Tags: [], Children: [] }))
     const dash = (components, incidents = []) => dashboardFixture({ components, incidents })
@@ -1580,7 +1580,7 @@ describe('StatusPage', () => {
         notices: [{ ID: 5, Title: 'H', Message: 'x', Level: 'critical', Collapsed: false, CreatedAt: '2026-07-01T10:00:00Z' }],
       })
       const { wrapper } = await mountDash(d)
-      // v-show (Suchhilfe) schreibt nur display: none, das ist kein gestalteter Inline-Style
+      // v-show (search help) only writes display: none, that is not a designed inline style
       const styled = [...wrapper.element.querySelectorAll('[style]')].filter(e => e.getAttribute('style').trim() !== 'display: none;')
       expect(styled).toEqual([wrapper.find('.content-area').element])
       expect(wrapper.find('.content-area').attributes('style')).toContain('--primary:')
@@ -1596,9 +1596,9 @@ describe('StatusPage', () => {
       expect(wrapper.find('.badge').exists()).toBe(false)
       expect(wrapper.find('.status-pulse').exists()).toBe(false)
       expect(wrapper.findAll('.st-badge').length).toBeGreaterThanOrEqual(3)
-      // Statusfilter: Form (Symbol) statt Farbpunkt
+      // Status filter: shape (icon) instead of a colour dot
       expect(wrapper.find('.filter-tag.status-tag-major_outage svg.status-icon').exists()).toBe(true)
-      // Geplante Wartung: Badge „Geplant“ mit Wartungsform
+      // Scheduled maintenance: badge "Geplant" with the maintenance shape
       const planned = maintenanceCards(wrapper)[0].find('.st-badge')
       expect(planned.text()).toBe('Geplant')
       expect(planned.classes()).toContain('st-badge--maintenance')
@@ -1765,8 +1765,8 @@ describe('StatusPage', () => {
     })
   })
 
-  // Kundenmarke (Plan „Risiken pro Paket“, 4a): eine kräftige Markenfarbe bleibt
-  // über --primary wirksam und wird nur so weit angepasst, dass weiße Schrift 4,5:1 hält.
+  // Customer brand (plan "risks per package", 4a): a strong brand colour stays
+  // effective via --primary and is only adjusted so far that white text keeps 4.5:1.
   describe('Redesign 4a: Kundenfarbe #e11d48', () => {
     it('setzt --primary aus der Kundenfarbe und stellt die Statusflächen nicht um', async () => {
       const d = dashboardFixture({ page: { ID: 1, Name: 'Acme', PrimaryColor: '#e11d48', HeaderStyle: 'classic' } })
@@ -1813,7 +1813,7 @@ describe('StatusPage', () => {
       expect(wrapper.find('.subscribe-wizard-stub').exists()).toBe(true)
     })
 
-    // toter Code aus der Zeit vor dem Abo-Wizard ist entfernt.
+    // Dead code from the time before the subscription wizard is removed.
     it('hat keinen toten Abo-Code (publicSubscribe, successMessage) und keine zugehörigen Texte mehr', async () => {
       const { wrapper } = await mountStatusPage({ fetchImpl: routedFetch() })
       expect(wrapper.vm.publicSubscribe).toBeUndefined()
@@ -1825,7 +1825,7 @@ describe('StatusPage', () => {
     })
   })
 
-  // externe Quellen auf der Statusseite.
+  // External sources on the status page.
   describe('externe Quellen', () => {
     const extComp = (over = {}) => ({
       ID: 20, Name: 'Compute', Status: 'operational', effective_status: 'major_outage', Tags: [], Children: [],
@@ -1880,7 +1880,7 @@ describe('StatusPage', () => {
       expect(sec.text()).toContain(evil)
     })
 
-    // Suche und Filter erfassen auch externe Meldungen.
+    // Search and filters also cover external reports.
     describe('Suche, Filter, Verlauf und Zeitleiste', () => {
       const comps = () => [
         { ID: 20, Name: 'Compute', Status: 'major_outage', Tags: [{ Name: 'DE' }], Children: [] },
@@ -1985,7 +1985,7 @@ describe('StatusPage', () => {
     })
   })
 
-  // Übersetzungen auf der öffentlichen Statusseite.
+  // Translations on the public status page.
   describe('Übersetzungen', () => {
     const trFixture = (overrides = {}) => ({
       language: 'en',
@@ -2002,7 +2002,7 @@ describe('StatusPage', () => {
       fx.incidents[0].Components = [{ ID: 10, Name: 'API' }]
       return fx
     }
-    // Dashboard, Übersetzungen und restliche Aufrufe; translations: Funktion oder Antwort.
+    // Dashboard, translations and remaining calls; translations: a function or an answer.
     const withTranslations = ({ dashboard = fixtureWithNotice(), translations = trFixture(), detail = { updates: [] } } = {}) => vi.fn(async (url) => {
       if (url.includes('/translations')) {
         const res = typeof translations === 'function' ? translations(url) : translations
@@ -2035,13 +2035,13 @@ describe('StatusPage', () => {
       expect(text).toContain('Notice text EN')
       expect(text).not.toContain('API antwortet nicht')
       expect(text).not.toContain('Hinweistext')
-      // betroffene Komponente im Vorfall trägt den übersetzten Namen
+      // The affected component in the incident carries the translated name
       expect(currentCards(wrapper)[0].text()).toContain('API (EN)')
     })
 
     it('lässt nicht übersetzte Texte im Original, ohne Fehlermeldung', async () => {
       const { wrapper } = await enMount()
-      // „Web“, „CDN“ und das Wartungsfenster haben keine Übersetzung
+      // "Web", "CDN" and the maintenance window have no translation
       const names = wrapper.findAll('.component-tree-node-stub').map(n => n.text())
       expect(names).toEqual(expect.arrayContaining(['Web']))
       expect(wrapper.text()).toContain('Geplantes Upgrade')
@@ -2227,7 +2227,7 @@ describe('StatusPage', () => {
       expect(await axe(wrapper)).toHaveNoViolations()
     })
   })
-  // Updates eines Vorfalls in der Sprache des Besuchers.
+  // Updates of an incident in the visitor's language.
   describe('Update-Übersetzungen', () => {
     const upd = (id, message) => ({ id, status: 'monitoring', message, created_at: `2026-07-01T1${id}:00:00Z` })
     const detail = { updates: [upd(1, 'Erstes Update'), upd(2, 'Zweites Update')] }
@@ -2271,7 +2271,7 @@ describe('StatusPage', () => {
       await currentCards(wrapper)[0].find('.incident-history-btn').trigger('click')
       await flushPromises()
       const msgs = [...document.body.querySelectorAll('.tl-msg')].map(m => m.textContent)
-      expect(msgs).toEqual(['Second update', 'First update', 'API antwortet nicht']) // Erstmeldung zuletzt, unübersetzt
+      expect(msgs).toEqual(['Second update', 'First update', 'API antwortet nicht']) // initial report last, untranslated
     })
 
     it('holt beim Sprachwechsel die Texte der geladenen Vorfälle neu', async () => {

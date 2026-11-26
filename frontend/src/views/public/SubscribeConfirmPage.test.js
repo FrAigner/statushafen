@@ -5,7 +5,7 @@ import i18n from '../../i18n'
 import SubscribeConfirmPage from './SubscribeConfirmPage.vue'
 import { axe } from '../../test-support/axe'
 
-// Bestätigungsseite des Double-Opt-in für E-Mail-Abos.
+// Confirmation page of the double opt-in for email subscriptions.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -99,7 +99,7 @@ describe('SubscribeConfirmPage', () => {
     expect(wrapper.find('h1').text()).toBe('Confirm subscription')
   })
 
-  // Stufe 4e: alle Zustände ohne axe-Funde; der Fehler ist ein Alert.
+  // Stage 4e: all states without axe findings; the error is an alert.
   it('hat in allen Zuständen keine axe-Funde, der Fehler ist ein Alert', async () => {
     const idle = await mountPage()
     expect(await axe(idle)).toHaveNoViolations()

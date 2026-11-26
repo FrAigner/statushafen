@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '../../composables/useApi'
 import { useLandingChrome, loadOrdersEnabled } from '../../composables/useLandingChrome'
@@ -6,14 +6,15 @@ import { useI18n } from 'vue-i18n'
 import AppIcon from '../../components/AppIcon.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import StatusIcon from '../../components/StatusIcon.vue'
+import type { StatusPage } from '../../types/api'
 
 const { apiFetch } = useApi()
 const { t } = useI18n()
 const { isLanding, ordersEnabled } = useLandingChrome()
 
-// Richtung A: PublicLayout zeigt auf der Startseite die volle
-// Kopfzeile mit Navigation; sie wird hier angemeldet und beim Verlassen
-// zurückgenommen, damit Statusseiten ihren schlichten Kopf behalten.
+// Direction A: on the landing page PublicLayout shows the full
+// header with navigation; it is registered here and withdrawn on leaving,
+// so that status pages keep their plain header.
 isLanding.value = true
 ordersEnabled.value = true
 onBeforeUnmount(() => {
@@ -21,10 +22,10 @@ onBeforeUnmount(() => {
   ordersEnabled.value = true
 })
 
-// Richtung A: feste Beispieldaten für die dekorative Statuskarte im
-// Hero (aria-hidden, keine echten Kundendaten). 30 Tage je Komponente als grobe
-// Segmente; je ein Teilausfall (Form: Schraffur, Farbe: orange) an fester
-// Position, damit die Darstellung stabil bleibt.
+// Direction A: fixed sample data for the decorative status card in the
+// hero (aria-hidden, no real customer data). 30 days per component as coarse
+// segments; one partial outage each (shape: hatching, colour: orange) at a fixed
+// position, so the rendering stays stable.
 const MOCK_DAYS = 30
 const MOCK_ROWS = [
   { key: 'mockApi', outliers: {} },
@@ -32,10 +33,10 @@ const MOCK_ROWS = [
   { key: 'mockPayments', outliers: { 9: 'partial' } },
 ].map(row => ({
   key: row.key,
-  bars: Array.from({ length: MOCK_DAYS }, (_, i) => row.outliers[i] ?? 'operational'),
+  bars: Array.from({ length: MOCK_DAYS }, (_, i) => (row.outliers as Record<number, string>)[i] ?? 'operational'),
 }))
 
-// Funktionsabschnitt: Symbole und Texte aus der Vorlage (landing.featureNTitle/Desc).
+// Features section: icons and texts from the template (landing.featureNTitle/Desc).
 const FEATURES = [
   { n: 1, icon: 'grid' },
   { n: 2, icon: 'alert-triangle' },
@@ -45,15 +46,15 @@ const FEATURES = [
   { n: 6, icon: 'shield' },
 ]
 
-const pages = ref([])
+const pages = ref<StatusPage[]>([])
 const loading = ref(true)
 
-// Anfangsbuchstabe für die Logo-Kachel der Beispielkarte und der Verzeichniskarten.
-const initial = name => String(name).trim().charAt(0).toUpperCase()
+// Initial letter for the logo tile of the sample card and the directory cards.
+const initial = (name: unknown) => String(name).trim().charAt(0).toUpperCase()
 
 onMounted(async () => {
   try {
-    pages.value = await apiFetch('/api/public/pages')
+    pages.value = await apiFetch<StatusPage[]>('/api/public/pages')
   } catch (err) {
     console.error("Failed to load public pages", err)
   } finally {
@@ -65,9 +66,9 @@ onMounted(async () => {
 
 <template>
   <div class="landing-page">
-    <!-- Richtung A: Die Kopfzeile der Startseite liefert PublicLayout
-         (useLandingChrome), der Fuß ebenfalls; hier steht der Seiteninhalt.
-         Die Abschnitte laufen randlos, der Inhalt sitzt in .lp-in (Breite --lp-max). -->
+    <!-- Direction A: the landing page header is provided by PublicLayout
+         (useLandingChrome), the footer too; the page content lives here.
+         The sections run edge to edge, the content sits in .lp-in (width --lp-max). -->
     <section class="lp-hero" aria-labelledby="hero-title">
       <div class="lp-in lp-hero-in">
         <div class="lp-hero-copy">
@@ -86,7 +87,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Dekorative Beispielkarte: feste Daten, für Hilfstechnik ausgeblendet. -->
+        <!-- Decorative sample card: fixed data, hidden from assistive technology. -->
         <div class="lp-hero-visual mock" aria-hidden="true">
           <div class="mock-head">
             <span class="cust-logo">{{ initial(t('landing.mockName')) }}</span>
@@ -153,19 +154,19 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Richtung A, richtung-a.html#landing: Die Abschnitte laufen über die
-   volle Fensterbreite (Punkteraster, Trennlinien), der Inhalt sitzt zentriert in
-   .lp-in mit der Breite --lp-max. */
+/* Direction A, richtung-a.html#landing: the sections span the
+   full window width (dot grid, dividers), the content sits centred in
+   .lp-in with the width --lp-max. */
 .lp-in {
   max-width: var(--lp-max);
   margin: 0 auto;
   padding: 0 var(--sp-5);
 }
 
-/* Hero: zweigeteilt, links Text, rechts die Beispielkarte; auf Mobil gestapelt. */
+/* Hero: split in two, text on the left, sample card on the right; stacked on mobile. */
 .lp-hero {
   padding: var(--sp-7) 0;
-  /* Punkteraster und Unterkante wie in Richtung A. */
+  /* Dot grid and bottom edge as in Direction A. */
   background-image: radial-gradient(var(--border) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: -10px -10px;
@@ -173,8 +174,8 @@ onMounted(async () => {
 }
 .lp-hero-in {
   display: grid;
-  /* minmax(0, …): sonst weitet der min-content der Beispielkarte die Spalte
-     und die Karte ragt über den Seitenrand hinaus. */
+  /* minmax(0, …): otherwise the min-content of the sample card widens the column
+     and the card sticks out over the page edge. */
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: var(--sp-6);
   align-items: center;
@@ -192,8 +193,8 @@ onMounted(async () => {
   color: var(--text-2);
   margin-bottom: var(--sp-4);
 }
-/* Die Breite 13ch hält den Umbruch der Vorlage; Wörter werden nie mitten im
-   Wort getrennt (kein overflow-wrap/hyphens): das längste Wort ist kürzer. */
+/* The width of 13ch keeps the template's line break; words are never broken in
+   the middle (no overflow-wrap/hyphens): the longest word is shorter. */
 .lp-title {
   max-width: 13ch;
   font-size: var(--fs-3xl);
@@ -231,7 +232,7 @@ onMounted(async () => {
   text-decoration: none;
 }
 
-/* Beispielkarte */
+/* Sample card */
 .mock {
   position: relative;
   display: flex;
@@ -313,15 +314,15 @@ onMounted(async () => {
   border-radius: var(--bar-r);
   background: var(--ok);
 }
-/* Teilausfall = Form (Schraffur) + Farbe (orange), nicht nur Farbe. */
+/* Partial outage = shape (hatching) + colour (orange), not colour alone. */
 .bar--partial {
   background: repeating-linear-gradient(135deg, var(--part) 0 2px, var(--part-soft) 2px 3px);
 }
 
-/* Abschnitte */
+/* Sections */
 .lp-sec {
   padding: var(--sp-7) 0;
-  /* Der Anker (#features, #directory) landet nicht unter der klebenden Kopfzeile. */
+  /* The anchor (#features, #directory) does not land under the sticky header. */
   scroll-margin-top: 64px;
 }
 .lp-sec--alt {
@@ -345,7 +346,7 @@ onMounted(async () => {
   color: var(--text-2);
 }
 
-/* Funktionen: drei Spalten, bei sechs Karten zwei Reihen. */
+/* Features: three columns, two rows with six cards. */
 .feats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -367,7 +368,7 @@ onMounted(async () => {
   color: var(--primary-text);
   margin-bottom: var(--sp-3);
 }
-/* Überschriften-Reihenfolge h1 -> h2 (Abschnitt) -> h3 (Karte). */
+/* Heading order h1 -> h2 (section) -> h3 (card). */
 .feat h3 {
   font-size: var(--fs-md);
   font-weight: 600;
@@ -381,7 +382,7 @@ onMounted(async () => {
   line-height: 1.55;
 }
 
-/* Statusseiten-Verzeichnis */
+/* Status page directory */
 .directory-loading {
   padding: var(--sp-6);
   color: var(--text-2);
@@ -434,13 +435,13 @@ onMounted(async () => {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-3);
-  /* eine Zeile, bei Platzmangel mit Auslassung (voller Slug im
-     title) statt mitten im Wort umzubrechen; Karten bleiben gleich hoch. */
+  /* one line, with ellipsis when space is short (full slug in the
+     title) instead of breaking mid-word; cards stay the same height. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Status = Form + Farbe + Text: Punkt, grüne Fläche und das Wort „Live“. */
+/* Status = shape + colour + text: dot, green area and the word "Live". */
 .badge {
   margin-left: auto;
   flex-shrink: 0;
@@ -448,7 +449,7 @@ onMounted(async () => {
   align-items: center;
   gap: var(--sp-1);
   background: var(--ok-soft);
-  color: var(--ok-text); /* 4,5:1 auf dem Grünton */
+  color: var(--ok-text); /* 4.5:1 on the green tone */
   font-size: var(--fs-xs);
   font-weight: 700;
   padding: var(--sp-1) var(--sp-2);

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { parseSearchQuery, matchesSearchQuery } from '../../composables/useSearchQuery'
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -36,6 +36,48 @@ import { useTheme } from '../../composables/useTheme'
 import { useDismissable } from '../../composables/useDismissable'
 import { ensureContrast } from '../../utils/contrast'
 import { BRAND_ON_PRIMARY, BRAND_SECONDARY_BACKGROUNDS } from '../../utils/brandContrast'
+import type { PublicTranslations } from '../../utils/publicTranslations'
+import type {
+  ApiError, Component, ExternalIncident, GeneralNotice, IncidentDetail, IncidentResponse, IncidentUpdateView,
+  IsoDateString, MyPage, PageAvailability, PublicDashboard, StatusPage,
+} from '../../types/api'
+
+/** What the history dialog shows: an own incident, a timeline entry of the list layout or an external report. */
+interface HistoryIncident {
+  ID?: number | string
+  Title: string
+  Status: string
+  Message: string
+  StartedAt?: IsoDateString | null
+  CreatedAt?: IsoDateString
+  /** Set on timeline entries of external reports: the original report. */
+  external?: object
+}
+
+/** Entry of the history dialog: an incident update, an external update or the initial report. */
+interface HistoryEntry {
+  id: number | string
+  status: string
+  message: string
+  created_at?: IsoDateString | null
+  author_email?: string
+  /** External texts are plain text, never Markdown. */
+  plain?: boolean
+  /** The initial report while updates exist (its status back then is not stored). */
+  initial?: boolean
+}
+
+/** Updates loaded inline for a current incident. */
+interface InlineUpdates {
+  state: 'loading' | 'ok' | 'error'
+  updates: IncidentUpdateView[]
+}
+
+interface NoticeLevelMeta {
+  label: string
+  class: string
+  icon: string
+}
 
 const route = useRoute()
 const { apiFetch } = useApi()
@@ -44,46 +86,42 @@ const { setActiveTenant, setMyPages } = useTenant()
 const { t, locale } = useI18n()
 const { theme } = useTheme()
 
-// Stryker disable all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({
-  slug: {
-    type: String,
-    required: true
-  },
+// Stryker disable all: Vue hoists defineProps/defineEmits/defineModel out of setup, instrumented code must not reference local variables there
+const props = withDefaults(defineProps<{
+  slug: string
   // Preview mode for the admin edit form: unsaved design values (LogoURL,
   // PrimaryColor, SecondaryColor, HeaderStyle, PageLayout) override the saved
   // ones. The page is then read-only (inert), does not poll and leaves the
   // shared page state (current slug, page languages, active tenant) alone.
-  preview: {
-    type: Object,
-    default: null
-  }
+  preview?: Partial<StatusPage> | null
+}>(), {
+  preview: null
 })
 // Stryker restore all
 
-const savedPageInfo = ref(null)
+const savedPageInfo = ref<StatusPage | null>(null)
 const isPreview = computed(() => props.preview !== null)
 const pageInfo = computed(() => (savedPageInfo.value && isPreview.value
   ? { ...savedPageInfo.value, ...props.preview }
   : savedPageInfo.value))
 
-// seiten-spezifisches Branding (Logo, Farben, Header-Design).
-// Setzt --primary/--primary-hover/--text-secondary als Inline-Style-Override
-// auf dem Wurzel-Element dieser View, sodass CSS, das weiterhin var(--primary)
-// nutzt, automatisch die Seitenfarbe bekommt - ohne globale Defaults für
-// andere Seiten (z.B. das Admin-UI) zu verändern. Seiten ohne eigene Farbe
-// (leerer String, z.B. weil noch nicht migriert oder Admin hat nichts
-// gesetzt) fallen auf die bestehenden globalen CSS-Variablen zurück, indem
-// einfach keine Inline-Variable gesetzt wird.
-// Die Markenfarben werden bei Bedarf so weit nachgedunkelt bzw.
-// aufgehellt, dass sie WCAG 1.4.3 (4,5:1) erfüllen: --primary trägt weiße
-// Schrift (Abonnieren-Button), --text-secondary ist Schrift auf Panel- und
-// Hover-Flächen des aktuellen Themes. Passende Farben bleiben unverändert.
-// Die Hintergründe (--surface, --surface-2 der Ebene „public“) und
-// die Schriftfarbe auf --primary stehen in utils/brandContrast.js, weil
-// ensureContrast Hex-Werte braucht und var() nicht auflösen kann.
+// Page-specific branding (logo, colours, header design).
+// Sets --primary/--primary-hover/--text-secondary as an inline style override
+// on the root element of this view, so CSS that still uses var(--primary)
+// automatically gets the page colour - without changing global defaults for
+// other pages (e.g. the admin UI). Pages without their own colour
+// (empty string, e.g. because not migrated yet or the admin set nothing)
+// fall back to the existing global CSS variables, simply because
+// no inline variable is set.
+// The brand colours are darkened or lightened as far as needed
+// to meet WCAG 1.4.3 (4.5:1): --primary carries white
+// text (subscribe button), --text-secondary is text on panel and
+// hover surfaces of the current theme. Suitable colours stay unchanged.
+// The backgrounds (--surface, --surface-2 of the "public" layer) and
+// the text colour on --primary live in utils/brandContrast.js, because
+// ensureContrast needs hex values and cannot resolve var().
 const brandingStyle = computed(() => {
-  const style = {}
+  const style: Record<string, string> = {}
   if (pageInfo.value?.PrimaryColor) {
     const primary = ensureContrast(pageInfo.value.PrimaryColor, BRAND_ON_PRIMARY)
     style['--primary'] = primary
@@ -99,100 +137,100 @@ const headerStyleClass = computed(() => {
   const style = pageInfo.value?.HeaderStyle
   return style && style !== 'classic' ? `status-header--${style}` : ''
 })
-// Seiten-Layout; fehlender/unbekannter Wert -> "standard".
+// Page layout; missing/unknown value -> "standard".
 const isListLayout = computed(() => normalizePageLayout(pageInfo.value?.PageLayout) === 'liste')
-// rawComponents/rawIncidents/rawNotices sind die Originale aus dem
-// Dashboard; components/incidents/notices zeigen sie in der Sprache des Besuchers
-// (bestätigte Übersetzungen, Rückfall Standardsprache der Seite, dann Original).
-// Alles Weitere (Suche, Filter, Karten, Verlauf-Dialog) arbeitet auf diesen
-// angezeigten Texten.
-const rawComponents = ref([])
-const translations = ref(null)
+// rawComponents/rawIncidents/rawNotices are the originals from the
+// dashboard; components/incidents/notices show them in the visitor's language
+// (confirmed translations, falling back to the page's default language, then the original).
+// Everything else (search, filters, cards, history dialog) works on these
+// displayed texts.
+const rawComponents = ref<Component[]>([])
+const translations = ref<PublicTranslations | null>(null)
 const components = computed(() => localizeTree(rawComponents.value, translations.value?.components))
-// gespiegelte Meldungen externer Quellen (nur Text, nie HTML, nie übersetzt).
-const externalIncidents = ref([])
-// Das Dashboard liefert alle offenen und die neuesten behobenen Vorfälle;
-// ältere kommen per „Ältere Vorfälle laden“ aus der Liste dazu und bleiben bei
-// der regelmäßigen Aktualisierung erhalten.
-const dashboardIncidents = ref([])
-const olderIncidents = ref([])
+// Mirrored reports of external sources (text only, never HTML, never translated).
+const externalIncidents = ref<ExternalIncident[]>([])
+// The dashboard delivers all open and the newest resolved incidents;
+// older ones are added from the list via "Load older incidents" and are kept
+// across the regular refresh.
+const dashboardIncidents = ref<IncidentResponse[]>([])
+const olderIncidents = ref<IncidentResponse[]>([])
 const rawIncidents = computed(() => mergeIncidents(dashboardIncidents.value, olderIncidents.value))
 const incidentsMore = ref(false)
 const loadingMoreIncidents = ref(false)
 const moreIncidentsError = ref(false)
 const incidents = computed(() => localizeIncidents(rawIncidents.value, translations.value))
-const rawNotices = ref([])
+const rawNotices = ref<GeneralNotice[]>([])
 const notices = computed(() => localizeNotices(rawNotices.value, translations.value?.notices))
 const errorMessage = ref('')
 const isPrivateError = ref(false)
 const noticesExpanded = ref(false)
 
-// offene Vorfälle und laufende Wartungen, ohne Filter. Steuert die
-// „Alles im grünen Bereich“-Karte; welche Status als behoben gelten, legt
-// utils/incidentStatus.js fest.
+// Open incidents and running maintenance, without filters. Controls the
+// "all systems operational" card; utils/incidentStatus.js defines which
+// statuses count as resolved.
 const activeIncidents = computed(() => incidents.value.filter(i => !isResolvedStatus(i.Status) && !isUpcomingMaintenance(i)))
 
-// General Notices - vom Backend bereits auf aktive, nicht
-// abgelaufene Notices gefiltert (IsActive + StartAt/EndAt-Fenster), hier nur
-// noch nach Collapsed aufteilen: nicht eingeklappte Notices erscheinen direkt,
-// Collapsed-Notices werden hinter einem gemeinsamen aufklappbaren Header
-// gruppiert, um auf der Statusseite Platz zu sparen.
+// General notices - already filtered by the backend to active, not
+// expired notices (IsActive + StartAt/EndAt window), here they are only
+// split by Collapsed: non-collapsed notices appear directly,
+// collapsed notices are grouped behind a shared expandable header
+// to save space on the status page.
 const visibleNotices = computed(() => notices.value.filter(n => !n.Collapsed))
 const collapsedNotices = computed(() => notices.value.filter(n => n.Collapsed))
 
-const noticeLevelMeta = (level) => ({
+const noticeLevelMeta = (level: string) => (({
   info:     { label: t('notices.levelInfo'),     class: 'notice-info',     icon: 'alert-circle' },
   warning:  { label: t('notices.levelWarning'),  class: 'notice-warning',  icon: 'alert-triangle' },
   critical: { label: t('notices.levelCritical'), class: 'notice-critical', icon: 'alert-triangle' },
-}[level] ?? { label: level, class: 'notice-info', icon: 'alert-circle' })
+} as Record<string, NoticeLevelMeta>)[level] ?? { label: level, class: 'notice-info', icon: 'alert-circle' })
 
-// geplante Wartungsfenster (noch nicht gestartet) bekommen eine
-// eigene Sektion mit Start-/Endzeit, statt in der generischen Incident-Liste
-// zu erscheinen, als wären sie bereits aktiv.
+// Scheduled maintenance windows (not started yet) get their
+// own section with start/end time, instead of appearing in the generic incident list
+// as if they were already active.
 const upcomingMaintenance = computed(() => incidents.value.filter(isUpcomingMaintenance))
-const formatMaintenanceWindow = (i) => {
+const formatMaintenanceWindow = (i: IncidentResponse) => {
   const intlLocale = toIntlLocale(locale.value)
-  const opts = { dateStyle: 'medium', timeStyle: 'short' }
+  const opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' }
   const start = i.ScheduledStartAt ? new Date(i.ScheduledStartAt).toLocaleString(intlLocale, opts) : '?'
   const end = i.ScheduledEndAt ? new Date(i.ScheduledEndAt).toLocaleString(intlLocale, { timeStyle: 'short' }) : '?'
   return `${start} – ${end}`
 }
 
-// Wizard State
+// Wizard state
 const showWizard = ref(false)
 
-// Öffnet den Abo-Editor direkt aus dem Abonnieren-CTA heraus, statt dass
-// angemeldete Nutzer die separate Sektion weiter unten erst manuell aufklappen
-// und "Mein Abo laden" klicken müssen.
-const subscriptionManagerRef = ref(null)
-// null = unbekannt, true/false = Abonnement vorhanden bzw. nicht (vom SubscriptionManager gemeldet)
-const hasSubscription = ref(null)
+// Opens the subscription editor directly from the subscribe CTA, instead of
+// signed-in users having to expand the separate section further down manually
+// and click "Load my subscription" first.
+const subscriptionManagerRef = ref<InstanceType<typeof SubscriptionManager> | null>(null)
+// null = unknown, true/false = subscription exists or not (reported by the SubscriptionManager)
+const hasSubscription = ref<boolean | null>(null)
 // Scrolling happens inside the manager: its section may only exist once it is open.
 const openMySubscription = () => subscriptionManagerRef.value?.revealEditAbo()
 
-// Header-Menü (PublicLayout.vue) löst dieses Event aus, da es –
-// via Subdomain-Root oder /status/:slug erreicht – keine eigene Ref auf die
-// hier gerenderte Komponente durch <router-view/> hindurch hat.
+// The header menu (PublicLayout.vue) fires this event because -
+// reached via the subdomain root or /status/:slug - it has no ref of its own to the
+// component rendered here through <router-view/>.
 const handleOpenSubscriptionManagerEvent = () => openMySubscription()
 
-// Filter state (wiederhergestellt)
+// Filter state (restored)
 const searchText = ref('')
 const debouncedSearchText = ref('')
-let searchTimeout = null
-// Mehrfachauswahl. Leere Liste = „Alle“; innerhalb einer Gruppe ODER,
-// zwischen Region, Status und Suchtext UND.
-const activeCountryTags = ref([])
-const activeStatusTags = ref([])
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+// Multiple selection. Empty list = "all"; OR within a group,
+// AND between region, status and search text.
+const activeCountryTags = ref<string[]>([])
+const activeStatusTags = ref<string[]>([])
 const searchHelpOpen = ref(false)
 // The help closes on a click/tap outside the search field area; the field
 // itself counts as inside so the examples stay visible while typing. Escape
 // is handled on the input and the button (focus stays where it is).
-const searchWrapperRef = ref(null)
+const searchWrapperRef = ref<HTMLElement | null>(null)
 useDismissable(searchHelpOpen, [searchWrapperRef], () => { searchHelpOpen.value = false }, { escape: false })
 
-const toggleIn = (list, key) => (list.includes(key) ? list.filter(k => k !== key) : [...list, key])
-const toggleCountry = (key) => { activeCountryTags.value = toggleIn(activeCountryTags.value, key) }
-const toggleStatus = (key) => { activeStatusTags.value = toggleIn(activeStatusTags.value, key) }
+const toggleIn = (list: string[], key: string) => (list.includes(key) ? list.filter(k => k !== key) : [...list, key])
+const toggleCountry = (key: string) => { activeCountryTags.value = toggleIn(activeCountryTags.value, key) }
+const toggleStatus = (key: string) => { activeStatusTags.value = toggleIn(activeStatusTags.value, key) }
 const resetFilters = () => {
   searchText.value = ''
   debouncedSearchText.value = ''
@@ -200,29 +238,29 @@ const resetFilters = () => {
   activeStatusTags.value = []
 }
 
-// Ab mehr als 8 Region-Einträgen (inkl. „Alle“) nur die ersten
-// Chips zeigen; der aktive Filter bleibt auch eingeklappt sichtbar.
+// With more than 8 region entries (incl. "all") show only the first
+// chips; the active filter stays visible even when collapsed.
 const REGION_CHIP_THRESHOLD = 8
 const REGION_COLLAPSED_COUNT = 6
 const regionsExpanded = ref(false)
 
 const initialLoading = ref(true)
-let pollInterval = null
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
-// 4a: 90-Tage-Verfügbarkeit (GET …/availability). Lädt getrennt vom
-// Dashboard und blockiert die Seite nicht: Fehler oder eine leere Antwort lassen
-// nur die Balken weg (availability bleibt null), der Rest der Seite steht.
-// Je Komponente (?include=components, deutlich größere Antwort) nur im
-// Listen-Layout, das die Zeilenbalken zeigt.
-const availability = ref(null)
-const lastUpdated = ref(null)
+// 4a: 90-day availability (GET …/availability). Loads separately from the
+// dashboard and does not block the page: errors or an empty answer only leave out
+// the bars (availability stays null), the rest of the page stands.
+// Per component (?include=components, a much larger answer) only in the
+// list layout, which shows the row bars.
+const availability = ref<PageAvailability | null>(null)
+const lastUpdated = ref<Date | null>(null)
 const loadAvailability = async () => {
-  const params = []
-  if (route.query.token) params.push(`token=${encodeURIComponent(route.query.token)}`)
+  const params: string[] = []
+  if (route.query.token) params.push(`token=${encodeURIComponent(route.query.token as string)}`)
   if (isListLayout.value) params.push('include=components')
   try {
     const res = await apiFetch(`/api/public/pages/${props.slug}/availability${params.length ? `?${params.join('&')}` : ''}`)
-    availability.value = parseAvailability(res)
+    availability.value = parseAvailability(res) as PageAvailability | null
   } catch {
     availability.value = null
   }
@@ -235,20 +273,20 @@ watch(searchText, (newVal) => {
   }, 300)
 })
 
-// Übersetzungen für die Oberflächensprache des Besuchers. Der Abruf
-// läuft parallel zum Dashboard; solange der Ladezustand steht, erscheint kein
-// Originaltext, der danach umspringt. Fehler ergeben null (Originaltexte).
-// translationsRequest verwirft veraltete Antworten bei schnellem Sprachwechsel.
+// Translations for the visitor's UI language. The fetch
+// runs in parallel with the dashboard; while the loading state is shown, no
+// original text appears that would switch afterwards. Errors yield null (original texts).
+// translationsRequest discards stale answers on a quick language switch.
 let translationsRequest = 0
 const loadTranslations = () => fetchPublicTranslations(apiFetch, props.slug, locale.value, route.query.token)
 watch(locale, async () => {
-  // Update-Texte der schon geladenen Vorfälle in der neuen Sprache holen.
+  // Fetch the update texts of already loaded incidents in the new language.
   const loaded = new Set(Object.keys(inlineUpdates.value))
   if (historyIncident.value?.ID) loaded.add(String(historyIncident.value.ID))
   for (const id of loaded) loadUpdateTexts(Number(id))
   const request = ++translationsRequest
   const next = await loadTranslations()
-  // Beim Wechsel bleibt der alte Stand stehen, bis der neue da ist (kein Flackern).
+  // On a switch the old state stays until the new one is there (no flicker).
   if (request === translationsRequest) translations.value = next
 })
 
@@ -257,32 +295,33 @@ const loadData = async (isInitial = false) => {
     initialLoading.value = true
   }
   try {
-    // ein Subscriber-Token im Link (aus einer Benachrichtigungsmail
-    // für eine private Statusseite) wird an den Dashboard-Request durchgereicht,
-    // damit ein Abonnent ohne eigenes Konto die Seite trotzdem öffnen kann.
-    const tokenParam = route.query.token ? `?token=${encodeURIComponent(route.query.token)}` : ''
+    // A subscriber token in the link (from a notification mail
+    // for a private status page) is passed on to the dashboard request,
+    // so a subscriber without an account of their own can still open the page.
+    const tokenParam = route.query.token ? `?token=${encodeURIComponent(route.query.token as string)}` : ''
     const request = ++translationsRequest
     const [res, translated] = await Promise.all([
-      apiFetch(`/api/public/pages/${props.slug}/dashboard${tokenParam}`),
+      apiFetch<PublicDashboard>(`/api/public/pages/${props.slug}/dashboard${tokenParam}`),
       loadTranslations(),
     ])
     savedPageInfo.value = res.page
     if (!isPreview.value) setPageLanguages(res.languages)
     if (request === translationsRequest) translations.value = translated
-    // überall der effektive Status (eigener + externer).
+    // The effective status everywhere (own + external).
     rawComponents.value = applyEffectiveStatus(res.components)
     externalIncidents.value = res.external_incidents || []
     dashboardIncidents.value = res.incidents
-    // Nach einem Nachladen gilt dessen Ergebnis, sonst die Angabe des Dashboards.
+    // After loading more, its result applies, otherwise the dashboard's value.
     if (olderIncidents.value.length === 0) incidentsMore.value = !!res.incidents_more
     rawNotices.value = res.notices || []
     lastUpdated.value = new Date()
   } catch (err) {
-    // am Status statt am (jetzt übersetzten) Meldungstext erkennen;
-    // eine anonyme 401 ist seitdem auch kein „Sitzung abgelaufen“ mehr.
-    // Eine private Seite ohne Berechtigung antwortet wie eine fehlende Seite mit
-    // 404; der Besucher sieht beides als „nicht verfügbar“ und kann sich anmelden.
-    if (err.status === 401 || err.status === 403 || err.status === 404) {
+    // Detect by the status instead of the (now translated) message text;
+    // an anonymous 401 is no "session expired" any more since then.
+    // A private page without permission answers like a missing page with
+    // 404; the visitor sees both as "not available" and can log in.
+    const status = (err as ApiError).status
+    if (status === 401 || status === 403 || status === 404) {
       errorMessage.value = t('statusPage.privateErrorMessage')
       isPrivateError.value = true
     } else {
@@ -294,14 +333,14 @@ const loadData = async (isInitial = false) => {
   if (pageInfo.value) await loadAvailability()
 }
 
-// Lädt die nächste Seite behobener Vorfälle (Vorfälle und Wartungen) hinter den
-// bereits angezeigten. Weniger als eine volle Seite heißt: nichts mehr offen.
+// Loads the next page of resolved incidents (incidents and maintenance) after the
+// ones already shown. Less than a full page means: nothing more left.
 const loadMoreIncidents = async () => {
   loadingMoreIncidents.value = true
   moreIncidentsError.value = false
   try {
     const offset = rawIncidents.value.filter(i => isResolvedStatus(i.Status)).length
-    const batch = await apiFetch(incidentListUrl(pageInfo.value?.ID, {
+    const batch = await apiFetch<IncidentResponse[]>(incidentListUrl(pageInfo.value?.ID as number, {
       maintenance: 'any', state: 'resolved', limit: PUBLIC_PAGE_SIZE, offset,
     }))
     olderIncidents.value = mergeIncidents(olderIncidents.value, batch)
@@ -313,16 +352,16 @@ const loadMoreIncidents = async () => {
   }
 }
 
-// die seitenbezogene Berechtigung im Header-Menü darf sich nicht nach dem
-// zuletzt im Admin-Bereich gewählten Mandanten richten, sondern nach der
-// gerade angezeigten Statusseite. Deshalb wird activeTenantId hier immer auf
-// die aktuell geladene Seite synchronisiert, sobald ein User eingeloggt ist.
+// The page-specific permission in the header menu must not follow the tenant
+// last chosen in the admin area, but the status page currently
+// shown. That is why activeTenantId is always synchronized here to
+// the currently loaded page as soon as a user is logged in.
 // The Dashboard link in PublicLayout is decided by the role on THIS page
 // (matched via currentPageSlug), never by a role on another page.
-watch(() => [pageInfo.value?.ID, isLoggedIn.value], async ([pageId, loggedIn]) => {
+watch(() => [pageInfo.value?.ID, isLoggedIn.value] as const, async ([pageId, loggedIn]) => {
   if (!pageId || !loggedIn || isPreview.value) return
   try {
-    const pages = await apiFetch('/api/me/pages')
+    const pages = await apiFetch<MyPage[]>('/api/me/pages')
     setMyPages(pages)
     setActiveTenant(pageId)
   } catch (err) {
@@ -347,9 +386,9 @@ onMounted(async () => {
   }, 60000)
 })
 
-// Slug für den Login-Knopf im Kopf (PublicLayout.vue) bereitstellen.
+// Provide the slug for the login button in the header (PublicLayout.vue).
 const { currentPageSlug } = useCurrentPageSlug()
-// Sprachen der Seite für den Sprachumschalter im Kopf.
+// Languages of the page for the language switcher in the header.
 const { setPageLanguages, clearPageLanguages } = usePublicPageLanguages()
 watch(() => props.slug, (slug) => { if (!isPreview.value) currentPageSlug.value = slug }, { immediate: true })
 onUnmounted(() => {
@@ -365,13 +404,13 @@ onUnmounted(() => {
 })
 
 
-// Dynamisch alle vorhandenen Tags aus den Daten ermitteln (Ersatz
-// für das frühere einzelne Country-Feld - eine Komponente kann jetzt mehrere
-// Tags tragen statt eines einzelnen Werts).
+// Determine all existing tags from the data dynamically (replacement
+// for the former single Country field - a component can now carry several
+// tags instead of a single value).
 const availableCountries = computed(() => {
-  const extractTagNames = (nodes) => {
+  const extractTagNames = (nodes: Component[] | null | undefined): string[] => {
     if (!nodes) return []
-    let result = []
+    let result: string[] = []
     for (const n of nodes) {
       result = result.concat((n.Tags || []).map(t => t.Name))
       if (n.Children) result = result.concat(extractTagNames(n.Children))
@@ -397,21 +436,21 @@ const statusTags = computed(() => [
   { key: 'major_outage', label: t('status.majorOutage'), dot: 'major' },
 ])
 
-// Rekursive Suche: filtert den Baum und behält Gruppen die passende Kinder haben
-const filterTree = (nodes, query, countryQ, statusQ) => {
+// Recursive search: filters the tree and keeps groups that have matching children
+const filterTree = (nodes: Component[] | null | undefined, query: ReturnType<typeof parseSearchQuery>, countryQ: string[], statusQ: string[]): Component[] => {
   if (!nodes) return []
-  const result = []
+  const result: Component[] = []
   for (const node of nodes) {
     const matchText = matchesSearchQuery(query, [node.Name, node.Description])
     const matchCountry = !countryQ.length || node.Tags?.some(t => countryQ.includes(t.Name))
     const matchStatus = !statusQ.length || statusQ.includes(node.Status)
 
-    // Kinder rekursiv filtern
+    // Filter children recursively
     const filteredChildren = node.Children && node.Children.length > 0
       ? filterTree(node.Children, query, countryQ, statusQ)
       : []
 
-    // Knoten aufnehmen wenn er selbst passt ODER Kinder passen
+    // Include the node if it matches itself OR children match
     if ((matchText && matchCountry && matchStatus) || filteredChildren.length > 0) {
       result.push({ ...node, Children: filteredChildren })
     }
@@ -425,15 +464,15 @@ const filteredComponents = computed(() =>
   filterTree(components.value, searchQuery.value, activeCountryTags.value, activeStatusTags.value)
 )
 
-// Die Status-Chips stehen für Komponenten-Status (operational …),
-// nicht für Vorfall-Status (investigating …). Ein Vorfall passt, wenn eine
-// seiner betroffenen Komponenten den gewählten Status hat. Maßgeblich ist der
-// Status aus dem Komponentenbaum, also derselbe (vom Backend mit offenen
-// Vorfällen überlagerte) Wert, nach dem auch die Komponentenliste
-// gefiltert wird; die Kopie in i.Components trägt den manuell gesetzten Status.
+// The status chips stand for component statuses (operational …),
+// not for incident statuses (investigating …). An incident matches if one
+// of its affected components has the chosen status. What counts is the
+// status from the component tree, i.e. the same value (overlaid by the backend with open
+// incidents) the component list is
+// filtered by; the copy in i.Components carries the manually set status.
 const componentStatusById = computed(() => {
-  const map = new Map()
-  const walk = (nodes) => {
+  const map = new Map<number, string>()
+  const walk = (nodes: Component[] | null | undefined) => {
     for (const n of nodes || []) {
       map.set(n.ID, n.Status)
       walk(n.Children)
@@ -442,11 +481,11 @@ const componentStatusById = computed(() => {
   walk(components.value)
   return map
 })
-// Länder-Tags je Komponente, damit externe Meldungen (ohne eigene
-// Tags) dem Länderfilter über ihre betroffenen Komponenten folgen können.
+// Country tags per component, so external reports (without tags of their
+// own) can follow the country filter via their affected components.
 const componentTagsById = computed(() => {
-  const map = new Map()
-  const walk = (nodes) => {
+  const map = new Map<number, string[]>()
+  const walk = (nodes: Component[] | null | undefined) => {
     for (const n of nodes || []) {
       map.set(n.ID, (n.Tags || []).map(tag => tag.Name))
       walk(n.Children)
@@ -455,8 +494,8 @@ const componentTagsById = computed(() => {
   walk(components.value)
   return map
 })
-const incidentMatchesStatus = (i, statusQ) =>
-  (i.Components || []).some(c => statusQ.includes(componentStatusById.value.get(c.ID)))
+const incidentMatchesStatus = (i: IncidentResponse, statusQ: string[]) =>
+  (i.Components || []).some(c => statusQ.includes(componentStatusById.value.get(c.ID) as string))
 
 const filteredIncidents = computed(() => {
   return incidents.value.filter(i => {
@@ -468,25 +507,25 @@ const filteredIncidents = computed(() => {
   })
 })
 
-// Suche und Filter erfassen auch die externen Meldungen. Text:
-// Titel und Namen der betroffenen Komponenten; Land und Status folgen den
-// betroffenen Komponenten (deren Tags bzw. effektivem Status, wie bei eigenen
-// Vorfällen). Eine Meldung passt, wenn mindestens eine betroffene Komponente passt.
+// Search and filters also cover the external reports. Text:
+// title and names of the affected components; country and status follow the
+// affected components (their tags or effective status, as with own
+// incidents). A report matches if at least one affected component matches.
 const filteredExternalIncidents = computed(() => externalIncidents.value.filter(e => {
   const affected = e.affected_components || []
   const matchText = matchesSearchQuery(searchQuery.value, [e.title, ...affected.map(c => c.name)])
   const matchCountry = !activeCountryTags.value.length
     || affected.some(c => (componentTagsById.value.get(c.id) || []).some(n => activeCountryTags.value.includes(n)))
   const matchStatus = !activeStatusTags.value.length
-    || affected.some(c => activeStatusTags.value.includes(componentStatusById.value.get(c.id)))
+    || affected.some(c => activeStatusTags.value.includes(componentStatusById.value.get(c.id) as string))
   return matchText && matchCountry && matchStatus
 }))
 
-const externalUpdatesNewestFirst = (e) =>
-  [...(e.updates || [])].sort((a, b) => new Date(b.display_at) - new Date(a.display_at))
+const externalUpdatesNewestFirst = (e: ExternalIncident) =>
+  [...(e.updates || [])].sort((a, b) => new Date(b.display_at).getTime() - new Date(a.display_at).getTime())
 
-// Im Layout liste stehen externe Meldungen in der Zeitleiste, dazu
-// als Vorfall-ähnliche Einträge (external trägt das Original für den Dialog).
+// In the list layout external reports appear in the timeline,
+// as incident-like entries (external carries the original for the dialog).
 const externalTimelineItems = computed(() => filteredExternalIncidents.value.map(e => ({
   ID: `ext-${e.id}`,
   Title: e.title,
@@ -496,78 +535,80 @@ const externalTimelineItems = computed(() => filteredExternalIncidents.value.map
   IsMaintenance: false,
   external: e,
 })))
-const timelineIncidents = computed(() => [...filteredIncidents.value, ...externalTimelineItems.value])
+// PageLayoutList types its entries as full incidents; the external entries only carry what the timeline reads.
+type TimelineIncidents = InstanceType<typeof PageLayoutList>['$props']['timelineIncidents']
+const timelineIncidents = computed(() => [...filteredIncidents.value, ...externalTimelineItems.value] as TimelineIncidents)
 
-// Behobene Vorfälle gehören nicht unter „Aktuelle Vorfälle“,
-// sondern in den Verlauf darunter (neueste zuerst). Beide Listen folgen
-// denselben Filtern; das Layout liste zeigt weiter alles in seiner Zeitleiste.
+// Resolved incidents do not belong under "Current incidents",
+// but into the history below (newest first). Both lists follow
+// the same filters; the list layout still shows everything in its timeline.
 const currentIncidents = computed(() => filteredIncidents.value.filter(i => !isResolvedStatus(i.Status)))
 const pastIncidents = computed(() => filteredIncidents.value
   .filter(i => isResolvedStatus(i.Status))
-  .sort((a, b) => new Date(eventTime(b)) - new Date(eventTime(a))))
+  .sort((a, b) => new Date(eventTime(b) as string).getTime() - new Date(eventTime(a) as string).getTime()))
 
 
-// 4a: Vorfallstatus als StatusBadge-Eigenschaften (Stufe für Form
-// und Farbe, Text aus i18n). Unbekannte Rohwerte bleiben neutral und zeigen den
-// Rohwert; die Zuordnung steht in utils/incidentStatus.js.
-const incidentBadge = (status) => {
+// 4a: incident status as StatusBadge properties (level for shape
+// and colour, text from i18n). Unknown raw values stay neutral and show the
+// raw value; the mapping lives in utils/incidentStatus.js.
+const incidentBadge = (status: string) => {
   const meta = incidentStatusMeta(status)
   return { level: meta.level, label: meta.labelKey ? t(meta.labelKey) : status }
 }
 
-// 4a: Gesamtstatus oben auf der Seite, unabhängig von den Filtern
-// (wie schon im Listen-Layout, Review-Befund 2). Eine laufende Wartung wird zu
-// „Wartungsarbeiten laufen“, solange keine Störung vorliegt.
+// 4a: overall status at the top of the page, independent of the filters
+// (as already in the list layout, review finding 2). A running maintenance becomes
+// "maintenance in progress" as long as there is no disruption.
 const overall = computed(() => pageOverallStatus(components.value, incidents.value))
 const overallLevel = computed(() => statusMeta(overall.value).level)
-const overallText = computed(() => t(OVERALL_TEXT_KEYS[overall.value]))
+const overallText = computed(() => t(OVERALL_TEXT_KEYS[overall.value] as string))
 const leafCounts = computed(() => countLeaves(components.value))
 const brandInitial = computed(() => (pageInfo.value?.Name || '?').trim().charAt(0).toUpperCase())
 const heroSummary = computed(() => t('statusPage.heroSummary', { ok: leafCounts.value.operational, total: leafCounts.value.total }))
 
-// Update-Verlauf je Incident wird erst bei Klick nachgeladen
-// (GET /api/pages/:page_id/incidents/:id), damit das Dashboard-Payload
-// (GET /api/public/pages/:slug/dashboard) schlank bleibt. Der Detail-
-// Endpunkt ist bereits öffentlich lesbar (main.go), diese Änderung
-// erzeugt also keine neue Datenexposition, sondern zeigt im UI, was die
-// API schon heute liefert.
-// 4a: Für die aktuellen Vorfälle lädt die Seite die Updates
-// gleich mit, damit die Zeitleiste direkt unter dem Vorfall steht. Höchstens
-// INLINE_INCIDENTS Vorfälle und je Vorfall INLINE_UPDATES Updates (neueste
-// zuerst); alles weitere steht im Verlauf-Dialog.
+// The update history per incident is only loaded on click
+// (GET /api/pages/:page_id/incidents/:id), so the dashboard payload
+// (GET /api/public/pages/:slug/dashboard) stays lean. The detail
+// endpoint is already publicly readable (main.go), so this change
+// creates no new data exposure but shows in the UI what the
+// API already delivers today.
+// 4a: for the current incidents the page loads the updates
+// right away, so the timeline sits directly below the incident. At most
+// INLINE_INCIDENTS incidents and INLINE_UPDATES updates per incident (newest
+// first); everything else is in the history dialog.
 const INLINE_INCIDENTS = 3
 const INLINE_UPDATES = 3
-const inlineUpdates = ref({}) // Vorfall-ID -> { state: 'loading' | 'ok' | 'error', updates: [] }
-const inlineLoadedKey = new Map() // Vorfall-ID -> "Status|UpdatedAt" des zuletzt geladenen Stands
+const inlineUpdates = ref<Record<number, InlineUpdates>>({}) // incident ID -> { state: 'loading' | 'ok' | 'error', updates: [] }
+const inlineLoadedKey = new Map<number, string>() // incident ID -> "Status|UpdatedAt" of the last loaded state
 
-// Texte der Updates in der Sprache des Besuchers (Vorfall-ID -> { Update-ID: Text }).
-// Sie werden mit den Updates geladen und beim Sprachwechsel für die geladenen
-// Vorfälle neu geholt; fehlt ein Text, bleibt die Nachricht im Original.
-const updateTexts = ref({})
-const updateTextsRequest = new Map() // Vorfall-ID -> Zähler; verwirft veraltete Antworten beim Sprachwechsel
-const loadUpdateTexts = async (incidentId) => {
+// Update texts in the visitor's language (incident ID -> { update ID: text }).
+// They are loaded with the updates and fetched again for the loaded incidents
+// on a language switch; if a text is missing, the message stays in the original.
+const updateTexts = ref<Record<number, Record<string, unknown>>>({})
+const updateTextsRequest = new Map<number, number>() // incident ID -> counter; discards stale answers on a language switch
+const loadUpdateTexts = async (incidentId: number) => {
   const request = (updateTextsRequest.get(incidentId) ?? 0) + 1
   updateTextsRequest.set(incidentId, request)
   const map = await fetchPublicUpdateTranslations(apiFetch, props.slug, incidentId, locale.value, route.query.token)
   if (updateTextsRequest.get(incidentId) === request) updateTexts.value = { ...updateTexts.value, [incidentId]: map }
 }
-const withUpdateTexts = (incidentId, list) => localizeUpdates(list, updateTexts.value[incidentId])
+const withUpdateTexts = <T extends { id: number | string; message?: string }>(incidentId: number | string | undefined, list: T[]) => localizeUpdates(list, updateTexts.value[incidentId as number])
 
-const setInline = (id, value) => { inlineUpdates.value = { ...inlineUpdates.value, [id]: value } }
-const loadInlineUpdates = async (incident) => {
+const setInline = (id: number, value: InlineUpdates) => { inlineUpdates.value = { ...inlineUpdates.value, [id]: value } }
+const loadInlineUpdates = async (incident: IncidentResponse) => {
   setInline(incident.ID, { state: 'loading', updates: [] })
   try {
     const [detail] = await Promise.all([
-      apiFetch(`/api/pages/${pageInfo.value?.ID}/incidents/${incident.ID}`),
+      apiFetch<IncidentDetail>(`/api/pages/${pageInfo.value?.ID}/incidents/${incident.ID}`),
       loadUpdateTexts(incident.ID),
     ])
-    // Neueste zuerst, analog zur Timeline in AdminIncidentDetail.vue.
+    // Newest first, like the timeline in AdminIncidentDetail.vue.
     setInline(incident.ID, { state: 'ok', updates: [...(detail.updates || [])].reverse() })
   } catch {
     setInline(incident.ID, { state: 'error', updates: [] })
   }
 }
-const inlineKey = (i) => `${i.Status}|${i.UpdatedAt}`
+const inlineKey = (i: IncidentResponse) => `${i.Status}|${i.UpdatedAt}`
 const inlineIncidents = computed(() => currentIncidents.value.slice(0, INLINE_INCIDENTS))
 watch(inlineIncidents, (list) => {
   for (const i of list) {
@@ -576,35 +617,35 @@ watch(inlineIncidents, (list) => {
     loadInlineUpdates(i)
   }
 })
-const inlineState = (id) => inlineUpdates.value[id]?.state
-const inlineVisibleUpdates = (id) => withUpdateTexts(id, (inlineUpdates.value[id]?.updates ?? []).slice(0, INLINE_UPDATES))
+const inlineState = (id: number) => inlineUpdates.value[id]?.state
+const inlineVisibleUpdates = (id: number) => withUpdateTexts(id, (inlineUpdates.value[id]?.updates ?? []).slice(0, INLINE_UPDATES))
 
-const fmtDateTime = (d) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }) : '—'
-const fmtShortDate = (d) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value)) : '—'
-const incidentTimestamp = (i) => (i.IsMaintenance ? formatMaintenanceWindow(i) : fmtShortDate(i.StartedAt || i.CreatedAt))
+const fmtDateTime = (d: IsoDateString | Date | null | undefined) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+const fmtShortDate = (d: IsoDateString | Date | null | undefined) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value)) : '—'
+const incidentTimestamp = (i: IncidentResponse) => (i.IsMaintenance ? formatMaintenanceWindow(i) : fmtShortDate(i.StartedAt || i.CreatedAt))
 
-const historyIncident = ref(null)
-const historyUpdates = ref([])
+const historyIncident = ref<HistoryIncident | null>(null)
+const historyUpdates = ref<HistoryEntry[]>([])
 const historyLoading = ref(false)
 const historyError = ref('')
-// Die Erstmeldung (Incident.Message) bleibt bei Updates erhalten und
-// steht als ältester Verlaufseintrag (die Liste läuft neueste zuerst, also am
-// Ende). Ohne Updates ist sie der einzige Eintrag mit dem aktuellen Status;
-// mit Updates ist der damalige Status nicht gespeichert, dann gibt es statt
-// des Status-Badges die Kennzeichnung „Erstmeldung“.
-const historyEntries = computed(() => {
+// The initial report (Incident.Message) is kept when there are updates and
+// is the oldest history entry (the list runs newest first, so at the
+// end). Without updates it is the only entry, with the current status;
+// with updates the status back then is not stored, so instead of
+// the status badge it gets the label "initial report".
+const historyEntries = computed((): HistoryEntry[] => {
   const i = historyIncident.value
   const updates = withUpdateTexts(i?.ID, historyUpdates.value)
   if (!i?.Message) return updates
   const hasUpdates = updates.length > 0
-  const initial = { id: 'initial', initial: hasUpdates, status: hasUpdates ? '' : i.Status, message: i.Message, created_at: i.StartedAt || i.CreatedAt }
+  const initial: HistoryEntry = { id: 'initial', initial: hasUpdates, status: hasUpdates ? '' : i.Status, message: i.Message, created_at: i.StartedAt || i.CreatedAt }
   return [...updates, initial]
 })
 
-// Verlauf einer externen Meldung. Die Updates liegen schon in der
-// Dashboard-Antwort, es wird nichts nachgeladen; der Dialog zeigt sie wie bei
-// eigenen Vorfällen (neueste zuerst, nur Text). Ohne Erstmeldung (Message leer).
-const openExternalHistory = (e) => {
+// History of an external report. The updates are already in the
+// dashboard answer, nothing is loaded; the dialog shows them like
+// own incidents (newest first, text only). Without an initial report (Message empty).
+const openExternalHistory = (e: ExternalIncident) => {
   historyIncident.value = { Title: e.title, Status: e.status, Message: '' }
   historyUpdates.value = externalUpdatesNewestFirst(e)
     .map(u => ({ id: u.id, status: u.status, message: u.body, plain: true, created_at: u.display_at }))
@@ -612,21 +653,21 @@ const openExternalHistory = (e) => {
   historyLoading.value = false
 }
 
-const openHistory = async (incident) => {
-  if (incident.external) return openExternalHistory(incident.external)
+const openHistory = async (incident: HistoryIncident) => {
+  if (incident.external) return openExternalHistory(incident.external as ExternalIncident)
   historyIncident.value = incident
   historyUpdates.value = []
   historyError.value = ''
   historyLoading.value = true
   try {
     const [detail] = await Promise.all([
-      apiFetch(`/api/pages/${pageInfo.value?.ID}/incidents/${incident.ID}`),
-      loadUpdateTexts(incident.ID),
+      apiFetch<IncidentDetail>(`/api/pages/${pageInfo.value?.ID}/incidents/${incident.ID}`),
+      loadUpdateTexts(incident.ID as number),
     ])
-    // Neueste zuerst, analog zur Timeline in AdminIncidentDetail.vue.
+    // Newest first, like the timeline in AdminIncidentDetail.vue.
     historyUpdates.value = [...(detail.updates || [])].reverse()
   } catch (err) {
-    historyError.value = t('statusPage.historyLoadError') + err.message
+    historyError.value = t('statusPage.historyLoadError') + (err as Error).message
   } finally {
     historyLoading.value = false
   }
@@ -638,9 +679,9 @@ const closeHistory = () => {
 </script>
 
 <template>
-  <!-- 4a: Der einzige Inline-Style dieser View ist die Kundenmarke
-       (--primary/--primary-hover/--text-secondary aus brandingStyle); alles
-       andere läuft über Klassen und Tokens. -->
+  <!-- 4a: The only inline style of this view is the customer brand
+       (--primary/--primary-hover/--text-secondary from brandingStyle); everything
+       else runs via classes and tokens. -->
   <div class="content-area" :style="brandingStyle" :inert="isPreview || undefined">
     <div v-if="errorMessage && !isPrivateError" class="alert alert-error sp-alert">
       {{ errorMessage }}
@@ -670,7 +711,7 @@ const closeHistory = () => {
     </div>
 
     <template v-else-if="!isPrivateError && !initialLoading">
-      <!-- Kopf (Richtung B): Kundenmarke mit Logo, Name und „Systemstatus“ -->
+      <!-- Header (Direction B): customer brand with logo, name and "System status" -->
       <header class="sp-head" :class="headerStyleClass">
         <div class="sp-brand">
           <img v-if="pageInfo?.LogoURL" :src="pageInfo.LogoURL" alt="" class="status-header-logo" />
@@ -680,8 +721,8 @@ const closeHistory = () => {
         </div>
       </header>
 
-      <!-- Gesamtstatus als großer, nach Status getönter Hero ganz oben, unabhängig
-           von Filtern (Form + Farbe + Text). Der Titel ist die h1 der Seite. -->
+      <!-- Overall status as a large hero tinted by status at the very top, independent
+           of filters (shape + colour + text). The title is the page's h1. -->
       <section
         class="sp-hero"
         :class="`sp-hero--${overallLevel}`"
@@ -696,9 +737,9 @@ const closeHistory = () => {
         </div>
       </section>
 
-      <!-- Filter-Bereich -->
+      <!-- Filter area -->
       <div class="filter-bar" role="search" :aria-label="t('statusPage.filterLabel')">
-        <!-- Freitext-Suche -->
+        <!-- Free text search -->
         <div ref="searchWrapperRef" class="search-wrapper">
           <AppIcon name="search" :size="15" class="search-icon" />
           <input
@@ -732,7 +773,7 @@ const closeHistory = () => {
           </div>
         </div>
 
-        <!-- Länder-Tags -->
+        <!-- Country tags -->
         <div class="tag-group">
           <span class="tag-label">{{ t('statusPage.regionLabel') }}</span>
           <div class="tag-chips">
@@ -760,7 +801,7 @@ const closeHistory = () => {
           </div>
         </div>
 
-        <!-- Status-Tags: Form (StatusIcon) + Text, nicht nur Farbe -->
+        <!-- Status tags: shape (StatusIcon) + text, not colour alone -->
         <div class="tag-group">
           <span class="tag-label">{{ t('statusPage.statusLabel') }}</span>
           <div class="tag-chips">
@@ -778,7 +819,7 @@ const closeHistory = () => {
           </div>
         </div>
 
-        <!-- Ergebnis-Counter -->
+        <!-- Result counter -->
         <div class="filter-result-count" role="status" v-if="searchText || activeCountryTags.length || activeStatusTags.length">
           {{ t('statusPage.filterResultCount', { components: filteredComponents.length, incidents: filteredIncidents.length + filteredExternalIncidents.length }) }}
           <button class="clear-all-btn" @click="resetFilters">
@@ -787,7 +828,7 @@ const closeHistory = () => {
         </div>
       </div>
 
-      <!-- Aktuelle Vorfälle mit Zeitleiste, vor der Komponentenliste -->
+      <!-- Current incidents with timeline, before the component list -->
       <section v-if="activeIncidents.length > 0" class="sp-section" aria-labelledby="sp-current-heading">
         <h2 id="sp-current-heading" class="sp-heading">{{ t('statusPage.currentIncidentsHeading') }}</h2>
         <article class="sp-incident" v-for="i in currentIncidents" :key="i.ID">
@@ -828,7 +869,7 @@ const closeHistory = () => {
         />
       </section>
 
-      <!-- Geplante Wartungsarbeiten -->
+      <!-- Scheduled maintenance -->
       <section v-if="upcomingMaintenance.length > 0" class="sp-section" aria-labelledby="sp-maintenance-heading">
         <h2 id="sp-maintenance-heading" class="sp-heading"><AppIcon name="clock" :size="18" /> {{ t('statusPage.upcomingMaintenanceHeading') }}</h2>
         <article class="sp-incident" v-for="i in upcomingMaintenance" :key="i.ID">
@@ -847,14 +888,14 @@ const closeHistory = () => {
         </article>
       </section>
 
-      <!-- Vorfälle und Wartungen externer Quellen, klar als „extern“ gekennzeichnet -->
+      <!-- Incidents and maintenance of external sources, clearly marked as "external" -->
       <ExternalIncidentList
         v-if="!isListLayout && filteredExternalIncidents.length > 0"
         :items="filteredExternalIncidents"
-        @open-history="openExternalHistory"
+        @open-history="(item) => openExternalHistory(item!)"
       />
 
-      <!-- Verfügbarkeit der letzten 90 Tage (Gesamtseite). Ohne Daten entfällt der Abschnitt. -->
+      <!-- Availability of the last 90 days (whole page). Without data the section is left out. -->
       <section v-if="availability" class="sp-section" aria-labelledby="sp-availability-heading">
         <h2 id="sp-availability-heading" class="sp-heading">{{ t('availability.heading') }}</h2>
         <div class="sp-card">
@@ -866,7 +907,7 @@ const closeHistory = () => {
         </div>
       </section>
 
-      <!-- Komponenten: Listen-Layout (Karten mit Balken, Zeitleiste) oder Baum -->
+      <!-- Components: list layout (cards with bars, timeline) or tree -->
       <PageLayoutList
         v-if="isListLayout"
         :components="filteredComponents"
@@ -892,8 +933,8 @@ const closeHistory = () => {
         </div>
       </section>
 
-      <!-- Ankündigungen: neueste zuerst, nicht eingeklappte Notices
-           direkt sichtbar, Collapsed-Notices hinter aufklappbarem Header -->
+      <!-- Announcements: newest first, non-collapsed notices
+           directly visible, collapsed notices behind an expandable header -->
       <section v-if="notices.length > 0" class="sp-section" aria-labelledby="sp-notices-heading">
         <h2 id="sp-notices-heading" class="sp-heading"><AppIcon name="alert-circle" :size="18" /> {{ t('statusPage.announcementsHeading') }}</h2>
         <div class="notices-list">
@@ -938,7 +979,7 @@ const closeHistory = () => {
         </div>
       </section>
 
-      <!-- Vergangene Vorfälle -->
+      <!-- Past incidents -->
       <section v-if="!isListLayout && pastIncidents.length > 0" class="sp-section" aria-labelledby="sp-past-heading">
         <h2 id="sp-past-heading" class="sp-heading"><AppIcon name="clock" :size="18" /> {{ t('statusPage.pastIncidentsHeading') }}</h2>
         <ul class="past-incidents-list">
@@ -955,7 +996,7 @@ const closeHistory = () => {
         </ul>
       </section>
 
-      <!-- Ältere behobene Vorfälle nachladen (Dashboard liefert nur die neuesten) -->
+      <!-- Load older resolved incidents (the dashboard delivers only the newest) -->
       <div v-if="incidentsMore" class="sp-more">
         <button type="button" class="incident-history-btn" data-test="load-more-incidents" :disabled="loadingMoreIncidents" @click="loadMoreIncidents">
           <AppIcon name="clock" :size="13" /> {{ t('statusPage.loadMoreIncidents') }}
@@ -963,7 +1004,7 @@ const closeHistory = () => {
         <p v-if="moreIncidentsError" class="sp-muted" role="alert" data-test="load-more-error">{{ t('statusPage.loadMoreIncidentsError') }}</p>
       </div>
 
-      <!-- ====== Abonnieren ====== -->
+      <!-- ====== Subscribe ====== -->
       <section class="subscribe-cta" aria-labelledby="sp-subscribe-heading">
         <div class="subscribe-cta-text">
           <h2 id="sp-subscribe-heading"><AppIcon name="bell" :size="18" /> {{ t('statusPage.subscribeCtaTitle') }}</h2>
@@ -977,7 +1018,7 @@ const closeHistory = () => {
         </div>
       </section>
 
-      <!-- ====== Abonnement verwalten (einzige Stelle; der Kopf-Menüpunkt öffnet sie per Event) ====== -->
+      <!-- ====== Manage subscription (the only place; the header menu item opens it via an event) ====== -->
       <SubscriptionManager
         v-if="!isPreview"
         id="subscription-manager-anchor"
@@ -1000,7 +1041,7 @@ const closeHistory = () => {
       @subscribed="subscriptionManagerRef?.refresh()"
     />
 
-    <!-- Incident-Verlauf Modal -->
+    <!-- Incident history modal -->
     <Teleport to="body">
       <div v-if="historyIncident" class="history-backdrop" @click.self="closeHistory">
         <div class="history-modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -1040,16 +1081,16 @@ const closeHistory = () => {
 </template>
 
 <style scoped>
-/* 4a: Alle Farben, Abstände und Radien aus Tokens (tokens.css);
-   --primary, --primary-hover und --text-secondary bleiben bewusst die Namen,
-   die die Kundenmarke überschreibt (brandingStyle). */
+/* 4a: all colours, spacing and radii from tokens (tokens.css);
+   --primary, --primary-hover and --text-secondary deliberately keep the names
+   the customer brand overrides (brandingStyle). */
 
 .sp-alert { margin-bottom: var(--sp-5); }
 
-/* Kopf (Richtung B): Kundenmarke links. Header-Branding:
-   Standard-Layout ("classic") zeigt Logo links neben dem Namen - "centered" und
-   "minimal" werden nur per Modifier-Klasse aktiviert, wenn eine Seite
-   HeaderStyle explizit gesetzt hat. */
+/* Header (Direction B): customer brand on the left. Header branding:
+   the standard layout ("classic") shows the logo left of the name - "centered" and
+   "minimal" are only activated via a modifier class when a page has
+   set HeaderStyle explicitly. */
 .sp-head {
   display: flex;
   align-items: center;
@@ -1083,7 +1124,7 @@ const closeHistory = () => {
 
 .status-description { margin: var(--sp-2) 0 0; color: var(--text-secondary); }
 
-/* Gesamtstatus als Hero: große Form, getönte Fläche, Text. Farbe nie allein. */
+/* Overall status as a hero: large shape, tinted area, text. Never colour alone. */
 .sp-hero {
   display: flex;
   align-items: center;
@@ -1106,7 +1147,7 @@ const closeHistory = () => {
   .sp-hero { align-items: flex-start; padding: var(--sp-5) var(--sp-4); gap: var(--sp-4); }
 }
 
-/* Abschnitte */
+/* Sections */
 .sp-section { margin-top: var(--sp-6); }
 .sp-heading {
   display: flex;
@@ -1126,7 +1167,7 @@ const closeHistory = () => {
 .sp-more { margin: var(--sp-4) 0; }
 .sp-muted { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--text-secondary); }
 
-/* Vorfall mit Zeitleiste */
+/* Incident with timeline */
 .sp-incident {
   padding: var(--sp-4) var(--sp-5);
   border: 1px solid var(--border);
@@ -1154,8 +1195,8 @@ const closeHistory = () => {
 .sp-timeline-time { font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
 .sp-timeline-message { margin: var(--sp-1) 0 0; font-size: var(--fs-base); color: var(--text-secondary); overflow-wrap: anywhere; }
 
-/* Notices - reuse .incident-card visual language, eigene
-   Level-Farben statt Incident-Status-Farben */
+/* Notices - reuse .incident-card visual language, own
+   level colours instead of incident status colours */
 .notices-list { display: flex; flex-direction: column; }
 
 .notice-card {
@@ -1310,7 +1351,7 @@ const closeHistory = () => {
   }
 }
 
-/* Hilfe-Icon + Tooltip am Suchfeld */
+/* Help icon + tooltip at the search field */
 .search-help-btn {
   flex-shrink: 0;
   width: var(--search-help-size);
@@ -1402,18 +1443,18 @@ const closeHistory = () => {
   padding: var(--sp-5);
   margin-top: var(--sp-6);
   display: flex;
-  /* Ohne Umbruch lagen Hinweis und Button bei 390 px rechts
-     außerhalb der Karte (.subscribe-cta-actions bis x=782), weil die
-     Aktionen nicht schrumpfen. Reicht der Platz nicht, stapeln sich die
-     Aktionen jetzt unter dem Text. */
+  /* Without wrapping, the hint and button sat to the right outside
+     the card at 390 px (.subscribe-cta-actions up to x=782), because the
+     actions do not shrink. If there is not enough room, the
+     actions now stack below the text. */
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-5);
 }
 
-/* Der Text darf auf die Kartenbreite schrumpfen (min-width: 0)
-   und nimmt mindestens 240 px ein, bevor die Aktionen umbrechen. */
+/* The text may shrink to the card width (min-width: 0)
+   and takes at least 240 px before the actions wrap. */
 .subscribe-cta-text {
   flex: 1 1 240px;
   min-width: 0;
@@ -1464,8 +1505,8 @@ const closeHistory = () => {
 
 .subscribe-cta-actions {
   display: flex;
-  /* Hinweis „noch kein Abonnement“ und die Knöpfe brechen
-     untereinander um, statt die Karte zu sprengen. */
+  /* The "no subscription yet" hint and the buttons wrap
+     below each other instead of bursting the card. */
   flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-3);
@@ -1473,8 +1514,8 @@ const closeHistory = () => {
   max-width: 100%;
 }
 
-/* Vergangene Vorfälle: kompakte Zeilen statt Karten, bricht in
-   schmalen Ansichten um statt horizontal zu scrollen. */
+/* Past incidents: compact rows instead of cards, wraps in
+   narrow views instead of scrolling horizontally. */
 .past-incidents-list {
   list-style: none;
   margin: 0;
@@ -1509,7 +1550,7 @@ const closeHistory = () => {
 .past-incident .incident-history-btn { margin-top: 0; }
 .past-incident-main .incident-timestamp { margin-left: 0; }
 
-/* "Verlauf anzeigen" Button auf der Incident-Karte */
+/* "Show history" button on the incident card */
 .incident-history-btn {
   display: inline-flex;
   align-items: center;
@@ -1534,10 +1575,10 @@ const closeHistory = () => {
 }
 .incident-history-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* Verlauf-Modal + Timeline, im Stil von AdminIncidentDetail.vue übernommen
-   (.tl-row etc.) damit Admin- und Public-Ansicht der Timeline konsistent
-   aussehen. Scoped styles vererben sich nicht component-übergreifend,
-   daher hier dupliziert statt importiert. */
+/* History modal + timeline, adopted from the style of AdminIncidentDetail.vue
+   (.tl-row etc.) so the admin and public views of the timeline look
+   consistent. Scoped styles are not inherited across components,
+   hence duplicated here instead of imported. */
 .history-backdrop {
   position: fixed;
   inset: 0;

@@ -1,5 +1,6 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { OnyxBasicPopover } from 'sit-onyx'
@@ -13,20 +14,21 @@ import { useLandingChrome } from '../composables/useLandingChrome'
 import { useDismissable } from '../composables/useDismissable'
 import AppIcon from '../components/AppIcon.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
+import type { MyPage } from '../types/api'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 
-// Jahr im Footer-Copyright, einmal beim Laden des Layouts ermittelt.
+// Year in the footer copyright, determined once when the layout loads.
 const currentYear = new Date().getFullYear()
 const { currentUser, logout, hasPerm } = useAuth()
 const { apiFetch } = useApi()
 const { myPages, setMyPages, setActiveTenant } = useTenant()
 const { theme, toggleTheme } = useTheme()
 const { currentPageSlug } = useCurrentPageSlug()
-// Auf der Startseite zeigt der Kopf die Richtung-A-Variante (Logo mit
-// Marker, Navigation, Anmelden, Bestell-Knopf); LandingPage meldet sich dort an.
+// On the landing page the header shows the Direction A variant (logo with
+// marker, navigation, login, order button); LandingPage registers itself there.
 const { isLanding, ordersEnabled } = useLandingChrome()
 // The section anchors live on the landing page; elsewhere (e.g. /docs) the links lead there.
 const landingAnchorBase = computed(() => (route.path === '/' ? '' : '/'))
@@ -35,7 +37,7 @@ const landingAnchorBase = computed(() => (route.path === '/' ? '' : '/'))
 // status page it also passes the page along, so the login page can show its
 // "Mit SSO anmelden" button.
 const goToLogin = () => {
-  const query = { returnTo: route.fullPath }
+  const query: Record<string, string> = { returnTo: route.fullPath }
   if (currentPageSlug.value) query.page = currentPageSlug.value
   router.push({ path: '/login', query })
 }
@@ -43,8 +45,8 @@ const goToLogin = () => {
 const isUserMenuOpen = ref(false)
 // OnyxBasicPopover only toggles via its trigger; a click/tap outside the
 // popover (trigger + panel live inside its root) or Escape closes it too.
-const userMenuRef = ref(null)
-const userMenuTriggerRef = ref(null)
+const userMenuRef = ref<ComponentPublicInstance | null>(null)
+const userMenuTriggerRef = ref<HTMLButtonElement | null>(null)
 useDismissable(isUserMenuOpen, [userMenuRef], (reason) => {
   isUserMenuOpen.value = false
   if (reason === 'escape') userMenuTriggerRef.value?.focus()
@@ -56,11 +58,11 @@ const handleLogout = () => {
   router.push('/')
 }
 
-// Öffnet den Abo-Editor der aktuell angezeigten Statusseite. Der Editor lebt
-// als ausklappbarer Bereich direkt in StatusPage.vue (kein eigenständiger
-// Dialog); statt einer Ref-Verdrahtung durch <router-view/> hindurch wird ein
-// DOM-Event genutzt, auf das StatusPage.vue lauscht – funktioniert für alle
-// Zugriffswege (Subdomain-Root, /status/:slug) ohne Kenntnis der Route hier.
+// Opens the subscription editor of the currently shown status page. The editor lives
+// as a collapsible area directly in StatusPage.vue (no standalone
+// dialog); instead of wiring a ref through <router-view/> a
+// DOM event is used that StatusPage.vue listens to - works for all
+// access paths (subdomain root, /status/:slug) without knowing the route here.
 const openSubscriptionSettings = () => {
   isUserMenuOpen.value = false
   window.dispatchEvent(new CustomEvent('statushafen:open-subscription-manager'))
@@ -73,8 +75,8 @@ const openSubscriptionSettings = () => {
 watch(currentUser, async (user) => {
   if (!user || myPages.value.length > 0) return
   try {
-    const pages = await apiFetch('/api/me/pages')
-    // Späte Antwort eines inzwischen abgemeldeten oder gewechselten Nutzers verwerfen.
+    const pages = await apiFetch<MyPage[]>('/api/me/pages')
+    // Discard a late answer for a user who has since logged out or switched.
     if (currentUser.value !== user) return
     setMyPages(pages)
   } catch (err) {
@@ -89,7 +91,7 @@ watch(currentUser, async (user) => {
 const isGlobalAdmin = computed(() => !!currentUser.value?.is_global_admin)
 // admin_dashboard only counts with an admin right: a "status page only" role
 // has no admin area to open.
-const grantsDashboard = (page) => isGlobalAdmin.value
+const grantsDashboard = (page: MyPage) => isGlobalAdmin.value
   || (grants(page.Permissions, ADMIN_DASHBOARD) && grantsAdminArea(page.Permissions))
 const dashboardPage = computed(() => (currentPageSlug.value
   ? myPages.value.find(p => p.Slug === currentPageSlug.value && grantsDashboard(p))
@@ -111,7 +113,7 @@ const goToDashboard = () => {
   // dashboard is kept.
   const keepActive = !currentPageSlug.value && hasPerm(ADMIN_DASHBOARD)
   if (dashboardPage.value && !keepActive) setActiveTenant(dashboardPage.value.ID)
-  router.push('/admin') // erster lesbarer Tab statt fest Komponenten
+  router.push('/admin') // first readable tab instead of always components
 }
 </script>
 
@@ -120,8 +122,8 @@ const goToDashboard = () => {
     <header class="app-header" :class="{ 'app-header--landing': isLanding }">
      <div class="header-inner">
       <router-link to="/" class="logo" :class="{ 'logo--landing': isLanding }">
-        <!-- Marker überall als Inline-SVG mit currentColor (Token --primary),
-             kein PNG und kein Filter mehr; Hell/Dunkel folgt dem Token. -->
+        <!-- Marker everywhere as an inline SVG with currentColor (token --primary),
+             no PNG and no filter any more; light/dark follows the token. -->
         <svg
           class="logo-mark"
           width="28"
@@ -164,6 +166,7 @@ const goToDashboard = () => {
         <LanguageSwitcher class="header-control" />
 
         <template v-if="currentUser">
+          <!-- @vue-expect-error sit-onyx knows no "end" alignment; kept so the rendering stays unchanged -->
           <OnyxBasicPopover
             ref="userMenuRef"
             v-model:open="isUserMenuOpen"
@@ -212,7 +215,7 @@ const goToDashboard = () => {
             </template>
           </OnyxBasicPopover>
         </template>
-        <!-- Auf der Anmeldeseite selbst ist ein Anmelden-Knopf überflüssig. -->
+        <!-- On the login page itself a login button is superfluous. -->
         <template v-else-if="route.path !== '/login'">
           <button class="header-control header-control--text login-button" @click="goToLogin">
             {{ t('nav.login') }}
@@ -226,16 +229,16 @@ const goToDashboard = () => {
      </div>
     </header>
 
-    <!-- <main> als Hauptlandmarke. Damit liegt der Seiteninhalt in einer
-         Landmarke (axe region/landmark-one-main), und ein <header> innerhalb einer
-         View (z. B. .status-header) zählt nicht mehr als zweites banner. -->
+    <!-- <main> as the main landmark. This puts the page content inside a
+         landmark (axe region/landmark-one-main), and a <header> inside a
+         view (e.g. .status-header) no longer counts as a second banner. -->
     <main class="app-body">
       <router-view />
     </main>
 
-    <!-- Schlichter Footer in derselben Breite wie die Kopfzeile.
-         Weitere Links (z. B. Impressum, Datenschutz) kommen als zusätzliche
-         <li> in .footer-links, sobald es die Seiten gibt. -->
+    <!-- Plain footer with the same width as the header.
+         Further links (e.g. imprint, privacy policy) come as additional
+         <li> in .footer-links once those pages exist. -->
     <footer class="app-footer">
       <nav class="footer-nav" :aria-label="t('layout.footer.navLabel')">
         <ul class="footer-links">
@@ -254,27 +257,27 @@ const goToDashboard = () => {
 </template>
 
 <style scoped>
-/* gemeinsame Größe für alle Bedienelemente der Kopfzeile
-   (44 px = Mindestzielgröße für Berührung). .action-btn bleibt den
-   Tabellenknöpfen vorbehalten. */
+/* shared size for all header controls
+   (44 px = minimum touch target size). .action-btn stays reserved for
+   the table buttons. */
 .app-header {
   --header-control-size: 44px;
-  /* Die Zielfläche bleibt 44 px, sichtbar sind nur 34 px (Vorlage
-     30-36 px): ein transparenter Rand der Stärke --header-control-ring vergrößert
-     die klickbare Fläche, Hintergrund (background-clip: padding-box) und
-     Rahmen (inset box-shadow) liegen innerhalb davon. */
+  /* The target area stays 44 px, only 34 px are visible (template
+     30-36 px): a transparent border of width --header-control-ring enlarges
+     the clickable area, background (background-clip: padding-box) and
+     border (inset box-shadow) lie inside it. */
   --header-control-ring: 5px;
-  /* Ohne gap stieß die Wortmarke bei 390 px direkt an den
-     Theme-Knopf; 15 px wie zwischen den übrigen Knöpfen (.nav-actions). */
+  /* Without a gap the wordmark touched the theme button at 390 px;
+     15 px as between the other buttons (.nav-actions). */
   gap: 15px;
-  /* Logo und Bedienelemente brechen bei schmalen Breiten in eine
-     zweite Zeile um, statt die Seite seitlich aufzuschieben (400 px: +39 px). */
+  /* Logo and controls wrap into a second line at narrow widths,
+     instead of pushing the page sideways (400 px: +39 px). */
   flex-wrap: wrap;
   row-gap: var(--sp-2);
 }
 
-/* war Inline-Style; flex-wrap + min-width verhindern bei 320 px den
-   Überlauf (Thema + Sprache + Anmelden sind zusammen 287 px breit). */
+/* was an inline style; flex-wrap + min-width prevent the overflow
+   at 320 px (theme + language + login are 287 px wide together). */
 .nav-actions {
   display: flex;
   flex-wrap: wrap;
@@ -284,16 +287,16 @@ const goToDashboard = () => {
   max-width: 100%;
 }
 
-/* Logo: Leuchtturm-Icon + Wortmarke nebeneinander (Icon ist ein Inline-SVG
-   mit currentColor). */
+/* Logo: lighthouse icon + wordmark side by side (the icon is an inline SVG
+   with currentColor). */
 .logo {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 
-/* Logo und Name führen zur Startseite (2026-10-29), sehen aber weiter wie
-   die Wortmarke aus statt wie ein Textlink. */
+/* Logo and name lead to the landing page (2026-10-29), but still look like
+   the wordmark instead of a text link. */
 a.logo {
   color: inherit;
   text-decoration: none;
@@ -341,9 +344,9 @@ a.logo:focus-visible {
   padding: 0;
 }
 
-/* Text-Bedienelement der Kopfzeile (z. B. Login), damit es exakt wie
-   Theme-Toggle und Sprachauswahl aussieht (gleiche Höhe/Rahmen/Radius/Font)
-   statt als abweichend gestylter OnyxButton mit Serifen-Fallback. */
+/* Text control of the header (e.g. login), so it looks exactly like
+   the theme toggle and language selection (same height/border/radius/font)
+   instead of a differently styled OnyxButton with a serif fallback. */
 .header-control--text {
   display: inline-flex;
   align-items: center;
@@ -353,11 +356,11 @@ a.logo:focus-visible {
   font-weight: 500;
 }
 
-/* Spezifischer als .language-switcher in LanguageSwitcher.vue, damit die
-   Komponente an anderen Stellen unverändert bleibt. LanguageSwitcher hat zwei
-   Wurzelelemente (select + Fehlermeldung), deshalb bekommt das <select> das
-   scoped-Attribut dieses Layouts nicht und .header-control griff nie (28 statt
-   44 px hoch, 2026-10-29). :deep() reicht die Regeln hinein. */
+/* More specific than .language-switcher in LanguageSwitcher.vue, so the
+   component stays unchanged elsewhere. LanguageSwitcher has two
+   root elements (select + error message), so the <select> does not get this
+   layout's scoped attribute and .header-control never applied (28 instead of
+   44 px high, 2026-10-29). :deep() passes the rules in. */
 .app-header :deep(.header-control.language-switcher) {
   box-sizing: border-box;
   height: var(--header-control-size);
@@ -370,8 +373,8 @@ a.logo:focus-visible {
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 0.85rem;
-  /* Eigener Pfeil statt des Browser-Standards (wie im Admin-Bereich, style.css):
-     Chevron aus zwei Verlaufs-Diagonalen in currentColor. */
+  /* Own arrow instead of the browser default (as in the admin area, style.css):
+     chevron from two gradient diagonals in currentColor. */
   appearance: none;
   -webkit-appearance: none;
   padding-right: 28px;
@@ -384,9 +387,9 @@ a.logo:focus-visible {
   background-position: right 15px center, right 10px center;
 }
 
-/* Footer. Liegt in .app-container und hat damit dieselbe Breite
-   und dieselben Kanten wie die Kopfzeile; Farben nur über Tokens, damit Hell
-   und Dunkel ohne eigene Regeln funktionieren. */
+/* Footer. Lives in .app-container and thus has the same width
+   and the same edges as the header; colours only via tokens, so light
+   and dark work without rules of their own. */
 .app-footer {
   display: flex;
   flex-wrap: wrap;
@@ -429,9 +432,9 @@ a.logo:focus-visible {
 }
 
 /* ============================================================
-   Startseite (Richtung A): volle, klebende Kopfzeile und
-   randloser Inhalt. Gilt nur mit .app-container--landing; Statusseiten und
-   übrige öffentliche Seiten behalten den schlichten Kopf.
+   Landing page (Direction A): full, sticky header and
+   edge-to-edge content. Applies only with .app-container--landing; status pages and
+   other public pages keep the plain header.
    ============================================================ */
 .header-inner {
   display: contents;
@@ -500,7 +503,7 @@ a.logo:focus-visible {
   margin-left: auto;
 }
 
-/* „Anmelden“ als Textlink: ohne Rahmen und Fläche, gleiche Zielgröße. */
+/* "Log in" as a text link: without border and fill, same target size. */
 .app-header--landing .login-button {
   box-shadow: none;
   background: transparent;
@@ -523,13 +526,13 @@ a.logo:focus-visible {
   white-space: nowrap;
 }
 
-/* .btn-primary:hover setzt border-color; der Rand muss transparent bleiben. */
+/* .btn-primary:hover sets border-color; the border must stay transparent. */
 .app-header .order-button:hover {
   border-color: transparent;
 }
 
-/* Footer unverändert im Inhalt; auf der Startseite läuft die Linie randlos und
-   der Inhalt fluchtet mit der Kopfzeile (--lp-max). */
+/* Footer content unchanged; on the landing page the line runs edge to edge and
+   the content aligns with the header (--lp-max). */
 .app-container--landing .app-footer {
   margin-top: 0;
   padding: var(--sp-5) max(var(--sp-5), calc((100% - var(--lp-max)) / 2 + var(--sp-5)));
@@ -537,15 +540,15 @@ a.logo:focus-visible {
 }
 
 @media (max-width: 640px) {
-  /* Mobil: Logo und Bedienelemente in der ersten Zeile, die Navigation
-     rutscht in eine zweite Zeile; der Bestell-Knopf steht im Hero. */
+  /* Mobile: logo and controls in the first line, the navigation
+     moves to a second line; the order button sits in the hero. */
   .app-header--landing .header-inner {
     flex-wrap: wrap;
     gap: 0 var(--sp-3);
     padding: var(--sp-2) var(--sp-4);
   }
 
-  /* 15 px Abstand sind zu breit für eine Zeile mit Logo. */
+  /* 15 px gap is too wide for a line with the logo. */
   .app-header--landing .nav-actions {
     gap: var(--sp-2);
   }

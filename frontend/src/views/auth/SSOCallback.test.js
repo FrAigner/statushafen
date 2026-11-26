@@ -10,9 +10,9 @@ function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
 }
 
-// loginWithToken() (useAuth.js) verlangt ein strukturell gültiges JWT
-// (3 dot-getrennte Teile, Base64-Payload) - ein beliebiger String würde
-// still verworfen (siehe useAuth.test.js).
+// loginWithToken() (useAuth.js) requires a structurally valid JWT
+// (3 dot-separated parts, Base64 payload) - an arbitrary string would be
+// silently discarded (see useAuth.test.js).
 function makeJwt(payload) {
   const base64url = (obj) =>
     btoa(JSON.stringify(obj)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
@@ -111,8 +111,8 @@ describe('SSOCallback', () => {
     expect(router.currentRoute.value.fullPath).toBe('/')
   })
 
-  // Nach dem Verknüpfen im Profil zurück ins Profil; nur dieser
-  // feste Wert, kein beliebiges Ziel aus der URL (Open Redirect).
+  // After linking in the profile, back to the profile; only this
+  // fixed value, no arbitrary target from the URL (open redirect).
   it('goes to the profile with next=profile, even with a return_to', async () => {
     global.fetch = vi.fn().mockResolvedValue(jsonResponse({ token: makeJwt({ email: 'a@b.de' }), return_to: '/status/acme' }))
     const { router } = await mountCallback('?code=abc123&next=profile')

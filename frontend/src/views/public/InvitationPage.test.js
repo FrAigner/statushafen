@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import InvitationPage from './InvitationPage.vue'
 import { axe } from '../../test-support/axe'
 
-// Einladung auf eine Statusseite annehmen oder ablehnen.
+// Accept or decline an invitation to a status page.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -43,7 +43,7 @@ async function mountPage({ token = 'tok-123', hashToken = null, loggedIn = true,
   return { wrapper, fetchImpl, router }
 }
 
-// Blockierter Speicher (privates Fenster, Cookies gesperrt): jeder Zugriff wirft.
+// Blocked storage (private window, cookies blocked): every access throws.
 function blockedStorage() {
   const boom = () => { throw new Error('blockiert') }
   return { getItem: boom, setItem: boom, removeItem: boom }
@@ -73,7 +73,7 @@ describe('InvitationPage', () => {
     const { wrapper, fetchImpl } = await mountPage({ loggedIn: false, token: 'ABC 1' })
     expect(fetchImpl).not.toHaveBeenCalled()
     expect(wrapper.find('.invitation-login').text()).toContain('Melde dich mit der E-Mail-Adresse an')
-    // Der Token wandert weder in returnTo (Query) noch in ein Fragment der Login-Adresse.
+    // The token goes neither into returnTo (query) nor into a fragment of the login address.
     const href = wrapper.find('.invitation-login a').attributes('href')
     expect(href).toBe('/login?returnTo=' + encodeURIComponent('/invitation'))
     expect(href).not.toContain('ABC')
@@ -153,7 +153,7 @@ describe('InvitationPage', () => {
   it('Login-Rückkehr: Token überlebt den Weg über /login ohne Query', async () => {
     const first = await mountPage({ loggedIn: false, token: null, hashToken: 'tok-login' })
     expect(first.wrapper.find('.invitation-login').exists()).toBe(true)
-    // nach dem Login führt returnTo auf die nackte Adresse
+    // after the login returnTo leads to the bare address
     const { fetchImpl, router } = await mountPage({ token: null })
     expect(bodyOf(fetchImpl.mock.calls[0])).toEqual({ token: 'tok-login' })
     expect(router.currentRoute.value.fullPath).toBe('/invitation')

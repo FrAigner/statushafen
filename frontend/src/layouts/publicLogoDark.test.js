@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-// Regressionstest: Das Leuchtturm-Icon der
-// öffentlichen Kopfzeile war ein dunkelblaues PNG, das im Dunkelmodus per
-// CSS-Filter (brightness(0) invert(1)) aufgehellt werden musste. Jetzt ist es
-// ein Inline-SVG mit currentColor; die Farbe kommt aus dem Token --primary und
-// folgt damit Hell und Dunkel ohne Filter.
+// Regression test: the lighthouse icon of the
+// public header was a dark blue PNG that had to be lightened in dark mode via
+// a CSS filter (brightness(0) invert(1)). Now it is
+// an inline SVG with currentColor; the colour comes from the token --primary and
+// thus follows light and dark without a filter.
 describe('PublicLayout: Logo-Farbe', () => {
   const vue = readFileSync(resolve(__dirname, 'PublicLayout.vue'), 'utf-8')
 
