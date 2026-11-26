@@ -23,7 +23,7 @@ function sourceFiles(dir = root): string[] {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name)
     if (statSync(full).isDirectory()) files.push(...sourceFiles(full))
-    else if (/\.(vue|js)$/.test(name) && !/\.(test|spec)\.js$/.test(name) && !full.includes('test-support')) files.push(full)
+    else if (/\.(vue|js|ts)$/.test(name) && !/\.(test|spec)\.[jt]s$/.test(name) && !full.includes('test-support')) files.push(full)
   }
   return files
 }
@@ -62,6 +62,13 @@ describe('HTML-Senken', () => {
     expect(findHtmlSinks('el.insertAdjacentHTML("beforeend", a)').length).toBe(1)
     expect(findHtmlSinks('<!-- nie v-html="x" -->\n// el.innerHTML = a').length).toBe(0)
     expect(findHtmlSinks('/* offen */\n<div v-html="y"></div>').length).toBe(1)
+  })
+
+  it('erfasst .ts-Module, aber keine Tests und test-support', () => {
+    const files = sourceFiles().map((f) => relative(root, f).split('\\').join('/'))
+    expect(files).toContain('main.ts')
+    expect(files).toContain('App.vue')
+    expect(files.filter((f) => /\.(test|spec)\.[jt]s$/.test(f) || f.startsWith('test-support/'))).toEqual([])
   })
 
   it('nur die bekannten Senken sind vorhanden, jeweils mit Bereiniger', () => {

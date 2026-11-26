@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
-import { dirname, resolve } from 'path'
+import { dirname, resolve, relative } from 'path'
 
 // Stage 4f: cleanup after the redesign. This test ensures that the removed
 // dead classes, alias tokens and the AdminPageHead component do not come
@@ -64,8 +64,8 @@ describe('Design-Aufräumen (Stufe 4f)', () => {
     const sammeln = (dir: string) => {
       for (const name of readdirSync(dir)) {
         const pfad = resolve(dir, name)
-        if (statSync(pfad).isDirectory()) sammeln(pfad)
-        else if (/\.(vue|js|css)$/.test(name) && !/\.test\.js$/.test(name)) quellen.push(pfad)
+        if (statSync(pfad).isDirectory()) { if (name !== 'test-support') sammeln(pfad) }
+        else if (/\.(vue|js|ts|css)$/.test(name) && !/\.(test|spec)\.[jt]s$/.test(name)) quellen.push(pfad)
       }
     }
     sammeln(root)
@@ -75,6 +75,11 @@ describe('Design-Aufräumen (Stufe 4f)', () => {
     it('findet die Quelldateien (Schutz gegen leere Suche)', () => {
       expect(quellen.length).toBeGreaterThan(50)
       expect(alles).toContain('var(--surface)')
+      const rel = quellen.map((p) => relative(root, p).split('\\').join('/'))
+      expect(rel).toContain('main.ts')
+      expect(rel).toContain('App.vue')
+      expect(rel).toContain('style.css')
+      expect(rel.filter((f) => /\.(test|spec)\.[jt]s$/.test(f) || f.startsWith('test-support/'))).toEqual([])
     })
 
     it.each(ALIASE)('--%s wird weder definiert noch verwendet', (alias) => {
