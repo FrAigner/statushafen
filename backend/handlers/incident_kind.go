@@ -15,12 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Wartungen und Vorfälle teilen sich Tabelle und Routen. Die
-// Rechte-Ressource folgt deshalb der Art des Datensatzes: "maintenance" für
-// Wartungsfenster (IsMaintenance), sonst "incidents". Die Resolver laufen in
-// middleware.RequireResolvedPermission; ein unbekannter Datensatz gilt als
-// "incidents" (der Handler antwortet danach selbst mit 404); Lese- und
-// Datenbankfehler brechen dagegen ab.
+// Maintenances and incidents share a table and routes. The
+// permission resource therefore follows the kind of the record: "maintenance" for
+// maintenance windows (IsMaintenance), otherwise "incidents". The resolvers run in
+// middleware.RequireResolvedPermission; an unknown record counts as
+// "incidents" (the handler then answers with 404 itself); read and
+// database errors, on the other hand, abort.
 const (
 	resourceIncidents   = "incidents"
 	resourceMaintenance = "maintenance"
@@ -33,16 +33,16 @@ func incidentResource(isMaintenance bool) string {
 	return resourceIncidents
 }
 
-// maxKindBody begrenzt den Body der Anlegen-Route. Ein Vorfall oder
-// eine Wartung trägt höchstens 5.000 Zeichen Text, ein paar IDs und Zeiten;
-// 64 KiB reichen großzügig. Größere Bodys werden mit 413 abgewiesen.
+// maxKindBody limits the body of the create route. An incident or
+// a maintenance carries at most 5,000 characters of text, a few IDs and times;
+// 64 KiB is more than enough. Larger bodies are rejected with 413.
 const maxKindBody = 64 << 10
 
-// IncidentResourceFromBody: Art aus dem Feld IsMaintenance des Anlegen-Bodys.
-// Der Body wird für den Handler wiederhergestellt. Ein unlesbarer, zu großer
-// oder kaputter Body bricht die Anfrage mit 413/400 ab, statt
-// still auf "incidents" zurückzufallen: sonst bekäme der Handler einen Body,
-// den die Arterkennung nie gesehen hat.
+// IncidentResourceFromBody: kind from the IsMaintenance field of the create body.
+// The body is restored for the handler. An unreadable, too large
+// or broken body aborts the request with 413/400 instead of
+// silently falling back to "incidents": otherwise the handler would get a body
+// that the kind detection never saw.
 func (h *Handler) IncidentResourceFromBody() func(c *gin.Context) string {
 	return func(c *gin.Context) string {
 		raw, err := readLimitedBody(c, maxKindBody)
@@ -64,8 +64,8 @@ func (h *Handler) IncidentResourceFromBody() func(c *gin.Context) string {
 
 var errBodyInvalid = errors.New("body invalid")
 
-// readLimitedBody liest den Body vollständig, höchstens limit Bytes; mehr
-// ergibt *http.MaxBytesError. Ein fehlender Body gilt als leer.
+// readLimitedBody reads the body completely, at most limit bytes; more
+// yields *http.MaxBytesError. A missing body counts as empty.
 func readLimitedBody(c *gin.Context, limit int64) ([]byte, error) {
 	if c.Request.Body == nil {
 		return nil, nil
@@ -73,19 +73,19 @@ func readLimitedBody(c *gin.Context, limit int64) ([]byte, error) {
 	return io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, limit))
 }
 
-// isBodyTooLarge: der Fehler stammt vom MaxBytesReader.
+// isBodyTooLarge: the error comes from the MaxBytesReader.
 func isBodyTooLarge(err error) bool {
 	var tooLarge *http.MaxBytesError
 	return errors.As(err, &tooLarge)
 }
 
-// respondRequestTooLarge antwortet mit 413 und dem Code request_too_large
-// (Text de/en unter api.errors.request_too_large).
+// respondRequestTooLarge answers with 413 and the code request_too_large
+// (text de/en under api.errors.request_too_large).
 func respondRequestTooLarge(c *gin.Context) {
 	c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Anfrage zu groß", "code": "request_too_large"})
 }
 
-// respondBodyError bricht die Anfrage ab: 413 bei zu großem Body, sonst 400.
+// respondBodyError aborts the request: 413 for a too large body, otherwise 400.
 func respondBodyError(c *gin.Context, err error) {
 	if isBodyTooLarge(err) {
 		respondRequestTooLarge(c)
@@ -94,9 +94,9 @@ func respondBodyError(c *gin.Context, err error) {
 	c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid request fields", "code": "invalid_request"})
 }
 
-// abortKindLookup bricht bei einem Datenbankfehler der Arterkennung mit 500 ab.
-// "Nicht gefunden" ist kein Fehler dieser Art: Der Handler antwortet dann selbst
-// mit 404 (und kennt die Art des fehlenden Datensatzes nie).
+// abortKindLookup aborts with 500 on a database error in the kind detection.
+// "Not found" is not an error of this kind: the handler then answers
+// with 404 itself (and never knows the kind of the missing record).
 func abortKindLookup(c *gin.Context, err error) string {
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		slog.Error("Arterkennung (Vorfall/Wartung) fehlgeschlagen", "path", c.FullPath(), "error", err)
@@ -105,11 +105,11 @@ func abortKindLookup(c *gin.Context, err error) string {
 	return resourceIncidents
 }
 
-// IncidentResourceByParam: Art des Datensatzes, dessen ID im Pfad-Parameter
-// param steht. Auf Routen mit :page_id wird die Seite mitgeprüft, damit ein
-// Datensatz einer fremden Seite die Art nicht verrät. Eine ungültige ID oder ein
-// unbekannter Datensatz gilt als "incidents" (der Handler antwortet mit 400/404,
-// legt aber nichts an); ein Datenbankfehler bricht mit 500 ab.
+// IncidentResourceByParam: kind of the record whose ID is in the path parameter
+// param. On routes with :page_id the page is checked as well, so that a
+// record of a foreign page does not reveal the kind. An invalid ID or an
+// unknown record counts as "incidents" (the handler answers with 400/404,
+// but creates nothing); a database error aborts with 500.
 func (h *Handler) IncidentResourceByParam(param string) func(c *gin.Context) string {
 	return func(c *gin.Context) string {
 		id, err := strconv.ParseUint(c.Param(param), 10, 32)
@@ -120,8 +120,8 @@ func (h *Handler) IncidentResourceByParam(param string) func(c *gin.Context) str
 	}
 }
 
-// IncidentResourceByTranslation: Art des Vorfalls, zu dem die Übersetzung
-// :translation_id gehört.
+// IncidentResourceByTranslation: kind of the incident to which the translation
+// :translation_id belongs.
 func (h *Handler) IncidentResourceByTranslation() func(c *gin.Context) string {
 	return func(c *gin.Context) string {
 		id, err := strconv.ParseUint(c.Param("translation_id"), 10, 32)

@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Retry-After nennt ganze Sekunden und rundet auf: Eine Restsperre von unter
-// einer Sekunde darf nicht als "0" erscheinen (der Client versuchte es sofort
-// wieder und liefe erneut in die Sperre).
+// Retry-After gives whole seconds and rounds up: a remaining lockout of less than
+// one second must not appear as "0" (the client would retry immediately
+// and run into the lockout again).
 func TestLogin_RetryAfterRoundsUpToWholeSeconds(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -24,7 +24,7 @@ func TestLogin_RetryAfterRoundsUpToWholeSeconds(t *testing.T) {
 	r.POST("/api/login", h.LoginHandler)
 
 	const source = "198.51.100.7"
-	// Schon der erste Versuch erreicht die Schwelle und sperrt das Paar für 400 ms.
+	// The very first attempt reaches the threshold and locks the pair for 400 ms.
 	h.loginThrottle.Admit("ziel@example.com", source)
 
 	w, _ := loginFrom(r, context.Background(), source+":4000", "falsch-falsch")

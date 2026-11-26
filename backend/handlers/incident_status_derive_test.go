@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Ableitung des Wartungsstatus aus den Zeiten, inkl. Grenzfälle.
+// Derivation of the maintenance status from the times, including edge cases.
 func TestDeriveMaintenanceStatus(t *testing.T) {
 	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	cases := []struct {

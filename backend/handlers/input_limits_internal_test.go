@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Das Logo wird als <img src> ausgeliefert: erlaubt sind nur eine https-URL mit
-// Host oder ein absoluter Pfad auf dem eigenen Host; Schemata wie javascript:
-// und data:, unverschlüsseltes http und übergroße Werte werden abgelehnt.
+// The logo is served as <img src>: only an https URL with a
+// host or an absolute path on the own host are allowed; schemes like javascript:
+// and data:, unencrypted http and oversized values are rejected.
 func TestValidateBranding_LogoURL(t *testing.T) {
 	valid := func(logo string) bool {
 		_, ok := validateBranding(&models.StatusPage{LogoURL: logo, PageLayout: "standard"})
@@ -35,8 +35,8 @@ func TestValidateBranding_LogoURL(t *testing.T) {
 	}
 }
 
-// Eine Adresse über der RFC-5321-Grenze von 254 Zeichen ist keine gültige
-// Abonnentenadresse (verhindert Megabyte-Adressen in der Datenbank).
+// An address above the RFC 5321 limit of 254 characters is not a valid
+// subscriber address (prevents megabyte-sized addresses in the database).
 func TestIsPlainEmailAddress_RejectsOverlongAddresses(t *testing.T) {
 	assert.True(t, isPlainEmailAddress("a@example.com"))
 	long := strings.Repeat("a", 250) + "@example.com"
@@ -61,13 +61,13 @@ func TestCheckInputTexts(t *testing.T) {
 	} {
 		assert.Equal(t, codeInputInvalidCharacters, codeOf(checkInputTexts(textField{v, 50})), name)
 	}
-	// Länge hat Vorrang vor Zeichen, die Prüfung bricht beim ersten Fehler ab.
+	// Length takes precedence over characters; the check stops at the first error.
 	assert.Equal(t, codeInputTooLong, codeOf(checkInputTexts(textField{"x\x00", 50}, textField{"toolong", 3})))
 }
 
-// Jede Obergrenze der öffentlichen Eingaben liegt genau auf ihrem Wert: ein Byte
-// darunter und darauf geht durch, eines darüber nicht. Die Zahlen stehen hier
-// absichtlich ausgeschrieben, damit eine unbemerkte Änderung der Konstanten auffällt.
+// Every upper bound on public inputs sits exactly on its value: one byte
+// below and at it passes, one above does not. The numbers are written out here
+// on purpose so that an unnoticed change to the constants stands out.
 func TestInputLimits_ExactBoundaries(t *testing.T) {
 	a := func(n int) string { return strings.Repeat("a", n) }
 	tooLong := func(err error) bool {

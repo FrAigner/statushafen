@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Auch die Übernahme externer Bausteine vergibt Kennungen
-// (Umlaute transliteriert, Kollision zählt hoch, höchstens 60 Zeichen).
+// Adopting external building blocks also assigns identifiers
+// (umlauts transliterated, collisions count up, at most 60 characters).
 func TestImport_VergibtKennungen(t *testing.T) {
 	f := newExtFixture(t)
 	src := f.createSource(f.page, f.pageAdminTok, "https://status.example.org")

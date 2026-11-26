@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Feldlängen (Name 60, Beschreibung 240) und Sichtbarkeit.
+// Field lengths (name 60, description 240) and visibility.
 
 type visEnv struct {
 	t    *testing.T
@@ -104,7 +104,7 @@ func TestComponentLaengen_Create(t *testing.T) {
 	assert.Equal(t, "description_too_long", m["code"])
 	assert.Zero(t, count(), "nichts darf angelegt werden")
 
-	// Genau an der Grenze; Umlaute zählen als je ein Zeichen (nicht als Bytes).
+	// Exactly at the limit; umlauts count as one character each (not as bytes).
 	w, _ = e.do("POST", e.base, map[string]any{"name": strings.Repeat("ä", 60), "description": strings.Repeat("ö", 240)})
 	requireStatusCode(t, w, http.StatusCreated)
 	assert.EqualValues(t, 1, count())
@@ -113,12 +113,12 @@ func TestComponentLaengen_Create(t *testing.T) {
 func TestComponentLaengen_Update(t *testing.T) {
 	e := newVisEnv(t)
 	long := strings.Repeat("x", 300)
-	// Bestandsdaten dürfen länger sein: direkt in die DB geschrieben.
+	// Existing data may be longer: written directly to the DB.
 	comp := e.comp(strings.Repeat("n", 70), nil, true, "operational")
 	require.NoError(t, e.db.Model(&comp).Update("description", long).Error)
 	url := e.base + "/" + strconv.Itoa(int(comp.ID))
 
-	// Quick-Status schickt nur den Status: Bestand bleibt unberührt und stört nicht.
+	// Quick status sends only the status: existing data stays untouched and does not interfere.
 	w, _ := e.do("PUT", url, map[string]any{"status": "major_outage"})
 	requireStatusCode(t, w, http.StatusOK)
 	var fresh models.Component
@@ -126,7 +126,7 @@ func TestComponentLaengen_Update(t *testing.T) {
 	assert.Equal(t, long, fresh.Description)
 	assert.Len(t, []rune(fresh.Name), 70)
 
-	// Beim nächsten Speichern der langen Felder wird geprüft.
+	// The long fields are checked on the next save.
 	w, m := e.do("PUT", url, map[string]any{"name": strings.Repeat("n", 61), "status": "operational"})
 	requireStatusCode(t, w, http.StatusBadRequest)
 	assert.Equal(t, "name_too_long", m["code"])
@@ -139,7 +139,7 @@ func TestComponentLaengen_Update(t *testing.T) {
 	w, _ = e.do("PUT", url, map[string]any{"name": strings.Repeat("n", 60), "status": "operational", "description": strings.Repeat("d", 240)})
 	requireStatusCode(t, w, http.StatusOK)
 
-	// Mandantentrennung: fremde Seite bleibt 404, auch mit zu langem Namen.
+	// Tenant isolation: a foreign page stays 404, even with an overly long name.
 	other := models.StatusPage{Name: "Fremd", Slug: "fremd-580"}
 	require.NoError(t, e.db.Create(&other).Error)
 	foreign := "/api/pages/" + strconv.Itoa(int(other.ID)) + "/components/" + strconv.Itoa(int(comp.ID))
@@ -162,7 +162,7 @@ func TestComponentVisible_CreateUpdate(t *testing.T) {
 	assert.False(t, stored.Visible, "false muss trotz GORM-Default true gespeichert sein")
 
 	url := e.base + "/" + strconv.Itoa(int(stored.ID))
-	// Quick-Status ohne visible lässt das Feld unverändert.
+	// Quick status without visible leaves the field unchanged.
 	w, _ = e.do("PUT", url, map[string]any{"status": "degraded_performance"})
 	requireStatusCode(t, w, http.StatusOK)
 	e.db.First(&stored, stored.ID)
@@ -209,8 +209,8 @@ func TestComponentVisible_AdminSiehtAlles_WebhookFunktioniert(t *testing.T) {
 	require.NoError(t, e.db.Create(&reader).Error)
 	require.NoError(t, e.db.Create(&models.UserStatusPageRole{UserID: reader.ID, StatusPageID: e.page.ID, RoleID: plainRole.ID}).Error)
 
-	// Die Route ist anonym lesbar: Anonyme und Leser ohne Komponentenrecht
-	// bekommen den gefilterten Baum, Verwalter sehen alles mit Markierung.
+	// The route is anonymously readable: anonymous users and readers without component permission
+	// get the filtered tree, managers see everything with a marker.
 	assert.Len(t, listAs(0), 1, "anonym: unsichtbare Komponente fehlt")
 	assert.Len(t, listAs(reader.ID), 1, "Rolle ohne Komponentenrecht: fehlt")
 	for _, uid := range []uint{admin.ID, editor.ID} {
@@ -298,8 +298,8 @@ func TestComponentVisible_Verfuegbarkeit(t *testing.T) {
 	assert.Zero(t, d.DowntimeSeconds)
 }
 
-// Meldungen externer Quellen an einer unsichtbaren Komponente zählen nicht in
-// die öffentliche Verfügbarkeit der Seite.
+// Reports from external sources on an invisible component do not count towards
+// the page's public availability.
 func TestComponentVisible_VerfuegbarkeitIgnoriertExterneMeldungenUnsichtbarer(t *testing.T) {
 	x := newExtAvail(t)
 	x.add(models.ExternalIncidentKindIncident, "major", utc(20, 6), utc(20, 12), true)
@@ -307,13 +307,13 @@ func TestComponentVisible_VerfuegbarkeitIgnoriertExterneMeldungenUnsichtbarer(t 
 	assert.Equal(t, "partial_outage", day(t, before.Days, "2026-10-20").Status, "Gegenprobe: sichtbar zählt (impact major)")
 
 	require.NoError(t, x.db.Model(&x.comp).Update("visible", false).Error)
-	x.now = x.now.Add(2 * time.Minute) // Cache (60 s) umgehen
+	x.now = x.now.Add(2 * time.Minute) // bypass cache (60 s)
 	_, after := x.get("/api/public/pages/ext/availability")
 	assert.Equal(t, "operational", day(t, after.Days, "2026-10-20").Status)
 }
 
-// Schlägt das Nachziehen von visible=false fehl, scheitert das Anlegen
-// komplett (Transaktion), statt eine sichtbare Komponente zu hinterlassen.
+// If applying visible=false afterwards fails, creation fails
+// entirely (transaction) instead of leaving a visible component behind.
 func TestComponentVisible_CreateUnsichtbarFehlerRollbackt(t *testing.T) {
 	e := newVisEnv(t)
 	require.NoError(t, e.db.Callback().Update().Before("gorm:update").Register("test:fail", func(d *gorm.DB) {

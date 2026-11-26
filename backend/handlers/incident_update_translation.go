@@ -14,26 +14,26 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Übersetzungen der Updates eines Vorfalls (Timeline-Einträge).
+// Translations of an incident's updates (timeline entries).
 //
-// Ein Update hat nur eine Nachricht, keinen Titel. Das Muster folgt den
-// Vorfall-Übersetzungen: je Sprache ein PUT mit Stand draft oder
-// confirmed; Entwürfe sieht nur der Admin, die öffentliche Auslieferung nimmt
-// ausschließlich bestätigte Texte.
+// An update has only a message, no title. The pattern follows the
+// incident translations: one PUT per language with state draft or
+// confirmed; only the admin sees drafts, public delivery takes
+// only confirmed texts.
 //
-// Routen (main.go):
+// Routes (main.go):
 //
 //	admin:      GET /pages/:page_id/incidents/:id/updates/:update_id/translations
 //	            PUT /pages/:page_id/incidents/:id/updates/:update_id/translations/:language_code
-//	öffentlich: GET /api/public/pages/:slug/incidents/:incident_id/update-translations?lang=xx
+//	public: GET /api/public/pages/:slug/incidents/:incident_id/update-translations?lang=xx
 //
-// Die Admin-Routen tragen :page_id und :id im Pfad; die Rechte folgen dem
-// Vorfall (incidents bzw. maintenance, read bzw. update), die Seite wird wie bei
-// "Update posten" über die Seiten-ID geprüft. Löscht man das Update, entfernt
-// der Fremdschlüssel (OnDelete:CASCADE) seine Übersetzungen mit.
+// The admin routes carry :page_id and :id in the path; permissions follow the
+// incident (incidents or maintenance, read or update), and the page is checked via the
+// page ID as with "post update". If the update is deleted, the foreign key
+// (OnDelete:CASCADE) removes its translations as well.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// incidentUpdateTranslationView ist die Admin-Sicht auf eine Übersetzung.
+// incidentUpdateTranslationView is the admin view of a translation.
 type incidentUpdateTranslationView struct {
 	LanguageCode string `json:"LanguageCode"`
 	Message      string `json:"Message"`
@@ -41,9 +41,9 @@ type incidentUpdateTranslationView struct {
 	Source       string `json:"Source"`
 }
 
-// loadUpdateForTranslation ermittelt aus :page_id, :id und :update_id das
-// Update samt Vorfall. Sie antwortet selbst bei Fehlern (400 ungültige ID,
-// 404 unbekannt oder fremde Seite, 403 ohne Tag-Zugriff) und liefert dann false.
+// loadUpdateForTranslation determines the update including its incident from
+// :page_id, :id and :update_id. It responds itself on errors (400 invalid ID,
+// 404 unknown or foreign page, 403 without tag access) and then returns false.
 func (h *Handler) loadUpdateForTranslation(c *gin.Context) (models.Incident, models.IncidentUpdate, bool) {
 	var inc models.Incident
 	var upd models.IncidentUpdate
@@ -77,8 +77,8 @@ func (h *Handler) loadUpdateForTranslation(c *gin.Context) (models.Incident, mod
 	return inc, upd, true
 }
 
-// GetIncidentUpdateTranslationsHandler liefert alle Übersetzungen eines Updates
-// inklusive Entwürfen (Admin).
+// GetIncidentUpdateTranslationsHandler returns all translations of an update
+// including drafts (admin).
 func (h *Handler) GetIncidentUpdateTranslationsHandler(c *gin.Context) {
 	_, upd, ok := h.loadUpdateForTranslation(c)
 	if !ok {
@@ -96,9 +96,9 @@ func (h *Handler) GetIncidentUpdateTranslationsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// SaveIncidentUpdateTranslationHandler speichert die Übersetzung eines Updates
-// für genau eine Sprache: anlegen oder ändern, Stand draft oder confirmed.
-// Die Standardsprache der Seite ist das Update selbst und hat keine Übersetzung.
+// SaveIncidentUpdateTranslationHandler saves the translation of an update
+// for exactly one language: create or change, state draft or confirmed.
+// The default language of the page is the update itself and has no translation.
 func (h *Handler) SaveIncidentUpdateTranslationHandler(c *gin.Context) {
 	inc, upd, ok := h.loadUpdateForTranslation(c)
 	if !ok {
@@ -140,19 +140,19 @@ func (h *Handler) SaveIncidentUpdateTranslationHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, incidentUpdateTranslationView{LanguageCode: trans.LanguageCode, Message: trans.Message, Status: trans.Status, Source: trans.Source})
 }
 
-// publicUpdateTranslationsResponse: je Update-ID (als Zeichenkette) die
-// Nachricht in der gewünschten Sprache, sonst der Standardsprache. Updates ohne
-// bestätigte Übersetzung fehlen - das Frontend zeigt dann das Original.
+// publicUpdateTranslationsResponse: per update ID (as a string) the
+// message in the requested language, otherwise in the default language. Updates without a
+// confirmed translation are missing - the frontend then shows the original.
 type publicUpdateTranslationsResponse struct {
 	Language        string            `json:"language"`
 	DefaultLanguage string            `json:"default_language"`
 	Updates         map[string]string `json:"updates"`
 }
 
-// GetPublicIncidentUpdateTranslationsHandler liefert die bestätigten
-// Übersetzungen der Updates eines Vorfalls für die Statusseite. Zugriff wie das
-// Dashboard (authorizePublicPageRead); der Vorfall muss zur Seite gehören.
-// Sprachwahl wie GetPublicTranslationsHandler (lang leer = Standardsprache).
+// GetPublicIncidentUpdateTranslationsHandler returns the confirmed
+// translations of an incident's updates for the status page. Access like the
+// dashboard (authorizePublicPageRead); the incident must belong to the page.
+// Language selection like GetPublicTranslationsHandler (empty lang = default language).
 func (h *Handler) GetPublicIncidentUpdateTranslationsHandler(c *gin.Context) {
 	var page models.StatusPage
 	if err := h.DB.Where(slugWhereClause, c.Param("slug")).First(&page).Error; err != nil {

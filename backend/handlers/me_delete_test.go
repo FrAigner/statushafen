@@ -21,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Tests für DELETE /api/me (Konto löschen, DSGVO Art. 17).
+// Tests for DELETE /api/me (delete account, GDPR Art. 17).
 
 const meDeletePassword = "richtiges-passwort"
 
@@ -175,7 +175,7 @@ func TestDeleteMeHandler_LetzterGlobalAdmin409(t *testing.T) {
 	e := newMeDeleteEnv(t)
 	u := models.User{Email: "ga@example.com", IsGlobalAdmin: true}
 	require.NoError(t, e.db.Create(&u).Error)
-	// Ein soft-gelöschter zweiter Global Admin zählt nicht.
+	// A soft-deleted second Global Admin does not count.
 	gone := models.User{Email: "ga-weg@example.com", IsGlobalAdmin: true}
 	require.NoError(t, e.db.Create(&gone).Error)
 	require.NoError(t, e.db.Delete(&gone).Error)
@@ -200,7 +200,7 @@ func TestDeleteMeHandler_AlleinigerSeitenAdmin(t *testing.T) {
 
 	solePage := e.createPage(t, "Solo Page")
 	e.assign(t, u, solePage, e.adminRole)
-	e.assign(t, other, solePage, e.viewRole) // Viewer zählt nicht als Admin
+	e.assign(t, other, solePage, e.viewRole) // Viewer does not count as admin
 
 	sharedPage := e.createPage(t, "Shared Page")
 	e.assign(t, u, sharedPage, e.adminRole)
@@ -209,14 +209,14 @@ func TestDeleteMeHandler_AlleinigerSeitenAdmin(t *testing.T) {
 	viewerPage := e.createPage(t, "Viewer Page")
 	e.assign(t, u, viewerPage, e.viewRole)
 
-	// Der zweite Admin wurde per Admin-Oberfläche soft-gelöscht, seine
-	// Rollenzeile blieb liegen - er verwaltet die Seite faktisch nicht mehr.
+	// The second admin was soft-deleted via the admin UI, their
+	// role row was left behind - they effectively no longer manage the page.
 	orphanPage := e.createPage(t, "Orphan Page")
 	e.assign(t, u, orphanPage, e.adminRole)
 	e.assign(t, softDeleted, orphanPage, e.adminRole)
 	require.NoError(t, e.db.Delete(&softDeleted).Error)
 
-	// Rollenzeile auf eine bereits gelöschte Seite: keine Rückfrage nötig.
+	// Role row on an already deleted page: no confirmation needed.
 	deletedPage := e.createPage(t, "Deleted Page")
 	e.assign(t, u, deletedPage, e.adminRole)
 	require.NoError(t, e.db.Delete(&deletedPage).Error)
@@ -253,7 +253,7 @@ func TestDeleteMeHandler_AlleinigerSeitenAdmin(t *testing.T) {
 	t.Run("mit Bestätigung werden genau die Seiten gelöscht", func(t *testing.T) {
 		w := e.deleteMe(t, u, map[string]interface{}{
 			"confirm_email": u.Email,
-			// sharedPage ist nicht betroffen und wird trotz Nennung nicht gelöscht.
+			// sharedPage is not affected and is not deleted despite being named.
 			"confirm_delete_page_ids": []uint{orphanPage.ID, solePage.ID, sharedPage.ID},
 		})
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -341,10 +341,10 @@ func TestDeleteMeHandler_LoeschtUndAnonymisiert(t *testing.T) {
 	assert.Equal(t, int64(1), countUnscoped(&models.OIDCLoginState{}, "link_user_id = ?", other.ID))
 	assert.Equal(t, int64(0), countUnscoped(&models.Subscriber{}, "email = ?", u.Email))
 	assert.Equal(t, int64(1), countUnscoped(&models.Subscriber{}, "email = ?", other.Email))
-	// Seite bleibt erhalten: other ist dort weiterhin Admin.
+	// Page is kept: other is still admin there.
 	assert.Equal(t, int64(1), countUnscoped(&models.StatusPage{}, "id = ? AND deleted_at IS NULL", page.ID))
 
-	// Kein Datensatz außer dem neuen Löscheintrag darf die E-Mail noch enthalten.
+	// No record except the new deletion entry may still contain the email.
 	var logs []models.AuditLog
 	e.db.Order("id").Find(&logs)
 	require.Len(t, logs, 4)
@@ -388,14 +388,14 @@ func TestDeleteMeHandler_LoeschtUndAnonymisiert(t *testing.T) {
 	assert.Equal(t, other.Email, orders[1].Email)
 	assert.Equal(t, "10.0.0.2", orders[1].RequestIP)
 
-	// Die Adresse ist wieder frei (harte Löschung, Unique-Index blockiert nicht).
+	// The address is free again (hard delete, unique index does not block).
 	assert.NoError(t, e.db.Create(&models.User{Email: u.Email}).Error)
 }
 
-// failOnTable registriert für die Dauer des Tests einen GORM-Callback, der
-// Abfragen (kind "query") bzw. Löschungen (kind "delete") auf der Tabelle
-// table mit einem simulierten Fehler abbricht. after gibt an, wie viele
-// Treffer vorher noch durchgelassen werden.
+// failOnTable registers a GORM callback for the duration of the test that
+// aborts queries (kind "query") or deletions (kind "delete") on the table
+// named table with a simulated error. after specifies how many
+// hits are still let through beforehand.
 func failOnTable(t *testing.T, db *gorm.DB, kind, table string, after int) {
 	t.Helper()
 	name := "test:me_delete_fail_" + kind + "_" + table
@@ -440,7 +440,7 @@ func TestDeleteMeHandler_TransaktionsfehlerRolltZurueck(t *testing.T) {
 	e.assign(t, u, page, e.adminRole)
 	require.NoError(t, e.db.Create(&models.Subscriber{StatusPageID: page.ID, Email: u.Email, Channel: "email", CreatedByUserID: &u.ID}).Error)
 	require.NoError(t, e.db.Create(&models.AuditLog{Action: "incident.created", Category: "incident", ActorID: &u.ID, ActorEmail: u.Email}).Error)
-	// Der letzte Schritt (User löschen) scheitert: alles davor muss zurückgerollt werden.
+	// The last step (delete user) fails: everything before it must be rolled back.
 	failOnTable(t, e.db, "delete", "users", 0)
 
 	w := e.deleteMe(t, u, map[string]interface{}{"confirm_email": u.Email, "confirm_delete_page_ids": []uint{page.ID}})

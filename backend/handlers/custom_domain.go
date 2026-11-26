@@ -18,30 +18,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// lookupTXT ist als Package-Variable statt direktem Resolver-Aufruf
-// deklariert, damit Tests eine DNS-Antwort (auch echte *net.DNSError-Werte)
-// simulieren können, ohne echte Netzwerk-Lookups zu benötigen. Der Context
-// trägt die Frist (vorher ohne Timeout, ein hängender Resolver
-// blockierte den Request).
+// lookupTXT is declared as a package variable instead of a direct resolver call
+// so that tests can simulate a DNS response (including real *net.DNSError values)
+// without needing real network lookups. The context
+// carries the deadline (previously there was no timeout and a hanging resolver
+// blocked the request).
 var lookupTXT = net.DefaultResolver.LookupTXT
 
-// customDomainLookupTimeout begrenzt einen einzelnen TXT-Lookup (Variable,
-// damit der Timeout-Test nicht 5 s wartet).
+// customDomainLookupTimeout limits a single TXT lookup (a variable
+// so the timeout test does not wait 5 s).
 var customDomainLookupTimeout = 5 * time.Second
 
-// customDomainTXTChallenge liefert den erwarteten TXT-Record-Wert für den
-// Owner-Nachweis einer Domain (Standard-Verfahren wie bei Google
-// Search Console/Mailgun: TXT beweist DNS-Kontrolle, unabhängig vom später
-// gesetzten CNAME).
+// customDomainTXTChallenge returns the expected TXT record value for the
+// ownership proof of a domain (standard procedure as with Google
+// Search Console/Mailgun: TXT proves DNS control, independent of the later
+// configured CNAME).
 func customDomainTXTChallenge(token string) string {
 	return "statushafen-verify=" + token
 }
 
-// customDomainCNAMETarget liefert den Hostnamen, auf den Kunden ihren
-// CNAME zeigen müssen (der gemeinsame Reverse-Proxy/Edge-Server der
-// Installation). Konfigurierbar über CUSTOM_DOMAIN_CNAME_TARGET, damit
-// mehrere Umgebungen unterschiedliche Ziel-Hosts verwenden können. Ohne
-// Angabe gilt "edge.<Host aus FRONTEND_URL>".
+// customDomainCNAMETarget returns the hostname that customers must point
+// their CNAME to (the shared reverse proxy/edge server of the
+// installation). Configurable via CUSTOM_DOMAIN_CNAME_TARGET so that
+// several environments can use different target hosts. Without
+// a setting, "edge.<host from FRONTEND_URL>" applies.
 func customDomainCNAMETarget() string {
 	if v := os.Getenv("CUSTOM_DOMAIN_CNAME_TARGET"); v != "" {
 		return v
@@ -49,14 +49,14 @@ func customDomainCNAMETarget() string {
 	return "edge." + frontendURLHost()
 }
 
-// normalizeDomain trimmt/lowercased eine vom Client eingegebene Domain und
-// lässt nur echte Hostnamen durch (RFC 1123): mindestens zwei Labels aus
-// a-z, 0-9 und Bindestrich (nicht am Rand), je höchstens 63 Zeichen, gesamt
-// höchstens 253, keine rein numerische Endung. Abgewiesen werden damit
-// Schema, Pfad, Port, Wildcards, IP-Literale, leere Labels, ein abschließender
-// Punkt (er würde die Eindeutigkeitsprüfung umgehen: "example.com." gegen
-// "example.com") und Nicht-ASCII-Zeichen (internationale Namen nur in der
-// Punycode-Schreibweise). Leer bleibt leer und gültig (löscht die Domain).
+// normalizeDomain trims/lowercases a domain entered by the client and
+// lets only real hostnames through (RFC 1123): at least two labels made of
+// a-z, 0-9 and hyphen (not at the edges), at most 63 characters each, at most 253
+// in total, no purely numeric ending. This rejects
+// scheme, path, port, wildcards, IP literals, empty labels, a trailing
+// dot (it would bypass the uniqueness check: "example.com." against
+// "example.com") and non-ASCII characters (international names only in
+// punycode notation). Empty stays empty and valid (deletes the domain).
 func normalizeDomain(raw string) (string, bool) {
 	d := strings.ToLower(strings.TrimSpace(raw))
 	if d == "" {
@@ -74,15 +74,15 @@ func normalizeDomain(raw string) (string, bool) {
 			return "", false
 		}
 	}
-	// Eine rein numerische Endung wäre ein IP-Literal (127.0.0.1) oder zumindest
-	// kein gültiger Top-Level-Name.
+	// A purely numeric ending would be an IP literal (127.0.0.1) or at least
+	// not a valid top-level name.
 	if tld := labels[len(labels)-1]; strings.Trim(tld, "0123456789") == "" {
 		return "", false
 	}
 	return d, true
 }
 
-// validHostnameLabel prüft ein einzelnes Label eines Hostnamens.
+// validHostnameLabel checks a single label of a hostname.
 func validHostnameLabel(l string) bool {
 	if l == "" || len(l) > 63 || l[0] == '-' || l[len(l)-1] == '-' {
 		return false
@@ -98,10 +98,10 @@ func validHostnameLabel(l string) bool {
 	return true
 }
 
-// loadStatusPageForCustomDomain parst :page_id und lädt die zugehörige
-// Statusseite - gemeinsame Vorbedingung aller drei Custom-Domain-Admin-
-// Endpunkte (Set/Delete/Verify). Bei Fehler ist die Response bereits
-// geschrieben; der Aufrufer muss dann nur returnen.
+// loadStatusPageForCustomDomain parses :page_id and loads the associated
+// status page - common precondition of all three custom-domain admin
+// endpoints (Set/Delete/Verify). On error the response has already been
+// written; the caller then only needs to return.
 func (h *Handler) loadStatusPageForCustomDomain(c *gin.Context) (models.StatusPage, uint64, bool) {
 	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
 	if err != nil {
@@ -118,24 +118,24 @@ func (h *Handler) loadStatusPageForCustomDomain(c *gin.Context) (models.StatusPa
 	return page, pageID, true
 }
 
-// Gründe einer fehlgeschlagenen DNS-Prüfung, als stabile Codes
-// für das Frontend (Texte dort in de/en).
+// Reasons for a failed DNS check, as stable codes
+// for the frontend (texts there in de/en).
 const (
 	customDomainCheckTXTNotFound = "txt_not_found"
 	customDomainCheckLookupError = "dns_lookup_failed"
 )
 
-// resetCustomDomainCheck vergisst das Ergebnis der letzten Prüfung (neue oder
-// entfernte Domain: ein altes Prüfergebnis gehört nicht zur neuen Eintragung).
+// resetCustomDomainCheck forgets the result of the last check (new or
+// removed domain: an old check result does not belong to the new entry).
 func resetCustomDomainCheck(page *models.StatusPage) {
 	page.CustomDomainCheckedAt = nil
 	page.CustomDomainCheckError = ""
 }
 
-// PUT /api/admin/pages/:page_id/custom-domain — trägt eine Custom Domain ein
-// (oder ändert eine bestehende). Setzt den Verifikationsstatus immer auf
-// "pending" zurück, ein alter "verified"/"active"-Status einer vorherigen
-// Domain darf nie an die neue Domain "vererbt" werden.
+// PUT /api/admin/pages/:page_id/custom-domain — registers a custom domain
+// (or changes an existing one). Always resets the verification status to
+// "pending"; an old "verified"/"active" status of a previous
+// domain must never be "inherited" by the new domain.
 func (h *Handler) SetCustomDomainHandler(c *gin.Context) {
 	page, pageID, ok := h.loadStatusPageForCustomDomain(c)
 	if !ok {
@@ -156,11 +156,11 @@ func (h *Handler) SetCustomDomainHandler(c *gin.Context) {
 		return
 	}
 
-	// Bewusst keine Eindeutigkeitsprüfung beim Eintragen: Eine unbewiesene
-	// Eintragung (pending) darf die Domain nicht reservieren, sonst könnte jeder
-	// Seiten-Admin fremde Domains sperren, und die Antwort würde verraten, bei
-	// welchem Mandanten sie hinterlegt ist. Wer gewinnt, entscheidet der
-	// TXT-Nachweis in VerifyCustomDomainHandler (wer zuerst verifiziert, gewinnt).
+	// Deliberately no uniqueness check on registration: an unproven
+	// entry (pending) must not reserve the domain, otherwise any
+	// page admin could block foreign domains, and the response would reveal which
+	// tenant it is registered with. Who wins is decided by the
+	// TXT proof in VerifyCustomDomainHandler (whoever verifies first wins).
 
 	page.CustomDomain = domain
 	if domain == "" {
@@ -168,9 +168,9 @@ func (h *Handler) SetCustomDomainHandler(c *gin.Context) {
 		page.CustomDomainVerificationToken = ""
 	} else {
 		page.CustomDomainStatus = "pending"
-		// Neuer Token bei jedem Set (auch beim erneuten Speichern derselben
-		// Domain) - konsistent mit dem Status-Reset direkt darüber: ein alter
-		// Token darf nie an eine "neue" Eintragung vererbt werden.
+		// New token on every Set (also when saving the same
+		// domain again) - consistent with the status reset right above: an old
+		// token must never be inherited by a "new" entry.
 		page.CustomDomainVerificationToken = randomToken(16)
 	}
 	page.CustomDomainVerifiedAt = nil
@@ -194,8 +194,8 @@ func (h *Handler) SetCustomDomainHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// DELETE /api/admin/pages/:page_id/custom-domain — entfernt eine gesetzte
-// Custom Domain vollständig (Domain-String + Status).
+// DELETE /api/admin/pages/:page_id/custom-domain — removes a configured
+// custom domain completely (domain string + status).
 func (h *Handler) DeleteCustomDomainHandler(c *gin.Context) {
 	page, pageID, ok := h.loadStatusPageForCustomDomain(c)
 	if !ok {
@@ -216,15 +216,15 @@ func (h *Handler) DeleteCustomDomainHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Custom Domain entfernt"})
 }
 
-// POST /api/admin/pages/:page_id/custom-domain/verify — prüft per DNS-TXT-
-// Lookup, ob der generierte Verifizierungsstring (CustomDomainVerificationToken)
-// bei der Domain hinterlegt wurde, und schaltet den Status bei Erfolg von
-// "pending" auf "verified" (Voraussetzung dafür, dass Caddys On-Demand-TLS
-// ein Zertifikat für die Domain ausstellen darf, siehe
-// InternalCustomDomainCheckHandler). Der TXT-Eintrag beweist nur den
-// DNS-Besitz - das eigentliche Routing per CNAME auf den Edge-Server wird
-// dem Kunden erst nach erfolgreicher Verifizierung als nächster Schritt
-// angezeigt (cname_target in der Response), analog zu Google Search
+// POST /api/admin/pages/:page_id/custom-domain/verify — checks via DNS TXT
+// lookup whether the generated verification string (CustomDomainVerificationToken)
+// has been published for the domain, and on success switches the status from
+// "pending" to "verified" (prerequisite for Caddy's on-demand TLS
+// to be allowed to issue a certificate for the domain, see
+// InternalCustomDomainCheckHandler). The TXT record only proves
+// DNS ownership - the actual routing via CNAME to the edge server is
+// shown to the customer as the next step only after successful verification
+// (cname_target in the response), analogous to Google Search
 // Console/Mailgun.
 func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	page, pageID, ok := h.loadStatusPageForCustomDomain(c)
@@ -243,9 +243,9 @@ func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	records, err := lookupTXT(ctx, page.CustomDomain)
 	cancel()
 
-	// Ein fehlender TXT-Eintrag ist für Go ein *net.DNSError{IsNotFound} (NXDOMAIN
-	// bzw. keine TXT-Records) und damit der Normalfall "nicht gefunden"; nur
-	// Timeouts, SERVFAIL u. Ä. sind ein Lookup-Fehler.
+	// A missing TXT record is a *net.DNSError{IsNotFound} in Go (NXDOMAIN
+	// or no TXT records) and thus the normal case "not found"; only
+	// timeouts, SERVFAIL etc. are a lookup error.
 	var dnsErr *net.DNSError
 	lookupFailed := err != nil && (!errors.As(err, &dnsErr) || !dnsErr.IsNotFound)
 	found := false
@@ -257,13 +257,13 @@ func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	}
 
 	now := time.Now()
-	// Verified/active sind live (Caddy-Check, Auflösung der Domain): eine
-	// Prüfung, egal wie sie ausgeht, ändert deren Status nie.
+	// Verified/active are live (Caddy check, domain resolution): a
+	// check, however it turns out, never changes their status.
 	live := page.CustomDomainStatus == "verified" || page.CustomDomainStatus == "active"
 	updates := map[string]any{"custom_domain_checked_at": now}
 	if !found {
-		// eigener Zustand statt "pending", damit die Oberfläche
-		// "noch nicht geprüft" von "geprüft, aber fehlgeschlagen" trennt.
+		// own state instead of "pending", so that the UI
+		// distinguishes "not yet checked" from "checked but failed".
 		reason := customDomainCheckTXTNotFound
 		message := "TXT-Eintrag nicht gefunden. Bitte füge bei " + page.CustomDomain + " einen TXT-Record mit dem Wert \"" + expected + "\" hinzu."
 		if lookupFailed {
@@ -294,9 +294,9 @@ func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	}
 
 	if !live {
-		// Der Nachweis ist erbracht, aber eine andere Seite trägt die Domain bereits
-		// verifiziert oder aktiv: Verifizierte Domains bleiben geschützt. Diese
-		// Antwort sieht nur, wer den TXT-Eintrag setzen konnte.
+		// The proof has been provided, but another page already carries the domain
+		// as verified or active: verified domains stay protected. Only whoever
+		// was able to set the TXT record sees this response.
 		taken, err := h.customDomainLiveOnOtherPage(page)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Fehler beim Speichern des Verifikationsstatus", "code": "server_error"})
@@ -330,8 +330,8 @@ func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	})
 }
 
-// customDomainLiveOnOtherPage meldet, ob eine andere (nicht gelöschte) Seite
-// dieselbe Domain im Status verified oder active trägt.
+// customDomainLiveOnOtherPage reports whether another (non-deleted) page
+// carries the same domain in status verified or active.
 func (h *Handler) customDomainLiveOnOtherPage(page models.StatusPage) (bool, error) {
 	var n int64
 	err := h.DB.Model(&models.StatusPage{}).
@@ -340,16 +340,16 @@ func (h *Handler) customDomainLiveOnOtherPage(page models.StatusPage) (bool, err
 	return n > 0, err
 }
 
-// saveCustomDomainCheck schreibt nur die Prüf-Spalten, und nur wenn Domain und
-// Token noch die sind, gegen die geprüft wurde: Der DNS-Lookup
-// dauert, in der Zwischenzeit kann die Domain geändert oder entfernt worden
-// sein; ein Save der ganzen Zeile würde das überschreiben (eine entfernte
-// Domain käme als "verified" zurück). Bei Fehler ist die Antwort (500 bzw. 409
-// bei zwischenzeitlicher Änderung) geschrieben und false zurückgegeben. Weisen
-// zwei Seiten dieselbe Domain gleichzeitig nach, passiert beide die Vorabprüfung
-// (customDomainLiveOnOtherPage); erst der partielle Unique-Index
-// idx_status_pages_custom_domain_live entscheidet. Der Verlierer bekommt wie bei
-// der Vorabprüfung 409 domain_taken statt 500.
+// saveCustomDomainCheck writes only the check columns, and only if domain and
+// token are still the ones checked against: the DNS lookup
+// takes time, and in the meantime the domain may have been changed or removed;
+// saving the whole row would overwrite that (a removed
+// domain would come back as "verified"). On error the response (500 or 409
+// on a change in the meantime) has been written and false is returned. If
+// two pages prove the same domain at the same time, both pass the pre-check
+// (customDomainLiveOnOtherPage); only the partial unique index
+// idx_status_pages_custom_domain_live decides. As with the pre-check, the loser
+// gets 409 domain_taken instead of 500.
 func (h *Handler) saveCustomDomainCheck(c *gin.Context, page models.StatusPage, updates map[string]any) bool {
 	res := h.DB.Model(&models.StatusPage{}).
 		Where("id = ? AND custom_domain = ? AND custom_domain_verification_token = ?",
@@ -370,15 +370,15 @@ func (h *Handler) saveCustomDomainCheck(c *gin.Context, page models.StatusPage, 
 	return true
 }
 
-// GET /api/public/resolve-domain?host=... — öffentlicher Lookup, der einen
-// per Custom Domain aufgerufenen Host auf den zugehörigen Statusseiten-Slug
-// abbildet (siehe frontend/src/views/public/PublicRoot.vue). Nur Domains im
-// Status "verified"/"active" werden aufgelöst. Der Status wird hier nie
-// verändert: Ein anonymer Aufruf beweist weder funktionierendes DNS noch ein
-// ausgestelltes Zertifikat; den Wechsel verified -> active löst allein der
-// interne Check aus (InternalCustomDomainCheckHandler). Private Seiten
-// liefern ihren Slug nur an Mitglieder, für alle anderen sieht die Antwort aus
-// wie bei einer unbekannten Domain.
+// GET /api/public/resolve-domain?host=... — public lookup that maps a host
+// called via a custom domain to the associated status page slug
+// (see frontend/src/views/public/PublicRoot.vue). Only domains in
+// status "verified"/"active" are resolved. The status is never
+// changed here: an anonymous call proves neither working DNS nor an
+// issued certificate; the transition verified -> active is triggered solely by the
+// internal check (InternalCustomDomainCheckHandler). Private pages
+// return their slug only to members; for everyone else the response looks
+// like that of an unknown domain.
 func (h *Handler) ResolvePublicDomainHandler(c *gin.Context) {
 	host, _ := normalizeDomain(c.Query("host"))
 	if host == "" {
@@ -396,38 +396,38 @@ func (h *Handler) ResolvePublicDomainHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"slug": page.Slug})
 }
 
-// customDomainCheckTokenRequired meldet, ob der interne Check ein
-// CADDY_INTERNAL_TOKEN verlangt: überall außer in ausdrücklichen
-// Entwicklungsumgebungen (APP_ENV development, dev, test, local). Fail closed: Eine
-// vergessene oder abweichend geschriebene APP_ENV ("prod") öffnet den Endpunkt
-// nicht.
+// customDomainCheckTokenRequired reports whether the internal check requires a
+// CADDY_INTERNAL_TOKEN: everywhere except in explicit
+// development environments (APP_ENV development, dev, test, local). Fail closed: a
+// forgotten or misspelled APP_ENV ("prod") does not open the endpoint
+// up.
 func customDomainCheckTokenRequired() bool {
 	return !database.IsDevelopmentAppEnv()
 }
 
-// WarnIfCustomDomainCheckUnprotected schreibt beim Start eine Warnung, wenn der
-// interne Domain-Check wegen fehlendem CADDY_INTERNAL_TOKEN alle Anfragen mit
-// 503 abweist (eigene Domains funktionieren dann nicht).
+// WarnIfCustomDomainCheckUnprotected logs a warning at startup if the
+// internal domain check rejects all requests with
+// 503 due to a missing CADDY_INTERNAL_TOKEN (custom domains then do not work).
 func WarnIfCustomDomainCheckUnprotected() {
 	if customDomainCheckTokenRequired() && os.Getenv("CADDY_INTERNAL_TOKEN") == "" {
 		slog.Warn("CADDY_INTERNAL_TOKEN nicht gesetzt: /api/internal/custom-domain-check antwortet mit 503, eigene Domains (On-Demand-TLS) sind deaktiviert")
 	}
 }
 
-// GET /api/internal/custom-domain-check?domain=... — von Caddys On-Demand-TLS
-// ("ask"-Endpunkt) aufgerufen, bevor ein Zertifikat für eine unbekannte
-// Domain angefordert wird. Antwortet 200 nur für Domains im Status
-// "verified"/"active", sonst 404 - verhindert, dass beliebige, nur per DNS
-// auf unseren Server gezeigte Fremd-Domains kostenlose Zertifikate über
-// unseren Server erschleichen können (Caddy stellt sonst für jede Domain ein
-// Zertifikat aus, deren TLS-Handshake bei uns ankommt).
+// GET /api/internal/custom-domain-check?domain=... — called by Caddy's on-demand TLS
+// ("ask" endpoint) before a certificate is requested for an unknown
+// domain. Answers 200 only for domains in status
+// "verified"/"active", otherwise 404 - prevents arbitrary foreign domains merely
+// pointed at our server via DNS from obtaining free certificates through
+// our server (Caddy otherwise issues a certificate for every domain whose
+// TLS handshake reaches us).
 //
-// Der Endpunkt ist ein Orakel für Kundendomains und verlangt deshalb außerhalb
-// der Entwicklung das gemeinsame Secret CADDY_INTERNAL_TOKEN (Header
-// X-Internal-Token). Ist es nicht gesetzt, antwortet er immer mit 503 und
-// gibt nichts frei; ein falscher oder fehlender Token ergibt 404. Eine
-// freigegebene Domain im Status "verified" wird hier auf "active" gesetzt:
-// Caddy fragt unmittelbar vor dem Ausstellen des Zertifikats.
+// The endpoint is an oracle for customer domains and therefore requires, outside
+// of development, the shared secret CADDY_INTERNAL_TOKEN (header
+// X-Internal-Token). If it is not set, it always answers 503 and
+// releases nothing; a wrong or missing token yields 404. A
+// released domain in status "verified" is set to "active" here:
+// Caddy asks immediately before issuing the certificate.
 func (h *Handler) InternalCustomDomainCheckHandler(c *gin.Context) {
 	secret := os.Getenv("CADDY_INTERNAL_TOKEN")
 	if secret == "" && customDomainCheckTokenRequired() {
@@ -456,7 +456,7 @@ func (h *Handler) InternalCustomDomainCheckHandler(c *gin.Context) {
 	}
 
 	if page.CustomDomainStatus == "verified" {
-		// Nur hochstufen, wenn sich die Zeile seit dem Lesen nicht geändert hat.
+		// Only promote if the row has not changed since it was read.
 		h.DB.Model(&models.StatusPage{}).
 			Where("id = ? AND custom_domain = ? AND custom_domain_status = 'verified'", page.ID, domain).
 			Update("custom_domain_status", "active")

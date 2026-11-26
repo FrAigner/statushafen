@@ -184,8 +184,8 @@ func TestIncidentHandlers(t *testing.T) {
 		var incidents []models.Incident
 		_ = json.Unmarshal(w.Body.Bytes(), &incidents)
 
-		// 2 statt 1: "Create Incident" + "Create Incident mit mehreren Komponenten"
-		// haben beide bereits einen Incident auf dieser Seite angelegt.
+		// 2 instead of 1: "Create Incident" + "Create Incident mit mehreren Komponenten"
+		// have both already created an incident on this page.
 		if len(incidents) != 2 {
 			t.Errorf("Expected 2 incidents, got %d", len(incidents))
 		}
@@ -242,18 +242,18 @@ func TestIncidentHandlers(t *testing.T) {
 	})
 
 	t.Run("Update Incident mit erneut denselben ComponentIDs bleibt konsistent", func(t *testing.T) {
-		// Nach dem vorherigen Subtest ist der Incident an "Test Cache"
-		// gebunden. Ein erneutes Update mit derselben ComponentID löst
-		// intern ein (Soft-)Delete gefolgt von einem Create desselben
-		// (incident_id, component_id)-Paares aus, das ohne den partiellen
-		// Unique-Index mit dem gerade gelöschten Eintrag
-		// kollidiert wäre. Vor der Transaktions-Fix verwarf
-		// replaceIncidentComponents diesen Create-Fehler stillschweigend und
-		// beließ den Incident ohne jede Komponenten-Zuordnung, obwohl der
-		// Handler 200 OK zurückgab. Seit der Umstellung rollt die Transaktion bei einem
-		// Fehler vollständig zurück (Zuordnung bleibt erhalten), aber der
-		// Request selbst schlug weiterhin mit 500 fehl statt eines
-		// idempotenten No-Ops - das ist behoben.
+		// After the previous subtest the incident is bound to "Test Cache".
+		// Another update with the same ComponentID internally triggers
+		// a (soft) delete followed by a create of the same
+		// (incident_id, component_id) pair, which without the partial
+		// unique index would have collided with the just-deleted entry.
+		// Before the transaction fix,
+		// replaceIncidentComponents silently discarded this create error and
+		// left the incident without any component assignment, although the
+		// handler returned 200 OK. Since the switch the transaction rolls back completely on an
+		// error (assignment is preserved), but the
+		// request itself still failed with 500 instead of an
+		// idempotent no-op - that is fixed.
 		var comp3 models.Component
 		db.Where("name = ?", "Test Cache").First(&comp3)
 
@@ -333,9 +333,9 @@ func TestIncidentHandlers(t *testing.T) {
 	})
 }
 
-// TestSubscriberHasAnyComponent ist ein reiner Funktionstest der
-// Filter-Logik und war zuvor als Subtest in TestIncidentHandlers versteckt;
-// als eigenständiger Test unabhängig von HTTP-Router/DB-Setup.
+// TestSubscriberHasAnyComponent is a pure functional test of the
+// filter logic and was previously hidden as a subtest in TestIncidentHandlers;
+// as a standalone test independent of HTTP router/DB setup.
 func TestSubscriberHasAnyComponent(t *testing.T) {
 	cases := []struct {
 		subscribedIDs string

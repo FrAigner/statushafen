@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Übersetzungen der Updates eines Vorfalls.
+// Translations of an incident's updates.
 
 type iutEnv struct {
 	t    *testing.T
@@ -131,7 +131,7 @@ func codeFrom(t *testing.T, w *httptest.ResponseRecorder) string {
 
 func TestSaveIncidentUpdateTranslation_AnlegenDannAendern(t *testing.T) {
 	e := newIUTEnv(t)
-	w := e.save("EN", "We are working on it", "draft") // Großschreibung wird normalisiert
+	w := e.save("EN", "We are working on it", "draft") // Capitalization is normalized
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	w = e.save("en", "We are fixing it", "confirmed")
 	require.Equal(t, http.StatusOK, w.Code)
@@ -144,7 +144,7 @@ func TestSaveIncidentUpdateTranslation_AnlegenDannAendern(t *testing.T) {
 	assert.Equal(t, "confirmed", rows[0].Status)
 	assert.Equal(t, "manual", rows[0].Source)
 
-	// Admin-Liste enthält Entwürfe und Bestätigte, nach Sprache sortiert.
+	// The admin list contains drafts and confirmed ones, sorted by language.
 	// A legacy fr row (no content language any more) stays stored but is not listed.
 	require.NoError(t, e.db.Create(&models.IncidentUpdateTranslation{UpdateID: e.upd.ID, LanguageCode: "fr", Message: "On s'en occupe", Status: "draft"}).Error)
 	assert.Equal(t, "language_not_available", codeFrom(t, e.save("fr", "x", "draft")))
@@ -159,7 +159,7 @@ func TestSaveIncidentUpdateTranslation_AnlegenDannAendern(t *testing.T) {
 
 func TestSaveIncidentUpdateTranslation_Eingabepruefung(t *testing.T) {
 	e := newIUTEnv(t)
-	for _, code := range []string{"de", "es"} { // Standardsprache bzw. nicht aktiv
+	for _, code := range []string{"de", "es"} { // default language or not active
 		w := e.save(code, "x", "draft")
 		assert.Equal(t, http.StatusBadRequest, w.Code, code)
 		assert.Equal(t, "language_not_available", codeFrom(t, w), code)
@@ -194,10 +194,10 @@ func TestSaveIncidentUpdateTranslation_Eingabepruefung(t *testing.T) {
 func TestSaveIncidentUpdateTranslation_Mandantentrennung(t *testing.T) {
 	e := newIUTEnv(t)
 	other := e.newPage("iut-other", false)
-	// Vorfall einer fremden Seite über die eigene Seiten-ID: 404.
+	// Incident of another page via own page ID: 404.
 	w := e.do("PUT", e.path(other.ID, e.inc.ID, e.upd.ID, "/en"), map[string]string{"message": "x", "status": "draft"})
 	assert.Equal(t, http.StatusNotFound, w.Code)
-	// Update eines anderen Vorfalls derselben Seite: 404.
+	// Update of another incident on the same page: 404.
 	inc2 := models.Incident{StatusPageID: e.page.ID, Title: "Zwei", Status: "investigating"}
 	require.NoError(t, e.db.Create(&inc2).Error)
 	upd2 := e.newUpdate(inc2.ID, "anderes Update")
@@ -230,14 +230,14 @@ func TestSaveIncidentUpdateTranslation_TagZugriff(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, w.Code, method)
 		assert.Equal(t, "forbidden", codeFrom(t, w), method)
 	}
-	// Mit passendem Tag am Vorfall ist der Zugriff frei.
+	// With a matching tag on the incident, access is free.
 	require.NoError(t, e.db.Create(&models.IncidentTag{IncidentID: e.inc.ID, TagID: deTag.ID}).Error)
 	assert.Equal(t, http.StatusOK, e.do("PUT", e.adminPath("/en"), body, "X-Test-User", uid).Code)
 }
 
 func TestIncidentUpdateTranslation_Datenbankfehler500(t *testing.T) {
 	e := newIUTEnv(t)
-	// Speichern scheitert (Trigger), Lesen scheitert (Tabelle weg).
+	// Saving fails (trigger), reading fails (table gone).
 	e.db.Exec("CREATE TRIGGER no_insert BEFORE INSERT ON incident_update_translations BEGIN SELECT RAISE(ABORT, 'gesperrt'); END")
 	assert.Equal(t, http.StatusInternalServerError, e.save("en", "x", "draft").Code)
 	e.db.Exec("DROP TRIGGER no_insert")
@@ -255,11 +255,11 @@ func TestPublicIncidentUpdateTranslations_NurBestaetigteUndRueckfall(t *testing.
 	}
 	mk(e.upd, "en", "first en", "confirmed")
 	mk(e.upd, "fr", "premier fr", "confirmed")
-	mk(upd2, "en", "second en DRAFT", "draft") // Entwurf nie
-	mk(upd2, "fr", "deuxième fr", "confirmed") // nur fr bestätigt
+	mk(upd2, "en", "second en DRAFT", "draft") // draft never
+	mk(upd2, "fr", "deuxième fr", "confirmed") // only fr confirmed
 
-	// en: Update 1 en, Update 2 hat keinen bestätigten en-Text und fällt auf die
-	// Standardsprache de zurück - die gibt es als Übersetzung nicht, also fehlt der Eintrag.
+	// en: update 1 en, update 2 has no confirmed en text and falls back to the
+	// default language de - that does not exist as a translation, so the entry is missing.
 	w, resp := e.publicGet("iut", e.inc.ID, "?lang=EN")
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, "en", resp.Language)
@@ -272,7 +272,7 @@ func TestPublicIncidentUpdateTranslations_NurBestaetigteUndRueckfall(t *testing.
 	assert.NotContains(t, resp.Updates, strconv.Itoa(int(upd2.ID)))
 	assert.NotContains(t, resp.Updates, strconv.Itoa(int(upd3.ID)))
 
-	// Ohne lang gilt die Standardsprache (keine Übersetzung dazu: leere Map, nie null).
+	// Without lang the default language applies (no translation for it: empty map, never null).
 	w, resp = e.publicGet("iut", e.inc.ID, "")
 	require.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "de", resp.Language)
@@ -306,7 +306,7 @@ func TestPublicIncidentUpdateTranslations_Validierung(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	w, _ = e.publicGet("iut", 9999, "")
 	assert.Equal(t, "incident_not_found", codeFrom(t, w))
-	// Vorfall einer anderen Seite: 404, keine Daten fremder Seiten.
+	// Incident of another page: 404, no data from other pages.
 	w, _ = e.publicGet("iut", otherInc.ID, "")
 	assert.Equal(t, "incident_not_found", codeFrom(t, w))
 	w = e.do("GET", "/api/public/pages/iut/incidents/abc/update-translations", nil)

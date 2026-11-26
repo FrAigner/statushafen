@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Prüfungen und Antworten zur Kennung (Slug) einer Komponente.
-// Fehlercodes: slug_invalid (400, Format/Länge), slug_taken (409, auf der
-// Statusseite schon vergeben), slug_immutable (400, Änderung nach dem Anlegen).
+// Checks and responses for the identifier (slug) of a component.
+// Error codes: slug_invalid (400, format/length), slug_taken (409, already assigned on the
+// status page), slug_immutable (400, change after creation).
 
 func respondSlugInvalid(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{
@@ -27,10 +27,10 @@ func respondSlugImmutable(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "Slug cannot be changed after creation", "code": "slug_immutable"})
 }
 
-// checkNewComponentSlug prüft eine beim Anlegen vorgegebene Kennung auf Format
-// und Eindeutigkeit auf der Statusseite (nur aktive Komponenten, wie der
-// partielle Unique-Index). Leer = automatisch, nichts zu prüfen. Bei einem
-// Verstoß ist die Antwort geschrieben und die Rückgabe false.
+// checkNewComponentSlug checks an identifier given on creation for format
+// and uniqueness on the status page (only active components, like the
+// partial unique index). Empty = automatic, nothing to check. On a
+// violation the response is written and false is returned.
 func (h *Handler) checkNewComponentSlug(c *gin.Context, tenantID uint, slug string) bool {
 	if slug == "" {
 		return true

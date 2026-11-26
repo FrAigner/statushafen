@@ -1,9 +1,9 @@
 package handlers_test
 
-// Konto-Löschung (DeleteUserHandler, DeleteMeHandler) gegen
-// gleichzeitiges Annehmen einer Einladung auf einem ECHTEN Postgres (READ
-// COMMITTED). SQLite serialisiert Schreiber und zeigt die Race nicht. Wie
-// page_invitation_postgres_test.go nur mit MIGRATION_PG_TEST=1 und nicht als root.
+// Account deletion (DeleteUserHandler, DeleteMeHandler) against
+// concurrent acceptance of an invitation on a REAL Postgres (READ
+// COMMITTED). SQLite serializes writers and does not show the race. Like
+// page_invitation_postgres_test.go only with MIGRATION_PG_TEST=1 and not as root.
 
 import (
 	"fmt"
@@ -18,11 +18,11 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Das Löschen entfernte früher die Rollen, BEVOR die Annahme committete: die
-// Annahme legte danach ihre Rollenzeile an und das (weich gelöschte) Konto
-// behielt sie. Erwartung jetzt: Löschen und Annehmen serialisieren über die
-// Benutzerzeile; nach beiden Läufen gibt es keine Rolle des gelöschten Kontos,
-// keinen Deadlock (Postgres bricht einen Beteiligten sonst mit 40P01 ab => 500).
+// Deletion used to remove the roles BEFORE the acceptance committed: the
+// acceptance then created its role row and the (soft-deleted) account
+// kept it. Expectation now: deletion and acceptance serialize on the
+// user row; after both runs there is no role of the deleted account,
+// no deadlock (otherwise Postgres aborts one participant with 40P01 => 500).
 func TestAccountDeletePostgres_VsAcceptInvitation(t *testing.T) {
 	variants := []struct {
 		name string
@@ -73,7 +73,7 @@ func TestAccountDeletePostgres_VsAcceptInvitation(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					<-start
-					// Versatz: das Löschen soll in verschiedene Phasen der Annahme fallen.
+					// Offset: the deletion should fall into different phases of the acceptance.
 					time.Sleep(time.Duration(i%8) * 700 * time.Microsecond)
 					w := idorRequest(t, f.r, http.MethodDelete, v.path(u), v.tok(f, utok), v.body(u))
 					delCode, delBody = w.Code, w.Body.String()

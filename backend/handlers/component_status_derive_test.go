@@ -2,11 +2,11 @@ package handlers
 
 import "testing"
 
-// Ableitung des angezeigten Komponentenstatus aus manuell
-// gesetztem Status + offenen zugeordneten Vorfällen. effectiveComponentStatus
-// darf den schlechteren der beiden Werte gewinnen lassen, damit weder ein
-// offener Vorfall einen bereits schlechteren manuellen Status verschluckt,
-// noch - der eigentliche Bugfix - ein fehlender Vorfall einen guten Status
+// Derivation of the displayed component status from the manually
+// set status + open assigned incidents. effectiveComponentStatus
+// may let the worse of the two values win, so that neither an
+// open incident swallows an already worse manual status,
+// nor - the actual bugfix - a missing incident a good status
 // vorgaukelt.
 func TestEffectiveComponentStatus(t *testing.T) {
 	cases := []struct {

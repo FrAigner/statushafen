@@ -15,9 +15,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// cascadeAccess prüft die Tag-Rechte für alle Komponenten einer Kaskade:
-// Wer mindestens eine Komponente mit fremdem Tag trifft, darf die Gruppe nicht
-// archivieren; Lesefehler enden als Fehler und nie als Freigabe (fail closed).
+// cascadeAccess checks the tag permissions for all components of a cascade:
+// Whoever hits at least one component with a foreign tag may not archive the group;
+// read errors end as errors and never as approval (fail closed).
 func TestCascadeAccess_TagRulesAndDBErrors(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -66,7 +66,7 @@ func TestCascadeAccess_TagRulesAndDBErrors(t *testing.T) {
 	}
 }
 
-// Ohne gesetzte Uhr (Produktion) archiviert der Handler mit der Systemzeit.
+// Without a set clock (production) the handler archives with the system time.
 func TestArchiveComponentHandler_UsesSystemClockByDefault(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

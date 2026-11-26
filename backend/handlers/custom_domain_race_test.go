@@ -23,17 +23,17 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Zwei Seiten weisen dieselbe Domain gleichzeitig nach: Die Vorabprüfung
-// (customDomainLiveOnOtherPage) sieht beide Male keine live Seite, erst der
-// partielle Unique-Index idx_status_pages_custom_domain_live entscheidet. Der
-// Verlierer bekommt 409 domain_taken statt 500.
+// Two pages prove the same domain at the same time: the pre-check
+// (customDomainLiveOnOtherPage) sees no live page both times, only the
+// partial unique index idx_status_pages_custom_domain_live decides. The
+// loser gets 409 domain_taken instead of 500.
 
 func verifyPath(p models.StatusPage) string {
 	return "/api/admin/pages/" + strconv.Itoa(int(p.ID)) + "/custom-domain/verify"
 }
 
-// Deterministische Variante auf SQLite: Kurz vor dem eigenen UPDATE macht eine
-// andere Anfrage die konkurrierende Seite live.
+// Deterministic variant on SQLite: shortly before its own UPDATE, another
+// request makes the competing page live.
 func TestVerifyCustomDomain_ParallelVerifizierteDomainGibt409(t *testing.T) {
 	const domain = "status.race.example"
 	stubLookup(t, func(context.Context, string) ([]string, error) { return []string{"statushafen-verify=tok-b"}, nil })
@@ -62,7 +62,7 @@ func TestVerifyCustomDomain_ParallelVerifizierteDomainGibt409(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), "tok-", "keine Tokens in der Antwort")
 }
 
-// Gegenprobe: ein anderer Datenbankfehler bleibt ein 500.
+// Control case: a different database error remains a 500.
 func TestVerifyCustomDomain_AndererDBFehlerBleibt500(t *testing.T) {
 	stubLookup(t, func(context.Context, string) ([]string, error) { return []string{"statushafen-verify=tok"}, nil })
 	r, db, page, path := customDomainCheckFixture(t, "pending")
@@ -75,8 +75,8 @@ func TestVerifyCustomDomain_AndererDBFehlerBleibt500(t *testing.T) {
 	assertCustomDomainState(t, db, page.ID, "s.a.example", "pending")
 }
 
-// Echtes Postgres: gleichzeitige Nachweise, genau einer gewinnt, kein 500.
-// Nur mit MIGRATION_PG_TEST=1 (lädt Postgres, startet nicht als root).
+// Real Postgres: concurrent proofs, exactly one wins, no 500.
+// Only with MIGRATION_PG_TEST=1 (loads Postgres, does not start as root).
 func TestVerifyCustomDomainPostgres_ParallelGenauEinGewinner(t *testing.T) {
 	if os.Getenv("MIGRATION_PG_TEST") != "1" {
 		t.Skip("nur mit MIGRATION_PG_TEST=1 (echtes Postgres)")

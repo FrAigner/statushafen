@@ -11,18 +11,18 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Die Gmail-Domains stehen zusammengesetzt im Test, damit die Repo-Prüfung auf
-// private Postfachadressen nicht anschlägt (es sind Beispiele, keine Konten).
+// The Gmail domains are assembled from parts in the test so that the repo check for
+// private mailbox addresses does not trigger (they are examples, not accounts).
 const (
 	gmailDom   = "gmail.com"
 	gmail      = "@" + gmailDom
 	googlemail = "@googlemail.com"
 )
 
-// Gmail ignoriert Punkte im lokalen Teil und behandelt googlemail.com als
-// Alias von gmail.com; beides gehört in den Postfach-Schlüssel, damit
-// Schreibvarianten desselben Postfachs das Limit nicht umgehen. Bei anderen
-// Domains sind Punkte Teil der Adresse (Gegenprobe).
+// Gmail ignores dots in the local part and treats googlemail.com as an
+// alias of gmail.com; both belong in the mailbox key so that
+// spelling variants of the same mailbox do not bypass the limit. For other
+// domains, dots are part of the address (control case).
 func TestMailboxKey_GmailAequivalenzUndUnicode(t *testing.T) {
 	cases := []struct{ in, want, why string }{
 		{"a.b" + gmail, "ab" + gmail, "Punkt bei gmail.com"},
@@ -51,8 +51,8 @@ func TestMailboxKey_GmailAequivalenzUndUnicode(t *testing.T) {
 	assert.NotEqual(t, mailboxKey("a.b@example.com"), mailboxKey("ab@example.com"), "Gegenprobe: bei anderen Domains sind a.b und ab verschieden")
 }
 
-// Das Bestätigungs-Limit je Postfach zählt auch gespeicherte Gmail-Varianten
-// (Punkte, googlemail.com, +tag), nicht aber ähnlich aussehende fremde Adressen.
+// The per-mailbox confirmation limit also counts stored Gmail variants
+// (dots, googlemail.com, +tag), but not similar-looking foreign addresses.
 func TestConfirmationMailBudget_ZaehltGmailVarianten(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := &Handler{DB: db}
@@ -72,7 +72,7 @@ func TestConfirmationMailBudget_ZaehltGmailVarianten(t *testing.T) {
 	assert.True(t, h.confirmationMailBudgetExhausted("victim"+gmail), "drei Varianten desselben Gmail-Postfachs")
 	assert.True(t, h.confirmationMailBudgetExhausted("v.ictim"+googlemail), "auch von der Alias-Seite aus gesehen")
 
-	// Gegenprobe: gleiche Zeichen bei anderen Domains sind andere Postfächer.
+	// Control case: the same characters on other domains are different mailboxes.
 	for _, e := range []string{"vic.tim@example.com", "v.i.c.t.i.m@example.com", "victim@g.mail.com", "vic.tim@mail." + gmailDom} {
 		add(e)
 	}
@@ -80,15 +80,15 @@ func TestConfirmationMailBudget_ZaehltGmailVarianten(t *testing.T) {
 	assert.False(t, h.confirmationMailBudgetExhausted("victim@mail."+gmailDom), "Subdomain von gmail.com ist eigenes Postfach")
 }
 
-// Nicht-ASCII-Eingaben stehen roh in der Datenbank. Ihre unveränderte
-// Wiederholung zählt weiter zum Limit, obwohl der Schlüssel (NFKC) anders
-// aussieht als der gespeicherte Wert.
+// Non-ASCII inputs are stored raw in the database. Their unchanged
+// repetition continues to count toward the limit, although the key (NFKC) looks different
+// from the stored value.
 func TestMailboxMatch_NichtASCIIEingabeBleibtAuffindbar(t *testing.T) {
 	clause, args := mailboxMatch("ＶＩＣ@example.com")
 	assert.Contains(t, clause, "lower(email) = ? OR lower(email) = ?")
 	assert.Equal(t, []any{"vic@example.com", "ｖｉｃ@example.com", "vic+%@example.com"}, args)
 
-	// reine ASCII-Eingabe: keine zusätzliche Roh-Bedingung
+	// pure ASCII input: no additional raw condition
 	_, args = mailboxMatch("VIC@example.com")
 	assert.Len(t, args, 2)
 
@@ -110,9 +110,9 @@ func TestMailboxMatch_NichtASCIIEingabeBleibtAuffindbar(t *testing.T) {
 	assert.False(t, h.confirmationMailBudgetExhausted("andere@example.com"), "Gegenprobe")
 }
 
-// Die Suche nach gespeicherten Schreibvarianten trifft genau das Postfach der
-// Eingabe: Zeichen mit Bedeutung in LIKE (_ und %) stehen als Text, beide
-// Gmail-Domains zählen, und fremde Adressen mit ähnlicher Form nicht.
+// The lookup of stored spelling variants matches exactly the mailbox of the
+// input: characters meaningful in LIKE (_ and %) are treated as text, both
+// Gmail domains count, and foreign addresses of similar form do not.
 func TestMailboxMatch_FindetNurDasEigenePostfach(t *testing.T) {
 	cases := []struct {
 		stored, query string
@@ -141,7 +141,7 @@ func TestMailboxMatch_FindetNurDasEigenePostfach(t *testing.T) {
 		assert.Equal(t, tc.match, n == 1, "%s (gespeichert %s, gesucht %s)", tc.why, tc.stored, tc.query)
 	}
 
-	// Ohne verwertbares @ gilt nur der exakte Vergleich.
+	// Without a usable @, only exact comparison applies.
 	for _, in := range []string{"ohne-at", "@" + gmailDom, "@example.com"} {
 		clause, args := mailboxMatch(in)
 		assert.Equal(t, "lower(email) = ?", clause, in)
@@ -149,7 +149,7 @@ func TestMailboxMatch_FindetNurDasEigenePostfach(t *testing.T) {
 	}
 }
 
-// Schlüssel in Grenzfällen: mehrere @ (der letzte trennt die Domain), leere Domain.
+// Key in edge cases: multiple @ (the last one separates the domain), empty domain.
 func TestMailboxKey_Grenzfaelle(t *testing.T) {
 	assert.Equal(t, "a@b@example.com", mailboxKey("a@b@Example.com"), "der letzte @ trennt die Domain")
 	assert.Equal(t, "user@", mailboxKey("User@"), "leere Domain bleibt leer")

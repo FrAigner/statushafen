@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Auto-Join per DefaultRoleID gilt nur noch für Konten, deren
-// E-Mail-Domain in der Allowlist der Seite (AutoJoinEmailDomains) steht.
+// Auto-join via DefaultRoleID now only applies to accounts whose
+// email domain is in the page's allowlist (AutoJoinEmailDomains).
 func TestAutoJoinRequiresAllowlistedEmailDomain(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -80,8 +80,8 @@ func putPage(t *testing.T, r http.Handler, id uint, body map[string]interface{})
 	return w
 }
 
-// DefaultRoleID wird serverseitig beschränkt, die Allowlist
-// normalisiert und validiert.
+// DefaultRoleID is restricted server-side, the allowlist is
+// normalized and validated.
 func TestUpdateStatusPageValidatesAutoJoinSettings(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -154,10 +154,10 @@ func TestUpdateStatusPageValidatesAutoJoinSettings(t *testing.T) {
 	})
 }
 
-// Die Rollenprüfung gilt auch beim Beitritt, nicht
-// nur beim Speichern der Seite. Spätere Rechteänderungen an der Default-Rolle
-// und Bestandsseiten dürfen Auto-Join-Konten keine Schreib- oder
-// Abonnentenrechte geben.
+// The role check also applies on joining, not
+// only when saving the page. Later permission changes to the default role
+// and existing pages must not give auto-join accounts write or
+// subscriber rights.
 func TestAutoJoinRechecksRoleAtJoinTime(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -226,10 +226,10 @@ func TestAutoJoinRechecksRoleAtJoinTime(t *testing.T) {
 	})
 }
 
-// Scheitert die Rollenvergabe beim Auto-Join an der Datenbank, ist das ein
-// Serverfehler (500) und keine Antwort wie bei einer fehlenden Seite: Ein
-// berechtigtes Konto soll den Fehler sehen, statt die Seite für nicht vorhanden
-// zu halten.
+// If role assignment during auto-join fails due to the database, that is a
+// server error (500) and not a response like for a missing page: An
+// authorized account should see the error instead of assuming the page
+// does not exist.
 func TestAutoJoinDatabaseFailureIs500NotNotFound(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

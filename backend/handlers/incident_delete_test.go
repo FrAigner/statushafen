@@ -15,21 +15,21 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// serve führt einen vorbereiteten Request gegen den Router aus (für eigene Header).
+// serve runs a prepared request against the router (for custom headers).
 func serve(r http.Handler, req *http.Request) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
 }
 
-// DeleteIncidentHandler hatte nur den Normalfall getestet.
-// Ergänzt: ungültige Parameter, Mandantentrennung, Tag-Zugriff, Aufräumen der
-// Komponenten-Verknüpfungen, Audit-Eintrag und Datenbankfehler.
+// DeleteIncidentHandler had only the normal case tested.
+// Added: invalid parameters, tenant isolation, tag access, cleanup of the
+// component links, audit entry and database errors.
 func TestDeleteIncidentHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Der Aufrufer wird per Header simuliert, wie es die AuthMiddleware mit dem JWT täte.
+	// The caller is simulated via header, as AuthMiddleware would do with the JWT.
 	r.Use(func(c *gin.Context) {
 		if v := c.GetHeader("X-Test-User"); v != "" {
 			id, _ := strconv.ParseUint(v, 10, 32)

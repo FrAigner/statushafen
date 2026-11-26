@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Randfälle der Intervallbildung und der Gruppen-Auflösung.
+// Edge cases of interval building and group resolution.
 func TestIncidentInterval(t *testing.T) {
 	now := time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 	h := func(n int) time.Time { return now.Add(time.Duration(n) * time.Hour) }

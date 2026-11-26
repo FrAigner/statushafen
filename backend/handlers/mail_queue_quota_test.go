@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// subscribeFrom meldet eine Adresse für die Seite mit dem Slug von einer
-// festen Quelladresse an (Router ohne vorgelagerten Proxy: RemoteAddr zählt).
+// subscribeFrom subscribes an address for the page with the given slug from a
+// fixed source address (router without an upstream proxy: RemoteAddr counts).
 func subscribeFrom(r http.Handler, slug, email, remoteAddr string) *httptest.ResponseRecorder {
 	body, _ := json.Marshal(map[string]string{"channel": "email", "email": email, "component_ids": "all", "slug": slug})
 	req, _ := http.NewRequest(http.MethodPost, "/api/subscribe", bytes.NewBuffer(body))
@@ -26,8 +26,8 @@ func subscribeFrom(r http.Handler, slug, email, remoteAddr string) *httptest.Res
 	return w
 }
 
-// Gmail-Domains zusammengesetzt, damit die Repo-Prüfung auf private
-// Postfachadressen nicht anschlägt (Beispiele, keine Konten).
+// Gmail domains assembled from parts so that the repo check for private
+// mailbox addresses does not trigger (examples, not accounts).
 const (
 	gmail      = "@" + "gmail.com"
 	googlemail = "@" + "googlemail.com"
@@ -37,9 +37,9 @@ func queueDrops(buf *lockedBuffer) int {
 	return strings.Count(buf.String(), "Mail queue full, mail dropped")
 }
 
-// Angriff mit hängendem SMTP: Eine einzelne Seite darf die Warteschlange der
-// Abo-Bestätigungen nicht allein füllen (höchstens ein Viertel der 32 Plätze);
-// die Anmeldung einer anderen Seite von einer anderen Quelle wird weiter
+// Attack with a hanging SMTP: a single page must not fill the queue of
+// subscription confirmations alone (at most a quarter of the 32 slots);
+// the sign-up of another page from another source continues to be
 // angenommen.
 func TestSubscribe_EinzelneSeiteFuelltWarteschlangeNichtAllein(t *testing.T) {
 	logBuf := captureSlog(t)
@@ -49,7 +49,7 @@ func TestSubscribe_EinzelneSeiteFuelltWarteschlangeNichtAllein(t *testing.T) {
 
 	const flood = 20
 	for i := 0; i < flood; i++ {
-		// Wechselnde Quelladressen: nur die Seite bindet die Angriffe aneinander.
+		// Rotating source addresses: only the page ties the attacks together.
 		src := "198.51.100." + itoa(uint(i+1)) + ":4000"
 		assert.Equal(t, http.StatusOK, subscribeFrom(e.r, "doi-page", "flut-"+itoa(uint(i))+"@example.com", src).Code)
 	}
@@ -66,7 +66,7 @@ func TestSubscribe_EinzelneSeiteFuelltWarteschlangeNichtAllein(t *testing.T) {
 	}
 }
 
-// Dieselbe Quell-IP über viele Seiten hinweg: auch sie belegt höchstens ein Viertel.
+// The same source IP across many pages: it too occupies at most a quarter.
 func TestSubscribe_EineQuelleUeberVieleSeitenFuelltWarteschlangeNichtAllein(t *testing.T) {
 	logBuf := captureSlog(t)
 	release := startHangingSMTP(t)
@@ -87,8 +87,8 @@ func TestSubscribe_EineQuelleUeberVieleSeitenFuelltWarteschlangeNichtAllein(t *t
 	assert.Equal(t, before, queueDrops(logBuf), "eine andere Quelle kommt weiter durch")
 }
 
-// Gegenprobe: Ohne Angriff werden Bestätigungsmails normal zugestellt, auch
-// viele nacheinander von derselben Seite und Quelle.
+// Control case: without an attack, confirmation mails are delivered normally, even
+// many in a row from the same page and source.
 func TestSubscribe_NormaleZustellungOhneAngriffVerwirftNichts(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -102,9 +102,9 @@ func TestSubscribe_NormaleZustellungOhneAngriffVerwirftNichts(t *testing.T) {
 	assert.Zero(t, queueDrops(logBuf), "ohne Rückstau wird nichts verworfen")
 }
 
-// Die Bestellung nutzt denselben Postfach-Schlüssel: Gmail-Schreibvarianten
-// (Punkte, googlemail.com) erschöpfen das Limit offener Bestellungen, gleich
-// aussehende Adressen bei anderen Anbietern nicht.
+// The order uses the same mailbox key: Gmail spelling variants
+// (dots, googlemail.com) exhaust the limit of open orders, identical-looking
+// addresses at other providers do not.
 func TestCreateOrder_GmailVariantenTeilenSichDasLimit(t *testing.T) {
 	e := setupOrderMailEnv(t, nil)
 	for _, addr := range []string{"mi.ra" + gmail, "m.i.r.a+x" + googlemail, "Mira" + "@GMAIL.com"} {
@@ -118,9 +118,9 @@ func TestCreateOrder_GmailVariantenTeilenSichDasLimit(t *testing.T) {
 	e.h.WaitMails()
 }
 
-// Bestellungen sind anonym: Dieselbe Quell-IP belegt höchstens ein Viertel der
-// Plätze der Bestell-Warteschlange (8 von 32), auch mit wechselnden Adressen.
-// Die Abo-Warteschlange bleibt davon unberührt.
+// Orders are anonymous: the same source IP occupies at most a quarter of the
+// slots of the order queue (8 of 32), even with rotating addresses.
+// The subscription queue is unaffected by this.
 func TestCreateOrder_EineQuelleFuelltWarteschlangeNichtAllein(t *testing.T) {
 	logBuf := captureSlog(t)
 	release := startHangingSMTP(t)

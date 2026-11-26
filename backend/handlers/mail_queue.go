@@ -8,44 +8,44 @@ import (
 	"sync"
 )
 
-// Versand von Bestätigungsmails im Hintergrund.
+// Sending confirmation mails in the background.
 //
-// Der SMTP-Versand darf die HTTP-Anfrage nicht aufhalten: Ein hängender Server
-// bände sie bis zu 15 s, und eine Adresse, für die eine Mail verschickt wird,
-// antwortete dann spürbar langsamer als eine bereits bekannte (Orakel für
-// vorhandene Adressen). Die Mails laufen deshalb über kleine, begrenzte
-// Warteschlangen. Ist eine voll, wird die Mail verworfen und geloggt; das Abo
-// bleibt wartend und lässt sich nach Ablauf des Links erneut anfordern. Ein
-// unbegrenzter Rückstau bei ausgefallenem Mailserver ist damit ausgeschlossen.
+// SMTP sending must not hold up the HTTP request: a hanging server
+// would tie it up for up to 15 s, and an address for which a mail is sent
+// would then respond noticeably slower than an already known one (oracle for
+// existing addresses). The mails therefore run through small, bounded
+// queues. If one is full, the mail is dropped and logged; the subscription
+// stays pending and can be requested again after the link expires. An
+// unbounded backlog when the mail server is down is thereby ruled out.
 //
-// Zwei Grenzen verhindern, dass eine einzelne anonyme Quelle alle Plätze belegt
-// und damit fremde Mails verdrängt:
-//   - Je Zweck (Abo-Bestätigung, Bestellung, Einladung) gibt es eine eigene
-//     Warteschlange; eine Flut an Abo-Anfragen verdrängt keine Einladungen.
-//   - Innerhalb eines Zwecks darf ein Absender-Schlüssel (Seite, Quell-IP-Gruppe)
-//     höchstens ein Viertel der Plätze belegen. Eine Quelle füllt die Schlange
-//     so nie allein; mindestens vier unabhängige Schlüssel sind nötig. Ein
-//     Viertel lässt einer Seite genug Luft für eine Spitze von Anmeldungen und
-//     hält den Rest für andere Seiten frei.
+// Two limits prevent a single anonymous source from occupying all slots
+// and thereby displacing other people's mails:
+//   - Each purpose (subscription confirmation, order, invitation) has its own
+//     queue; a flood of subscription requests does not displace invitations.
+//   - Within one purpose, a sender key (page, source IP group)
+//     may occupy at most a quarter of the slots. A single source thus never
+//     fills the queue alone; at least four independent keys are needed. A
+//     quarter leaves a page enough room for a spike of sign-ups and
+//     keeps the rest free for other pages.
 //
-// Vorfall- und Hinweis-Benachrichtigungen laufen nicht über diese Schlangen.
+// Incident and notice notifications do not run through these queues.
 
-// defaultMailQueueSize: Obergrenze gleichzeitig angestoßener oder laufender
-// Hintergrund-Mails je Zweck und Prozess. Reicht für Spitzen beim Abonnieren,
-// hält die Zahl offener SMTP-Verbindungen und Goroutinen aber klein.
+// defaultMailQueueSize: upper bound of simultaneously triggered or running
+// background mails per purpose and process. Sufficient for subscription spikes,
+// but keeps the number of open SMTP connections and goroutines small.
 const defaultMailQueueSize = 32
 
-// mailQueueSourceShare: Nenner des Anteils, den ein Schlüssel je Zweck
-// belegen darf (1/4 der Plätze).
+// mailQueueSourceShare: denominator of the share a key may
+// occupy per purpose (1/4 of the slots).
 const mailQueueSourceShare = 4
 
-// purposeQueue zählt die belegten Plätze eines Zwecks, gesamt und je Schlüssel.
+// purposeQueue counts the occupied slots of a purpose, in total and per key.
 type purposeQueue struct {
 	used  int
 	byKey map[string]int
 }
 
-// mailQueue ist die Warteschlange; die Nullwerte genügen (träge angelegt).
+// mailQueue is the queue; the zero values suffice (lazily created).
 type mailQueue struct {
 	mu       sync.Mutex
 	size     int
@@ -53,7 +53,7 @@ type mailQueue struct {
 	wg       sync.WaitGroup
 }
 
-// capacity liefert die Plätze je Zweck (Standard, wenn nichts gesetzt ist).
+// capacity returns the slots per purpose (default if nothing is set).
 func (q *mailQueue) capacity() int {
 	if q.size <= 0 {
 		return defaultMailQueueSize
@@ -61,12 +61,12 @@ func (q *mailQueue) capacity() int {
 	return q.size
 }
 
-// keyCapacity liefert die Plätze je Schlüssel: ein Viertel, mindestens einer.
+// keyCapacity returns the slots per key: a quarter, at least one.
 func (q *mailQueue) keyCapacity() int {
 	return max(1, q.capacity()/mailQueueSourceShare)
 }
 
-// acquire belegt einen Platz für den Zweck und alle Schlüssel oder meldet false.
+// acquire occupies a slot for the purpose and all keys, or reports false.
 func (q *mailQueue) acquire(purpose string, keys []string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -93,7 +93,7 @@ func (q *mailQueue) acquire(purpose string, keys []string) bool {
 	return true
 }
 
-// release gibt die Plätze wieder frei.
+// release frees the slots again.
 func (q *mailQueue) release(purpose string, keys []string) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -106,21 +106,21 @@ func (q *mailQueue) release(purpose string, keys []string) {
 	}
 }
 
-// SetMailQueueSize legt die Obergrenze je Zweck fest, bevor die erste Mail
-// angestoßen wird; n <= 0 behält den Standard.
+// SetMailQueueSize sets the upper bound per purpose before the first mail
+// is triggered; n <= 0 keeps the default.
 func (h *Handler) SetMailQueueSize(n int) {
 	h.mailQ.mu.Lock()
 	h.mailQ.size = n
 	h.mailQ.mu.Unlock()
 }
 
-// WaitMails blockiert, bis alle im Hintergrund angestoßenen Mails verarbeitet
-// sind (Tests und geordnetes Beenden).
+// WaitMails blocks until all mails triggered in the background have been processed
+// (tests and orderly shutdown).
 func (h *Handler) WaitMails() { h.mailQ.wg.Wait() }
 
-// mailSourceKey bildet aus einer Quell-IP den Schlüssel der Anteilsgrenze: IPv4
-// je Adresse, IPv6 je /64-Präfix (wie der Rate-Limiter), damit ein Anschluss
-// nicht durch wechselnde Adressen im eigenen Präfix mehr Plätze bekommt.
+// mailSourceKey forms the share-limit key from a source IP: IPv4
+// per address, IPv6 per /64 prefix (like the rate limiter), so that one connection
+// does not get more slots by rotating addresses within its own prefix.
 func mailSourceKey(ip string) string {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil {
@@ -134,13 +134,13 @@ func mailSourceKey(ip string) string {
 	return "ip:" + prefix.String()
 }
 
-// mailPageKey ist der Schlüssel einer Seite für die Anteilsgrenze.
+// mailPageKey is the key of a page for the share limit.
 func mailPageKey(pageID uint) string { return "page:" + strconv.FormatUint(uint64(pageID), 10) }
 
-// queueMail führt job im Hintergrund aus. Ist die Warteschlange des Zwecks oder
-// der Anteil eines Schlüssels voll, wird er verworfen; das Log enthält nur die
-// feste Meldung und den Zweck, nie Adressen oder Schlüssel. Ein Panic im Job
-// beendet nur den Job, nicht den Prozess.
+// queueMail runs job in the background. If the purpose's queue or
+// a key's share is full, it is dropped; the log contains only the
+// fixed message and the purpose, never addresses or keys. A panic in the job
+// ends only the job, not the process.
 func (h *Handler) queueMail(purpose string, job func(), keys ...string) bool {
 	q := &h.mailQ
 	if !q.acquire(purpose, keys) {

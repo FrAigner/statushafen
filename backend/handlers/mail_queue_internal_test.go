@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ein Panic im Hintergrundjob beendet nur den Job: Der Prozess läuft weiter,
-// der Platz in der Warteschlange wird frei, und das Log nennt nur den Typ des
-// Panics, nie dessen Inhalt.
+// A panic in the background job ends only the job: the process keeps running,
+// the queue slot is freed, and the log names only the type of the
+// panic, never its content.
 func TestQueueMail_PanicGibtPlatzFreiUndLoggtKeinenInhalt(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()
@@ -46,9 +46,9 @@ func TestQueueMail_StandardgroesseUndVollerZustand(t *testing.T) {
 	full.WaitMails()
 }
 
-// Die Warteschlangen sind nach Zweck getrennt: Sind alle Plätze der
-// Abo-Bestätigungen belegt (hier über vier Schlüssel mit je einem Viertel),
-// werden Bestellungen und Einladungen weiter angenommen.
+// The queues are separated by purpose: if all slots of the
+// subscription confirmations are occupied (here via four keys with a quarter each),
+// orders and invitations are still accepted.
 func TestQueueMail_VolleAboWarteschlangeVerdraengtAndereZweckeNicht(t *testing.T) {
 	h := &Handler{}
 	h.SetMailQueueSize(8)
@@ -65,8 +65,8 @@ func TestQueueMail_VolleAboWarteschlangeVerdraengtAndereZweckeNicht(t *testing.T
 	h.WaitMails()
 }
 
-// Ein Schlüssel belegt höchstens ein Viertel; fertige Mails geben den Anteil
-// frei, und Mails ohne Schlüssel unterliegen nur der Gesamtgrenze.
+// A key occupies at most a quarter; finished mails release the share,
+// and mails without a key are subject only to the overall limit.
 func TestQueueMail_AnteilJeSchluesselWirdFreigegeben(t *testing.T) {
 	h := &Handler{}
 	h.SetMailQueueSize(8)

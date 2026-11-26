@@ -9,14 +9,14 @@ import (
 	"github.com/fraigner/statushafen/permissions"
 )
 
-// autoJoinDomainRegex: ein Hostname aus mindestens zwei Labels (Buchstaben,
-// Ziffern, Bindestriche; kein Bindestrich am Label-Rand).
+// autoJoinDomainRegex: a hostname of at least two labels (letters,
+// digits, hyphens; no hyphen at the label edge).
 var autoJoinDomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 
-// normalizeAutoJoinDomains macht aus der Admin-Eingabe eine
-// kanonische, kommagetrennte Liste: Kleinschreibung, ohne führendes "@",
-// ohne Duplikate und Leereinträge, stabil sortiert nach erstem Auftreten.
-// Ungültige Einträge liefern eine Fehlermeldung.
+// normalizeAutoJoinDomains turns the admin input into a
+// canonical, comma-separated list: lowercase, without leading "@",
+// without duplicates and empty entries, stably sorted by first occurrence.
+// Invalid entries yield an error message.
 func normalizeAutoJoinDomains(raw string) (string, string, bool) {
 	var out []string
 	seen := map[string]bool{}
@@ -34,9 +34,9 @@ func normalizeAutoJoinDomains(raw string) (string, string, bool) {
 	return strings.Join(out, ","), "", true
 }
 
-// emailMatchesAutoJoin prüft, ob die Domain der E-Mail exakt in der
-// normalisierten Allowlist steht. Subdomains zählen bewusst nicht mit, eine
-// leere Liste heißt "kein Auto-Join".
+// emailMatchesAutoJoin checks whether the domain of the email is exactly in the
+// normalized allowlist. Subdomains deliberately do not count, an
+// empty list means "no auto-join".
 func emailMatchesAutoJoin(email, domains string) bool {
 	if domains == "" {
 		return false
@@ -54,10 +54,10 @@ func emailMatchesAutoJoin(email, domains string) bool {
 	return false
 }
 
-// roleSafeAsDefault: eine Default-Rolle (Auto-Join) darf nichts schreiben
-// und keine Abonnentendaten lesen.
+// roleSafeAsDefault: a default role (auto-join) must not write anything
+// and must not read subscriber data.
 func roleSafeAsDefault(list string) bool {
-	if permissions.CanChange(list) { // create/update/delete (und der Altwert write)
+	if permissions.CanChange(list) { // create/update/delete (and the legacy value write)
 		return false
 	}
 	for _, p := range strings.Split(list, ",") {
@@ -68,9 +68,9 @@ func roleSafeAsDefault(list string) bool {
 	return true
 }
 
-// validateAutoJoinSettings normalisiert AutoJoinEmailDomains und
-// prüft DefaultRoleID serverseitig: Die Rolle muss existieren und darf weder
-// "*:write" noch "subscribers:*" enthalten.
+// validateAutoJoinSettings normalizes AutoJoinEmailDomains and
+// validates DefaultRoleID server-side: the role must exist and must contain neither
+// "*:write" nor "subscribers:*".
 func (h *Handler) validateAutoJoinSettings(page *models.StatusPage) (int, string, bool) {
 	domains, msg, ok := normalizeAutoJoinDomains(page.AutoJoinEmailDomains)
 	if !ok {

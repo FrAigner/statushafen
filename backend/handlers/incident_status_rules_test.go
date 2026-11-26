@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// AddIncidentUpdateHandler übernahm den Status ungeprüft, und
-// "behoben" war im Backend nur resolved, im Frontend resolved + completed.
+// AddIncidentUpdateHandler accepted the status unchecked, and
+// "resolved" meant only resolved in the backend, but resolved + completed in the frontend.
 func TestIncidentStatusValidationAndResolvedRule(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -133,8 +133,8 @@ func TestIncidentStatusValidationAndResolvedRule(t *testing.T) {
 	})
 }
 
-// Gruppen verlieren ihren Status nie, auch nicht über Webhook
-// oder Wartungs-Statusschreiber.
+// Groups never lose their status, not even via webhook
+// or maintenance status writers.
 func TestGroupStatusProtectedFromWriters(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

@@ -14,8 +14,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Komponenten-API - Tag-Zuordnung ohne Duplikate/ersetzbar, Status
-// und Eltern-Komponente beim Anlegen, parent_id bei Create und Update.
+// Component API - tag assignment without duplicates/replaceable, status
+// and parent component on creation, parent_id on create and update.
 func TestComponentAPI(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -210,7 +210,7 @@ func TestComponentAPI(t *testing.T) {
 		a := create(map[string]interface{}{"name": "zyk-a"})
 		b := create(map[string]interface{}{"name": "zyk-b", "parent_id": a.ID})
 		third := create(map[string]interface{}{"name": "zyk-c"})
-		// Zyklus A -> B -> A direkt in der DB (Altlast/Race), vorbei an der API.
+		// Cycle A -> B -> A directly in the DB (legacy issue/race), bypassing the API.
 		db.Model(&models.Component{}).Where("id = ?", a.ID).Update("parent_id", b.ID)
 
 		withTimeout := func(fn func() *httptest.ResponseRecorder) *httptest.ResponseRecorder {

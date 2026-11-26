@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Betreiberentscheidung: Meldungen ohne verknüpfte Komponenten
-// bleiben gespiegelt, lösen aber keine Abonnenten-Mails aus; Mitarbeitende
-// bekommen keine Mails; Abonnenten bekommen die Standardsprache der Seite.
+// Operator decision: reports without linked components
+// stay mirrored but do not trigger subscriber mails; staff members
+// get no mails; subscribers get the site's default language.
 
 func TestExternalIncidentMail_OhneKomponentenGespiegeltAberStill(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
@@ -37,7 +37,7 @@ func TestExternalIncidentMail_OhneKomponentenGespiegeltAberStill(t *testing.T) {
 	assert.EqualValues(t, 0, s.auditCount("external_incident.failed"))
 	assert.EqualValues(t, 0, s.auditCount("external_incident.mirrored"), "kein Ereignis ohne gekoppelte Komponente")
 
-	// Zur Kontrolle: Dieselbe Quelle mit gekoppelter Komponente meldet sehr wohl.
+	// As a check: the same source with a linked component does report.
 	s.setFeed(models.ExternalIncidentKindIncident, noComp, unlinked, extInc("mit", "investigating", "Betrifft VM"))
 	require.True(t, s.poll().OK)
 	assert.Equal(t, []string{"alle@example.com"}, recipients(drainMails(t, srv, 1)))
@@ -51,7 +51,7 @@ func TestExternalIncidentMail_MitarbeitendeBekommenKeineMail(t *testing.T) {
 	var staff []models.User
 	require.NoError(t, s.db.Find(&staff).Error)
 	require.NotEmpty(t, staff, "Fixture hat Mitarbeitende mit E-Mail-Adresse")
-	// Auch eine Vorlage mit Audience staff ändert daran nichts.
+	// A template with audience staff changes nothing here either.
 	require.NoError(t, s.db.Create(&models.NotificationTemplate{
 		StatusPageID: s.page.ID, Kind: "external_incident_created", Audience: "staff", Language: "de",
 		Subject: "Intern {{.Title}}", BodyHTML: "<p>intern</p>",
@@ -69,7 +69,7 @@ func TestExternalIncidentMail_AbonnentenBekommenStandardspracheDerSeite(t *testi
 	defer srv.close()
 	s := newIncidentSetup(t)
 	s.subscriber("abo@example.com", "all")
-	// Staff-Sprache ist irrelevant: Eine Mitarbeiterin mit Englisch ändert die Abo-Mail nicht.
+	// Staff language is irrelevant: A staff member with English does not change the subscription mail.
 	require.NoError(t, s.db.Model(&models.User{}).Where("1 = 1").Update("preferred_language", "en-GB").Error)
 
 	s.setFeed(models.ExternalIncidentKindIncident, extInc("i1", "investigating", "Wir prüfen"))
@@ -79,7 +79,7 @@ func TestExternalIncidentMail_AbonnentenBekommenStandardspracheDerSeite(t *testi
 	assert.NotContains(t, m.subject, "[EXTERNAL]")
 }
 
-// Der Aufräumlauf schreibt einen Audit-Eintrag mit der Anzahl.
+// The cleanup run writes an audit entry with the count.
 func TestMirroredIncidentsPruned_SchreibtAuditEintrag(t *testing.T) {
 	s := newIncidentSetup(t)
 	s.h.MirroredIncidentsPruned(context.Background(), 7, 90*24*time.Hour)

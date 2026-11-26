@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Der Schweregrad eines offenen Vorfalls bestimmt den
-// angezeigten Komponentenstatus - dieselbe Zuordnung wie bei den
-// Verfügbarkeitsbalken (partial_outage/major_outage statt pauschal
-// degraded_performance). Es gilt weiter "der Schlimmste gewinnt", und ein
-// schlechterer manueller Status wird nie abgemildert.
+// The severity of an open incident determines the
+// displayed component status - the same mapping as for the
+// availability bars (partial_outage/major_outage instead of a blanket
+// degraded_performance). "Worst wins" still applies, and a
+// worse manual status is never softened.
 func TestIncidentSeverity_PraegtAngezeigtenKomponentenstatus(t *testing.T) {
 	f := newExtFixture(t)
 	openInc := func(severity string, compID uint, status string) models.Incident {
@@ -74,7 +74,7 @@ func TestIncidentSeverity_PraegtAngezeigtenKomponentenstatus(t *testing.T) {
 	})
 }
 
-// Die Übersicht (externalstatus.EffectiveStatuses) nutzt dieselbe Zuordnung.
+// The overview (externalstatus.EffectiveStatuses) uses the same mapping.
 func TestIncidentSeverity_Uebersicht(t *testing.T) {
 	f := newExtFixture(t)
 	inc := models.Incident{StatusPageID: f.page.ID, Title: "t", Message: "m", Status: "investigating", Severity: "major_outage"}

@@ -14,8 +14,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// doTemplateRequest führt einen Request gegen den Test-Router aus und
-// JSON-kodiert payload (falls gesetzt) als Body.
+// doTemplateRequest runs a request against the test router and
+// JSON-encodes payload (if set) as the body.
 func doTemplateRequest(r http.Handler, method, path string, payload interface{}) *httptest.ResponseRecorder {
 	var body io.Reader
 	if payload != nil {
@@ -41,8 +41,8 @@ func TestIncidentTemplateHandlers(t *testing.T) {
 	r.PUT("/api/pages/:page_id/incident-templates/:id", h.UpdateIncidentTemplateHandler)
 	r.DELETE("/api/pages/:page_id/incident-templates/:id", h.DeleteIncidentTemplateHandler)
 
-	// Für den "Vorlage anlegen -> Incident daraus erstellen"-Verifikationsschritt aus
-	// (keine FK-Abhängigkeit) auch die Incident-Routen mitregistrieren.
+	// For the "create template -> create incident from it" verification step from
+	// (no FK dependency) also register the incident routes.
 	r.POST("/api/pages/:page_id/incidents", h.CreateIncidentHandler)
 
 	page := models.StatusPage{Name: "Template Page", Slug: "tpl-page"}
@@ -124,9 +124,9 @@ func TestIncidentTemplateHandlers(t *testing.T) {
 		}
 	})
 
-	// Verifikation: Löschen einer Vorlage darf bereits mit ihr
-	// erstellte Incidents nicht beeinflussen, da keine FK-Beziehung besteht -
-	// die Feldwerte wurden beim Anlegen des Incidents nur kopiert.
+	// Verification: deleting a template must not affect incidents
+	// already created with it, since there is no FK relation -
+	// the field values were only copied when the incident was created.
 	t.Run("Deleting a template does not affect incidents created from it", func(t *testing.T) {
 		w := doTemplateRequest(r, "POST", "/api/pages/"+pid+"/incidents", map[string]interface{}{
 			"Title":        "Geplante Datenbank-Wartung",
@@ -139,7 +139,7 @@ func TestIncidentTemplateHandlers(t *testing.T) {
 		var createdIncident models.Incident
 		_ = json.Unmarshal(w.Body.Bytes(), &createdIncident)
 
-		// Vorlage jetzt löschen
+		// Delete the template now
 		delW := doTemplateRequest(r, "DELETE", "/api/pages/"+pid+"/incident-templates/"+strconv.Itoa(int(createdTemplateID)), nil)
 		requireStatusCode(t, delW, http.StatusOK)
 
@@ -149,8 +149,8 @@ func TestIncidentTemplateHandlers(t *testing.T) {
 			t.Errorf("Expected template to be deleted, still found %d row(s)", tmplCount)
 		}
 
-		// Der zuvor erstellte Incident muss unverändert und weiterhin auffindbar sein
-		// (kein FK/CASCADE-Zusammenhang mit der gelöschten Vorlage).
+		// The previously created incident must be unchanged and still findable
+		// (no FK/CASCADE relation with the deleted template).
 		var incAfterDelete models.Incident
 		if err := db.Where("id = ?", createdIncident.ID).First(&incAfterDelete).Error; err != nil {
 			t.Fatalf("Expected incident to still exist after template deletion, got error: %v", err)

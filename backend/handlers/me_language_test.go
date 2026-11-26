@@ -15,16 +15,16 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// TestUpdateMeHandler prüft (i18n-Infrastruktur), dass der
-// PATCH-artige Endpunkt an /api/me die bevorzugte Sprache eines eingeloggten
-// Users korrekt in der DB persistiert und in der Antwort zurückliefert.
+// TestUpdateMeHandler checks (i18n infrastructure) that the
+// PATCH-style endpoint at /api/me correctly persists a logged-in
+// user's preferred language in the DB and returns it in the response.
 func TestUpdateMeHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
 
-	// Mock der JWT-Middleware, analog zu den anderen /api/me-Tests: userID wird
-	// direkt über einen Test-Header statt einem echten Token gesetzt.
+	// Mock of the JWT middleware, analogous to the other /api/me tests: userID is
+	// set directly via a test header instead of a real token.
 	r.Use(mockUserIDMiddleware)
 
 	r.GET("/api/me", h.MeHandler)
@@ -55,7 +55,7 @@ func TestUpdateMeHandler(t *testing.T) {
 			t.Errorf("Expected preferred_language 'de' in response, got %q", resp["preferred_language"])
 		}
 
-		// In der DB nachschauen: Persistenz muss über Requests hinweg bestehen bleiben.
+		// Check the DB: persistence must survive across requests.
 		var reloaded models.User
 		if err := db.First(&reloaded, testUser.ID).Error; err != nil {
 			t.Fatalf("Failed to reload user: %v", err)
@@ -120,9 +120,9 @@ func patchMeLanguage(t *testing.T, h *handlers.Handler, userID uint, body string
 	return w
 }
 
-// PATCH /api/me muss für alle Kontoarten 200 liefern und darf
-// ausschließlich die Spalte preferred_language schreiben (kein Save des
-// ganzen Users, der an Constraints anderer Spalten scheitern kann).
+// PATCH /api/me must return 200 for all account types and may
+// write only the preferred_language column (no Save of the
+// whole user, which can fail on constraints of other columns).
 func TestUpdateMeHandler_AlleKontoarten(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -154,7 +154,7 @@ func TestUpdateMeHandler_AlleKontoarten(t *testing.T) {
 			if after.PreferredLanguage != "en" {
 				t.Errorf("PreferredLanguage in DB = %q, erwartet en", after.PreferredLanguage)
 			}
-			// Nur preferred_language darf sich ändern.
+			// Only preferred_language may change.
 			after.PreferredLanguage, after.UpdatedAt = before.PreferredLanguage, before.UpdatedAt
 			if !reflect.DeepEqual(after, before) {
 				t.Errorf("andere Felder wurden verändert: vorher %+v, nachher %+v", before, after)
@@ -163,10 +163,10 @@ func TestUpdateMeHandler_AlleKontoarten(t *testing.T) {
 	}
 }
 
-// Das Konto mit gesetztem SSO-Feld ohne Passwort/Rolle darf den
-// Save nicht mehr über Zusatz-Spalten scheitern lassen; ein Update auf eine
-// Spalte reicht auch dann, wenn andere Spalten in der DB nicht zum Modell
-// passen (hier: Zeile mit einer Rolle, die es nicht mehr gibt).
+// The account with the SSO field set but without password/role must no longer
+// let the save fail over extra columns; an update to a
+// single column is enough even if other columns in the DB do not match the model
+// (here: row with a role that no longer exists).
 func TestUpdateMeHandler_VerwaisteRolle(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -212,8 +212,8 @@ func TestUpdateMeHandler_UnbekannterUser(t *testing.T) {
 	requireStatusCode(t, w, http.StatusUnauthorized)
 }
 
-// Ein echter DB-Fehler bleibt 500, die Antwort verrät keine
-// Interna (Tabellenname, SQL-Text).
+// A real DB error stays 500, the response does not reveal any
+// internals (table name, SQL text).
 func TestUpdateMeHandler_DBFehler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

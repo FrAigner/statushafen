@@ -1,10 +1,10 @@
 package handlers
 
-// Drift-Test für die eingebaute App-Doku (frontend/src/docs/{de,en}).
-// Die Doku nennt Zahlen, Listen und Namen, die im Code stehen (reservierte Slugs,
-// Passwort-Mindestlänge, Fristen externer Quellen, Rechte der Standardrollen,
-// Fehlercodes). Ändert sich einer dieser Werte, ohne dass die Doku mitzieht, wird
-// dieser Test rot, statt dass die Doku still veraltet (wie es geschehen ist).
+// Drift test for the built-in app documentation (frontend/src/docs/{de,en}).
+// The documentation names numbers, lists and names that live in the code (reserved slugs,
+// minimum password length, deadlines of external sources, permissions of the default roles,
+// error codes). If one of these values changes without the documentation following, this
+// test turns red instead of the documentation silently going stale (as has happened).
 
 import (
 	"fmt"
@@ -116,8 +116,8 @@ func TestDocs_VerfuegbarkeitNenntDasFensterDesCodes(t *testing.T) {
 	}
 }
 
-// Die Rechte der Standardrolle "Page Owner" sind in der Doku-Tabelle der Rechte
-// aufgeführt; eine neue Berechtigung im Seed ohne Doku fällt hier auf.
+// The permissions of the default role "Page Owner" are listed in the documentation table of
+// permissions; a new permission in the seed without documentation is caught here.
 func TestDocs_RechteDerStandardrollenStehenInDerDoku(t *testing.T) {
 	for _, locale := range []string{"de", "en"} {
 		md := readDoc(t, locale, "benutzer-und-rollen")
@@ -129,9 +129,9 @@ func TestDocs_RechteDerStandardrollenStehenInDerDoku(t *testing.T) {
 	}
 }
 
-// Jeder Fehlercode, den die API-Doku nennt, muss im Backend vorkommen (als
-// Stringliteral in einem Handler); sonst beschreibt die Doku einen Code, den es
-// nicht gibt.
+// Every error code named by the API documentation must occur in the backend (as a
+// string literal in a handler); otherwise the documentation describes a code that does
+// not exist.
 func TestDocs_GenannteFehlercodesGibtEsImBackend(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -162,8 +162,8 @@ func TestDocs_GenannteFehlercodesGibtEsImBackend(t *testing.T) {
 	}
 }
 
-// Die Ereignisse für gespiegelte Meldungen und ihre Platzhalter sind nur per API
-// anlegbar; die Doku muss genau diese Namen nennen.
+// The events for mirrored reports and their placeholders can only be created via the API;
+// the documentation must name exactly these names.
 func TestDocs_MailTemplatesNennenExterneEreignisseUndPlatzhalter(t *testing.T) {
 	for _, locale := range []string{"de", "en"} {
 		md := readDoc(t, locale, "mail-templates")

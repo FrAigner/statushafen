@@ -16,8 +16,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Gruppen lassen sich per API anlegen (is_group), haben keinen
-// eigenen Status und lassen sich nur löschen, wenn sie leer sind.
+// Groups can be created via the API (is_group), have no
+// status of their own and can be deleted only when they are empty.
 func TestComponentGroups_CreateAndDeleteGuard(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -170,7 +170,7 @@ func TestComponentGroups_CreateAndDeleteGuard(t *testing.T) {
 		if n != 2 || audits("component.deleted") != before {
 			t.Errorf("Gruppe/Kind verändert (%d) oder Audit geschrieben", n)
 		}
-		// Nach dem Entfernen des letzten Kindes ist die Gruppe löschbar.
+		// After removing the last child the group can be deleted.
 		requireStatusCode(t, doTemplateRequest(r, "DELETE", base(page.ID)+idStr(kid.ID), nil), http.StatusOK)
 		requireStatusCode(t, doTemplateRequest(r, "DELETE", base(page.ID)+idStr(g.ID), nil), http.StatusOK)
 	})

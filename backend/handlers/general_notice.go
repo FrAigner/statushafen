@@ -11,22 +11,22 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GeneralNotice: seitenweite Ankündigungen, die nicht an einen
-// konkreten Incident/Wartungsfenster gebunden sind (z.B. Richtlinien-
-// änderungen, organisatorische Hinweise). CRUD ist page-scoped und folgt dem
-// gleichen Muster wie die Incident-Handler (RequirePermission auf :page_id),
-// der Lesezugriff für die öffentliche Statusseite ist ungeschützt und liefert
-// nur aktive, nicht abgelaufene Notices.
+// GeneralNotice: site-wide announcements that are not tied to a
+// specific incident/maintenance window (e.g. policy
+// changes, organizational notes). CRUD is page-scoped and follows the
+// same pattern as the incident handlers (RequirePermission on :page_id),
+// read access for the public status page is unprotected and returns
+// only active, non-expired notices.
 //
-// Routen (main.go):
-//   öffentlich: r.GET("/api/pages/:page_id/notices", h.GetActiveNoticesHandler)
+// Routes (main.go):
+//   public: r.GET("/api/pages/:page_id/notices", h.GetActiveNoticesHandler)
 //   admin:      noticeAdmin (RequirePermission "notices:write")
 // ─────────────────────────────────────────────────────────────────────────────
 
 var validNoticeLevels = map[string]bool{"info": true, "warning": true, "critical": true}
 
-// parseNoticePageIDParam extrahiert und validiert :page_id, schreibt bei
-// Fehler direkt die Fehlerantwort und liefert ok=false zurück.
+// parseNoticePageIDParam extracts and validates :page_id, writes the
+// error response directly on failure and returns ok=false.
 func parseNoticePageIDParam(c *gin.Context) (uint64, bool) {
 	tenantIDStr := c.Param("page_id")
 	if tenantIDStr == "" {
@@ -41,8 +41,8 @@ func parseNoticePageIDParam(c *gin.Context) (uint64, bool) {
 	return tenantID, true
 }
 
-// parseNoticeIDParam extrahiert und validiert :id, schreibt bei Fehler
-// direkt die Fehlerantwort und liefert ok=false zurück.
+// parseNoticeIDParam extracts and validates :id, writes the error
+// response directly on failure and returns ok=false.
 func parseNoticeIDParam(c *gin.Context) (uint64, bool) {
 	noticeID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -52,9 +52,9 @@ func parseNoticeIDParam(c *gin.Context) (uint64, bool) {
 	return noticeID, true
 }
 
-// validateNoticeFields normalisiert Level (Default "info") und prüft
-// Level-Gültigkeit sowie StartAt/EndAt-Reihenfolge; schreibt bei Fehler
-// direkt die Fehlerantwort und liefert ok=false zurück.
+// validateNoticeFields normalizes level (default "info") and checks
+// level validity as well as StartAt/EndAt order; on failure writes
+// the error response directly and returns ok=false.
 func validateNoticeFields(c *gin.Context, level string, startAt, endAt *time.Time) (string, bool) {
 	if level == "" {
 		level = "info"
@@ -70,10 +70,10 @@ func validateNoticeFields(c *gin.Context, level string, startAt, endAt *time.Tim
 	return level, true
 }
 
-// GetActiveNoticesHandler liefert die auf der öffentlichen Statusseite
-// anzuzeigenden Notices: IsActive muss true sein, und falls StartAt/EndAt
-// gesetzt sind, muss "jetzt" innerhalb des Zeitfensters liegen. Neueste
-// zuerst (analog zur Incident-Liste).
+// GetActiveNoticesHandler returns the notices to be shown on the public
+// status page: IsActive must be true, and if StartAt/EndAt
+// are set, "now" must lie within the time window. Newest
+// first (analogous to the incident list).
 func (h *Handler) GetActiveNoticesHandler(c *gin.Context) {
 	tenantID, ok := parseNoticePageIDParam(c)
 	if !ok {
@@ -103,8 +103,8 @@ func (h *Handler) GetActiveNoticesHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, notices)
 }
 
-// GetNoticesHandler (Admin): liefert ALLE Notices einer Seite (auch
-// inaktive/abgelaufene), damit die Verwaltungsseite sie bearbeiten kann.
+// GetNoticesHandler (admin): returns ALL notices of a page (including
+// inactive/expired) so the admin page can edit them.
 func (h *Handler) GetNoticesHandler(c *gin.Context) {
 	tenantID, ok := parseNoticePageIDParam(c)
 	if !ok {
@@ -177,11 +177,11 @@ func (h *Handler) CreateNoticeHandler(c *gin.Context) {
 	}
 
 	h.RecordAudit(c, "notice.created", "notice", "GeneralNotice", strconv.FormatUint(uint64(notice.ID), 10), notice.Title, "")
-	// Mail-Versand nur bei aktiver Notice mit NotifySubscribers=true.
-	// Der Dispatcher entscheidet nochmal selbst per NotifySubscribers-Feld,
-	// aber ein zusätzlicher IsActive-Guard hier verhindert, dass eine
-	// deaktivierte Notice bei Anlage Mails auslöst (die man sehen würde,
-	// bevor sie sichtbar ist).
+	// Mail delivery only for an active notice with NotifySubscribers=true.
+	// The dispatcher decides again itself via the NotifySubscribers field,
+	// but an additional IsActive guard here prevents a
+	// deactivated notice from triggering mails on creation (which would arrive
+	// before it is visible).
 	if notice.IsActive && notice.NotifySubscribers {
 		h.DispatchNoticeNotifications(notice, "created")
 	}
@@ -231,10 +231,10 @@ func (h *Handler) UpdateNoticeHandler(c *gin.Context) {
 		return
 	}
 
-	// alten Aktivzustand merken, um zu erkennen, ob ein Update
-	// die Notice erstmals aktiviert (dann "created"-Kind) oder deaktiviert
-	// (dann "ended"-Kind). Ein reguläres Update einer bereits aktiven
-	// Notice wird zu "updated".
+	// remember the old active state to detect whether an update
+	// activates the notice for the first time (then "created" kind) or deactivates it
+	// (then "ended" kind). A regular update of an already active
+	// notice becomes "updated".
 	wasActive := notice.IsActive
 
 	notice.Title = req.Title

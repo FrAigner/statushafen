@@ -329,7 +329,7 @@ func TestDeleteComponentTranslationHandler_InvalidID(t *testing.T) {
 	}
 }
 
-// Speichern je Sprache aus dem Bearbeiten-Formular.
+// Saving per language from the edit form.
 func saveComponentTransSetup(t *testing.T) (*gorm.DB, http.Handler, string) {
 	t.Helper()
 	db, r, h := newTestSetup()
@@ -365,7 +365,7 @@ func TestSaveComponentTranslationHandler_CreatesThenUpdates(t *testing.T) {
 	}
 }
 
-// Die Beschreibung ist optional (Komponente ohne Beschreibung, Gruppen).
+// The description is optional (component without description, groups).
 func TestSaveComponentTranslationHandler_DescriptionOptional(t *testing.T) {
 	db, r, base := saveComponentTransSetup(t)
 	if c := putComponentTrans(r, base+"en", map[string]string{"title": "API", "status": "confirmed"}); c != http.StatusOK {
@@ -381,7 +381,7 @@ func TestSaveComponentTranslationHandler_DescriptionOptional(t *testing.T) {
 func TestSaveComponentTranslationHandler_RejectsBadInput(t *testing.T) {
 	_, r, base := saveComponentTransSetup(t)
 	ok := map[string]string{"title": "API", "description": "d", "status": "draft"}
-	for _, code := range []string{"de", "fr"} { // Standardsprache bzw. nicht aktiv
+	for _, code := range []string{"de", "fr"} { // Default language or not active
 		if c := putComponentTrans(r, base+code, ok); c != http.StatusBadRequest {
 			t.Errorf("%s: erwartet 400, war %d", code, c)
 		}

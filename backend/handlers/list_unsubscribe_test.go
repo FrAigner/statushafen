@@ -8,23 +8,23 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// API-Befund / RFC 8058: Benachrichtigungsmails an Abonnenten
-// tragen List-Unsubscribe (POST-fähige URL mit Token) und
-// List-Unsubscribe-Post, damit Mail-Clients ein One-Click-Abbestellen
-// anbieten, ohne dass ein bloßer GET (Link-Scanner) etwas löscht. Interne
-// Mails an Team-Mitglieder haben kein Abo und daher keinen solchen Header.
+// API finding / RFC 8058: notification emails to subscribers
+// carry List-Unsubscribe (POST-capable URL with token) and
+// List-Unsubscribe-Post so that mail clients offer one-click unsubscribe
+// without a mere GET (link scanner) deleting anything. Internal
+// mails to team members have no subscription and therefore no such header.
 
 const oneClickPostHeader = "List-Unsubscribe-Post: List-Unsubscribe=One-Click"
 const listUnsubscribePrefix = "List-Unsubscribe: <https://status.example.test/api/public/subscribers/unsubscribe?token="
 
-// mailHeaders liefert den Header-Block einer vom Fake-SMTP-Server
-// mitgeschnittenen Nachricht (alles vor der ersten Leerzeile).
+// mailHeaders returns the header block of a message captured by the
+// fake SMTP server (everything before the first blank line).
 func mailHeaders(msg string) string {
 	head, _, _ := strings.Cut(msg, "\n\n")
 	return head
 }
 
-// collectSMTPMessages sammelt n Nachrichten und ordnet sie nach Empfänger.
+// collectSMTPMessages collects n messages and sorts them by recipient.
 func collectSMTPMessages(t *testing.T, srv *fakeSMTPServer, n int) map[string]string {
 	t.Helper()
 	out := map[string]string{}

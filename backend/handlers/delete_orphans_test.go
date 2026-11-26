@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Löschen einer Rolle setzt StatusPage.DefaultRoleID auf NULL, das
-// Löschen eines Benutzers durch den Admin räumt UserTag und UserSSOIdentity auf.
+// Deleting a role sets StatusPage.DefaultRoleID to NULL, and
+// deleting a user by the admin cleans up UserTag and UserSSOIdentity.
 func TestDeleteRoleHandler_ClearsDefaultRoleID(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -79,8 +79,8 @@ func TestDeleteUserHandler_RemovesTagsAndSSOIdentities(t *testing.T) {
 	assert.Equal(t, other.ID, ids[0].UserID)
 }
 
-// Datenbankfehler beim Aufräumen führen zu 500, ohne dass Rolle bzw. Benutzer
-// gelöscht werden (alles in einer Transaktion).
+// Database errors during cleanup lead to 500 without the role or user
+// being deleted (everything in one transaction).
 func TestDeleteHandlers_CleanupErrorsReturn500(t *testing.T) {
 	t.Run("Rolle: DefaultRoleID-Bereinigung scheitert", func(t *testing.T) {
 		db := testutils.SetupTestDB()

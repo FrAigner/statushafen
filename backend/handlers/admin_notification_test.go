@@ -17,13 +17,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// Admin-Nachrichtencenter (Glocke).
+// Admin message center (bell).
 
 type anFixture struct {
 	*extFixture
 	now    time.Time
-	subTok string // Rolle nur mit subscribers:write auf f.page
-	// zweiter Admin der Seite (components:write), für den Lesestatus je Benutzer
+	subTok string // role with subscribers:write only on f.page
+	// second admin of the page (components:write), for the per-user read state
 	pageAdmin2Tok string
 }
 
@@ -97,7 +97,7 @@ func (f *anFixture) pagePath(p models.StatusPage, suffix string) string {
 	return "/api/pages/" + pid(p) + "/admin-notifications" + suffix
 }
 
-// --- Dienst: Zusammenfassen -------------------------------------------------
+// --- Service: merging -------------------------------------------------
 
 func TestNotifyAdmins_FasstGleicheMeldungenInnerhalbVonFuenfzehnMinutenZusammen(t *testing.T) {
 	f := newAnFixture(t)
@@ -133,7 +133,7 @@ func TestNotifyAdmins_VerschiedeneSeitenUndSchluesselWerdenNichtZusammengefasst(
 	f := newAnFixture(t)
 	a, b := f.page.ID, f.other.ID
 	f.notify(&a, "k")
-	f.notify(&b, "k") // Mandantentrennung: gleicher Schlüssel, andere Seite
+	f.notify(&b, "k") // Tenant isolation: same key, different page
 	f.notify(&a, "k2")
 	f.notify(nil, "k") // systemweit
 	assert.Len(t, f.all(), 4)
@@ -168,8 +168,8 @@ func TestNotifyAdmins_GelesenesLebtBeiWiederholungFuerAlleAlsUngelesenAuf(t *tes
 func TestNotifyAdmins_ParallelAngelegteMeldungWirdZusammengefasstStattZuScheitern(t *testing.T) {
 	f := newAnFixture(t)
 	p := f.page.ID
-	// Konkurrenz: Kurz vor dem eigenen INSERT legt eine andere Anfrage dieselbe
-	// offene Meldung an. Der Unique-Index schlägt zu, der Dienst zählt hoch.
+	// Concurrency: just before its own INSERT, another request creates the same
+	// open message. The unique index kicks in, the service counts it up.
 	fired := false
 	require.NoError(t, f.db.Callback().Create().Before("gorm:create").Register("an_race", func(tx *gorm.DB) {
 		if !fired {
@@ -216,7 +216,7 @@ func TestNotifyAdmins_UnbekannterSchweregradWirdInfo(t *testing.T) {
 	assert.Equal(t, "info", f.all()[0].Severity)
 }
 
-// --- Geheimnisse und Links --------------------------------------------------
+// --- Secrets and links --------------------------------------------------
 
 func TestNotifyAdmins_SpeichertKeineGeheimnisseOderAdressen(t *testing.T) {
 	f := newAnFixture(t)
@@ -273,7 +273,7 @@ func TestWebhookNachrichten_TexteParamsUndSchluessel(t *testing.T) {
 	assert.Equal(t, "/admin/subscribers", rows[1].LinkPath)
 }
 
-// --- API: Sichtbarkeit und Mandantentrennung --------------------------------
+// --- API: visibility and tenant isolation --------------------------------
 
 func TestAdminNotificationsAPI_SichtbarkeitNachRolle(t *testing.T) {
 	f := newAnFixture(t)
@@ -331,7 +331,7 @@ func TestAdminNotificationsAPI_MandantentrennungBeiListeZaehlerUndLesen(t *testi
 	assert.Equal(t, rows[0].ID, list.Items[0].ID)
 	assert.Equal(t, 1, f.unread(f.pagePath(f.page, "/unread-count"), f.pageAdminTok))
 
-	// Nachricht einer anderen Seite oder systemweit: 404, auch für den Global Admin.
+	// Message of another page or system-wide: 404, even for the global admin.
 	for _, other := range []uint{rows[1].ID, rows[2].ID} {
 		for _, tok := range []string{f.pageAdminTok, f.adminTok} {
 			w := f.do("POST", f.pagePath(f.page, "/"+strconv.Itoa(int(other))+"/read"), tok, nil)
@@ -339,7 +339,7 @@ func TestAdminNotificationsAPI_MandantentrennungBeiListeZaehlerUndLesen(t *testi
 			assert.Contains(t, w.Body.String(), `"code":"notification_not_found"`)
 		}
 	}
-	// read-all der eigenen Seite lässt fremde Nachrichten unberührt.
+	// read-all of the own page leaves other pages' messages untouched.
 	require.Equal(t, http.StatusNoContent, f.do("POST", f.pagePath(f.page, "/read-all"), f.adminTok, nil).Code)
 	var reads []models.NotificationRead
 	require.NoError(t, f.db.Find(&reads).Error)
@@ -368,7 +368,7 @@ func TestAdminNotificationsAPI_SystemweitNurFuerGlobalAdmins(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, f.do("POST", "/api/admin-notifications/"+id+"/read", f.pageAdminTok, nil).Code)
 	assert.Equal(t, http.StatusNoContent, f.do("POST", "/api/admin-notifications/"+id+"/read", f.adminTok, nil).Code)
 	assert.Equal(t, 0, f.unread("/api/admin-notifications/unread-count", f.adminTok))
-	// Seiten-Nachricht über die systemweite Route: 404.
+	// Page message via the system-wide route: 404.
 	seiteID := strconv.Itoa(int(f.all()[1].ID))
 	assert.Equal(t, http.StatusNotFound, f.do("POST", "/api/admin-notifications/"+seiteID+"/read", f.adminTok, nil).Code)
 }
@@ -383,7 +383,7 @@ func TestAdminNotificationsAPI_LesestatusJeBenutzer(t *testing.T) {
 
 	w := f.do("POST", f.pagePath(f.page, "/"+strconv.Itoa(int(rows[0].ID))+"/read"), f.pageAdminTok, nil)
 	require.Equal(t, http.StatusNoContent, w.Code)
-	// Wiederholen ist idempotent.
+	// Repeating is idempotent.
 	require.Equal(t, http.StatusNoContent, f.do("POST", f.pagePath(f.page, "/"+strconv.Itoa(int(rows[0].ID))+"/read"), f.pageAdminTok, nil).Code)
 
 	assert.Equal(t, 1, f.unread(count, f.pageAdminTok))
@@ -454,7 +454,7 @@ func TestAdminNotificationsAPI_DatenbankfehlerGebenFehlercode500(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, f.do("POST", f.pagePath(f.page, "/1/read"), f.pageAdminTok, nil).Code)
 }
 
-// --- Ausfall externer Quellen -----------------------------------------------
+// --- Outage of external sources -----------------------------------------------
 
 func TestAusfallExternerQuelle_ErzeugtNachrichtUndEntwarnungErledigtSie(t *testing.T) {
 	f := newAnFixture(t)
@@ -481,12 +481,12 @@ func TestAusfallExternerQuelle_ErzeugtNachrichtUndEntwarnungErledigtSie(t *testi
 	assert.NotContains(t, n.Params, "HTTP 503", "kein Fehlertext der Fremdseite")
 	assert.Equal(t, 1, f.unread(f.pagePath(f.page, "/unread-count"), f.pageAdminTok))
 
-	// Erinnerung nach 24 Stunden: eine weitere offene Meldung.
+	// Reminder after 24 hours: one more open message.
 	f.now = start.Add(25 * time.Hour)
 	f.fetchAt(srcID, f.now)
 	require.GreaterOrEqual(t, len(f.all()), 2)
 
-	// Entwarnung: Ausfall-Nachricht erledigt, Info "wieder erreichbar".
+	// All clear: outage message resolved, info "wieder erreichbar".
 	f.provider.err = nil
 	f.provider.sum = &externalstatus.Summary{Components: []externalstatus.Component{{ExternalID: "vm", Name: "VM", Status: "operational", RawStatus: "operational"}}}
 	f.now = start.Add(26 * time.Hour)
@@ -509,7 +509,7 @@ func TestAusfallExternerQuelle_ErzeugtNachrichtUndEntwarnungErledigtSie(t *testi
 	assert.Equal(t, 1, f.unread(f.pagePath(f.page, "/unread-count"), f.pageAdminTok), "nur die Entwarnung ist ungelesen")
 }
 
-// --- Fehler- und Randpfade ---------------------------------------------------
+// --- Error and edge paths ---------------------------------------------------
 
 func TestNotifyAdmins_ParamsMitNichtSerialisierbaremWertFallenAufLeeresObjekt(t *testing.T) {
 	f := newAnFixture(t)
@@ -530,7 +530,7 @@ func TestNotifyAdmins_ParallelErledigteMeldungWirdNeuAngelegtStattHochgezaehlt(t
 	f := newAnFixture(t)
 	p := f.page.ID
 	f.notify(&p, "k")
-	// Zwischen Lesen und Hochzählen löst eine parallele Anfrage die Zeile ab.
+	// Between reading and incrementing, a concurrent request supersedes the row.
 	fired := false
 	require.NoError(t, f.db.Callback().Update().Before("gorm:update").Register("an_detach", func(tx *gorm.DB) {
 		if fired {
@@ -570,10 +570,10 @@ func TestAdminNotificationsAPI_NichtAngemeldetUndGeloeschterBenutzer(t *testing.
 
 func TestAdminNotificationsAPI_DatenbankfehlerBeiSeitenPruefungUndRollen(t *testing.T) {
 	f := newAnFixture(t)
-	// Rollenabfrage scheitert: kein Zugriff (403), kein 500 mit Details.
+	// Role query fails: no access (403), no 500 with details.
 	require.NoError(t, f.db.Migrator().DropTable(&models.UserStatusPageRole{}))
 	assert.Equal(t, http.StatusForbidden, f.do("GET", f.pagePath(f.page, ""), f.subTok, nil).Code)
-	// Seitenabfrage des Global Admins scheitert: 500 mit Code.
+	// Global admin's page query fails: 500 with code.
 	require.NoError(t, f.db.Migrator().DropTable(&models.StatusPage{}))
 	w := f.do("GET", f.pagePath(f.page, ""), f.adminTok, nil)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)

@@ -7,9 +7,9 @@ import (
 )
 
 // Time-Limits (SSO Code Expiry, SSO Cleanup Interval,
-// Maintenance-Scheduler-Interval) waren hardcoded. envDurationOrDefault und
-// die darauf aufbauenden Wrapper machen sie per Env-Var konfigurierbar, ohne
-// das bisherige Default-Verhalten zu ändern.
+// Maintenance scheduler interval) were hard-coded. envDurationOrDefault and
+// the wrappers built on it make them configurable via env var, without
+// changing the previous default behavior.
 
 func TestEnvDurationOrDefault(t *testing.T) {
 	const key = "TEST_ENV_DURATION_OR_DEFAULT"
@@ -101,8 +101,8 @@ func TestMaintenanceSchedulerIntervalConfigurable(t *testing.T) {
 	})
 }
 
-// TestStoreSSOCodeUsesConfigurableExpiry deckt die Verdrahtung von
-// storeSSOCode mit ssoCodeExpiry() ab, nicht nur die Helper-Funktion isoliert.
+// TestStoreSSOCodeUsesConfigurableExpiry covers the wiring of
+// storeSSOCode with ssoCodeExpiry(), not just the helper function in isolation.
 func TestStoreSSOCodeUsesConfigurableExpiry(t *testing.T) {
 	_ = os.Setenv("SSO_CODE_EXPIRY_SECONDS", "1")
 	defer func() { _ = os.Unsetenv("SSO_CODE_EXPIRY_SECONDS") }()
@@ -118,8 +118,8 @@ func TestStoreSSOCodeUsesConfigurableExpiry(t *testing.T) {
 		t.Fatal("expected code to still be valid immediately after storing")
 	}
 
-	// Code erneut speichern (consumeSSOCode hat ihn bereits gelöscht), dann
-	// über die konfigurierte Expiry hinaus warten.
+	// Store the code again (consumeSSOCode has already deleted it), then
+	// wait beyond the configured expiry.
 	code = storeSSOCode("short-lived-token-2", "", "", "")
 	time.Sleep(1100 * time.Millisecond)
 	if _, ok := consumeSSOCode(code); ok {

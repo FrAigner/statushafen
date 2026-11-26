@@ -13,14 +13,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// globaler E-Mail-Schalter (Systemeinstellung email.enabled).
-// Abgedeckt: GET/PUT mit Teilfeldern samt Fehlerpfaden sowie alle drei
-// Versandpfade (Bestell-Bestätigung, Abo-Bestätigung, Incident-/Notice-Mails
-// über sendAlertEmail) bei an- und abgeschaltetem Versand.
+// global email switch (system setting email.enabled).
+// Covered: GET/PUT with partial fields including error paths and all three
+// send paths (order confirmation, subscription confirmation, incident/notice mails
+// via sendAlertEmail) with sending switched on and off.
 
 const skippedAction = "email.skipped_disabled"
 
-// disableEmail legt email.enabled=false an, wie es das Admin-PUT täte.
+// disableEmail sets email.enabled=false, as the admin PUT would do.
 func disableEmail(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	if err := db.Create(&models.SystemSetting{Key: "email.enabled", Value: "false"}).Error; err != nil {
@@ -28,8 +28,8 @@ func disableEmail(t *testing.T, db *gorm.DB) {
 	}
 }
 
-// awaitSkippedAudit wartet auf den Audit-Eintrag für den übersprungenen
-// Versand (Incident-/Notice-Mails laufen in einer Goroutine) und liefert ihn.
+// awaitSkippedAudit waits for the audit entry for the skipped
+// send (incident/notice mails run in a goroutine) and returns it.
 func awaitSkippedAudit(t *testing.T, db *gorm.DB, targetType string) models.AuditLog {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -155,7 +155,7 @@ func TestSettingsHandlers_EmailNonAdminForbidden(t *testing.T) {
 	}
 }
 
-// Pfad 1: Bestell-Bestätigung (page_order.go).
+// Path 1: order confirmation (page_order.go).
 func TestCreateOrderHandler_EmailDisabledSkipsMail(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -167,7 +167,7 @@ func TestCreateOrderHandler_EmailDisabledSkipsMail(t *testing.T) {
 		"company_name": "Ohne Mail GmbH",
 		"email":        "ohne-mail@example.com",
 	})
-	// Die Bestellung selbst darf nicht scheitern.
+	// The order itself must not fail.
 	requireStatusCode(t, w, http.StatusCreated)
 	expectNoSMTPMessage(t, srv)
 
@@ -200,7 +200,7 @@ func TestCreateOrderHandler_EmailExplicitlyEnabledSendsMail(t *testing.T) {
 	}
 }
 
-// Pfad 2: Abo-Bestätigung (subscriber_confirm.go).
+// Path 2: subscription confirmation (subscriber_confirm.go).
 func TestSubscribe_EmailDisabledSkipsConfirmationMail(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -221,7 +221,7 @@ func TestSubscribe_EmailDisabledSkipsConfirmationMail(t *testing.T) {
 	}
 }
 
-// Pfad 3a: Incident-Mails über sendAlertEmail (incident.go).
+// Path 3a: incident mails via sendAlertEmail (incident.go).
 func TestDispatchNotifications_EmailDisabledSkipsMail(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -238,7 +238,7 @@ func TestDispatchNotifications_EmailDisabledSkipsMail(t *testing.T) {
 	expectNoSMTPMessage(t, srv)
 }
 
-// Pfad 3b: Notice-Mails laufen ebenfalls über sendAlertEmail.
+// Path 3b: notice mails also go through sendAlertEmail.
 func TestDispatchNoticeNotifications_EmailDisabledSkipsMail(t *testing.T) {
 	srv, h, page, _ := setupNoticeDispatch(t, "toggle-notice")
 	db := h.DB

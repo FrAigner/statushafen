@@ -14,14 +14,14 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Komponenten archivieren statt löschen. Archivierte Komponenten
-// behalten Verlauf, Verfügbarkeit, Vorfall-Zuordnungen und Übersetzungen und
-// lassen sich wiederherstellen; öffentlich sind sie wie unsichtbare Komponenten
-// ausgeblendet (hiddenComponentIDs). Die Statusänderung per Webhook bleibt
-// möglich (wie bei unsichtbaren), damit ein Monitoring nicht in Fehler läuft.
+// Archive components instead of deleting. Archived components
+// keep history, availability, incident assignments and translations and
+// can be restored; publicly they are hidden like invisible components
+// (hiddenComponentIDs). Status changes via webhook remain
+// possible (as with invisible ones) so that a monitoring system does not run into errors.
 
-// descendantComponentIDs liefert die IDs aller Nachfahren von rootID in all.
-// Besuchte IDs schützen vor Zyklen in Altdaten.
+// descendantComponentIDs returns the IDs of all descendants of rootID in all.
+// Visited IDs protect against cycles in legacy data.
 func descendantComponentIDs(all []models.Component, rootID uint) []uint {
 	children := map[uint][]uint{}
 	for _, comp := range all {
@@ -46,8 +46,8 @@ func descendantComponentIDs(all []models.Component, rootID uint) []uint {
 	return out
 }
 
-// loadComponentForArchive lädt die Komponente der Seite und prüft Tag-Zugriff;
-// bei Fehlern ist die Antwort schon geschrieben (ok=false).
+// loadComponentForArchive loads the page's component and checks tag access;
+// on errors the response is already written (ok=false).
 func (h *Handler) loadComponentForArchive(c *gin.Context) (comp models.Component, tenantID uint, ok bool) {
 	compID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -69,10 +69,10 @@ func (h *Handler) loadComponentForArchive(c *gin.Context) (comp models.Component
 	return comp, tenantID, true
 }
 
-// cascadeAccess lädt die Tag-Rechte des Aufrufers (einmal, VOR der Transaktion)
-// und liefert eine Prüfung für die IDs der Kaskade. Die Komponenten-Tags kommen
-// mit zwei Abfragen für alle IDs, damit die Zeilensperre nicht während hunderter
-// Roundtrips gehalten wird. Verhalten wie userHasTagAccess.
+// cascadeAccess loads the caller's tag permissions (once, BEFORE the transaction)
+// and returns a check for the IDs of the cascade. The component tags come
+// with two queries for all IDs so that the row lock is not held during hundreds of
+// round trips. Behavior as in userHasTagAccess.
 func (h *Handler) cascadeAccess(c *gin.Context) func(db *gorm.DB, ids []uint) (bool, error) {
 	userTags, isAdmin := h.userTagsAndAdmin(c)
 	return func(db *gorm.DB, ids []uint) (bool, error) {
@@ -113,13 +113,13 @@ func (h *Handler) cascadeAccess(c *gin.Context) func(db *gorm.DB, ids []uint) (b
 	}
 }
 
-// errCascadeForbidden bricht die Transaktion ab, wenn die Tag-Rechte fehlen.
+// errCascadeForbidden aborts the transaction when the tag permissions are missing.
 var (
 	errCascadeForbidden = errors.New("cascade forbidden")
 	errParentArchived   = errors.New("parent archived")
 )
 
-// isActiveIn: ob die Komponente id in all nicht archiviert ist.
+// isActiveIn: whether the component id in all is not archived.
 func isActiveIn(all []models.Component, id uint) bool {
 	for _, x := range all {
 		if x.ID == id {
@@ -129,7 +129,7 @@ func isActiveIn(all []models.Component, id uint) bool {
 	return false
 }
 
-// archivedAtIn: ob die Komponente id in all genau zum Zeitpunkt at archiviert wurde.
+// archivedAtIn: whether the component id in all was archived at exactly the time at.
 func archivedAtIn(all []models.Component, id uint, at time.Time) bool {
 	for _, x := range all {
 		if x.ID == id {
@@ -139,18 +139,18 @@ func archivedAtIn(all []models.Component, id uint, at time.Time) bool {
 	return false
 }
 
-// lockedPageComponents liest alle Komponenten der Seite. Auf Postgres mit
-// Zeilensperre (FOR NO KEY UPDATE in fester Reihenfolge: reicht für archived_at und kollidiert nicht mit den FK-Prüfungen parallel angelegter Vorfälle, Deadlock-frei), damit gleichzeitiges Umhängen/Archivieren bis zum
-// Ende der Transaktion wartet; SQLite kennt die Klausel nicht und
-// serialisiert Schreiber selbst.
+// lockedPageComponents reads all components of the page. On Postgres with
+// a row lock (FOR NO KEY UPDATE in fixed order: sufficient for archived_at and does not collide with the FK checks of concurrently created incidents, deadlock-free), so that concurrent reparenting/archiving waits until the
+// end of the transaction; SQLite does not know the clause and
+// serializes writers itself.
 func lockedPageComponents(tx *gorm.DB, tenantID uint) ([]models.Component, error) {
 	var all []models.Component
 	err := tx.Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Where("status_page_id = ?", tenantID).Order("id").Find(&all).Error
 	return all, err
 }
 
-// hasArchivedAncestor: ob irgendein Vorfahr von comp archiviert ist (ganze
-// Kette, nicht nur der direkte Elternknoten). Besuchte IDs schützen vor Zyklen.
+// hasArchivedAncestor: whether any ancestor of comp is archived (the whole
+// chain, not only the direct parent). Visited IDs protect against cycles.
 func hasArchivedAncestor(all []models.Component, comp models.Component) bool {
 	byID := make(map[uint]models.Component, len(all))
 	for _, x := range all {
@@ -178,9 +178,9 @@ func (h *Handler) archiveNow() time.Time {
 	return time.Now()
 }
 
-// ArchiveComponentHandler archiviert eine Komponente samt Nachfahren (eine
-// Gruppe nimmt ihre Mitglieder mit). Bereits archivierte Einträge behalten
-// ihren Zeitpunkt; ein zweiter Aufruf ändert nichts (idempotent).
+// ArchiveComponentHandler archives a component including descendants (a
+// group takes its members along). Already archived entries keep
+// their timestamp; a second call changes nothing (idempotent).
 func (h *Handler) ArchiveComponentHandler(c *gin.Context) {
 	comp, tenantID, ok := h.loadComponentForArchive(c)
 	if !ok {
@@ -193,15 +193,15 @@ func (h *Handler) ArchiveComponentHandler(c *gin.Context) {
 	now := h.archiveNow()
 	allowed := h.cascadeAccess(c)
 	changed := true
-	// Lesen, Prüfen und Schreiben in EINER Transaktion, sonst bliebe
-	// ein gleichzeitig eingehängtes aktives Element unter der archivierten Gruppe aktiv.
+	// Reading, checking and writing in ONE transaction, otherwise a
+	// concurrently attached active element would remain active under the archived group.
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
 		all, err := lockedPageComponents(tx, tenantID)
 		if err != nil {
 			return err
 		}
-		// Die Wurzel kommt aus dem gesperrten Stand: wurde sie inzwischen
-		// archiviert, bleibt der Aufruf ohne Schreiben und Audit (idempotent).
+		// The root comes from the locked state: if it has been
+		// archived in the meantime, the call stays without writing and audit (idempotent).
 		root, found := componentIn(all, comp.ID)
 		if !found {
 			return gorm.ErrRecordNotFound
@@ -211,7 +211,7 @@ func (h *Handler) ArchiveComponentHandler(c *gin.Context) {
 			changed = false
 			return nil
 		}
-		// Nur die Komponenten, die sich wirklich ändern (noch aktiv), brauchen ein Tag-Recht.
+		// Only the components that actually change (still active) need a tag permission.
 		var ids []uint
 		for _, id := range append(descendantComponentIDs(all, comp.ID), comp.ID) {
 			if isActiveIn(all, id) {
@@ -250,7 +250,7 @@ func (h *Handler) ArchiveComponentHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, comp)
 }
 
-// componentIn sucht die Komponente id in all.
+// componentIn finds the component id in all.
 func componentIn(all []models.Component, id uint) (models.Component, bool) {
 	for _, x := range all {
 		if x.ID == id {
@@ -260,11 +260,11 @@ func componentIn(all []models.Component, id uint) (models.Component, bool) {
 	return models.Component{}, false
 }
 
-// RestoreComponentHandler stellt eine Komponente wieder her. Liegt sie in einer
-// archivierten Gruppe, ist das nur über die Gruppe möglich (409
-// parent_archived). Bei einer Gruppe kommen die Mitglieder zurück, die mit ihr
-// zusammen archiviert wurden (gleicher Zeitpunkt); einzeln früher archivierte
-// bleiben archiviert.
+// RestoreComponentHandler restores a component. If it is in an
+// archived group, that is only possible via the group (409
+// parent_archived). For a group, the members come back that were archived
+// together with it (same timestamp); members archived individually earlier
+// stay archived.
 func (h *Handler) RestoreComponentHandler(c *gin.Context) {
 	comp, tenantID, ok := h.loadComponentForArchive(c)
 	if !ok {
@@ -281,8 +281,8 @@ func (h *Handler) RestoreComponentHandler(c *gin.Context) {
 		if err != nil {
 			return err
 		}
-		// Wurzel aus dem gesperrten Stand (Zeitpunkt und Eltern können sich seit
-		// dem Laden geändert haben).
+		// Root from the locked state (timestamp and parent may have changed since
+		// loading).
 		root, found := componentIn(all, comp.ID)
 		if !found {
 			return gorm.ErrRecordNotFound
@@ -295,8 +295,8 @@ func (h *Handler) RestoreComponentHandler(c *gin.Context) {
 		if hasArchivedAncestor(all, root) {
 			return errParentArchived
 		}
-		// Nur die Komponenten, die tatsächlich zurückkommen (die Wurzel und
-		// die mit ihr zusammen archivierten), brauchen ein Tag-Recht.
+		// Only the components that actually come back (the root and
+		// those archived together with it) need a tag permission.
 		at := *root.ArchivedAt
 		ids := []uint{comp.ID}
 		for _, id := range descendantComponentIDs(all, comp.ID) {

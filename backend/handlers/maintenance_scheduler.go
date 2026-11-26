@@ -9,17 +9,17 @@ import (
 	"github.com/fraigner/statushafen/statushistory"
 )
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const (
 	preloadIncidentComponentsComponent = "IncidentComponents.Component"
 	whereIDEquals                      = "id = ?"
 )
 
-// StartMaintenanceScheduler: einfache Hintergrund-Schleife, die
-// geplante Wartungsfenster automatisch weiterschaltet. Läuft im 1-Minuten-Takt,
-// analog zum bestehenden RateLimiter-Cleanup-Loop
-// (middleware/security.go NewRateLimiter) - bewusst kein externes
-// Cron-/Scheduler-Package, da für diesen einen periodischen Task ausreichend.
+// StartMaintenanceScheduler: simple background loop that
+// advances scheduled maintenance windows automatically. Runs on a 1-minute tick,
+// analogous to the existing RateLimiter cleanup loop
+// (middleware/security.go NewRateLimiter) - deliberately no external
+// cron/scheduler package, since it is sufficient for this one periodic task.
 func (h *Handler) StartMaintenanceScheduler() {
 	go func() {
 		for {
@@ -40,7 +40,7 @@ func (h *Handler) runMaintenanceTick() {
 	h.pruneExpiredPageOrders(now)
 }
 
-// pruneExpiredPageOrders: unbestätigte, abgelaufene Bestellungen aufräumen.
+// pruneExpiredPageOrders: clean up unconfirmed, expired orders.
 func (h *Handler) pruneExpiredPageOrders(now time.Time) {
 	marked, deleted, err := pruneExpiredOrders(h.DB, now)
 	if err != nil {
@@ -52,8 +52,8 @@ func (h *Handler) pruneExpiredPageOrders(now time.Time) {
 	}
 }
 
-// pruneExpiredPageInvitations: abgelaufene Einladungen aller
-// Seiten entfernen; eine einzelne DELETE-Anweisung je Tick.
+// pruneExpiredPageInvitations: remove expired invitations of all
+// pages; one single DELETE statement per tick.
 func (h *Handler) pruneExpiredPageInvitations(now time.Time) {
 	n, err := pruneExpiredInvitations(h.DB, now)
 	if err != nil {
@@ -65,8 +65,8 @@ func (h *Handler) pruneExpiredPageInvitations(now time.Time) {
 	}
 }
 
-// statusPruneInterval: Die Bereinigung der Statushistorie läuft höchstens
-// einmal am Tag.
+// statusPruneInterval: the cleanup of the status history runs at most
+// once a day.
 const statusPruneInterval = 24 * time.Hour
 
 func (h *Handler) pruneStatusHistory(now time.Time) {
@@ -84,10 +84,10 @@ func (h *Handler) pruneStatusHistory(now time.Time) {
 	}
 }
 
-// sendDueMaintenanceReminders verschickt die (optionale, vom Admin pro
-// Wartungsfenster konfigurierte) Erinnerungs-Benachrichtigung, wenn die
-// verbleibende Zeit bis ScheduledStartAt kleiner als ReminderLeadMinutes ist.
-// ReminderSentAt verhindert Mehrfachversand bei jedem Tick.
+// sendDueMaintenanceReminders sends the (optional, configured by the admin per
+// maintenance window) reminder notification when the
+// remaining time until ScheduledStartAt is less than ReminderLeadMinutes.
+// ReminderSentAt prevents repeated sending on every tick.
 func (h *Handler) sendDueMaintenanceReminders(now time.Time) {
 	var due []models.Incident
 	h.DB.Preload(preloadIncidentComponentsComponent).
@@ -112,16 +112,16 @@ func (h *Handler) sendDueMaintenanceReminders(now time.Time) {
 	}
 }
 
-// applyMaintenanceStatusTransition speichert den neuen Incident-Status und
-// setzt den Status aller betroffenen Komponenten, bricht bei einem
-// DB-Fehler geloggt ab (false) statt mit einem inkonsistenten Zustand
-// weiterzumachen.
+// applyMaintenanceStatusTransition saves the new incident status and
+// sets the status of all affected components; on a
+// DB error it aborts with a log entry (false) instead of carrying on
+// with an inconsistent state.
 func (h *Handler) applyMaintenanceStatusTransition(inc *models.Incident, componentStatus string) bool {
-	// gezieltes Update statt Save(inc). Save schrieb die vorgeladenen
-	// Assoziationen (IncidentComponents.Component) per Upsert zurück: unter
-	// SQLite scheiterte das mit "near DEFAULT" bei gemischten parent_id, und
-	// auch auf Postgres überschrieb es Komponentenzeilen mit dem (veralteten)
-	// Stand aus dem Preload. Geändert wird nur der Status.
+	// targeted update instead of Save(inc). Save wrote the preloaded
+	// associations (IncidentComponents.Component) back via upsert: under
+	// SQLite that failed with "near DEFAULT" for mixed parent_id, and
+	// even on Postgres it overwrote component rows with the (stale)
+	// state from the preload. Only the status is changed.
 	if err := h.DB.Model(&models.Incident{}).Where(whereIDEquals, inc.ID).Update("status", inc.Status).Error; err != nil {
 		slog.Error("Failed maintenance status transition", "incident_id", inc.ID, "new_status", inc.Status, "error", err)
 		return false
@@ -135,14 +135,14 @@ func (h *Handler) applyMaintenanceStatusTransition(inc *models.Incident, compone
 	return true
 }
 
-// finishMaintenanceTransition schaltet einen einzelnen fälligen
-// Wartungsfenster-Incident um: Status + Komponentenstatus speichern (bricht
-// bei einem DB-Fehler ab, siehe applyMaintenanceStatusTransition), Timeline-
-// Eintrag anlegen, Benachrichtigung verschicken, Audit-Log schreiben.
-// Parametrisiert über alles, was sich zwischen "Start" und "Complete"
-// unterscheidet - startDueMaintenanceWindows/completeDueMaintenanceWindows
-// teilen sich dadurch diesen Ablauf, statt ihn (nur mit anderen String-
-// Literalen) zu duplizieren.
+// finishMaintenanceTransition advances a single due
+// maintenance-window incident: save status + component status (aborts
+// on a DB error, see applyMaintenanceStatusTransition), timeline
+// entry, send notification, write audit log.
+// Parameterized over everything that differs between "start" and "complete"
+// - startDueMaintenanceWindows/completeDueMaintenanceWindows
+// thereby share this flow instead of duplicating it (only with different string
+// literals).
 func (h *Handler) finishMaintenanceTransition(inc models.Incident, newStatus, componentStatus, timelineMessage, notificationAction, auditAction, logMessage string) {
 	inc.Status = newStatus
 	if !h.applyMaintenanceStatusTransition(&inc, componentStatus) {
@@ -161,9 +161,9 @@ func (h *Handler) finishMaintenanceTransition(inc models.Incident, newStatus, co
 	slog.Info(logMessage, "incident_id", inc.ID, "title", inc.Title)
 }
 
-// startDueMaintenanceWindows schaltet "scheduled" -> "in_progress", sobald
-// ScheduledStartAt erreicht ist, setzt die betroffenen Komponenten auf
-// "under_maintenance" und legt einen Timeline-Eintrag an.
+// startDueMaintenanceWindows switches "scheduled" -> "in_progress" as soon as
+// ScheduledStartAt is reached, sets the affected components to
+// "under_maintenance" and creates a timeline entry.
 func (h *Handler) startDueMaintenanceWindows(now time.Time) {
 	var due []models.Incident
 	h.DB.Preload(preloadIncidentComponentsComponent).
@@ -177,11 +177,11 @@ func (h *Handler) startDueMaintenanceWindows(now time.Time) {
 	}
 }
 
-// completeDueMaintenanceWindows schaltet "in_progress" -> "resolved" (bewusst
-// derselbe Terminal-Status wie bei normalen Incidents, siehe models.Incident),
-// sobald ScheduledEndAt erreicht ist, und setzt die Komponenten zurück auf
-// "operational". Vereinfachung für v1: ein evtl. unabhängig vom Wartungsfenster
-// bereits gestörter Komponenten-Status wird dabei überschrieben.
+// completeDueMaintenanceWindows switches "in_progress" -> "resolved" (deliberately the
+// same terminal status as for normal incidents, see models.Incident),
+// once ScheduledEndAt is reached, and resets the components to
+// "operational". Simplification for v1: a component status that may already be disturbed
+// independently of the maintenance window is overwritten in the process.
 func (h *Handler) completeDueMaintenanceWindows(now time.Time) {
 	var due []models.Incident
 	h.DB.Preload(preloadIncidentComponentsComponent).

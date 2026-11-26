@@ -13,10 +13,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Eine neu angelegte Komponente erschien vor den Geschwistern mit
-// gepflegter Reihenfolge (Seed: SortOrder 1, 2, 3 …), weil sie den Default 0
-// bekam. Sie soll ans Ende ihrer Ebene, auf oberster Ebene wie unter einer
-// Eltern-Komponente.
+// A newly created component appeared before siblings with
+// maintained order (seed: SortOrder 1, 2, 3 …) because it got the default 0.
+// It should go to the end of its level, both at top level and under a
+// parent component.
 func TestCreateComponent_NewComponentSortsLastAmongSiblings(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -32,7 +32,7 @@ func TestCreateComponent_NewComponentSortsLastAmongSiblings(t *testing.T) {
 	db.Create(&grp)
 	db.Create(&models.Component{StatusPageID: page.ID, Name: "Zweite", Status: "operational", SortOrder: 2})
 	db.Create(&models.Component{StatusPageID: page.ID, ParentID: &grp.ID, Name: "Kind A", Status: "operational", SortOrder: 5})
-	// Höhere SortOrder auf einer fremden Seite darf nicht zählen.
+	// A higher SortOrder on a foreign page must not count.
 	db.Create(&models.Component{StatusPageID: other.ID, Name: "Fremd", Status: "operational", SortOrder: 50})
 
 	base := "/api/pages/" + strconv.Itoa(int(page.ID)) + "/components"
@@ -80,8 +80,8 @@ func TestCreateComponent_NewComponentSortsLastAmongSiblings(t *testing.T) {
 	}
 }
 
-// Die geänderte Abfrage (sort_order, id) meldet einen
-// Datenbankfehler weiterhin als 500.
+// The changed query (sort_order, id) still reports a
+// database error as 500.
 func TestGetComponents_DBErrorReturns500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

@@ -12,19 +12,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// Wiederholtes Literal (go:S1192).
+// Repeated literal (go:S1192).
 const errNoticeNotFound = "Notice not found"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GeneralNoticeTranslation: Stage 4 der Mehrsprachigkeit - Notice-
-// Titel und Meldungen in mehreren Sprachen mit Draft/Confirmed-Workflow.
+// GeneralNoticeTranslation: stage 4 of multilingual support - notice
+// titles and messages in several languages with a draft/confirmed workflow.
 //
-// Draft-Translations sind nur für Admins sichtbar; Confirmed-Translations
-// werden über die öffentliche API auch für Subscriber sichtbar.
-// Source wird zum Tracking gesetzt (manual vs. deepl).
+// Draft translations are visible to admins only; confirmed translations
+// become visible to subscribers via the public API as well.
+// Source is set for tracking (manual vs. deepl).
 //
-// Routen (main.go):
-//   öffentlich: r.GET("/api/notices/:notice_id/translations", h.GetGeneralNoticeTranslationsHandler)
+// Routes (main.go):
+//   public: r.GET("/api/notices/:notice_id/translations", h.GetGeneralNoticeTranslationsHandler)
 //   admin:      translationAdmin (RequirePermission "notices:write")
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ func (h *Handler) GetGeneralNoticeTranslationsHandler(c *gin.Context) {
 		return
 	}
 
-	// siehe incident_translation.go - status_page_id-Join fehlte.
+	// see incident_translation.go - status_page_id join was missing.
 	var page models.StatusPage
 	if err := h.DB.First(&page, notice.StatusPageID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errNoticeNotFound, "code": "notice_not_found"})
@@ -193,9 +193,9 @@ func (h *Handler) DeleteGeneralNoticeTranslationHandler(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
-// SaveGeneralNoticeTranslationHandler speichert die Übersetzung einer Ankündigung
-// für genau eine Sprache: anlegen oder ändern, Stand draft oder
-// confirmed. Gegenstück zu SaveIncidentTranslationHandler.
+// SaveGeneralNoticeTranslationHandler saves the translation of an announcement
+// for exactly one language: create or change, state draft or
+// confirmed. Counterpart of SaveIncidentTranslationHandler.
 func (h *Handler) SaveGeneralNoticeTranslationHandler(c *gin.Context) {
 	noticeID, ok := parseNoticeID(c)
 	if !ok {

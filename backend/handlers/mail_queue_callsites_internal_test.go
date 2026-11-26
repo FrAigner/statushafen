@@ -15,14 +15,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter für die Mail-Warteschlangen: Jeder Aufruf von queueMail nennt
-// einen Zweck als Textliteral (jeder Zweck hat eine eigene Warteschlange) und
-// die Schlüssel, nach denen der Anteil begrenzt wird. Ohne eigenen Zweck teilten
-// sich zwei Funktionen die Plätze, ohne Schlüssel könnte eine einzelne Seite
-// oder Quelle die Warteschlange allein füllen. Ein neuer Aufruf schlägt hier an
-// und gehört samt Zweck und Schlüsseln in die Tabelle.
+// Structure guard for the mail queues: every call to queueMail names
+// a purpose as a text literal (each purpose has its own queue) and
+// the keys by which the share is limited. Without its own purpose, two functions would share
+// the slots; without keys, a single page
+// or source could fill the queue alone. A new call trips this test here
+// and belongs in the table together with its purpose and keys.
 var expectedMailQueueCallSites = map[string]string{
-	// Datei -> Zweck und Schlüssel (in der Reihenfolge der Argumente)
+	// file -> purpose and keys (in the order of the arguments)
 	"subscriber_confirm.go": "subscription_confirmation: mailPageKey, mailSourceKey",
 	"page_order.go":         "order_confirmation: mailSourceKey",
 	"page_invitation.go":    "page_invitation: mailPageKey",

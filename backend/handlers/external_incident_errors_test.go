@@ -15,10 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Fehlerpfade (Datenbankfehler, Webhook, private Seite, Header).
+// Error paths (database errors, webhook, private site, header).
 
-// injectFail lässt GORM-Operationen op ("query", "row", "delete") auf table
-// scheitern; skip überspringt die ersten Treffer.
+// injectFail makes GORM operations op ("query", "row", "delete") on table
+// fail; skip skips the first hits.
 func injectFail(t *testing.T, db *gorm.DB, op, table string, skip int) {
 	t.Helper()
 	name := "test:fail:" + op + ":" + table
@@ -154,7 +154,7 @@ func TestExternalIncidentWebhook_ErfolgUndStatusfehler(t *testing.T) {
 	assert.EqualValues(t, 1, s.auditCount("external_incident.notified"))
 	assert.EqualValues(t, 0, s.auditCount("external_incident.failed"))
 
-	// 5xx würde wiederholt (mit echter Wartezeit); 403 ist permanent, ein Versuch.
+	// 5xx would be retried (with a real wait); 403 is permanent, one attempt.
 	status = http.StatusForbidden
 	s.setFeed("incident", extInc("i1", "identified", "Zeile 1\nZeile 2", "Neu"))
 	s.poll()
@@ -187,7 +187,7 @@ func TestExternalIncidentMail_PrivateSeiteMitBerechtigtemErsteller(t *testing.T)
 func TestExternalIncidentMail_HeaderMitZeilenumbruchWirdVerworfen(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
-	// FRONTEND_URL fließt in den List-Unsubscribe-Header; CR/LF darf dort nie ankommen.
+	// FRONTEND_URL flows into the List-Unsubscribe header; CR/LF must never end up there.
 	t.Setenv("FRONTEND_URL", "https://status.example.org\nBcc: x@example.com")
 	s := newIncidentSetup(t)
 	s.subscriber("alle@example.com", "all")
@@ -197,7 +197,7 @@ func TestExternalIncidentMail_HeaderMitZeilenumbruchWirdVerworfen(t *testing.T) 
 	assert.EqualValues(t, 1, s.auditCount("external_incident.failed"))
 }
 
-// Nur der List-Unsubscribe-Header trägt FRONTEND_URL (Vorlage ohne Link): auch dort wird CR/LF verworfen.
+// Only the List-Unsubscribe header carries FRONTEND_URL (template without link): CR/LF is discarded there too.
 func TestExternalIncidentMail_ListUnsubscribeHeaderMitZeilenumbruch(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()

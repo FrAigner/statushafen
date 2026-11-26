@@ -100,10 +100,10 @@ func TestIncidentDetailHandlers(t *testing.T) {
 		assert.Contains(t, authW.Body.String(), "Draft summary")
 	})
 
-	// Sicherheitsprüfung: vorher zeigte JEDER valide JWT den Entwurf,
-	// unabhängig davon, ob der User überhaupt eine Rolle auf DIESER page_id
-	// hat. Ein authentifizierter User ohne Rolle auf "detail-page" darf den
-	// Entwurf nicht sehen.
+	// Security check: previously ANY valid JWT showed the draft,
+	// regardless of whether the user had any role on THIS page_id at all. An
+	// authenticated user without a role on "detail-page" must not see the
+	// draft.
 	t.Run("Draft post-mortem hidden from authenticated user without role on this page", func(t *testing.T) {
 		strangerRole := models.Role{Name: "Stranger Viewer", Permissions: "incidents:read"}
 		db.Create(&strangerRole)
@@ -156,12 +156,12 @@ func TestIncidentDetailHandlers(t *testing.T) {
 		assert.Contains(t, anonW.Body.String(), "Final summary v2")
 	})
 
-	// page_id-Parse-Fehler wurden verworfen, sodass ein
-	// ungültiges page_id stillschweigend zu tenantID=0 wurde, statt einen
-	// klaren 400 zurückzugeben. GetIncidentDetailHandler ist die öffentliche
-	// Route ohne RequirePermission-Middleware, die den page_id-Parse-Fehler
-	// sonst schon vorher abfangen würde - hier greift also direkt der Fix im
-	// Handler selbst.
+	// page_id parse errors were discarded, so that an
+	// invalid page_id silently became tenantID=0 instead of returning a
+	// clear 400. GetIncidentDetailHandler is the public
+	// route without RequirePermission middleware, which would otherwise already catch
+	// the page_id parse error earlier - so here the fix applies directly in the
+	// handler itself.
 	t.Run("Get detail mit ungültiger page_id gibt 400", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/pages/not-a-number/incidents/"+iid, nil)
 		w := httptest.NewRecorder()
@@ -169,11 +169,11 @@ func TestIncidentDetailHandlers(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
-	// AddIncidentUpdateHandler/UpsertPostMortemHandler hängen hinter
-	// RequirePermission, das für normale User page_id selbst schon prüft -
-	// für Global Admins (wie adminToken hier) wird dieser Check aber
-	// übersprungen, sodass ein ungültiges page_id ungehindert bis in den
-	// Handler durchreicht.
+	// AddIncidentUpdateHandler/UpsertPostMortemHandler sit behind
+	// RequirePermission, which already checks page_id itself for regular users -
+	// for global admins (like adminToken here) this check is however
+	// skipped, so that an invalid page_id passes unhindered all the way into the
+	// handler.
 	t.Run("Add incident update mit ungültiger page_id gibt 400", func(t *testing.T) {
 		payload := map[string]string{"status": "identified", "message": "x"}
 		body, _ := json.Marshal(payload)
@@ -197,26 +197,26 @@ func TestIncidentDetailHandlers(t *testing.T) {
 	})
 }
 
-// Auto-Join (bei einer Verifikation entdeckt): auf einer privaten Seite mit gesetzter
-// DefaultRoleID legt pageIsAccessible per Auto-Join eine UserStatusPageRole-
-// Zeile für den aufrufenden User an. Fragte die Postmortem-Prüfung danach
-// erneut per userHasRoleOnPrivatePage ab, fand sie genau diese Zeile bereits
-// vor - ein Newcomer sah den unveröffentlichten Entwurf schon beim
-// allerersten Request, obwohl er zu Beginn des Requests keine Rolle hatte.
+// Auto-join (discovered during a verification): on a private page with
+// DefaultRoleID set, pageIsAccessible creates a UserStatusPageRole
+// row for the calling user via auto-join. If the postmortem check then
+// queried again via userHasRoleOnPrivatePage, it found exactly this row already
+// there - a newcomer saw the unpublished draft on their very
+// first request, although they had no role at the start of the request.
 //
-// Nachbesserung nach unabhängigem Review (Gemini): der erste Fix
-// (Rollen-Status vor pageIsAccessible festhalten) schützte nur GENAU den
-// ersten Request - die Auto-Join-Zeile landet ja tatsächlich in der DB, also
-// liefert jede spätere Abfrage "hat irgendeine Rolle" beim zweiten Request
-// bereits true. Der zweite GET-Request unten ist deshalb der eigentliche
-// Kernfall, nicht nur eine Ergänzung. Der korrekte Fix prüft nicht mehr
-// "irgendeine Rolle vorhanden", sondern dieselbe Berechtigung, die auch zum
-// Schreiben eines Postmortems nötig ist (incidents:write) - ein reiner
-// Auto-Join-Viewer bekommt diese Berechtigung nie, unabhängig davon, wie oft
-// er die Seite aufruft.
+// Follow-up fix after independent review (Gemini): the first fix
+// (record the role status before pageIsAccessible) protected only EXACTLY the
+// first request - the auto-join row does actually end up in the DB, so
+// every later query "has any role" already returns true on the second request.
+// The second GET request below is therefore the actual
+// core case, not just an addition. The correct fix no longer checks
+// "any role exists", but the same permission that is also required for
+// writing a postmortem (incidents:write) - a pure
+// auto-join viewer never gets this permission, regardless of how often
+// they visit the page.
 //
-// Eigene, isolierte Seite/Incident, damit der Test unabhängig von
-// TestIncidentDetailHandlers läuft.
+// Own, isolated page/incident so that the test runs independently of
+// TestIncidentDetailHandlers.
 func TestDraftPostMortemHiddenDespiteAutoJoinOnFirstRequest(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -266,8 +266,8 @@ func TestDraftPostMortemHiddenDespiteAutoJoinOnFirstRequest(t *testing.T) {
 	db.Model(&models.UserStatusPageRole{}).Where("user_id = ? AND status_page_id = ?", newcomer.ID, page.ID).Count(&before)
 	assert.Equal(t, int64(0), before, "Testvoraussetzung: Newcomer darf vor dem Request noch keine Rolle auf dieser Seite haben")
 
-	// Der eine, einzige Request: Auto-Join (Seitenzugriff) und Postmortem-Gate
-	// laufen im selben Handler-Durchlauf.
+	// The one and only request: auto-join (page access) and postmortem gate
+	// run in the same handler pass.
 	req, _ := http.NewRequest("GET", "/api/pages/"+pid+"/incidents/"+iid, nil)
 	req.Header.Set("Authorization", "Bearer "+newcomerToken)
 	w := httptest.NewRecorder()
@@ -281,10 +281,10 @@ func TestDraftPostMortemHiddenDespiteAutoJoinOnFirstRequest(t *testing.T) {
 	db.Model(&models.UserStatusPageRole{}).Where("user_id = ? AND status_page_id = ?", newcomer.ID, page.ID).Count(&after)
 	assert.Equal(t, int64(1), after, "Auto-Join für den reinen Seitenzugriff soll weiterhin greifen")
 
-	// Kernfall der Gemini-Nachbesserung: die Auto-Join-Zeile existiert jetzt
-	// in der DB (s.o.). Ein zweiter Request desselben Newcomers unmittelbar
-	// danach darf den Entwurf trotzdem NICHT zeigen - der Viewer-Rolle fehlt
-	// incidents:write, egal wie oft die Seite aufgerufen wird.
+	// Core case of the Gemini follow-up: the auto-join row now exists
+	// in the DB (see above). A second request by the same newcomer immediately
+	// afterwards must still NOT show the draft - the viewer role lacks
+	// incidents:write, no matter how often the page is visited.
 	req2, _ := http.NewRequest("GET", "/api/pages/"+pid+"/incidents/"+iid, nil)
 	req2.Header.Set("Authorization", "Bearer "+newcomerToken)
 	w2 := httptest.NewRecorder()
@@ -295,12 +295,12 @@ func TestDraftPostMortemHiddenDespiteAutoJoinOnFirstRequest(t *testing.T) {
 	assert.NotContains(t, w2.Body.String(), "Draft summary auto-join")
 }
 
-// Kontrolle zur Gemini-Nachbesserung oben: das Gate darf nicht pauschal jede
-// Rolle sperren, sondern nur Rollen ohne incidents:write. Ein User mit
-// Editor-artiger Rolle muss den Entwurf weiterhin sehen - sonst wäre das Gate
-// nur enger, nicht korrekt. Seit der Umstellung (Review-Befund 1) darf eine Rolle
-// mit Schreibrechten nicht mehr per Auto-Join vergeben werden, deshalb hier
-// über eine manuelle Zuweisung.
+// Control for the Gemini follow-up above: the gate must not block every
+// role across the board, only roles without incidents:write. A user with an
+// editor-like role must still see the draft - otherwise the gate would be
+// only narrower, not correct. Since the switch (review finding 1) a role
+// with write permissions may no longer be granted via auto-join, so here
+// via a manual assignment.
 func TestDraftPostMortemVisibleForManuallyAssignedUserWithWritePermission(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -356,9 +356,9 @@ func TestDraftPostMortemVisibleForManuallyAssignedUserWithWritePermission(t *tes
 	assert.Contains(t, w.Body.String(), "Draft summary visible to editor", "User mit incidents:write (manuell zugewiesen) muss den Entwurf sehen")
 }
 
-// Ein Update darf die Erstmeldung (Incident.Message) nicht
-// überschreiben; die Benachrichtigung enthält die Update-Nachricht. Fremde
-// Mandanten erhalten 404 und lassen Vorfall und Updates unverändert.
+// An update must not overwrite the initial report (Incident.Message);
+// the notification contains the update message. Foreign
+// tenants get 404 and leave the incident and updates unchanged.
 func TestAddIncidentUpdateKeepsInitialMessage(t *testing.T) {
 	handlers.SetWebhookLoopbackAllowedForTests(t.Cleanup)
 	received := make(chan string, 4)
@@ -401,7 +401,7 @@ func TestAddIncidentUpdateKeepsInitialMessage(t *testing.T) {
 		return w.Code
 	}
 
-	// Mandantentrennung: Vorfall einer anderen Seite -> 404, nichts geändert.
+	// Tenant isolation: incident of another page -> 404, nothing changed.
 	assert.Equal(t, http.StatusNotFound, post(other.ID))
 	var n int64
 	db.Model(&models.IncidentUpdate{}).Count(&n)
@@ -414,8 +414,8 @@ func TestAddIncidentUpdateKeepsInitialMessage(t *testing.T) {
 	assert.Equal(t, "Erstmeldung Text", after.Message)
 	assert.Equal(t, "identified", after.Status)
 
-	// Verspätete Webhooks anderer Tests können ebenfalls ankommen; gesucht wird
-	// die Meldung zu diesem Vorfall.
+	// Late webhooks from other tests may also arrive; we look for
+	// the message for this incident.
 	deadline := time.After(5 * time.Second)
 	for found := false; !found; {
 		select {

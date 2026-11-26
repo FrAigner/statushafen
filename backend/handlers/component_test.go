@@ -116,8 +116,8 @@ func TestComponentHandlers(t *testing.T) {
 		}
 	})
 
-	// Seiten-Rollen (hier ohne Login = kein Global Admin) vergeben
-	// nur seiteneigene Tags; globale Tags siehe page_tags_test.go.
+	// Site roles (here without login = no Global Admin) assign
+	// only the page's own tags; for global tags see page_tags_test.go.
 	t.Run("Update Component mit tag_ids weist seiteneigene Tags zu", func(t *testing.T) {
 		globalTag := models.Tag{Name: "global-tag", StatusPageID: &page1.ID}
 		db.Create(&globalTag)
@@ -177,11 +177,11 @@ func TestComponentHandlers(t *testing.T) {
 		}
 	})
 
-	// Regressionstest (ersetzt den früheren Country-Default-Test):
-	// ein fehlendes "tag_ids" im Request darf das Anlegen nicht verhindern -
-	// anders als beim alten Country-Feld (das implizit auf "global" fiel)
-	// bedeutet das aber KEINE automatische globale Tag-Zuweisung mehr,
-	// sondern eine Komponente ganz ohne Tag (fail-closed).
+	// Regression test (replaces the earlier Country default test):
+	// a missing "tag_ids" in the request must not prevent creation -
+	// unlike the old Country field (which implicitly fell back to "global")
+	// it now does NOT mean an automatic global tag assignment any more,
+	// but a component with no tag at all (fail-closed).
 	t.Run("Create Component ohne tag_ids legt Komponente ohne Tags an", func(t *testing.T) {
 		payload := map[string]interface{}{
 			"name":   "No Tags Component",

@@ -18,12 +18,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Auch die 500-Antworten und die übrigen Bind-/ID-Fehler der
-// Handler tragen einen Fehlercode (server_error, invalid_request, invalid_id).
+// The 500 responses and the remaining bind/ID errors of the
+// handlers also carry an error code (server_error, invalid_request, invalid_id).
 
-// failDB lässt jede Operation op (create, update, delete, query) auf table mit
-// einem Fehler scheitern; skip überspringt die ersten Treffer. Der Hook wird
-// nach dem Test wieder entfernt.
+// failDB makes every operation op (create, update, delete, query) on table fail with
+// an error; skip skips the first hits. The hook is removed again
+// after the test.
 func failDB(t *testing.T, db *gorm.DB, op, table string, skip int) {
 	t.Helper()
 	name := "test:fail613:" + op + ":" + table
@@ -57,7 +57,7 @@ func failDB(t *testing.T, db *gorm.DB, op, table string, skip int) {
 	})
 }
 
-// dbCase: Anfrage, bei der vorher eine DB-Operation scheitert.
+// dbCase: request in which a DB operation fails beforehand.
 type dbCase struct {
 	name        string
 	op, table   string
@@ -125,7 +125,7 @@ func TestFehlercodes_Serverfehler_KomponentenVorfaelleBenutzer(t *testing.T) {
 	})
 }
 
-// Ein Nutzer mit Tag-Einschränkung darf Vorfälle nicht auf fremde Tags verschieben (403 forbidden).
+// A user with tag restriction may not move incidents to foreign tags (403 forbidden).
 func TestFehlercodes_Vorfall_TagEinschraenkung(t *testing.T) {
 	h, r, _, _, page, _ := newCodeEnvRouter(t)
 	db := h.DB

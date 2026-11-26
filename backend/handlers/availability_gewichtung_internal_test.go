@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Zuordnung impact -> Status (Vorschlag).
+// Mapping impact -> status (suggestion).
 func TestExternalImpactStatus(t *testing.T) {
 	cases := []struct {
 		impact string

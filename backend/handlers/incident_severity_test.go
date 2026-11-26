@@ -17,8 +17,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Schweregrad je Vorfall. Anlegen/Ändern validieren ihn, die
-// 90-Tage-Verfügbarkeit gewichtet damit (Wartungen zählen weiter nicht).
+// Severity per incident. Creating/changing validate it, the
+// 90-day availability weights by it (maintenances still do not count).
 
 func TestIncidentSeverity_AnlegenUndAendern(t *testing.T) {
 	db := testutils.SetupTestDB()
@@ -111,12 +111,12 @@ func TestAvailability_EigenerVorfallNachSchweregrad(t *testing.T) {
 		{"partial_outage", "partial_outage", 0.6},
 		{"major_outage", "major_outage", 1.0},
 		{"degraded_performance", "degraded_performance", 0.3},
-		{"", "degraded_performance", 0.3}, // Altdaten ohne Wert
+		{"", "degraded_performance", 0.3}, // Legacy data without a value
 		{"unbekannt", "degraded_performance", 0.3},
 	}
 	for _, tc := range cases {
 		require.NoError(t, e.db.Model(&inc).UpdateColumn("severity", tc.severity).Error)
-		e.now = e.now.Add(2 * time.Minute) // Cache (60 s) verfallen lassen
+		e.now = e.now.Add(2 * time.Minute) // let the cache (60 s) expire
 		_, resp := e.get("/api/public/pages/sev/availability")
 		d := day(t, resp.Days, "2026-10-20")
 		assert.InDelta(t, 100-100*tc.weight*12/24, *d.Availability, 1e-9, "severity=%q", tc.severity)

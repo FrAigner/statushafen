@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Google-Chat-Texte folgen der Sprache des Abonnenten (leer =
-// Standardsprache der Seite); der globale Webhook bleibt englisch.
+// The Google Chat texts follow the subscriber's language (empty =
+// site default language); the global webhook stays English.
 
 func captureWebhookServer(t *testing.T) (*httptest.Server, func() string) {
 	t.Helper()
@@ -68,14 +68,14 @@ func TestGoogleChat_TextInSpracheDesAbonnenten(t *testing.T) {
 	assert.Contains(t, got(), "**Status:** investigating")
 	assert.NotContains(t, got(), "Komponente")
 
-	// Leer = Seitenstandardsprache (de): deutsche Beschriftungen und Statuslabel.
+	// Empty = site default language (de): German labels and status labels.
 	h.notifySubscriberGoogleChat(ctx, models.Subscriber{WebhookURL: srv.URL})
 	assert.Contains(t, got(), "**Komponente:** API")
 	assert.Contains(t, got(), "**Vorfall:** Latenz")
 	assert.Contains(t, got(), "**Status:** Untersuchung")
 	assert.NotContains(t, got(), "Component")
 
-	// Unbekannte/abgewählte Sprache: ebenfalls Seitenstandard.
+	// Unknown/deselected language: site default as well.
 	h.notifySubscriberGoogleChat(ctx, models.Subscriber{WebhookURL: srv.URL, Language: "xx"})
 	assert.Contains(t, got(), "**Komponente:** API")
 }
@@ -91,9 +91,9 @@ func TestGoogleChat_GlobalerWebhookBleibtEnglisch(t *testing.T) {
 	assert.Contains(t, got(), "**Component:** API")
 }
 
-// Review, Punkt 3: Die Chat-Sprache ist die effektive Sprache des
-// Abonnenten, nicht die Sprache der zufällig gefundenen Mail-Vorlage. Abonnent
-// wählt de, Seitenstandard ist en, es gibt nur eine englische Vorlage.
+// Review, point 3: The chat language is the subscriber's effective
+// language, not the language of the mail template found by chance. Subscriber
+// chooses de, site default is en, there is only an English template.
 func TestGoogleChat_SpracheDesAbonnentenUnabhaengigVonDerVorlage(t *testing.T) {
 	newWebhookEnv(t)
 	db := testutils.SetupTestDB()
@@ -119,7 +119,7 @@ func TestGoogleChat_SpracheDesAbonnentenUnabhaengigVonDerVorlage(t *testing.T) {
 	h.notifySubscriberGoogleChat(ctx, models.Subscriber{WebhookURL: srv.URL})
 	assert.Contains(t, got(), "**Component:** API", "ohne Wahl: Seitenstandard en")
 
-	// Externe Meldung: gleiche Regel über chatLang.
+	// External report: same rule via chatLang.
 	m := &extIncidentMail{
 		ev:        externalstatus.IncidentEvent{Kind: externalstatus.IncidentCreated, Source: models.ExternalSource{Name: "Q"}, Incident: models.ExternalIncident{Title: "T", Status: "in_progress"}},
 		compNames: "API", message: "msg", chatLang: h.memoSubscriberChatLang(page.ID),

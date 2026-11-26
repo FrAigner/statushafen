@@ -11,7 +11,7 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Übersetzungen von Vorlagen (Sprachumschalter im Vorlagen-Formular).
+// Template translations (language switcher in the template form).
 type tmplTransFixture struct {
 	db        *gorm.DB
 	r         http.Handler
@@ -70,7 +70,7 @@ func TestSaveIncidentTemplateTranslationHandler_CreatesThenUpdatesAndLists(t *te
 func TestIncidentTemplateTranslationHandlers_RejectBadInput(t *testing.T) {
 	f := newTmplTransFixture(t)
 	base := f.base(f.pageID, f.tmpl.ID)
-	for _, code := range []string{"de", "fr"} { // Standardsprache bzw. nicht aktiv
+	for _, code := range []string{"de", "fr"} { // Default language or not active
 		if c := putTmplTrans(f, base+"/"+code, "draft"); c != http.StatusBadRequest {
 			t.Errorf("%s: erwartet 400, war %d", code, c)
 		}
@@ -81,7 +81,7 @@ func TestIncidentTemplateTranslationHandlers_RejectBadInput(t *testing.T) {
 	if c := putTmplTrans(f, f.base(f.pageID, 999)+"/en", "draft"); c != http.StatusNotFound {
 		t.Errorf("unbekannte Vorlage: erwartet 404, war %d", c)
 	}
-	// Mandantentrennung: Vorlage von Seite A über Seite B ist nicht erreichbar.
+	// Tenant isolation: template of page A is not reachable via page B.
 	if c := putTmplTrans(f, f.base(f.otherPage, f.tmpl.ID)+"/en", "draft"); c != http.StatusNotFound {
 		t.Errorf("fremde Seite (PUT): erwartet 404, war %d", c)
 	}
@@ -96,7 +96,7 @@ func TestIncidentTemplateTranslationHandlers_RejectBadInput(t *testing.T) {
 	}
 }
 
-// Das Löschen einer Vorlage nimmt ihre Übersetzungen mit (Soft-Delete löst das FK-Cascade nicht aus).
+// Deleting a template takes its translations with it (soft delete does not trigger the FK cascade).
 func TestDeleteIncidentTemplateHandler_RemovesTranslations(t *testing.T) {
 	f := newTmplTransFixture(t)
 	if c := putTmplTrans(f, f.base(f.pageID, f.tmpl.ID)+"/en", "draft"); c != http.StatusOK {
