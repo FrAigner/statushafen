@@ -126,7 +126,7 @@ describe('AdminLayout', () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
     const { wrapper } = await mountLayout()
     const kids = Array.from(wrapper.find('.topbar-right').element.children).map(el => el.className.split(' ')[0])
-    expect(kids.slice(0, 3)).toEqual(['icon-btn', 'notif', 'language-switcher'])
+    expect(kids.slice(0, 3)).toEqual(['icon-btn', 'notif', 'language-switcher-root'])
     wrapper.unmount()
 
     asPageRole('jwt-2', { email: 'v@x.de', is_global_admin: false, permissions: 'components:read' })

@@ -62,14 +62,14 @@ describe('PublicLayout', () => {
   })
 
   // Regression 2026-10-29: Die Sprachauswahl war 28 statt 44 px hoch.
-  // LanguageSwitcher hat zwei Wurzelelemente, das scoped-Attribut des Layouts
-  // landet nicht am <select>, eine normale scoped-Regel greift dort nie.
-  // happy-dom rechnet kein Layout, deshalb: Klasse am <select> und die
+  // The layout's scoped attribute lands on the LanguageSwitcher root, not on
+  // its trigger button, so a plain scoped rule never matches the button.
+  // happy-dom rechnet kein Layout, deshalb: Klasse am Button und die
   // :deep()-Regel mit der gemeinsamen Höhe im Quelltext.
   it('Sprachauswahl hat die Höhe der übrigen Kopfzeilen-Elemente', async () => {
     const { wrapper } = await mountLayout()
 
-    const select = wrapper.find('header select.language-switcher')
+    const select = wrapper.find('header button.language-switcher')
     expect(select.classes()).toContain('header-control')
     const rule = layoutSource.match(/\.app-header :deep\(\.header-control\.language-switcher\) \{([^}]*)\}/)?.[1] ?? ''
     expect(rule).toMatch(/height: var\(--header-control-size\)/)
@@ -228,6 +228,27 @@ describe('PublicLayout', () => {
       expect(trigger.attributes('aria-expanded')).toBe('false')
       await trigger.trigger('click')
       expect(trigger.attributes('aria-expanded')).toBe('true')
+      wrapper.unmount()
+    })
+
+    // Only one header popup at a time: opening the language list closes the
+    // user menu and vice versa (mouse/touch and keyboard focus).
+    it('Sprachauswahl und Benutzermenü schließen sich gegenseitig', async () => {
+      const { wrapper, trigger } = await openMenu()
+      const lang = wrapper.find('header button.language-switcher')
+      await pointerdown(lang.element)
+      await lang.trigger('click')
+      expect(lang.attributes('aria-expanded')).toBe('true')
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+
+      await pointerdown(trigger.element)
+      await trigger.trigger('click')
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(lang.attributes('aria-expanded')).toBe('false')
+
+      lang.element.focus()
+      await flushPromises()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
       wrapper.unmount()
     })
 

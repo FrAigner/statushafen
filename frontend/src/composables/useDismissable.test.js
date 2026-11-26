@@ -54,6 +54,19 @@ describe('useDismissable', () => {
     expect(current.open.value).toBe(true)
   })
 
+  // Keyboard users: moving focus to another control (e.g. the next header
+  // popup) closes this one, focus moving inside keeps it open.
+  it('dismisses when focus moves outside, not when it moves inside', () => {
+    current = mountHost()
+    current.wrapper.find('.item').element.focus()
+    expect(current.onDismiss).not.toHaveBeenCalled()
+    const other = document.createElement('button')
+    document.body.appendChild(other)
+    other.focus()
+    expect(current.onDismiss).toHaveBeenCalledWith('outside')
+    other.remove()
+  })
+
   it('dismisses on Escape and prevents the default action', () => {
     current = mountHost()
     const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
@@ -93,6 +106,7 @@ describe('useDismissable', () => {
     current.open.value = false
     await nextTick()
     expect(remove).toHaveBeenCalledWith('pointerdown', expect.any(Function), true)
+    expect(remove).toHaveBeenCalledWith('focusin', expect.any(Function), true)
     expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function), false)
     current.open.value = true
     await nextTick()

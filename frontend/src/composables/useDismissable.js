@@ -2,7 +2,8 @@ import { watch, onScopeDispose, toValue } from 'vue'
 
 /*
   Closes a popup (menu, panel, popover) when the user clicks or taps outside
-  it, or presses Escape.
+  it, moves the focus outside it (e.g. Tab or opening another popup by
+  keyboard), or presses Escape.
 
   - open:     ref/getter, listeners are only attached while it is true.
   - inside:   elements that count as "inside" (trigger button and panel):
@@ -23,7 +24,8 @@ export function useDismissable(open, inside, onDismiss, { escape = true } = {}) 
     .map(value => value?.$el ?? value)
     .filter(Boolean)
 
-  const onPointerdown = (event) => {
+  // Used for pointerdown and focusin: both carry the new target.
+  const onOutside = (event) => {
     if (!elements().some(el => el.contains(event.target))) onDismiss('outside')
   }
 
@@ -37,14 +39,16 @@ export function useDismissable(open, inside, onDismiss, { escape = true } = {}) 
   const detach = () => {
     if (!attached) return
     attached = false
-    document.removeEventListener('pointerdown', onPointerdown, true)
+    document.removeEventListener('pointerdown', onOutside, true)
+    document.removeEventListener('focusin', onOutside, true)
     if (escape) document.removeEventListener('keydown', onKeydown, false)
   }
   // The watcher below only fires on a change of the boolean, so attach never
   // runs twice in a row.
   const attach = () => {
     attached = true
-    document.addEventListener('pointerdown', onPointerdown, true)
+    document.addEventListener('pointerdown', onOutside, true)
+    document.addEventListener('focusin', onOutside, true)
     if (escape) document.addEventListener('keydown', onKeydown, false)
   }
 
