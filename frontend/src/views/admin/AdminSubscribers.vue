@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { OnyxButton, OnyxSelect } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -25,34 +25,37 @@ import { fromAdminPageLanguages, hasLanguageChoice, subscriberLanguageOptions, s
 import { confirmDialog } from '../../composables/useConfirm'
 import { canSendTestMessage, testMessagePayload } from '../../utils/testMessageTarget'
 import { vHelp } from '../../directives/vHelp'
+import type { Subscriber } from '../../types/api'
+import type { ComponentTreeNode, FlatComponent } from '../../utils/componentTree'
+import type { TestMessageForm } from '../../utils/testMessageTarget'
 
 const { apiFetch } = useApi()
-// Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
-// Eintrag schreibgeschützt (formReadOnly), ohne Löschen entfällt der Eintrag im Zeilenmenü.
+// Permissions of this tab per action. Without update an existing entry opens
+// read-only (formReadOnly); without delete the row menu entry is gone.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('subscribers')
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const { activeTenantId } = useTenant()
 const { t, locale } = useI18n()
 
-const items         = ref([])
+const items         = ref<Subscriber[]>([])
 const loading       = ref(false)
 const loadFailed    = ref(false)
-const components    = ref([])
-// Sprachen der Seite für die Mailsprache des Abonnenten.
-const pageLanguages = ref([])
+const components    = ref<FlatComponent[]>([])
+// Languages of the page for the subscriber's mail language.
+const pageLanguages = ref<ReturnType<typeof fromAdminPageLanguages>>([])
 const isEditing     = ref(false)
-const currentEditId = ref(null)
-const formData      = ref({})
+const currentEditId = ref<number | null>(null)
+const formData      = ref<Partial<Subscriber>>({})
 const alertMsg      = ref('')
 const alertType     = ref('warning')
 const isSaving      = ref(false)
-const deletingId    = ref(null)
-const testingUrl    = ref(null)
+const deletingId    = ref<number | null>(null)
+const testingUrl    = ref<string | null | undefined>(null)
 // Test message from the open form: result is shown inline at the form.
 const sendingTestMessage = ref(false)
-const testMessageResult  = ref(null) // { type: 'success' | 'error', text }
+const testMessageResult  = ref<{ type: 'success' | 'error', text: string } | null>(null)
 const query         = ref('')
-const editName      = ref('')
+const editName      = ref<string | undefined>('')
 const fieldError    = ref('')
 const { formEl, focusForm, focusInvalid } = useFormPanel()
 
@@ -66,11 +69,10 @@ const channelOptions = computed(() => [
   { label: t('subscribers.channelGoogleChat'), value: 'google_chat' },
 ])
 
-// SubscribedComponentIDs bleibt für die API ein kommasepariertes
-// String-Feld (leer = alle), aber im Formular wird es per Multi-Select nach
-// Komponentenname statt Freitext-IDs bearbeitet - derselbe Umwandlungs-
-// Ansatz wie ComponentIDs bei AdminIncidents.vue, nur mit String statt Array
-// als Wire-Format.
+// SubscribedComponentIDs stays a comma-separated string field for the API
+// (empty = all), but the form edits it via a multi-select by component name
+// instead of free-text IDs - the same conversion approach as ComponentIDs in
+// AdminIncidents.vue, only with a string instead of an array as wire format.
 const selectedComponentIds = computed({
   get: () => idsFromCsv(formData.value.SubscribedComponentIDs),
   set: (ids) => { formData.value.SubscribedComponentIDs = csvFromIds(ids) },
@@ -82,17 +84,17 @@ const loadData = async () => {
   loadFailed.value = false
   try {
     const [subs, comps, langs] = await Promise.all([
-      apiFetch(`/api/pages/${activeTenantId.value}/subscribers`),
-      apiFetch(`/api/pages/${activeTenantId.value}/components`),
-      // ohne Recht auf die Sprachliste oder bei Fehler entfällt nur die Sprachwahl.
+      apiFetch<Subscriber[]>(`/api/pages/${activeTenantId.value}/subscribers`),
+      apiFetch<ComponentTreeNode[]>(`/api/pages/${activeTenantId.value}/components`),
+      // without permission for the language list, or on error, only the language choice is dropped.
       apiFetch(`/api/pages/${activeTenantId.value}/languages`).catch(() => []),
     ])
     items.value = subs
-    components.value = flattenComponentTree(comps) // inkl. Unterkomponenten
+    components.value = flattenComponentTree(comps) // including subcomponents
     pageLanguages.value = fromAdminPageLanguages(langs)
   } catch (err) {
     loadFailed.value = true
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   } finally {
     loading.value = false
   }
@@ -105,9 +107,9 @@ watch(activeTenantId, (newId) => {
 }, { immediate: true })
 
 /* ── CRUD helpers ── */
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value  = msg
   alertType.value = type
 }
@@ -121,7 +123,7 @@ const openNew = () => {
   focusForm()
 }
 
-const openEdit = (item) => {
+const openEdit = (item: Subscriber) => {
   formData.value  = { ...item }
   if (showLanguageChoice.value) formData.value.Language = selectableSubscriberLanguage(item.Language ?? '', pageLanguages.value)
   currentEditId.value = item.ID
@@ -139,7 +141,7 @@ const cancelEdit = () => {
 }
 
 const saveItem = async () => {
-  // Pflichtfeld Kontakt (E-Mail bzw. Webhook-URL): Fehler am Feld statt eines Serverfehlers.
+  // Required contact field (email or webhook URL): error at the field instead of a server error.
   const isEmail = formData.value.Channel === 'email'
   if (!((isEmail ? formData.value.Email : formData.value.WebhookURL) || '').trim()) {
     fieldError.value = t(isEmail ? 'subscribers.emailRequired' : 'subscribers.webhookRequired')
@@ -158,13 +160,13 @@ const saveItem = async () => {
     cancelEdit()
     await loadData()
   } catch (err) {
-    showAlert(t('common.saveError') + err.message, 'error')
+    showAlert(t('common.saveError') + (err as Error).message, 'error')
   } finally {
     isSaving.value = false
   }
 }
 
-const deleteItem = async (id, name) => {
+const deleteItem = async (id: number, name: string) => {
   if (!(await confirmDialog({ message: t('subscribers.confirmDelete', { name }) }))) return
   clearAlert()
   deletingId.value = id
@@ -173,13 +175,13 @@ const deleteItem = async (id, name) => {
     showAlert(t('adminFeedback.subscriberDeleted'), 'success')
     await loadData()
   } catch (err) {
-    showAlert(t('common.deleteError') + err.message, 'error')
+    showAlert(t('common.deleteError') + (err as Error).message, 'error')
   } finally {
     deletingId.value = null
   }
 }
 
-const testWebhook = async (url) => {
+const testWebhook = async (url: string | undefined) => {
   clearAlert()
   testingUrl.value = url
   try {
@@ -189,13 +191,13 @@ const testWebhook = async (url) => {
     })
     showAlert(t('subscribers.testSuccess'), 'success')
   } catch (err) {
-    showAlert(t('subscribers.testError') + err.message, 'error')
+    showAlert(t('subscribers.testError') + (err as Error).message, 'error')
   } finally {
     testingUrl.value = null
   }
 }
 
-const testMessageReady = computed(() => canSendTestMessage(formData.value))
+const testMessageReady = computed(() => canSendTestMessage(formData.value as TestMessageForm))
 
 // A new target makes the last result meaningless.
 watch(() => [formData.value.Channel, formData.value.Email, formData.value.WebhookURL], () => {
@@ -210,11 +212,11 @@ const sendTestMessage = async () => {
   try {
     await apiFetch(`/api/pages/${activeTenantId.value}/subscribers/test`, {
       method: 'POST',
-      body: JSON.stringify(testMessagePayload(formData.value, locale.value)),
+      body: JSON.stringify(testMessagePayload(formData.value as TestMessageForm, locale.value)),
     })
     testMessageResult.value = { type: 'success', text: t('subscribers.testMessageSent') }
   } catch (err) {
-    testMessageResult.value = { type: 'error', text: t('subscribers.testMessageFailed') + err.message }
+    testMessageResult.value = { type: 'error', text: t('subscribers.testMessageFailed') + (err as Error).message }
   } finally {
     sendingTestMessage.value = false
   }
@@ -224,7 +226,7 @@ const formTitle = computed(() => currentEditId.value
   ? t('subscribers.editTitle', { name: editName.value })
   : t('subscribers.createTitle'))
 
-// Richtung C: Seitenkopf mit Zählung, Suche, Zeilenmenü.
+// Direction C: page header with a count, search, row menu.
 const breadcrumbs = usePageCrumbs(() => t('subscribers.title'))
 const subtitle = computed(() => {
   const pending = items.value.filter(s => s.Status === 'pending').length
@@ -238,19 +240,19 @@ const rows = computed(() => {
   const needle = query.value.trim().toLowerCase()
   return items.value.filter(s => `${s.Email || ''} ${s.WebhookURL || ''} ${s.CreatedBy?.Email || ''}`.toLowerCase().includes(needle))
 })
-const menuItems = (s) => [
+const menuItems = (s: Subscriber) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === s.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === s.ID }] : []),
 ]
-const onMenuSelect = (s, key) => {
+const onMenuSelect = (s: Subscriber, key: string) => {
   if (key === 'edit') openEdit(s)
   else deleteItem(s.ID, s.Email || t('subscribers.channelGoogleChat'))
 }
 
-const channelLabel = (ch) => channelOptions.value.find(o => o.value === ch)?.label ?? ch
+const channelLabel = (ch: string) => channelOptions.value.find(o => o.value === ch)?.label ?? ch
 
-// auch in der Tabelle Komponentennamen statt roher IDs anzeigen.
-const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.value, t('subscribers.allComponents'))
+// show component names instead of raw IDs in the table as well.
+const componentLabels = (idsCsv: string) => componentLabelsFromCsv(idsCsv, components.value, t('subscribers.allComponents'))
 </script>
 
 <template>
@@ -273,7 +275,7 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Tabellenkarte links, Formular als Seitenkarte rechts. -->
+    <!-- Direction C: table card on the left, form as a side card on the right. -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('subscribers.cardTitle')">
         <template #tools>
@@ -298,12 +300,12 @@ const componentLabels = (idsCsv) => componentLabelsFromCsv(idsCsv, components.va
               <td :data-label="t('subscribers.tableContact')">
                 <template v-if="s.Channel === 'email'">
                   <strong>{{ s.Email }}</strong>
-                  <!-- unbestätigtes Abo (Double-Opt-in) -->
+                  <!-- unconfirmed subscription (double opt-in) -->
                   <StatusBadge v-if="s.Status === 'pending'" status="degraded" :label="t('subscribeConfirm.adminPendingBadge')" class="inline-badge badge-pending" :title="t('subscribeConfirm.adminPendingTitle')" />
                 </template>
                 <div v-else class="cell-contact">
                   <span class="cell-truncate" :title="s.WebhookURL">{{ s.WebhookURL }}</span>
-                  <!-- Der Test steht auch Lesenden offen, daher nicht im Zeilenmenü (nur mit subscribers:update). -->
+                  <!-- The test is open to readers too, hence not in the row menu (only with subscribers:update). -->
                   <button v-help="'subscribers.testWebhook'" class="action-btn" @click="testWebhook(s.WebhookURL)" :disabled="testingUrl === s.WebhookURL">
                     {{ testingUrl === s.WebhookURL ? t('subscribers.testSending') : t('subscribers.testSend') }}
                   </button>

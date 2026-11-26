@@ -1,19 +1,19 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Incident-Detail: Verlauf (Timeline) + Post-Mortem.
+  Incident detail: history (timeline) + post-mortem.
   Route:   { path: 'incidents/:pageId/:id', component: AdminIncidentDetail }
   Backend: GET /api/pages/:page_id/incidents/:id   (handlers/incident_detail.go)
 
-  Erwartet die Route-Parameter pageId und id. Verlinkbar aus AdminIncidents.vue:
+  Expects the route parameters pageId and id. Linkable from AdminIncidents.vue:
       <router-link :to="`/admin/incidents/${activeTenantId}/${i.ID}`">…</router-link>
 
-  Redesign Stufe 4b: PageHeader mit Brotkrumen (Seitentitel = h2
-  wie in allen Admin-Views, die h1 trägt die Topbar), Verlauf als Zeitleiste
-  (<ol>) mit StatusBadge, FormField für die Formulare, keine Inline-Styles.
+  Redesign stage 4b: PageHeader with breadcrumbs (page title = h2 as in
+  all admin views, the top bar carries the h1), history as a timeline
+  (<ol>) with StatusBadge, FormField for the forms, no inline styles.
 
-  Richtung C: Brotkrumen „Seitenname › Vorfälle › #ID“ und ein
-  Untertitel mit der relativen Meldezeit wie auf den Listenseiten; der Inhalt
-  nutzt die Breite links bündig statt zentriert.
+  Direction C: breadcrumbs "Page name › Incidents › #ID" and a subtitle
+  with the relative report time as on the list pages; the content uses the
+  width left-aligned instead of centred.
 */
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -35,13 +35,20 @@ import FormLanguageSwitch from '../../components/FormLanguageSwitch.vue'
 import FormLanguageDone from '../../components/FormLanguageDone.vue'
 // Help tooltips (what / effect / example) on every field and button via v-help.
 import { vHelp } from '../../directives/vHelp'
+import type { IncidentDetail, IncidentUpdateView } from '../../types/api'
+import type { PostMortem, PostMortemForm, PostMortemTextField } from '../../types/admin'
+
+/** The incident detail with its post-mortem typed. */
+interface AdminIncidentDetail extends Omit<IncidentDetail, 'post_mortem'> {
+  post_mortem?: PostMortem | null
+}
 
 const route = useRoute()
 const { apiFetch } = useApi()
 const { hasPerm } = useAuth()
 const { t, locale } = useI18n()
 
-const incident = ref(null)
+const incident = ref<AdminIncidentDetail | null>(null)
 const loading  = ref(true)
 const errorMsg = ref('')
 
@@ -49,8 +56,8 @@ const statusOptions = computed(() => ['investigating', 'identified', 'monitoring
   .map(value => ({ label: incidentBadge(value, t).label, value })))
 const actionStateOptions = computed(() => ['open', 'in_progress', 'done']
   .map(value => ({ label: actionBadge(value, t).label, value })))
-const fmtDate = (d) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }) : '—'
-const fmtDay  = (d) => d ? new Date(d).toLocaleDateString(toIntlLocale(locale.value), { dateStyle: 'long' }) : '—'
+const fmtDate = (d: string | null | undefined) => d ? new Date(d).toLocaleString(toIntlLocale(locale.value), { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+const fmtDay  = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString(toIntlLocale(locale.value), { dateStyle: 'long' }) : '—'
 
 const title = computed(() => incident.value?.Title ?? t('incidentDetail.pageTitle'))
 const breadcrumbs = usePageCrumbs(() => `#${incident.value?.ID ?? route.params.id}`, {
@@ -60,23 +67,23 @@ const subtitle = computed(() => incident.value?.CreatedAt
   ? t('incidentDetail.subtitle', { when: formatRelative(incident.value.CreatedAt, locale.value) })
   : null)
 
-// keepView: nach dem Speichern im Formular die Seite nicht durch den Ladezustand austauschen,
-// sonst springt sie nach oben und die Rückmeldung läge außerhalb des Bildes.
+// keepView: after saving in the form, do not swap the page for the loading state,
+// otherwise it jumps to the top and the feedback would be out of view.
 const load = async ({ keepView = false } = {}) => {
   if (!keepView) loading.value = true
   try {
     const { pageId, id } = route.params
     incident.value = await apiFetch(`/api/pages/${pageId}/incidents/${id}`)
     resetUpdateForm()
-    await trans.load(pageId)
+    await trans.load(pageId as string)
     resetPmForm()
   } catch (err) {
-    errorMsg.value = t('incidentDetail.loadError') + err.message
+    errorMsg.value = t('incidentDetail.loadError') + (err as Error).message
   } finally {
     loading.value = false
   }
-  // Link „Update posten“ aus der Liste (#update): Formular ins Bild, Status fokussiert.
-  // Erst nach dem Laden, vorher ist das Formular noch nicht gerendert.
+  // "Post update" link from the list (#update): form into view, status focused.
+  // Only after loading; before that the form is not rendered yet.
   if (route.hash === '#update' && incident.value) {
     await nextTick()
     const form = document.getElementById('update-form')
@@ -88,11 +95,11 @@ onMounted(load)
 
 const pm = computed(() => incident.value?.post_mortem || null)
 const updates = computed(() => {
-  // Neueste zuerst für die Timeline-Ansicht.
+  // Newest first for the timeline view.
   return [...(incident.value?.updates || [])].reverse()
 })
 
-/* ── Update hinzufügen ── */
+/* ── Add an update ── */
 const updateForm = ref({ status: '', message: '' })
 const updateSaving = ref(false)
 const updateAlert = ref('')
@@ -102,15 +109,15 @@ const resetUpdateForm = () => {
   trans.reset()
 }
 
-/* ── Übersetzungen der Updates ──
-   Ein Update hat nur eine Nachricht (kein Titel). Sprachumschalter im Formular
-   „Update posten“ und, für schon geposteter Einträge, im Editor „Übersetzungen“
-   je Zeitleisten-Eintrag. Recht wie das Ändern des Vorfalls (Wartung: maintenance). */
+/* ── Translations of the updates ──
+   An update only has a message (no title). Language switcher in the "Post update"
+   form and, for entries already posted, in the "Translations" editor per timeline
+   entry. Permission as for updating the incident (maintenance: maintenance). */
 const canTranslate = computed(() => hasPerm(`${incident.value?.IsMaintenance ? 'maintenance' : 'incidents'}:update`))
 const updatesBase = () => `/api/pages/${route.params.pageId}/incidents/${route.params.id}/updates`
 const transUrls = {
-  list: (updateId) => `${updatesBase()}/${updateId}/translations`,
-  save: (updateId, code) => `${updatesBase()}/${updateId}/translations/${code}`,
+  list: (updateId: number) => `${updatesBase()}/${updateId}/translations`,
+  save: (updateId: number, code: string) => `${updatesBase()}/${updateId}/translations/${code}`,
 }
 const transOptions = { apiFetch, urls: transUrls, contentKey: 'message', titleRequired: false, canEdit: canTranslate }
 const trans = useFormTranslations({ ...transOptions, formData: updateForm })
@@ -119,15 +126,15 @@ const { contentModel: updateMessage } = trans
 const editForm = ref({ message: '' })
 const editTrans = useFormTranslations({ ...transOptions, formData: editForm })
 const { contentModel: editMessage, onDefaultLang: editOnDefaultLang } = editTrans
-const editUpdateId = ref(null)
+const editUpdateId = ref<number | null>(null)
 const editSaving = ref(false)
 const editAlert = ref('')
 
-const openTranslations = async (u) => {
+const openTranslations = async (u: IncidentUpdateView) => {
   editUpdateId.value = u.id
   editAlert.value = ''
   editForm.value = { message: u.message }
-  await editTrans.load(route.params.pageId)
+  await editTrans.load(route.params.pageId as string)
   await editTrans.loadFor(u.id)
 }
 const closeTranslations = () => { editUpdateId.value = null; editTrans.reset() }
@@ -135,10 +142,10 @@ const saveTranslations = async () => {
   editSaving.value = true
   editAlert.value = ''
   try {
-    await editTrans.saveAll(editUpdateId.value)
+    await editTrans.saveAll(editUpdateId.value!)
     closeTranslations()
   } catch (err) {
-    editAlert.value = t('incidentDetail.translationsSaveError') + err.message
+    editAlert.value = t('incidentDetail.translationsSaveError') + (err as Error).message
   } finally {
     editSaving.value = false
   }
@@ -149,27 +156,27 @@ const submitUpdate = async () => {
   updateSaving.value = true
   updateAlert.value = ''
   try {
-    const created = await apiFetch(`/api/pages/${pageId}/incidents/${id}/updates`, {
+    const created: { id: number } = await apiFetch(`/api/pages/${pageId}/incidents/${id}/updates`, {
       method: 'POST',
       body: JSON.stringify({ status: updateForm.value.status, message: updateForm.value.message })
     })
-    // Das Update steht ab hier; scheitert nur eine Übersetzung, bleibt es bestehen und
-    // der Hinweis nennt den Weg, sie nachzuholen.
+    // From here on the update exists; if only a translation fails, it stays and
+    // the notice names the way to add it later.
     let translationError = ''
     if (trans.showSwitcher.value) {
-      try { await trans.saveAll(created.id) } catch (err) { translationError = err.message }
+      try { await trans.saveAll(created.id) } catch (err) { translationError = (err as Error).message }
     }
     await load()
     if (translationError) updateAlert.value = t('incidentDetail.updateTranslationError') + translationError
   } catch (err) {
-    updateAlert.value = t('incidentDetail.updateError') + err.message
+    updateAlert.value = t('incidentDetail.updateError') + (err as Error).message
   } finally {
     updateSaving.value = false
   }
 }
 
-/* ── Post-Mortem bearbeiten ── */
-const pmForm = ref({ summary: '', root_cause: '', impact: '', resolution: '', detection: '', actions: [] })
+/* ── Edit the post-mortem ── */
+const pmForm = ref<PostMortemForm>({ summary: '', root_cause: '', impact: '', resolution: '', detection: '', actions: [] })
 const pmSaving = ref(false)
 const pmAlert = ref('')
 const pmNotice = ref('')
@@ -189,11 +196,11 @@ const resetPmForm = () => {
 const addActionRow = () => {
   pmForm.value.actions.push({ text: '', owner: '', state: 'open' })
 }
-const removeActionRow = (idx) => {
+const removeActionRow = (idx: number) => {
   pmForm.value.actions.splice(idx, 1)
 }
 
-const submitPostMortem = async (publish) => {
+const submitPostMortem = async (publish: boolean) => {
   const { pageId, id } = route.params
   pmSaving.value = true
   pmAlert.value = ''
@@ -206,14 +213,14 @@ const submitPostMortem = async (publish) => {
     await load({ keepView: true })
     pmNotice.value = t(publish ? 'adminFeedback.postMortemPublished' : 'adminFeedback.postMortemDraftSaved')
   } catch (err) {
-    pmAlert.value = t('common.saveError') + err.message
+    pmAlert.value = t('common.saveError') + (err as Error).message
   } finally {
     pmSaving.value = false
   }
 }
 
-// Felder des Post-Mortem-Formulars: Schlüssel, Beschriftung, Platzhalter.
-const pmFields = computed(() => [
+// Fields of the post-mortem form: key, label, placeholder.
+const pmFields = computed((): { key: PostMortemTextField, label: string, placeholder: string, help: string }[] => [
   { key: 'root_cause', label: t('incidentDetail.rootCause'), placeholder: t('incidentDetail.rootCausePlaceholder'), help: 'incidentDetail.rootCause' },
   { key: 'impact', label: t('incidentDetail.impact'), placeholder: t('incidentDetail.impactPlaceholder'), help: 'incidentDetail.impact' },
   { key: 'resolution', label: t('incidentDetail.resolution'), placeholder: t('incidentDetail.resolutionPlaceholder'), help: 'incidentDetail.resolution' },
@@ -229,7 +236,7 @@ const pmFields = computed(() => [
     <p v-else-if="loading" class="loading" role="status" aria-busy="true">{{ t('common.loading') }}</p>
 
     <template v-else-if="incident">
-      <!-- Kopf -->
+      <!-- Header -->
       <section class="ent-card head" :aria-label="title">
         <StatusBadge size="md" v-bind="incidentBadge(incident.Status, t)" />
         <dl class="head-meta">
@@ -239,7 +246,7 @@ const pmFields = computed(() => [
         </dl>
       </section>
 
-      <!-- Verlauf -->
+      <!-- History -->
       <section class="ent-card body">
         <h3 class="section-title">{{ t('incidentDetail.historyHeading') }}</h3>
         <p v-if="updates.length === 0" class="loading">{{ t('incidentDetail.noUpdates') }}</p>
@@ -318,7 +325,7 @@ const pmFields = computed(() => [
         </template>
       </section>
 
-      <!-- Post-Mortem bearbeiten -->
+      <!-- Edit the post-mortem -->
       <section v-if="hasPerm('incidents:update')" class="ent-card body">
         <h3 class="section-title">{{ t('incidentDetail.editPostMortemHeading') }}</h3>
         <div v-if="pmAlert" class="alert alert-error">{{ pmAlert }}</div>
@@ -371,7 +378,7 @@ const pmFields = computed(() => [
 .body { padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-4); }
 .section-title { margin: 0 0 var(--sp-4); font-size: var(--fs-md); font-weight: 600; }
 
-/* Zeitleiste: Linie links, Punkt je Eintrag */
+/* Timeline: line on the left, dot per entry */
 .timeline { list-style: none; margin: 0; padding: 0; }
 .tl-row { position: relative; padding: 0 0 var(--sp-5) var(--sp-5); border-inline-start: 2px solid var(--border); margin-inline-start: 6px; }
 .tl-row::before { content: ''; position: absolute; inset-inline-start: -7px; top: 6px; inline-size: 12px; block-size: 12px; border-radius: 50%; background: var(--border-strong); border: 2px solid var(--surface); }
@@ -403,9 +410,9 @@ const pmFields = computed(() => [
 .flex-1 { flex: 1; }
 .w-owner { width: 180px; }
 .w-state { width: 150px; }
-/* Eingaben und Auswahl der Folgemaßnahmen wie die übrigen kompakten Steuerelemente:
-   kleinere Schrift (16 px war zu groß für die Zeile), feste Höhe. Den Pfeil bringt
-   die gemeinsame .form-select-Regel in style.css mit. */
+/* Inputs and selects of the follow-up actions like the other compact controls:
+   smaller font (16 px was too big for the row), fixed height. The arrow comes
+   from the shared .form-select rule in style.css. */
 .action-row.edit .form-input,
 .action-row.edit .form-select {
   font-size: var(--fs-sm);

@@ -40,9 +40,9 @@ function makeRouter() {
 
 let activeWrapper = null
 
-// Die Ansicht lädt Sprachkatalog und Seitensprachen (Sprachumschalter der Updates).
-// Der Wrapper beantwortet beide Abrufe und reicht alles andere an die Test-Attrappe durch,
-// deren Aufrufzahlen so unverändert bleiben. Standard: nur die Standardsprache (kein Umschalter).
+// The view loads the language catalog and the page languages (language switcher of the updates).
+// The wrapper answers both requests and passes everything else on to the test double,
+// so its call counts stay unchanged. Default: only the default language (no switcher).
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }, { Code: 'fr', Name: 'Français' }]
 const onlyDefault = [{ LanguageCode: 'de', IsDefault: true }]
 function withLanguages(base, languages = onlyDefault) {
@@ -73,9 +73,9 @@ describe('AdminIncidentDetail', () => {
     useAuth().logout()
     localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -241,7 +241,7 @@ describe('AdminIncidentDetail', () => {
     expect(published.wrapper.find('.pm-state').classes()).toContain('st-badge--operational')
   })
 
-  // Update-Nachricht ist der Editor; das Post-Mortem bleibt Klartext.
+  // The update message is the editor; the post-mortem stays plain text.
   it('Update-Nachricht ist der RichTextEditor, die Post-Mortem-Felder nicht', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'incidents:write' })
     const { wrapper } = await mountDetail({ fetchImpl: vi.fn().mockResolvedValue(jsonResponse(incidentFixture())) })
@@ -309,7 +309,7 @@ describe('AdminIncidentDetail', () => {
 
   it('sendet neue Maßnahmenzeilen mit und entfernt sie wieder', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'incidents:write' })
-    // Antwort bleibt unverändert, daher setzt jedes Neuladen die Zeilen zurück; Zeilen vor dem Speichern prüfen.
+    // The response stays unchanged, so every reload resets the rows; check the rows before saving.
     const { wrapper } = await mountDetail()
     await wrapper.find('.action-add').trigger('click')
     await wrapper.find('.action-add').trigger('click')
@@ -361,11 +361,11 @@ describe('AdminIncidentDetail', () => {
   })
 })
 
-// Folgemaßnahmen im Post-Mortem-Formular: Eingaben und Auswahl wie die übrigen Felder
-// (Schriftgröße, Höhe, eigener Pfeil), Platz für den Platzhalter „Verantwortlich“.
+// Follow-up actions in the post-mortem form: inputs and selects like the other fields
+// (font size, height, own arrow), room for the "Owner" placeholder.
 describe('AdminIncidentDetail: Zeile der Folgemaßnahmen (Layout)', () => {
   const sfc = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'AdminIncidentDetail.vue'), 'utf8')
-  // Alle Blöcke, deren Selektorliste auf `selector` endet, zusammengefasst.
+  // All blocks whose selector list ends with `selector`, combined.
   const rule = (selector) => [...sfc.matchAll(/([^{}]+)\{([^}]*)\}/g)]
     .filter(m => m[1].trim().endsWith(selector))
     .map(m => m[2]).join(';')
@@ -388,8 +388,8 @@ describe('AdminIncidentDetail: Zeile der Folgemaßnahmen (Layout)', () => {
   it('lässt dem Feld „Verantwortlich“ genug Breite für den Platzhalter', () => {
     expect(Number(rule('.w-owner').match(/width:\s*(\d+)px/)?.[1])).toBeGreaterThanOrEqual(180)
   })
-  // „Als Entwurf speichern“ lieferte PUT 200 ohne Meldung, und die Seite sprang nach oben,
-  // weil load() den Inhalt durch den Ladezustand ersetzte.
+  // "Save as draft" returned PUT 200 without a message, and the page jumped to the top,
+  // because load() replaced the content with the loading state.
   it('meldet das Speichern des Post-Mortems und tauscht die Seite dabei nicht aus', async () => {
     setAuthAsPageRole('jwt-1', { permissions: 'incidents:write' })
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(incidentFixture()))

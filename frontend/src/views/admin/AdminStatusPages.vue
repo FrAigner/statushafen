@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick, inject } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { OnyxButton, OnyxModal } from 'sit-onyx'
@@ -22,34 +22,45 @@ import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { formatRelative } from '../../utils/relativeTime'
 import { serverInputErrorText } from '../../utils/inputRules'
 import { primaryBaseDomain } from '../../utils/appDomains'
-// "Global Admin" ist keine Seitenrolle (GlobalOnly aus /api/roles).
+// "Global Admin" is not a page role (GlobalOnly from /api/roles).
 import { pageRoleOptions, userAdminErrorText } from '../../utils/userAdmin'
 import { confirmDialog } from '../../composables/useConfirm'
+import type { ApiError, Role, StatusPage as StatusPageModel, User, UserStatusPageRole } from '../../types/api'
+import type { CustomDomainResponse, PageInvitation } from '../../types/admin'
+
+/** Edit form of a status page; DefaultRoleID is the select's value. */
+interface StatusPageForm extends Omit<Partial<StatusPageModel>, 'DefaultRoleID'> {
+  DefaultRoleID?: number | string | null
+}
+
+/** A user's assignment to the page as GET /api/admin/pages/:id/users returns it. */
+interface PageUserAssignment extends UserStatusPageRole {
+  User?: User
+}
 
 const { apiFetch } = useApi()
 const { isGlobalAdmin } = useAuth()
 const { t, locale } = useI18n()
 
-const pages = ref([])
-const users = ref([])
-const roles = ref([])
+const pages = ref<StatusPageModel[]>([])
+const users = ref<User[]>([])
+const roles = ref<Role[]>([])
 const isEditing = ref(false)
-const showUsers = ref(null) // StatusPage ID für User-Management
-const currentEditItem = ref(null)
-const formData = ref({})
+const showUsers = ref<StatusPageModel | null>(null) // status page whose users are managed
+const currentEditItem = ref<'new' | number | null>(null)
+const formData = ref<StatusPageForm>({})
 
-// wählbare Seiten-Layouts (Werte wie models.StatusPage.PageLayout).
+// selectable page layouts (values as models.StatusPage.PageLayout).
 const pageLayoutOptions = [
   { value: 'standard', label: 'statusPages.pageLayoutStandard', desc: 'statusPages.pageLayoutStandardDesc' },
   { value: 'liste', label: 'statusPages.pageLayoutListe', desc: 'statusPages.pageLayoutListeDesc' },
 ]
 
-// Slug-Auto-Generierung aus dem Namen: so lange der Nutzer den
-// Slug bei einer neuen Statusseite noch nicht selbst angefasst hat, wird er
-// live aus dem Namen abgeleitet - identische Logik zu slugify() im Backend
-// (backend/handlers/statuspage.go), nur als Vorschau; die endgültige,
-// kollisionssichere Generierung passiert serverseitig, falls das Feld beim
-// Speichern trotzdem leer bleibt.
+// Slug auto-generation from the name: as long as the user has not touched
+// the slug of a new status page, it is derived live from the name - the same
+// logic as slugify() in the backend (backend/handlers/statuspage.go), only as
+// a preview; the final, collision-safe generation happens on the server if
+// the field is still empty on save.
 const slugTouched = ref(false)
 
 // Design preview: the real public page in a modal, rendered with the unsaved
@@ -65,11 +76,11 @@ const designPreview = computed(() => ({
   HeaderStyle: formData.value.HeaderStyle || 'classic',
   PageLayout: formData.value.PageLayout || 'standard',
 }))
-function slugify(name) {
-  const umlauts = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }
+function slugify(name: string | undefined) {
+  const umlauts: Record<string, string> = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'ß': 'ss' }
   return (name || '')
     .toLowerCase()
-    .replace(/[äöüß]/g, ch => umlauts[ch])
+    .replace(/[äöüß]/g, ch => umlauts[ch]!)
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .join('-')
@@ -80,60 +91,60 @@ watch(() => formData.value.Name, (name) => {
   }
 })
 
-const userAssignData = ref({ user_id: '', role_id: '' })
-const pageUsers = ref([])
-// offene Einladungen der Seite (per E-Mail eingeladen, noch nicht angenommen).
-const pageInvitations = ref([])
-const revokingInvitationId = ref(null)
+// Selected user and role ('' = none yet); the selects bind the numeric IDs.
+const userAssignData = ref<{ user_id: number | string, role_id: number | string }>({ user_id: '', role_id: '' })
+const pageUsers = ref<PageUserAssignment[]>([])
+// open invitations of the page (invited by email, not yet accepted).
+const pageInvitations = ref<PageInvitation[]>([])
+const revokingInvitationId = ref<number | null>(null)
 const alertMsg = ref('')
-// Erfolgsmeldungen tragen die Art „success“ (blenden sich selbst aus), alles andere bleibt Warnung;
-// clearAlert entfernt die Meldung des vorigen Schritts.
+// Success messages carry the type "success" (they dismiss themselves), everything else stays a warning;
+// clearAlert removes the message of the previous step.
 const successMsg = ref('')
 const alertType = computed(() => (alertMsg.value && alertMsg.value === successMsg.value ? 'success' : 'warning'))
 const clearAlert = () => { alertMsg.value = '' }
-const showSuccess = (msg) => {
+const showSuccess = (msg: string) => {
   successMsg.value = msg
   alertMsg.value = msg
 }
 const isSaving = ref(false)
-const deletingId = ref(null)
+const deletingId = ref<number | null>(null)
 const isAssigning = ref(false)
-const removingUserId = ref(null)
+const removingUserId = ref<number | null | undefined>(null)
 
-// Monitoring-Webhook-Token: der Klartext-Token wird vom Backend
-// nur direkt nach dem Generieren zurückgegeben - hier nur transient im
-// State gehalten, nie in formData/pages gespeichert oder erneut nachgeladen.
+// Monitoring webhook token: the backend returns the plain-text token only
+// right after generating it - here it is held only transiently in state,
+// never stored in formData/pages or reloaded.
 const webhookToken = ref('')
 const isGeneratingToken = ref(false)
 const isRevokingToken = ref(false)
 const tokenCopied = ref(false)
 
-// Custom Domain: läuft über eigene Endpunkte statt über das
-// generische Speichern-Formular, damit ein Domain-Wechsel immer zuverlässig
-// den Verifikationsstatus zurücksetzt (siehe Backend-Kommentar in
-// statuspage.go). customDomain* hält den zuletzt vom Backend bestätigten
-// Stand, customDomainInput das noch nicht gespeicherte Eingabefeld.
+// Custom domain: runs via its own endpoints instead of the generic save form,
+// so that a domain change always reliably resets the verification status (see
+// the backend comment in statuspage.go). customDomain* holds the state last
+// confirmed by the backend, customDomainInput the not yet saved input field.
 const customDomainInput = ref('')
 const customDomainStatus = ref('')
 const cnameTarget = ref('')
-const customDomainMessage = ref('')
+const customDomainMessage = ref<string | undefined>('')
 const isSavingDomain = ref(false)
 const isVerifyingDomain = ref(false)
 const isRemovingDomain = ref(false)
-// TXT-Owner-Verifizierung: txtRecordValue kommt nur direkt aus der
-// Set-/Verify-Response (CustomDomainVerificationToken ist json:"-" im Backend,
-// analog zum WebhookToken), customDomainVerifiedAt kommt dagegen normal aus den
-// Page-Daten (nicht versteckt) und übersteht daher auch ein erneutes Öffnen des
-// Formulars ohne erneuten Save/Verify-Aufruf.
+// TXT owner verification: txtRecordValue only comes directly from the
+// set/verify response (CustomDomainVerificationToken is json:"-" in the
+// backend, like the WebhookToken), whereas customDomainVerifiedAt comes
+// normally from the page data (not hidden) and therefore survives reopening
+// the form without another save/verify call.
 const txtRecordValue = ref('')
-const customDomainVerifiedAt = ref(null)
-// Letzte (fehlgeschlagene) DNS-Prüfung: Zeitpunkt und Grund-Code.
-const customDomainCheckedAt = ref(null)
+const customDomainVerifiedAt = ref<string | null>(null)
+// Last (failed) DNS check: time and reason code.
+const customDomainCheckedAt = ref<string | null>(null)
 const customDomainCheckError = ref('')
 const txtCopied = ref(false)
 
-// Stufe 4d: Tabellenspalten und Feldhinweise. Die Hinweise sind
-// reiner Text (FormField kennt keine <strong>-Auszeichnung im Hinweis).
+// Stage 4d: table columns and field hints. The hints are plain text
+// (FormField knows no <strong> markup in the hint).
 const pageColumns = computed(() => [
   { key: 'Name', label: t('statusPages.tableName') },
   { key: 'Slug', label: t('statusPages.tableSlug') },
@@ -150,9 +161,9 @@ const invitationColumns = computed(() => [
   { key: 'role', label: t('statusPages.fieldRoleOnPage') },
   { key: 'expires', label: t('statusPages.colInvitationExpires') },
 ])
-// Ohne konfigurierte Basisdomain (VITE_APP_BASE_DOMAINS) gibt es keine Subdomain:
-// die Statusseite ist dann unter /status/<slug> erreichbar, und der Standard-Absender
-// kommt vom Server.
+// Without a configured base domain (VITE_APP_BASE_DOMAINS) there is no subdomain:
+// the status page is then reachable under /status/<slug>, and the default sender
+// comes from the server.
 const slugHint = computed(() => {
   const slug = formData.value.Slug || '…'
   const base = primaryBaseDomain()
@@ -162,7 +173,7 @@ const slugHint = computed(() => {
 })
 const edgeTargetFallback = computed(() => `edge.${primaryBaseDomain() || 'example.com'}`)
 
-// Richtung C: Seitenkopf, Suche, Zeilenmenü und Formularfehler am Feld.
+// Direction C: page header, search, row menu and form errors at the field.
 const breadcrumbs = usePageCrumbs(computed(() => t('adminNav.items.pages')), { global: true })
 const subtitle = computed(() => t('statusPages.subtitle', {
   pages: t('statusPages.countPages', { n: pages.value.length }, pages.value.length),
@@ -171,7 +182,7 @@ const subtitle = computed(() => t('statusPages.subtitle', {
 const privateCount = computed(() => pages.value.filter(p => p.IsPrivate).length)
 const query = ref('')
 const searching = computed(() => query.value.trim() !== '')
-const searchText = p => `${p.Name} ${p.Slug} ${p.Description || ''} ${p.CustomDomain || ''}`.toLowerCase()
+const searchText = (p: StatusPageModel) => `${p.Name} ${p.Slug} ${p.Description || ''} ${p.CustomDomain || ''}`.toLowerCase()
 const rows = computed(() => {
   const q = query.value.trim().toLowerCase()
   return q ? pages.value.filter(p => searchText(p).includes(q)) : pages.value
@@ -181,24 +192,24 @@ const formTitle = computed(() => {
   return t('statusPages.editTitle', { name: formData.value.Name })
 })
 const formErrors = ref({ name: '', slug: '' })
-// Der Slug der Systemseite ist fest (Backend: system_page_slug_locked).
+// The slug of the system page is fixed (backend: system_page_slug_locked).
 const isSystemPageEdit = computed(() => currentEditItem.value !== 'new' && !!formData.value.IsSystem)
 const slugFieldHint = computed(() => {
   if (currentEditItem.value === 'new') return slugHint.value
   return isSystemPageEdit.value ? t('statusPages.systemSlugLocked') : null
 })
-const formEl = ref(null)
+const formEl = ref<HTMLFormElement | null>(null)
 
-const menuItems = (p) => [
+const menuItems = (p: StatusPageModel) => [
   { key: 'open', label: t('statusPages.openAction'), icon: 'globe' },
   { key: 'users', label: t('statusPages.usersAction'), icon: 'users' },
   ...(isGlobalAdmin.value ? [
     { key: 'edit', label: t('common.edit'), icon: 'pencil' },
-    // Die Systemseite lässt sich nicht löschen (Backend: 409).
+    // The system page cannot be deleted (backend: 409).
     ...(p.IsSystem ? [] : [{ key: 'delete', label: deletingId.value === p.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === p.ID }]),
   ] : []),
 ]
-const onMenuSelect = (p, key) => {
+const onMenuSelect = (p: StatusPageModel, key: string) => {
   if (key === 'open') openPublicPage(p)
   else if (key === 'users') openUserManagement(p)
   else if (key === 'edit') openEdit(p)
@@ -208,26 +219,26 @@ const onMenuSelect = (p, key) => {
 const loadData = async () => {
   try {
     const [p, u, r] = await Promise.all([
-      apiFetch('/api/pages'),
-      apiFetch('/api/users'),
-      apiFetch('/api/roles'),
+      apiFetch<StatusPageModel[]>('/api/pages'),
+      apiFetch<User[]>('/api/users'),
+      apiFetch<Role[]>('/api/roles'),
     ])
     pages.value = p
     users.value = u
     roles.value = r
   } catch (err) {
-    alertMsg.value = t('statusPages.loadError') + err.message
+    alertMsg.value = t('statusPages.loadError') + (err as Error).message
   }
 }
 
-const loadPageUsers = async (pageId) => {
-  // H6: Beide Listen unabhängig laden; scheitert nur die
-  // Einladungsliste, bleibt die Mitgliederliste sichtbar. Der Zustand wird erst
-  // nach den awaits gesetzt und nur, wenn noch dieselbe Seite offen ist (sonst
-  // überschriebe die späte Antwort einer zuvor geöffneten Seite die aktuelle).
+const loadPageUsers = async (pageId: number) => {
+  // H6: load both lists independently; if only the invitation list fails,
+  // the member list stays visible. The state is only set after the awaits and
+  // only if the same page is still open (otherwise the late response of a
+  // previously opened page would overwrite the current one).
   const [members, invitations] = await Promise.allSettled([
-    apiFetch(`/api/admin/pages/${pageId}/users`),
-    apiFetch(`/api/admin/pages/${pageId}/invitations`),
+    apiFetch<PageUserAssignment[]>(`/api/admin/pages/${pageId}/users`),
+    apiFetch<PageInvitation[]>(`/api/admin/pages/${pageId}/invitations`),
   ])
   if (showUsers.value?.ID !== pageId) return
   if (members.status === 'rejected') throw members.reason
@@ -246,7 +257,7 @@ const openFromQuery = () => {
   const page = pages.value.find(p => String(p.ID) === String(id))
   if (!page) return
   openEdit(page, { focus: false })
-  const { edit: _edit, ...rest } = route.query
+  const { edit: _edit, ...rest } = route!.query
   router?.replace({ query: rest })
 }
 watch(() => route?.query.edit, openFromQuery)
@@ -256,10 +267,10 @@ onMounted(async () => {
   openFromQuery()
 })
 
-const openEdit = (item, { focus = true } = {}) => {
+const openEdit = (item: StatusPageModel | 'new', { focus = true }: { focus?: boolean } = {}) => {
   formData.value = item === 'new'
     ? {
-      // Stryker disable next-line StringLiteral: Der Name-Watcher überschreibt den Slug beim Öffnen sofort (undefined -> ''), der Startwert ist nicht beobachtbar
+      // Stryker disable next-line StringLiteral: the name watcher overwrites the slug right on opening (undefined -> ''), so the initial value is not observable
       Slug: '',
       Name: '',
       Description: '',
@@ -271,7 +282,7 @@ const openEdit = (item, { focus = true } = {}) => {
       SecondaryColor: '',
       HeaderStyle: 'classic',
       PageLayout: 'standard',
-      // Stryker disable next-line StringLiteral: Der Slug-Watcher leitet die Adresse beim Öffnen sofort neu ab, der Startwert ist nicht beobachtbar
+      // Stryker disable next-line StringLiteral: the slug watcher re-derives the address right on opening, so the initial value is not observable
       NotificationFromAddress: ''
     }
     : JSON.parse(JSON.stringify(item))
@@ -293,8 +304,8 @@ const openEdit = (item, { focus = true } = {}) => {
   if (focus) focusForm()
 }
 
-// Formular öffnen: Fokus auf das Namensfeld; unter 860 px liegt das Formular
-// unter der Liste und wird in den Sichtbereich geholt.
+// Open the form: focus on the name field; below 860 px the form sits below
+// the list and is scrolled into view.
 const focusForm = async () => {
   await nextTick()
   formEl.value?.closest('aside')?.scrollIntoView?.({ block: 'nearest' })
@@ -317,31 +328,31 @@ const cancelEdit = () => {
   customDomainCheckError.value = ''
 }
 
-const customDomainStatusLabel = (status) => ({
+const customDomainStatusLabel = (status: string | undefined) => ({
   pending:  t('statusPages.domainPending'),
   check_failed: t('statusPages.domainCheckFailed'),
   verified: t('statusPages.domainVerified'),
   active:   t('statusPages.domainActive'),
-}[status] ?? t('statusPages.domainNone'))
+} as Record<string, string>)[status as string] ?? t('statusPages.domainNone')
 
-// Domain-Status auf die Statusstufe der StatusBadge: ausstehend = Warnung,
-// bestätigt = Hinweis (Wartungsform), aktiv = in Ordnung; Unbekanntes bleibt neutral.
-// Grund der letzten fehlgeschlagenen Prüfung (Backend-Code -> Text); unbekannte
-// Codes zeigen den allgemeinen Text.
+// Domain status to the status level of the StatusBadge: pending = warning,
+// verified = notice (maintenance shape), active = fine; anything unknown stays neutral.
+// Reason of the last failed check (backend code -> text); unknown codes show
+// the general text.
 const customDomainCheckReason = computed(() => ({
   txt_not_found: t('statusPages.checkReasonTxtNotFound'),
   dns_lookup_failed: t('statusPages.checkReasonLookupFailed'),
-}[customDomainCheckError.value] ?? t('statusPages.checkReasonUnknown')))
+} as Record<string, string>)[customDomainCheckError.value] ?? t('statusPages.checkReasonUnknown'))
 
-const DOMAIN_LEVEL = { pending: 'degraded', check_failed: 'major', verified: 'maintenance', active: 'operational' }
-const domainStatusLevel = (status) => DOMAIN_LEVEL[status] ?? null
+const DOMAIN_LEVEL: Record<string, string> = { pending: 'degraded', check_failed: 'major', verified: 'maintenance', active: 'operational' }
+const domainStatusLevel = (status: string | undefined) => DOMAIN_LEVEL[status as string] ?? null
 
 const saveCustomDomain = async () => {
   isSavingDomain.value = true
   customDomainMessage.value = ''
   txtRecordValue.value = ''
   try {
-    const resp = await apiFetch(`/api/admin/pages/${currentEditItem.value}/custom-domain`, {
+    const resp: CustomDomainResponse = await apiFetch(`/api/admin/pages/${currentEditItem.value}/custom-domain`, {
       method: 'PUT',
       body: JSON.stringify({ domain: customDomainInput.value })
     })
@@ -350,7 +361,7 @@ const saveCustomDomain = async () => {
     txtRecordValue.value = resp.txt_record_value || ''
     await loadData()
   } catch (err) {
-    alertMsg.value = t('statusPages.domainSaveError') + err.message
+    alertMsg.value = t('statusPages.domainSaveError') + (err as Error).message
   } finally {
     isSavingDomain.value = false
   }
@@ -361,7 +372,7 @@ const verifyCustomDomain = async () => {
   customDomainMessage.value = ''
   txtRecordValue.value = ''
   try {
-    const resp = await apiFetch(`/api/admin/pages/${currentEditItem.value}/custom-domain/verify`, { method: 'POST' })
+    const resp: CustomDomainResponse = await apiFetch(`/api/admin/pages/${currentEditItem.value}/custom-domain/verify`, { method: 'POST' })
     customDomainStatus.value = resp.custom_domain_status
     customDomainCheckedAt.value = resp.custom_domain_checked_at || null
     customDomainCheckError.value = resp.custom_domain_check_error || ''
@@ -373,14 +384,14 @@ const verifyCustomDomain = async () => {
     }
     await loadData()
   } catch (err) {
-    alertMsg.value = t('statusPages.domainVerifyError') + err.message
+    alertMsg.value = t('statusPages.domainVerifyError') + (err as Error).message
   } finally {
     isVerifyingDomain.value = false
   }
 }
 
 const removeCustomDomain = async () => {
-  // Ziel vor dem Dialog festhalten (die Auswahl kann sich währenddessen ändern).
+  // Capture the target before the dialog (the selection can change meanwhile).
   const pageId = currentEditItem.value
   if (!(await confirmDialog({ message: t('statusPages.confirmRemoveDomain'), confirmLabel: t('confirm.remove') }))) return
   isRemovingDomain.value = true
@@ -391,30 +402,30 @@ const removeCustomDomain = async () => {
     customDomainMessage.value = ''
     await loadData()
   } catch (err) {
-    alertMsg.value = t('statusPages.domainRemoveError') + err.message
+    alertMsg.value = t('statusPages.domainRemoveError') + (err as Error).message
   } finally {
     isRemovingDomain.value = false
   }
 }
 
 const generateWebhookToken = async () => {
-  // Ziel vor dem Dialog festhalten (die Auswahl kann sich währenddessen ändern).
+  // Capture the target before the dialog (the selection can change meanwhile).
   const pageId = currentEditItem.value
   if (!(await confirmDialog({ message: t('statusPages.confirmGenerateToken'), confirmLabel: t('confirm.generate') }))) return
   isGeneratingToken.value = true
   tokenCopied.value = false
   try {
-    const resp = await apiFetch(`/api/admin/pages/${pageId}/webhook-token`, { method: 'POST' })
+    const resp: { token: string } = await apiFetch(`/api/admin/pages/${pageId}/webhook-token`, { method: 'POST' })
     webhookToken.value = resp.token
   } catch (err) {
-    alertMsg.value = t('statusPages.tokenGenerateError') + err.message
+    alertMsg.value = t('statusPages.tokenGenerateError') + (err as Error).message
   } finally {
     isGeneratingToken.value = false
   }
 }
 
 const revokeWebhookToken = async () => {
-  // Ziel vor dem Dialog festhalten (die Auswahl kann sich währenddessen ändern).
+  // Capture the target before the dialog (the selection can change meanwhile).
   const pageId = currentEditItem.value
   if (!(await confirmDialog({ message: t('statusPages.confirmRevokeToken'), confirmLabel: t('confirm.revoke') }))) return
   isRevokingToken.value = true
@@ -423,7 +434,7 @@ const revokeWebhookToken = async () => {
     webhookToken.value = ''
     tokenCopied.value = false
   } catch (err) {
-    alertMsg.value = t('statusPages.tokenRevokeError') + err.message
+    alertMsg.value = t('statusPages.tokenRevokeError') + (err as Error).message
   } finally {
     isRevokingToken.value = false
   }
@@ -435,7 +446,7 @@ const copyWebhookToken = async () => {
     tokenCopied.value = true
     setTimeout(() => { tokenCopied.value = false }, 2000)
   } catch (err) {
-    alertMsg.value = t('statusPages.copyError') + err.message
+    alertMsg.value = t('statusPages.copyError') + (err as Error).message
   }
 }
 
@@ -445,21 +456,21 @@ const copyTxtRecord = async () => {
     txtCopied.value = true
     setTimeout(() => { txtCopied.value = false }, 2000)
   } catch (err) {
-    alertMsg.value = t('statusPages.copyError') + err.message
+    alertMsg.value = t('statusPages.copyError') + (err as Error).message
   }
 }
 
-// Eingabefehler des Backends (400 mit code) erscheinen am Feld.
-const onSaveError = async (err) => {
+// Input errors of the backend (400 with a code) appear at the field.
+const onSaveError = async (err: ApiError) => {
   const text = serverInputErrorText(err, t)
-  const field = { name_required: 'name', slug_reserved: 'slug', slug_taken: 'slug' }[err.data?.code]
+  const field = ({ name_required: 'name', slug_reserved: 'slug', slug_taken: 'slug' } as Record<string, 'name' | 'slug'>)[err.data?.code as string]
   if (!text || !field) {
     alertMsg.value = t('statusPages.saveError') + err.message
     return
   }
   formErrors.value = { ...formErrors.value, [field]: text }
   await nextTick()
-  formEl.value?.querySelector('[aria-invalid="true"]')?.focus()
+  formEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
 }
 
 const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onStart: clearAlert, onError: onSaveError })
@@ -467,33 +478,33 @@ const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadData, o
 
 const saveItem = async () => {
   const isNew = currentEditItem.value === 'new'
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste Fehlerfeld.
+  // Required fields: error at the field instead of a server error, focus on the first invalid field.
   formErrors.value = {
     name: (formData.value.Name || '').trim() ? '' : t('statusPages.nameRequired'),
     slug: !isNew && !(formData.value.Slug || '').trim() ? t('statusPages.slugRequired') : '',
   }
   if (formErrors.value.name || formErrors.value.slug) {
     await nextTick()
-    formEl.value?.querySelector('[aria-invalid="true"]')?.focus()
+    formEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
     return
   }
   const endpoint = `/api/admin/pages${isNew ? '' : '/' + currentEditItem.value}`
   const payload = { ...formData.value }
-  payload.DefaultRoleID = payload.DefaultRoleID ? Number.parseInt(payload.DefaultRoleID) : null
+  payload.DefaultRoleID = payload.DefaultRoleID ? Number.parseInt(String(payload.DefaultRoleID)) : null
 
   await saveAction(endpoint, isNew ? 'POST' : 'PUT', payload, cancelEdit)
 }
 
-const deleteItem = (id, name) =>
+const deleteItem = (id: number, name: string) =>
   deleteAction(`/api/admin/pages/${id}`, id, t('statusPages.confirmDelete', { name }))
 
-const openUserManagement = async (page) => {
+const openUserManagement = async (page: StatusPageModel) => {
   cancelEdit()
   showUsers.value = page
   await loadPageUsers(page.ID)
 }
 
-const openPublicPage = (page) => {
+const openPublicPage = (page: StatusPageModel) => {
   window.open('/status/' + page.Slug, '_blank')
 }
 
@@ -501,15 +512,15 @@ const assignUser = async () => {
   if (!userAssignData.value.user_id || !userAssignData.value.role_id) return
   isAssigning.value = true
   try {
-    await apiFetch(`/api/admin/pages/${showUsers.value.ID}/users`, {
+    await apiFetch(`/api/admin/pages/${showUsers.value!.ID}/users`, {
       method: 'POST',
       body: JSON.stringify({
-        user_id: Number.parseInt(userAssignData.value.user_id),
-        role_id: Number.parseInt(userAssignData.value.role_id),
+        user_id: Number.parseInt(String(userAssignData.value.user_id)),
+        role_id: Number.parseInt(String(userAssignData.value.role_id)),
       })
     })
     userAssignData.value = { user_id: '', role_id: '' }
-    await loadPageUsers(showUsers.value.ID)
+    await loadPageUsers(showUsers.value!.ID)
   } catch (err) {
     alertMsg.value = t('statusPages.assignError') + userAdminErrorText(err, t)
   } finally {
@@ -517,8 +528,8 @@ const assignUser = async () => {
   }
 }
 
-// Einladung zurückziehen; der Link in der Mail wird damit ungültig.
-const revokeInvitation = async (invitation) => {
+// Revoke an invitation; the link in the mail becomes invalid.
+const revokeInvitation = async (invitation: PageInvitation) => {
   const pageId = showUsers.value?.ID
   if (!(await confirmDialog({ message: t('statusPages.confirmRevokeInvitation', { email: invitation.Email }), confirmLabel: t('statusPages.revokeInvitation') }))) return
   clearAlert()
@@ -526,16 +537,16 @@ const revokeInvitation = async (invitation) => {
   try {
     await apiFetch(`/api/admin/pages/${pageId}/invitations/${invitation.ID}`, { method: 'DELETE' })
     showSuccess(t('statusPages.invitationRevoked'))
-    await loadPageUsers(pageId)
+    await loadPageUsers(pageId!)
   } catch (err) {
-    alertMsg.value = t('statusPages.revokeInvitationError') + err.message
+    alertMsg.value = t('statusPages.revokeInvitationError') + (err as Error).message
   } finally {
     revokingInvitationId.value = null
   }
 }
 
-const removeUser = async (assignment) => {
-  // Löschen fragt sonst überall nach, die Zuweisung nicht.
+const removeUser = async (assignment: PageUserAssignment) => {
+  // Deleting asks for confirmation everywhere else; removing the assignment did not.
   const userId = assignment?.User?.ID
   const name = assignment?.User?.Email || '–'
   const pageId = showUsers.value?.ID
@@ -545,9 +556,9 @@ const removeUser = async (assignment) => {
   try {
     await apiFetch(`/api/admin/pages/${pageId}/users/${userId}`, { method: 'DELETE' })
     showSuccess(t('adminFeedback.userRemoved'))
-    await loadPageUsers(pageId)
+    await loadPageUsers(pageId!)
   } catch (err) {
-    alertMsg.value = t('statusPages.removeUserError') + err.message
+    alertMsg.value = t('statusPages.removeUserError') + (err as Error).message
   } finally {
     removingUserId.value = null
   }
@@ -566,8 +577,8 @@ const removeUser = async (assignment) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Liste links, Formular bzw. Benutzerverwaltung als
-         Seitenkarte rechts (unter 860 px darunter). -->
+    <!-- Direction C: list on the left, form or user management as a
+         side card on the right (below it under 860 px). -->
     <div class="split" :class="{ 'split--open': isEditing || showUsers }">
       <ListCard :title="t('statusPages.cardTitle')">
         <template #tools>
@@ -607,10 +618,10 @@ const removeUser = async (assignment) => {
         </ResponsiveTable>
       </ListCard>
 
-      <!-- Formular -->
+      <!-- Form -->
       <FormPanel v-if="isEditing" class="form-panel--tall" :title="formTitle" @close="cancelEdit">
-        <!-- Name/Slug prüft saveItem selbst (Meldung am Feld), der Submit-Wächter
-             soll nicht dazwischenfunken. -->
+        <!-- saveItem checks name/slug itself (message at the field); the submit guard
+             should not interfere. -->
         <form ref="formEl" novalidate data-self-validates class="edit-form" @submit.prevent="saveItem">
           <FormField v-slot="f" :label="t('statusPages.fieldName')" required field-id="page-name" :error="formErrors.name || null">
             <input :id="f.id" v-model="formData.Name" class="form-input" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('statusPages.namePlaceholder')" @input="formErrors.name = ''" />
@@ -666,7 +677,7 @@ const removeUser = async (assignment) => {
             </select>
           </FormField>
 
-          <!-- Seiten-Layout mit kleiner Vorschau je Variante -->
+          <!-- Page layout with a small preview per variant -->
           <fieldset id="page-layout" class="form-group layout-picker">
             <legend>{{ t('statusPages.fieldPageLayout') }}</legend>
             <label
@@ -749,8 +760,8 @@ const removeUser = async (assignment) => {
           </div>
         </OnyxModal>
 
-        <!-- Monitoring-Webhook-Token: nur für bereits gespeicherte Seiten, -->
-        <!-- eine "neue" Seite hat noch keine ID, gegen die ein Token generiert werden könnte. -->
+        <!-- Monitoring webhook token: only for pages already saved; -->
+        <!-- a "new" page has no ID yet to generate a token against. -->
         <section v-if="currentEditItem !== 'new'" id="page-webhook" class="adm-section">
           <h4 class="adm-subhead">{{ t('statusPages.webhookHeading') }}</h4>
           <p class="section-text">
@@ -761,7 +772,7 @@ const removeUser = async (assignment) => {
 
           <FormField v-if="webhookToken" v-slot="f" :label="t('statusPages.newTokenLabel')" field-id="webhook-token-display">
             <div class="adm-row adm-row--nowrap">
-              <input :id="f.id" :value="webhookToken" class="form-input token-input" readonly @focus="$event.target.select()" />
+              <input :id="f.id" :value="webhookToken" class="form-input token-input" readonly @focus="($event.target as HTMLInputElement).select()" />
               <button type="button" class="action-btn" @click="copyWebhookToken">
                 <AppIcon :name="tokenCopied ? 'check-circle' : 'clipboard'" :size="14" /> {{ tokenCopied ? t('common.copied') : t('common.copy') }}
               </button>
@@ -778,7 +789,7 @@ const removeUser = async (assignment) => {
           </div>
         </section>
 
-        <!-- Custom Domain -->
+        <!-- Custom domain -->
         <section v-if="currentEditItem !== 'new'" class="adm-section">
           <h4 class="adm-subhead">{{ t('statusPages.customDomainHeading') }}</h4>
           <p class="section-text">
@@ -799,7 +810,7 @@ const removeUser = async (assignment) => {
             <StatusBadge :status="domainStatusLevel(customDomainStatus)" :label="customDomainStatusLabel(customDomainStatus)" />
           </p>
 
-          <!-- TXT-Verifizierung: Zuerst TXT-Eintrag bestätigen (DNS-Besitz), dann CNAME -->
+          <!-- TXT verification: first confirm the TXT record (DNS ownership), then the CNAME -->
           <div v-if="['pending', 'check_failed'].includes(customDomainStatus) && txtRecordValue" class="txt-box">
             <p class="txt-label">{{ t('statusPages.txtRecordLabel') }}</p>
             <div class="adm-row adm-row--grow adm-row--nowrap">
@@ -811,7 +822,7 @@ const removeUser = async (assignment) => {
             <p class="section-text section-text--small">{{ t('statusPages.txtRecordInstructions', { domain: customDomainInput }) }}</p>
           </div>
 
-          <!-- Letzter Prüffehler: bei verified/active ändert er den Status nicht, die Domain bleibt in Betrieb -->
+          <!-- Last check error: with verified/active it does not change the status, the domain stays in operation -->
           <p v-if="customDomainCheckError && customDomainCheckedAt" class="section-text section-text--small" data-test="domain-check-failed">
             {{ t('statusPages.checkFailedAt', { date: new Date(customDomainCheckedAt).toLocaleString(), reason: customDomainCheckReason }) }}
             <template v-if="['verified', 'active'].includes(customDomainStatus)"> {{ t('statusPages.checkFailedKept') }}</template>
@@ -834,9 +845,9 @@ const removeUser = async (assignment) => {
         </section>
       </FormPanel>
 
-      <!-- Benutzerverwaltung -->
+      <!-- User management -->
       <FormPanel v-else-if="showUsers" class="form-panel--tall" :title="t('statusPages.permissionsTitle', { name: showUsers.Name })" :show-required-hint="false" @close="showUsers = null">
-        <!-- Benutzer zuweisen -->
+        <!-- Assign users -->
         <div class="edit-form assign-block">
           <h4 class="adm-subhead">{{ t('statusPages.addUserHeading') }}</h4>
           <div class="assign-grid">
@@ -856,7 +867,7 @@ const removeUser = async (assignment) => {
           </div>
         </div>
 
-        <!-- Aktuelle Benutzer -->
+        <!-- Current users -->
         <EmptyState v-if="pageUsers.length === 0" :title="t('statusPages.noUsersAssigned')" icon="users" />
         <ResponsiveTable v-else data-table :columns="userColumns" :items="pageUsers" row-key="ID">
           <template #cell-user="{ item }">{{ item.User?.Email || '–' }}</template>
@@ -868,7 +879,7 @@ const removeUser = async (assignment) => {
           </template>
         </ResponsiveTable>
 
-        <!-- offene Einladungen -->
+        <!-- open invitations -->
         <h4 class="adm-subhead invitations-heading">{{ t('statusPages.invitationsHeading') }}</h4>
         <p class="section-text section-text--small">{{ t('statusPages.invitationsHint') }}</p>
         <EmptyState v-if="pageInvitations.length === 0" :title="t('statusPages.noInvitations')" icon="mail" />
@@ -891,7 +902,7 @@ const removeUser = async (assignment) => {
 .adm-row--nowrap { flex-wrap: nowrap; }
 .color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--sp-4); }
 .color-swatch { inline-size: 40px; block-size: 34px; padding: 2px; flex-shrink: 0; }
-/* Hex-Feld nimmt den Rest neben der Farbfläche und darf schrumpfen. */
+/* The hex field takes the rest next to the colour swatch and may shrink. */
 .color-grid .adm-row--nowrap > .form-input { flex: 1 1 0; min-inline-size: 0; }
 .color-hint { margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); }
 .checkbox-row { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-4); }
@@ -908,8 +919,8 @@ const removeUser = async (assignment) => {
 .invitations-heading { margin-top: var(--sp-5); }
 .assign-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); justify-items: start; }
 .assign-grid :deep(.form-field) { margin-bottom: 0; inline-size: 100%; }
-/* Das lange Domain-Badge ("Ausstehend – DNS noch nicht geprüft") darf in der
-   Karte (390 px) umbrechen statt rechts abgeschnitten zu werden. */
+/* The long domain badge ("Pending – DNS not checked yet") may wrap in the
+   card (390 px) instead of being cut off on the right. */
 .domain-badge { margin-inline-start: 6px; }
 .domain-badge.st-badge { white-space: normal; min-inline-size: 0; text-align: start; }
 
@@ -931,8 +942,8 @@ const removeUser = async (assignment) => {
 .lp-bar--status { height: 10px; background: var(--ok); opacity: 1; }
 .layout-preview--standard .lp-bar--status { display: none; }
 .layout-preview--liste .lp-bar { border-radius: 4px; }
-/* Der Slug ist Teil der URL (klein geschrieben); die globale
-   .meta-tag-Regel setzt sonst Großbuchstaben ("SYSTEM"). */
+/* The slug is part of the URL (lower case); the global .meta-tag rule
+   would otherwise set capitals ("SYSTEM"). */
 .meta-tag--slug { text-transform: none; letter-spacing: normal; }
 
 /* Design preview: the public page in its own token layer (.theme-public)

@@ -9,9 +9,9 @@ import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminNotices from './AdminNotices.vue'
 import AdminSubscribers from './AdminSubscribers.vue'
 
-// Knöpfe, Zeilenmenü und Formular richten sich je Aktion nach dem Recht
-// des Tabs: "Neu" nur mit create, Bearbeiten nur mit update (sonst "Ansehen" mit
-// gesperrtem Formular), Löschen nur mit delete.
+// Buttons, row menu and form follow the tab's permission per
+// action: "New" only with create, edit only with update (otherwise "View" with a
+// locked form), delete only with delete.
 const VIEWS = [
   { name: 'Ankündigungen', component: AdminNotices, resource: 'notices', item: { ID: 1, Title: 'Info', Message: 'm', Level: 'info', IsActive: true } },
   { name: 'Abonnenten', component: AdminSubscribers, resource: 'subscribers', item: { ID: 1, Channel: 'email', Email: 'a@b.de', SubscribedComponentIDs: 'all', CreatedAt: '2026-01-01T00:00:00Z' } },
@@ -26,7 +26,7 @@ async function mountView(view, perms) {
   await flushPromises()
   return wrapper
 }
-// „Übersetzungen“ ist ein Link (Leseaktion) und hier nicht Thema.
+// "Translations" is a link (read action) and not the subject here.
 const entries = () => [...new Set(wrapper.findAll('[role="menuitem"]').map(i => i.text()))].filter(t => t !== 'Übersetzungen')
 const newButton = () => wrapper.find('.page-head__actions button, .page-head button')
 
@@ -90,6 +90,6 @@ describe('useResourcePerms', () => {
     const n = useResourcePerms('notices')
     expect([n.canRead.value, n.canCreate.value, n.canUpdate.value, n.canDelete.value]).toEqual([true, false, true, false])
     const tags = useResourcePerms('tags')
-    expect(tags.canDelete.value).toBe(false) // globale Ressource: nur Global Admins
+    expect(tags.canDelete.value).toBe(false) // global resource: global admins only
   })
 })

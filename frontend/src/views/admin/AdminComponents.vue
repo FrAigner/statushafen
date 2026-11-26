@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { OnyxButton, OnyxSwitch } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -29,27 +29,39 @@ import ForbiddenNotice from '../../components/ForbiddenNotice.vue'
 import { vHelp } from '../../directives/vHelp'
 import { flattenComponentTree, descendantIds, visibleComponents, componentOptions } from '../../utils/componentTree'
 import { formatRelative } from '../../utils/relativeTime'
+import type { ComponentTreeNode, FlatComponent } from '../../utils/componentTree'
+import type { ApiError, Component } from '../../types/api'
+
+/** A component as the tree endpoint sends it. */
+type ComponentNode = Component & ComponentTreeNode
+/** A row of the flattened tree (with its depth). */
+type ComponentRow = FlatComponent<ComponentNode>
+
+/** Edit form: the component fields plus the selected tag IDs. */
+interface ComponentForm extends Partial<Component> {
+  TagIDs?: number[]
+}
 
 const { apiFetch } = useApi()
-// Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
-// Eintrag schreibgeschützt (formReadOnly), ohne Löschen entfällt der Eintrag im Zeilenmenü.
+// Permissions of this tab per action. Without update an existing entry opens
+// read-only (formReadOnly); without delete the row menu entry is gone.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('components')
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const { activeTenantId } = useTenant()
 const { t, locale } = useI18n()
-// Hilfetexte (help.components.*) für jedes Feld und jeden Button
-// per v-help (erscheint nach Verweilen, abschaltbar pro Benutzer).
+// Help texts (help.components.*) for every field and button via v-help
+// (appears after hovering, can be switched off per user).
 
-const items          = ref([])
+const items          = ref<ComponentRow[]>([])
 const { availableTags, canSelectTags, loadAvailableTags } = useAvailableTags(apiFetch, activeTenantId)
 const isEditing      = ref(false)
-const currentEditId  = ref(null)
+const currentEditId  = ref<number | null>(null)
 const editName       = ref('')
-const formData       = ref({})
+const formData       = ref<ComponentForm>({})
 
-// Sprachumschalter über Name und Beschreibung (weitere Sprachen der
-// Seite). Die Beschreibung ist optional, eine Übersetzung braucht nur den Namen.
-// Übersetzungen folgen dem Recht „Ändern“ des Tabs.
+// Language switcher above name and description (further languages of the
+// page). The description is optional; a translation only needs the name.
+// Translations follow the tab's "update" permission.
 const trans = useFormTranslations({
   apiFetch,
   urls: { list: (id) => `/api/components/${id}/translations/all`, save: (id, code) => `/api/components/${id}/translations/${code}` },
@@ -61,7 +73,7 @@ const trans = useFormTranslations({
   contentRequired: false,
 })
 const { showSwitcher, onDefaultLang, titleModel, contentModel: descriptionModel, active: activeLang } = trans
-const formEl         = ref(null)
+const formEl         = ref<HTMLFormElement | null>(null)
 const nameError      = ref('')
 const descriptionError = ref('')
 const slugError      = ref('')
@@ -69,45 +81,45 @@ const forbidden      = ref(false)
 const alertMsg       = ref('')
 const alertType      = ref('warning')
 const isSaving       = ref(false)
-const deletingId     = ref(null)
+const deletingId     = ref<number | null>(null)
 const query          = ref('')
-const collapsed      = ref(new Set())
+const collapsed      = ref(new Set<number>())
 
-// Richtung C: Der Titel nennt den Namen, nicht die ID.
+// Direction C: the title names the name, not the ID.
 const formTitle = computed(() => {
   if (currentEditId.value) return t(formData.value.IsGroup ? 'components.editGroupTitle' : 'components.editTitle', { name: editName.value })
   return t(formData.value.IsGroup ? 'components.createGroupTitle' : 'components.createTitle')
 })
 
-/* ── Feldlängen ── */
-// Grenzen wie im Backend (handlers/component.go); gezählt wird in Zeichen
-// (Code Points), nicht in UTF-16-Einheiten, damit Umlaute und Emojis wie dort
-// je als eins zählen.
+/* ── Field lengths ── */
+// Limits as in the backend (handlers/component.go); counted in characters
+// (code points), not in UTF-16 units, so that umlauts and emojis count as one
+// each, as there.
 const NAME_MAX = 60
 const DESCRIPTION_MAX = 240
-// Kennung, Format und Länge wie im Backend (models/component_slug.go).
+// Slug, format and length as in the backend (models/component_slug.go).
 const SLUG_MAX = 60
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
-const charCount = (value) => [...(value || '')].length
+const charCount = (value: string | null | undefined) => [...(value || '')].length
 const nameCount = computed(() => charCount(formData.value.Name))
 const descriptionCount = computed(() => charCount(formData.value.Description))
-// Angezeigt wird der Zähler des Feldes im aktiven Sprachreiter.
+// Shown is the counter of the field in the active language tab.
 const shownNameCount = computed(() => charCount(titleModel.value))
 const shownDescriptionCount = computed(() => charCount(descriptionModel.value))
-// Bestehende Texte können länger sein als erlaubt (vor der Umstellung gespeichert): Sie
-// werden nicht gekürzt, das Feld meldet den Überhang aber sofort, damit das
-// nächste Speichern nicht überrascht.
+// Existing texts can be longer than allowed (saved before the change): they
+// are not truncated, but the field reports the excess right away so that the
+// next save does not come as a surprise.
 const nameFieldError = computed(() => nameError.value || (nameCount.value > NAME_MAX ? t('components.nameTooLong', { max: NAME_MAX }) : null))
-// Die Kennung gibt es nur beim Anlegen vorzugeben (danach schreibgeschützt).
+// The slug can only be set when creating (read-only afterwards).
 const slugValue = computed(() => (formData.value.Slug || '').trim())
 const slugFieldError = computed(() => slugError.value || (currentEditId.value === null && slugValue.value && (slugValue.value.length > SLUG_MAX || !SLUG_RE.test(slugValue.value)) ? t('components.slugInvalid', { max: SLUG_MAX }) : null))
 const descriptionFieldError = computed(() => descriptionError.value || (descriptionCount.value > DESCRIPTION_MAX ? t('components.descriptionTooLong', { max: DESCRIPTION_MAX }) : null))
 
-/* ── Seitenkopf: Brotkrumen und Untertitel ── */
+/* ── Page header: breadcrumbs and subtitle ── */
 const breadcrumbs = usePageCrumbs(() => t('components.title'))
-// Aktiv/Archiviert. Archivierte Einträge (ArchivedAt) stehen nur im
-// Segment „Archiviert“ und zählen nicht in den Untertitel.
-const isArchived = c => !!c.ArchivedAt
+// Active/archived. Archived entries (ArchivedAt) only appear in the
+// "Archived" segment and do not count in the subtitle.
+const isArchived = (c: ComponentRow) => !!c.ArchivedAt
 const activeItems = computed(() => items.value.filter(c => !isArchived(c)))
 const archivedItems = computed(() => items.value.filter(isArchived))
 const view = ref('active')
@@ -116,12 +128,12 @@ const viewOptions = computed(() => [
   { value: 'archived', label: t('components.viewArchived', { n: archivedItems.value.length }) },
 ])
 const archivedView = computed(() => view.value === 'archived')
-// Tiefe neu bestimmen: Ein einzeln archiviertes Mitglied einer aktiven Gruppe
-// stünde sonst eingerückt ohne Gruppe in der Liste.
-const withShownDepth = (list) => {
-  const depthOf = new Map()
+// Recompute the depth: an individually archived member of an active group
+// would otherwise sit indented without its group in the list.
+const withShownDepth = (list: ComponentRow[]) => {
+  const depthOf = new Map<number | null | undefined, number>()
   return list.map(c => {
-    const depth = depthOf.has(c.ParentID) ? depthOf.get(c.ParentID) + 1 : 0
+    const depth = depthOf.has(c.ParentID) ? depthOf.get(c.ParentID)! + 1 : 0
     depthOf.set(c.ID, depth)
     return { ...c, depth }
   })
@@ -134,46 +146,46 @@ const subtitle = computed(() => t('components.subtitle', {
   groups: t('components.countGroups', { n: groupCount.value }, groupCount.value),
 }))
 
-/* ── Liste: Suche und einklappbare Gruppen ── */
-const searchText = c => `${c.Name} ${c.Slug || ''} ${c.Description || ''} ${(c.Tags || []).map(tag => tag.Name).join(' ')}`
+/* ── List: search and collapsible groups ── */
+const searchText = (c: ComponentRow) => `${c.Name} ${c.Slug || ''} ${c.Description || ''} ${(c.Tags || []).map(tag => tag.Name).join(' ')}`
 const rows = computed(() => visibleComponents(shownItems.value, { query: query.value, collapsed: collapsed.value, textOf: searchText }))
 const searching = computed(() => query.value.trim() !== '')
 
-const toggleGroup = (id) => {
+const toggleGroup = (id: number) => {
   const next = new Set(collapsed.value)
   if (next.has(id)) next.delete(id)
   else next.add(id)
   collapsed.value = next
 }
 
-/* ── Formular: Gruppe (Eltern-Komponente) ── */
-// Als Gruppe wählbar sind Gruppen, außer der Komponente selbst und ihren
-// Nachfahren (das Backend lehnt Zyklen ab). Ist die aktuelle Eltern-
-// Komponente keine Gruppe, bleibt sie trotzdem wählbar, sonst ginge sie beim
-// Speichern verloren.
+/* ── Form: group (parent component) ── */
+// Selectable as a group are groups, except the component itself and its
+// descendants (the backend rejects cycles). If the current parent component
+// is not a group, it stays selectable anyway, otherwise it would be lost on
+// save.
 const parentOptions = computed(() => {
   const excluded = new Set(currentEditId.value ? [currentEditId.value, ...descendantIds(items.value, currentEditId.value)] : [])
   const current = formData.value.ParentID
   const candidates = items.value.filter(c => !excluded.has(c.ID) && (c.IsGroup || c.ID === current))
-  return [{ label: t('components.groupNone'), value: null }, ...componentOptions(candidates, [current]).map(o => ({ ...o, value: Number(o.value) }))]
+  return [{ label: t('components.groupNone'), value: null }, ...componentOptions(candidates, [current as number]).map(o => ({ ...o, value: Number(o.value) }))]
 })
 
 /* ── Data loading ── */
 const loadData = async () => {
   forbidden.value = false
   try {
-    // Die API liefert einen Baum. Flach in Baumreihenfolge mit
-    // Tiefe, damit auch Unterkomponenten gelistet und bearbeitbar sind.
-    items.value = flattenComponentTree(await apiFetch(`/api/pages/${activeTenantId.value}/components`))
+    // The API returns a tree. Flat in tree order with depth, so that
+    // subcomponents are listed and editable too.
+    items.value = flattenComponentTree(await apiFetch<ComponentNode[]>(`/api/pages/${activeTenantId.value}/components`))
   } catch (err) {
-    // 403 -> Berechtigungsmeldung statt Ladefehler-Alert.
+    // 403 -> permission notice instead of a load error alert.
     if (isForbidden(err)) forbidden.value = true
-    else showAlert(t('common.loadError') + err.message, 'error')
+    else showAlert(t('common.loadError') + (err as Error).message, 'error')
   }
-  // Tags nur für Global Admins (siehe useAvailableTags).
+  // Tags only for global admins (see useAvailableTags).
   await loadAvailableTags()
-  // weitere Sprachen der Seite für den Umschalter.
-  await trans.load(activeTenantId.value)
+  // further languages of the page for the switcher.
+  await trans.load(activeTenantId.value!)
 }
 
 const toggleTag = useTagToggle(formData)
@@ -185,22 +197,22 @@ watch(activeTenantId, (newId) => {
 }, { immediate: true })
 
 /* ── CRUD helpers ── */
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value  = msg
   alertType.value = type
 }
 
-// Formular öffnen: Fokus auf das Namensfeld; unter 860 px liegt das Formular
-// unter der Liste und wird in den Sichtbereich geholt.
+// Open the form: focus on the name field; below 860 px the form sits below
+// the list and is scrolled into view.
 const focusForm = async () => {
   await nextTick()
   formEl.value?.closest('aside')?.scrollIntoView?.({ block: 'nearest' })
   formEl.value?.querySelector('input')?.focus({ preventScroll: true })
 }
 
-// isGroup legt eine Gruppe an (kein Status, wird aus den Mitgliedern berechnet).
+// isGroup creates a group (no status; it is computed from the members).
 const openNew = (isGroup = false) => {
   formData.value  = isGroup
     ? { IsGroup: true, TagIDs: [], ParentID: null, Visible: true }
@@ -215,8 +227,8 @@ const openNew = (isGroup = false) => {
   focusForm()
 }
 
-const openEdit = (item) => {
-  // Visible fehlt nur bei Altständen der API: dann gilt sichtbar.
+const openEdit = (item: ComponentRow) => {
+  // Visible is only missing with old API versions: then it counts as visible.
   formData.value  = { ...item, TagIDs: (item.Tags || []).map(t => t.ID), Visible: item.Visible !== false }
   currentEditId.value = item.ID
   editName.value = item.Name
@@ -239,9 +251,9 @@ const cancelEdit = () => {
   slugError.value = ''
 }
 
-// Längenfehler des Servers (Race mit anderem Client, ältere
-// Frontend-Stände) landen am Feld statt als allgemeine Meldung.
-const onSaveError = (err) => {
+// Length errors of the server (race with another client, older frontend
+// versions) end up at the field instead of as a general message.
+const onSaveError = (err: ApiError) => {
   if (err.data?.code === 'slug_invalid') slugError.value = t('components.slugInvalid', { max: SLUG_MAX })
   else if (err.data?.code === 'slug_taken') slugError.value = t('components.slugTaken')
   else if (err.data?.code === 'name_too_long') nameError.value = t('components.nameTooLong', { max: NAME_MAX })
@@ -249,8 +261,8 @@ const onSaveError = (err) => {
   else showAlert(t('common.saveError') + err.message, 'error')
 }
 const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onStart: clearAlert, onError: onSaveError })
-// 409 group_not_empty (Gruppe wurde inzwischen befüllt) mit
-// verständlicher, übersetzter Meldung statt der englischen Server-Meldung.
+// 409 group_not_empty (the group has been filled in the meantime) with an
+// understandable, translated message instead of the English server message.
 const deleteAction = useDeleteAction({
   apiFetch, deletingId, reload: loadData, onStart: clearAlert,
   onDeleted: () => showAlert(t('adminFeedback.deleted'), 'success'),
@@ -260,12 +272,12 @@ const deleteAction = useDeleteAction({
 })
 
 const saveItem = async () => {
-  // Pflichtfeld Name: Fehler am Feld statt eines Serverfehlers, Fokus aufs Feld.
+  // Required field name: error at the field instead of a server error, focus on the field.
   if (!(formData.value.Name || '').trim()) nameError.value = t('components.nameRequired')
   if (nameFieldError.value || descriptionFieldError.value || slugFieldError.value) {
-    activeLang.value = '' // die Prüfungen gehören zur Standardsprache
+    activeLang.value = '' // the checks belong to the default language
     await nextTick()
-    formEl.value?.querySelector('[aria-invalid="true"]')?.focus()
+    formEl.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
     return
   }
   if (!trans.checkComplete(showAlert)) return
@@ -273,47 +285,47 @@ const saveItem = async () => {
   const url   = isNew
     ? `/api/pages/${activeTenantId.value}/components`
     : `/api/pages/${activeTenantId.value}/components/${currentEditId.value}`
-  // Payload explizit gebaut statt formData direkt zu serialisieren: der
-  // Backend-Request-DTO erwartet "tag_ids" (snake_case), formData.TagIDs
-  // würde als JSON-Key "TagIDs" ankommen, was NICHT case-insensitive auf
-  // "tag_ids" matcht (anders als z.B. "Name"/"name").
-  const payload = {
+  // Payload built explicitly instead of serializing formData directly: the
+  // backend request DTO expects "tag_ids" (snake_case); formData.TagIDs would
+  // arrive as the JSON key "TagIDs", which does NOT match "tag_ids"
+  // case-insensitively (unlike e.g. "Name"/"name").
+  const payload: Record<string, unknown> = {
     name: formData.value.Name,
     description: formData.value.Description,
     tag_ids: formData.value.TagIDs || [],
-    // 0 = oberste Ebene (beim Bearbeiten löst das die Zuordnung).
+    // 0 = top level (when editing this removes the assignment).
     parent_id: formData.value.ParentID || 0,
-    // „Auf der Statusseite anzeigen“.
+    // "Show on the status page".
     visible: formData.value.Visible !== false,
   }
-  // Bei Gruppen ist Status der aus den Kindern berechnete Wert.
-  // Zurückgeschickt hätte er die Gruppe zur normalen Komponente gemacht.
+  // For groups the status is the value computed from the children.
+  // Sending it back would have turned the group into a normal component.
   if (!formData.value.IsGroup) payload.status = formData.value.Status
-  // Neue Gruppe ohne Status, dafür mit is_group.
+  // New group without a status, but with is_group.
   else if (isNew) payload.is_group = true
-  // Kennung nur beim Anlegen senden; leer = automatisch.
+  // Only send the slug when creating; empty = automatic.
   if (isNew && slugValue.value) payload.slug = slugValue.value
-  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved) => {
-    // Neue ID merken, bevor Übersetzungen folgen: scheitert eine, legt ein zweiter Versuch keine zweite Komponente an.
+  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved: { ID?: number } | null) => {
+    // Remember the new ID before translations follow: if one fails, a second attempt does not create a second component.
     if (isNew && saved?.ID) currentEditId.value = saved.ID
-    if (showSwitcher.value) await trans.saveAll(currentEditId.value)
+    if (showSwitcher.value) await trans.saveAll(currentEditId.value!)
     const createdKey = formData.value.IsGroup ? 'components.groupCreated' : 'components.created'
     showAlert(isNew ? t(createdKey) : t('common.changesSaved'), 'success')
     cancelEdit()
   })
 }
 
-const deleteItem = (id, name) =>
+const deleteItem = (id: number, name: string) =>
   deleteAction(`/api/pages/${activeTenantId.value}/components/${id}`, id, t('components.confirmDelete', { name }))
 
-// Zeilenmenü: Einträge je Zeile; „Übersetzungen“ ist ein Link.
-// Eine Gruppe mit Mitgliedern lässt sich nicht löschen (Backend: 409).
-const isNonEmptyGroup = (c) => !!c.IsGroup && items.value.some(x => x.ParentID === c.ID)
-const deleteLabel = (c) => {
+// Row menu: entries per row; "Translations" is a link.
+// A group with members cannot be deleted (backend: 409).
+const isNonEmptyGroup = (c: ComponentRow) => !!c.IsGroup && items.value.some(x => x.ParentID === c.ID)
+const deleteLabel = (c: ComponentRow) => {
   if (deletingId.value === c.ID) return t('common.deleting')
   return isNonEmptyGroup(c) ? t('components.deleteGroupBlocked') : t('common.delete')
 }
-const menuItems = (c) => [
+const menuItems = (c: ComponentRow) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   // Only with a second content language (switched off: the page lists its default only).
   ...(trans.multilingual.value ? [{ key: 'translations', label: t('translations.manageLink'), icon: 'globe', to: `/admin/components/${c.ID}/translations` }] : []),
@@ -322,42 +334,42 @@ const menuItems = (c) => [
     : { key: 'archive', label: t('components.archive'), icon: 'folder' }] : []),
   ...(canDelete.value ? [{ key: 'delete', label: deleteLabel(c), icon: 'trash', danger: true, disabled: deletingId.value === c.ID || isNonEmptyGroup(c) }] : []),
 ]
-const onMenuSelect = (c, key) => {
+const onMenuSelect = (c: ComponentRow, key: string) => {
   if (key === 'edit') openEdit(c)
   else if (key === 'archive' || key === 'restore') setArchived(c, key)
-  else deleteItem(c.ID, c.Name) // „Übersetzungen“ ist ein Link und meldet nichts
+  else deleteItem(c.ID, c.Name) // "Translations" is a link and reports nothing
 }
 
-// Archivieren/Wiederherstellen über eigene Routen; die Liste lädt
-// neu, weil eine Gruppe ihre Mitglieder mitnimmt.
-const setArchived = async (comp, action) => {
+// Archive/restore via their own routes; the list reloads, because a group
+// takes its members along.
+const setArchived = async (comp: ComponentRow, action: 'archive' | 'restore') => {
   clearAlert()
   try {
     await apiFetch(`/api/pages/${activeTenantId.value}/components/${comp.ID}/${action}`, { method: 'POST' })
     showAlert(t(action === 'archive' ? 'components.archived' : 'components.restored'), 'success')
     await loadData()
-  } catch (err) {
+  } catch (e) {
+    const err = e as ApiError
     showAlert(err.data?.code === 'parent_archived'
       ? t('components.parentArchived')
       : t(action === 'archive' ? 'components.archiveError' : 'components.restoreError') + err.message, 'error')
   }
 }
 
-const quickStatus = async (comp, newStatus) => {
+const quickStatus = async (comp: ComponentRow, newStatus: string) => {
   try {
     await apiFetch(`/api/pages/${activeTenantId.value}/components/${comp.ID}`, {
       method: 'PUT',
-      // nur den Status senden; fehlende Felder lässt das Backend
-      // unverändert. Die ganze Zeile hätte jetzt auch Children und depth
-      // mitgeschickt.
+      // only send the status; the backend leaves missing fields unchanged.
+      // The whole row would now also have sent Children and depth.
       body: JSON.stringify({ status: newStatus })
     })
-    // Rückmeldung wie beim Formular, statt eine ältere Meldung
-    // (z. B. "Komponente erstellt.") stehen zu lassen.
+    // Feedback as with the form, instead of leaving an older message
+    // (e.g. "Component created.") in place.
     showAlert(t('common.changesSaved'), 'success')
     loadData()
   } catch (err) {
-    showAlert(t('components.quickStatusError') + err.message, 'error')
+    showAlert(t('components.quickStatusError') + (err as Error).message, 'error')
   }
 }
 </script>
@@ -391,8 +403,8 @@ const quickStatus = async (comp, newStatus) => {
 
     <ForbiddenNotice v-if="forbidden" />
 
-    <!-- Stufe 4c: Liste und Formular stehen nebeneinander
-         (unter 860 px untereinander), das Formular ersetzt die Liste nicht mehr. -->
+    <!-- Stage 4c: list and form sit side by side
+         (stacked below 860 px); the form no longer replaces the list. -->
     <div v-else class="split" :class="{ 'split--open': isEditing }">
       <ListCard class="split__main" :title="t('components.cardTitle')">
         <template #tools>
@@ -418,10 +430,10 @@ const quickStatus = async (comp, newStatus) => {
               </tr>
             </thead>
             <tbody>
-              <!-- Gruppen (IsGroup) sind einklappbare Gruppenzeilen. -->
+              <!-- Groups (IsGroup) are collapsible group rows. -->
               <tr v-for="c in rows" :key="c.ID" :class="{ 'data-table__group': c.IsGroup }">
                 <component :is="c.IsGroup ? 'th' : 'td'" :scope="c.IsGroup ? 'row' : undefined" :data-label="t('components.tableName')">
-                  <!-- Unterkomponenten nach Tiefe im Baum eingerückt. -->
+                  <!-- Subcomponents indented by their depth in the tree. -->
                   <div class="component-name" :class="`depth-${Math.min(c.depth, 6)}`" :data-depth="c.depth">
                     <button
                       v-if="c.IsGroup"
@@ -455,14 +467,14 @@ const quickStatus = async (comp, newStatus) => {
                     @update:model-value="status => quickStatus(c, status)"
                   />
                   <StatusBadge v-else-if="c.Status !== 'group'" :status="c.Status" />
-                  <!-- Gruppen zeigen den berechneten Status nur an. -->
+                  <!-- Groups only display the computed status. -->
                   <span v-if="c.IsGroup" class="sr-only">{{ t('components.groupLabel') }}</span>
                 </td>
                 <td :data-label="t('components.tableChanged')" class="cell-changed">
                   <RelativeTime :value="c.UpdatedAt" />
                 </td>
                 <td class="actions-col">
-                  <!-- Übersetzungen nur noch über das Zeilenmenü. -->
+                  <!-- Translations only via the row menu now. -->
                   <RowMenu
                     v-help="'components.rowActions'"
                     :label="t('components.menuLabel', { name: c.Name })"
@@ -481,9 +493,9 @@ const quickStatus = async (comp, newStatus) => {
 
       <FormPanel v-if="isEditing" :title="formTitle" @close="cancelEdit">
 
-        <!-- Pflichtfeld Name prüft saveItem selbst (Meldung am Feld). Ohne data-self-validates
-             fängt der Submit-Wächter (utils/formValidation.js) den Submit ab und zeigt nur den
-             englischen Browser-Hinweis statt der Feldmeldung. -->
+        <!-- saveItem checks the required name field itself (message at the field). Without
+             data-self-validates the submit guard (utils/formValidation.ts) intercepts the submit
+             and only shows the English browser hint instead of the field message. -->
         <form ref="formEl" novalidate data-self-validates class="edit-form" @submit.prevent="saveItem">
           <p v-if="formReadOnly" class="form-lock-hint" role="status">{{ t('common.readOnlyForm') }}</p>
           <FormLanguageSwitch :trans="trans" />
@@ -508,7 +520,7 @@ const quickStatus = async (comp, newStatus) => {
 
           <FormLanguageDone :trans="trans" />
 
-          <!-- Kennung (Slug). Beim Anlegen optional (leer = aus dem Namen), danach schreibgeschützt. -->
+          <!-- Slug. Optional when creating (empty = from the name), read-only afterwards. -->
           <FormField v-slot="f" :label="t('components.fieldSlug')" help="components.slug" :hint="t(currentEditId ? 'components.slugHintEdit' : 'components.slugHintNew')" :error="slugFieldError">
             <input
               :id="f.id"
@@ -537,18 +549,18 @@ const quickStatus = async (comp, newStatus) => {
                 <span id="components-tags-label" class="form-field__label">{{ t('components.fieldTags') }}</span>
                 <span class="form-field__optional">{{ t('patterns.optional') }}</span>
               </div>
-              <TagChips :tags="availableTags" :selected-ids="formData.TagIDs" @toggle="toggleTag" />
+              <TagChips :tags="availableTags" :selected-ids="formData.TagIDs!" @toggle="toggleTag" />
             </div>
           </div>
 
-          <!-- unsichtbare Komponenten (bei Gruppen samt Mitgliedern) fehlen auf der
-               öffentlichen Statusseite, bleiben hier aber sichtbar und per Webhook setzbar. -->
+          <!-- invisible components (for groups including their members) are missing from the
+               public status page, but stay visible here and settable via webhook. -->
           <div v-help="'components.visible'" class="form-field form-field--manual" role="group" :aria-label="t('components.fieldVisible')">
             <OnyxSwitch v-model="formData.Visible" :label="t('components.fieldVisible')" />
             <p class="text-muted">{{ t(formData.Visible ? 'components.visibleOn' : 'components.visibleOff') }}</p>
           </div>
 
-          <!-- Gruppen haben keinen setzbaren Status. -->
+          <!-- Groups have no settable status. -->
           <p v-if="formData.IsGroup" class="form-group text-muted group-status-hint">{{ t('components.groupStatusHint') }}</p>
           <fieldset v-else v-help="'components.status'" class="form-field form-field--set" role="group">
             <legend class="form-field__labelrow">

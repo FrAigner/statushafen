@@ -1,8 +1,8 @@
-// Die Admin-Seiten mit OnyxSelect erzeugten pro Rendern Vue-Warnungen
+// The admin pages with OnyxSelect produced Vue warnings on every render
 // ("Missing required prop: listLabel", "Invalid prop: type check failed for
-// prop label"), weil sit-onyx die Prop listLabel verlangt. Alle anderen Tests
-// stubben OnyxSelect und sehen das nie - dieser Test mountet die ECHTEN
-// sit-onyx-Komponenten und schlägt bei jeder Vue-Warnung an.
+// prop label"), because sit-onyx requires the listLabel prop. All other tests
+// stub OnyxSelect and never see it - this test mounts the REAL
+// sit-onyx components and fails on every Vue warning.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
@@ -12,10 +12,10 @@ import AdminNotificationTemplates from './AdminNotificationTemplates.vue'
 import AdminSubscribers from './AdminSubscribers.vue'
 import ProfileView from './ProfileView.vue'
 
-// Vitest löst sit-onyx sonst über die "node"-Bedingung auf (dist/index.js) -
-// diese Build-Variante deklariert listLabel NICHT als Pflicht-Prop, die
-// Warnung bliebe unsichtbar. Der Browser (Vite) lädt dist/index.esm-bundler.js,
-// also genau diese Variante hier erzwingen.
+// Otherwise Vitest resolves sit-onyx via the "node" condition (dist/index.js) -
+// this build variant does NOT declare listLabel as a required prop, so the
+// warning would stay invisible. The browser (Vite) loads dist/index.esm-bundler.js,
+// so force exactly this variant here.
 vi.mock('sit-onyx', async () => await import('sit-onyx/dist/index.esm-bundler.js'))
 
 const json = (body) => ({ ok: true, status: 200, json: async () => body })
@@ -47,8 +47,8 @@ describe('Keine Vue-Warnungen mit echten sit-onyx-Komponenten', () => {
     wrapper.unmount()
   })
 
-  // Die Komponenten-Auswahl (multiple) steckt im Formular und wird erst beim
-  // Öffnen gerendert.
+  // The component selection (multiple) is in the form and is only rendered
+  // when it is opened.
   it('AdminSubscribers mountet mit geöffnetem Formular ohne Vue-Warnungen', async () => {
     const wrapper = mount(AdminSubscribers, { global: { plugins: [i18n], stubs: { RouterLink: true } } })
     await flushPromises()

@@ -1,11 +1,10 @@
-<script setup>
+<script setup lang="ts">
 /*
-  Seite „Keine Berechtigung“. AdminLayout zeigt sie anstelle einer
-  Admin-Seite, wenn der Nutzer das Leserecht dieses Tabs nicht hat (direkter
-  Aufruf per Adresse, Lesezeichen, alter Link). Die Seite der eigentlichen View
-  wird dann gar nicht erst geladen, es gibt also keine API-Aufrufe und keine
-  Weiterleitung ins Leere. Der Link führt zum ersten Tab, den der Nutzer lesen
-  darf; gibt es keinen, erklärt die Seite, dass noch keine Rolle vergeben ist.
+  "No permission" page. AdminLayout shows it instead of an admin page when the
+  user lacks read permission for that tab (direct URL, bookmark, old link). The
+  actual view is never loaded, so there are no API calls and no redirect into
+  nowhere. The link leads to the first tab the user may read; if there is none,
+  the page explains that no role has been assigned yet.
 */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -22,7 +21,7 @@ const target = computed(() => firstAllowedItem(hasPerm, isGlobalAdmin.value))
 <template>
   <section class="forbidden" data-status="forbidden">
     <PageHeader :level="2" :title="t('adminForbidden.title')" />
-    <!-- Für Screenreader: Status der Seite (wie ein 403), die Überschrift allein sagt es nicht. -->
+    <!-- For screen readers: the page status (like a 403); the heading alone does not say it. -->
     <p class="sr-only" role="status">{{ t('adminForbidden.status') }}</p>
     <p class="forbidden__text">{{ target ? t('adminForbidden.text') : t('adminForbidden.noAccess') }}</p>
     <p v-if="target">

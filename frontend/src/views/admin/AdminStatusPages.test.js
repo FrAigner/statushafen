@@ -20,7 +20,7 @@ function usersFixture() {
 }
 
 function rolesFixture() {
-  // "Global Admin" (GlobalOnly) darf keine Seitenrolle sein.
+  // "Global Admin" (GlobalOnly) must not be a page role.
   return [{ ID: 1, Name: 'Global Admin', GlobalOnly: true }, { ID: 3, Name: 'Viewer', GlobalOnly: false }]
 }
 
@@ -47,10 +47,10 @@ function makeFetchRouter({ pages = pagesFixture(), loadOk = true, writeOk = true
 
 let activeWrapper = null
 
-// Zeilenmenü (RowMenu): Eintrag einer Tabellenzeile der Liste auslösen.
+// Row menu (RowMenu): trigger an entry of a table row of the list.
 const rowAction = (wrapper, rowIndex, label) =>
   wrapper.findAll('tbody tr')[rowIndex].findAll('[role="menuitem"]').find(b => b.text() === label).trigger('click')
-// Formular absenden (Speichern ist ein Submit-Knopf; ein nicht angehängter Wrapper löst kein Klick-Submit aus).
+// Submit the form (save is a submit button; a wrapper that is not attached does not submit on click).
 const submitForm = (wrapper) => wrapper.find('form').trigger('submit')
 
 async function mountPages({ fetchImpl, isGlobalAdmin = true, attach = false } = {}) {
@@ -78,9 +78,9 @@ describe('AdminStatusPages', () => {
     useAuth().logout()
   })
 
-  // Die globale .meta-tag-Regel setzt Großbuchstaben ("SYSTEM"), der
-  // Slug ist aber Teil der (kleingeschriebenen) URL. Vitest lädt scoped CSS nicht,
-  // deshalb wird Klasse am Slug und Regel im Style-Block geprüft.
+  // The global .meta-tag rule sets capitals ("SYSTEM"), but the
+  // slug is part of the (lower-case) URL. Vitest does not load scoped CSS,
+  // so the class on the slug and the rule in the style block are checked.
   it('zeigt den Slug unverändert klein statt in Großbuchstaben', async () => {
     const { wrapper } = await mountPages()
 
@@ -89,9 +89,9 @@ describe('AdminStatusPages', () => {
     expect(statusPagesSource).toMatch(/\.meta-tag--slug\s*\{[^}]*text-transform:\s*none/)
   })
 
-  // Die Systemseite (IsSystem) lässt sich nicht löschen und ihr Slug
-  // nicht ändern (Backend: 409 system_page_slug_locked) - das Frontend bietet
-  // beides gar nicht erst an.
+  // The system page (IsSystem) cannot be deleted and its slug
+  // cannot be changed (backend: 409 system_page_slug_locked) - the frontend
+  // does not offer either in the first place.
   describe('Systemseite', () => {
     const withSystem = () => [
       ...pagesFixture(),
@@ -137,8 +137,8 @@ describe('AdminStatusPages', () => {
     expect(rows[1].text()).toContain('status.beta.example')
   })
 
-  // Stufe 4d: h2 statt h1 (die Admin-Topbar trägt die h1), Leerzustand,
-  // Domain-Status als StatusBadge (Form + Text), Felder über FormField.
+  // Stage 4d: h2 instead of h1 (the admin top bar carries the h1), empty state,
+  // domain status as StatusBadge (shape + text), fields via FormField.
   it('rendert den Titel als h2 ohne h1', async () => {
     const { wrapper } = await mountPages()
 
@@ -146,8 +146,8 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('h1').exists()).toBe(false)
   })
 
-  // Richtung C: Seitenkopf mit Brotkrumen und Zählung, Listenkarte mit
-  // Suche, Name fett mit Beschreibung, relative Zeitangabe, Zeilenmenü statt Knopfreihe.
+  // Direction C: page header with breadcrumbs and a count, list card with
+  // search, bold name with description, relative time, row menu instead of a row of buttons.
   it('zeigt Brotkrumen, Zählung und Karte mit Suche im Richtung-C-Muster', async () => {
     const { wrapper } = await mountPages()
 
@@ -198,7 +198,7 @@ describe('AdminStatusPages', () => {
     expect(panel.find('h3').text()).toBe('Statusseite „Acme Corp“ bearbeiten')
     expect(panel.find('h3').text()).not.toContain('ID')
     expect(panel.find('.form-panel__hint').text()).toBe('Felder mit * sind Pflichtfelder.')
-    // Liste bleibt neben dem Formular stehen.
+    // The list stays next to the form.
     expect(wrapper.find('.split').classes()).toContain('split--open')
     expect(wrapper.find('section.comp-card table').exists()).toBe(true)
 
@@ -257,7 +257,7 @@ describe('AdminStatusPages', () => {
     expect(rows[1].find('.st-badge--maintenance').exists()).toBe(true)
     expect(rows[2].find('.st-badge--operational').exists()).toBe(true)
     expect(rows[3].find('.st-badge--unknown').exists()).toBe(true)
-    // nach fehlgeschlagener Prüfung nicht mehr "DNS noch nicht geprüft".
+    // after a failed check no longer "DNS not checked yet".
     expect(rows[4].find('.st-badge--major').exists()).toBe(true)
     expect(rows[4].text()).toContain('Prüfung fehlgeschlagen')
     expect(rows[4].text()).not.toContain('DNS noch nicht geprüft')
@@ -318,7 +318,7 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('.status-line').text()).toContain('Aktiv')
     const verifyBtn = wrapper.findAll('button').find(b => b.text().includes('DNS verifizieren'))
     expect(verifyBtn.attributes('disabled')).toBeUndefined()
-    // Ohne Prüffehler keine Zeile.
+    // No row without a check error.
     await rowAction(wrapper, 1, 'Bearbeiten')
     expect(wrapper.find('[data-test="domain-check-failed"]').exists()).toBe(false)
   })
@@ -364,8 +364,8 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('.alert-warning').text()).toContain('kaputt')
   })
 
-  // Die Adresse ist nur noch eine Antwortadresse (Reply-To); die Absenderadresse
-  // gehört dem Server. Ein aus dem Slug erfundenes Postfach wird deshalb nicht mehr vorbelegt.
+  // The address is now only a reply address (Reply-To); the sender address
+  // belongs to the server. A mailbox invented from the slug is therefore no longer prefilled.
   it('generiert den Slug live aus dem Namen einer neuen Seite und lässt die Antwortadresse leer', async () => {
     vi.stubEnv('VITE_APP_BASE_DOMAINS', 'example.com')
     const { wrapper } = await mountPages()
@@ -422,16 +422,16 @@ describe('AdminStatusPages', () => {
     })
   })
 
-  // Der Submit-Wächter (utils/formValidation.js) würde sonst die Feldmeldung
-  // der View durch den englischen Browser-Hinweis ersetzen.
+  // The submit guard (utils/formValidation.ts) would otherwise replace the view's
+  // field message with the English browser hint.
   it('Formular meldet sich beim Submit-Wächter als selbstprüfend an', async () => {
     const { wrapper: attached } = await mountPages({ fetchImpl: makeFetchRouter(), attach: true })
     await attached.findAll('button').find(b => b.text().includes('Neue Statusseite')).trigger('click')
     expect(attached.find('form.edit-form').attributes('data-self-validates')).toBeDefined()
   })
 
-  // Richtung C: Pflichtfeld-Fehler steht am Feld und der Fokus springt
-  // dorthin; es geht kein Request an den Server.
+  // Direction C: the required-field error is at the field and focus jumps
+  // there; no request goes to the server.
   it('meldet einen leeren Namen am Feld, fokussiert es und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper: attached } = await mountPages({ fetchImpl: fetchMock, attach: true })
@@ -462,9 +462,9 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('#page-slug-error').text()).toContain('Bitte einen Slug eingeben.')
   })
 
-  // Stufe 4d: Alle Felder liegen in FormField; jedes muss seinen Wert
-  // wirklich ins Formular schreiben (Beschreibung, Logo, Farben als Farbwähler
-  // UND Hex-Feld, Kopfzeilen-Stil, Standardrolle).
+  // Stage 4d: all fields are in FormField; each must really write its value
+  // into the form (description, logo, colours as colour picker
+  // AND hex field, header style, default role).
   it('überträgt jedes Formularfeld in den POST', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountPages({ fetchImpl: fetchMock })
@@ -540,7 +540,7 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('#page-autojoin-domains').exists()).toBe(true)
   })
 
-  // "Global Admin" ist eine globale Eigenschaft, keine Seitenrolle.
+  // "Global Admin" is a global property, not a page role.
   it('bietet "Global Admin" nicht als Default-Rolle einer Seite an', async () => {
     const { wrapper } = await mountPages()
 
@@ -710,7 +710,7 @@ describe('AdminStatusPages', () => {
     await flushPromises()
 
     expect(wrapper.find('#webhook-token-display').element.value).toBe('whk-secret-123')
-    // Fokus markiert den Token zum Kopieren.
+    // Focus selects the token for copying.
     const select = vi.spyOn(wrapper.find('#webhook-token-display').element, 'select')
     await wrapper.find('#webhook-token-display').trigger('focus')
     expect(select).toHaveBeenCalled()
@@ -744,8 +744,8 @@ describe('AdminStatusPages', () => {
 
     await rowAction(wrapper, 0, 'Bearbeiten')
     await wrapper.find('#custom-domain-input').setValue('status.acme.example')
-    // .action-btn grenzt gegen den OnyxButton-"Speichern" des Hauptformulars ab,
-    // der denselben Label-Text trägt (t('common.save')).
+    // .action-btn distinguishes it from the main form's OnyxButton "Save",
+    // which carries the same label text (t('common.save')).
     await wrapper.findAll('.action-btn').find(b => b.text() === 'Speichern').trigger('click')
     await flushPromises()
 
@@ -756,6 +756,61 @@ describe('AdminStatusPages', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('DNS ok')
+  })
+
+  it('reports failing custom domain and webhook token requests with the server message', async () => {
+    stubConfirm(true)
+    const { wrapper } = await mountPages({ fetchImpl: makeFetchRouter({ writeOk: false }) })
+    const clickButton = async (text) => {
+      await wrapper.findAll('.action-btn').find(b => b.text().includes(text)).trigger('click')
+      await flushPromises()
+    }
+
+    // Beta Internal already has a pending domain, so verify and remove are offered.
+    await rowAction(wrapper, 1, 'Bearbeiten')
+    await wrapper.find('#custom-domain-input').setValue('status.beta.example')
+    await clickButton('Speichern')
+    expect(wrapper.text()).toContain('Domain konnte nicht gespeichert werden: Fehlgeschlagen')
+    await clickButton('DNS verifizieren')
+    expect(wrapper.text()).toContain('Verifikation fehlgeschlagen: Fehlgeschlagen')
+    await clickButton('Domain entfernen')
+    expect(wrapper.text()).toContain('Domain konnte nicht entfernt werden: Fehlgeschlagen')
+    await clickButton('Token erzeugen')
+    expect(wrapper.text()).toContain('Token konnte nicht erzeugt werden: Fehlgeschlagen')
+    await clickButton('Token widerrufen')
+    expect(wrapper.text()).toContain('Token konnte nicht widerrufen werden: Fehlgeschlagen')
+  })
+
+  it('reports a failed copy of the webhook token and the TXT record', async () => {
+    stubConfirm(true)
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } })
+    const base = makeFetchRouter()
+    const fetchImpl = vi.fn(async (url, options = {}) => {
+      const method = options.method || 'GET'
+      if (method === 'POST' && /\/webhook-token$/.test(url)) return jsonResponse({ token: 'whk-secret-123' })
+      if (method === 'PUT' && /\/custom-domain$/.test(url)) {
+        return jsonResponse({ custom_domain_status: 'pending', cname_target: 'edge.example.com', txt_record_value: 'txt-abc' })
+      }
+      return base(url, options)
+    })
+    const { wrapper } = await mountPages({ fetchImpl })
+
+    await rowAction(wrapper, 0, 'Bearbeiten')
+    await wrapper.findAll('button').find(b => b.text().includes('Token erzeugen')).trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text().includes('Kopieren')).trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Kopieren fehlgeschlagen: denied')
+
+    await wrapper.find('.alert-close').trigger('click')
+    expect(wrapper.text()).not.toContain('Kopieren fehlgeschlagen')
+    await wrapper.find('#custom-domain-input').setValue('status.acme.example')
+    await wrapper.findAll('.action-btn').find(b => b.text() === 'Speichern').trigger('click')
+    await flushPromises()
+    await wrapper.find('.txt-box .action-btn').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Kopieren fehlgeschlagen: denied')
+    vi.unstubAllGlobals()
   })
 
   it('versteckt Neu-Button, Edit/Delete für Nicht-Global-Admins, zeigt aber Öffnen/Benutzer', async () => {
@@ -872,7 +927,7 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('aside').exists()).toBe(false)
   })
 
-  // Backend-400 slug_reserved / name_required erscheinen am Feld.
+  // Backend 400 slug_reserved / name_required appear at the field.
   it('zeigt slug_reserved vom Server am Slug-Feld statt als Sammelmeldung', async () => {
     const fetchMock = makeFetchRouter({ writeOk: false, writeStatus: 400, writeError: { error: 'x', code: 'slug_reserved' } })
     const { wrapper } = await mountPages({ fetchImpl: fetchMock, attach: true })
@@ -886,7 +941,7 @@ describe('AdminStatusPages', () => {
     expect(document.activeElement).toBe(wrapper.find('#page-slug').element)
   })
 
-  // 409 slug_taken (auch aus der Race beim parallelen Anlegen) am Slug-Feld.
+  // 409 slug_taken (also from the race when creating in parallel) at the slug field.
   it('zeigt slug_taken vom Server am Slug-Feld', async () => {
     const fetchMock = makeFetchRouter({ writeOk: false, writeStatus: 409, writeError: { error: 'x', code: 'slug_taken' } })
     const { wrapper } = await mountPages({ fetchImpl: fetchMock, attach: true })
@@ -918,7 +973,7 @@ describe('AdminStatusPages', () => {
     expect(wrapper.find('#page-name').attributes('aria-invalid')).toBeUndefined()
     expect(wrapper.text()).toContain('kaputt')
   })
-  // „Entfernen“ in der Benutzerzuweisung löschte ohne Rückfrage und ohne Meldung.
+  // "Remove" in the user assignment deleted without confirmation and without a message.
   describe('Zuweisung entfernen', () => {
     const assignment = { ID: 9, User: { ID: 7, Email: 'x@y.de' }, Role: { ID: 3, Name: 'Viewer' } }
     const mountWithAssignment = async () => {
@@ -978,7 +1033,7 @@ describe('AdminStatusPages', () => {
     })
   })
 
-  // offene Einladungen (per E-Mail eingeladen, noch nicht angenommen).
+  // open invitations (invited by email, not yet accepted).
   describe('Offene Einladungen', () => {
     const invitation = { ID: 5, Email: 'neu@x.de', RoleID: 3, RoleName: 'Viewer', ExpiresAt: '2099-01-01T00:00:00Z' }
     const mountWithInvitation = async ({ deleteStatus = 200, roleName = 'Viewer' } = {}) => {
@@ -1000,7 +1055,7 @@ describe('AdminStatusPages', () => {
       return { wrapper, fetchImpl }
     }
 
-    // H6: Scheitert nur die Einladungsliste, bleibt die Mitgliederliste sichtbar.
+    // H6: if only the invitation list fails, the member list stays visible.
     it('zeigt die Mitglieder auch dann, wenn die Einladungsliste fehlschlägt', async () => {
       const base = makeFetchRouter()
       const fetchImpl = vi.fn(async (url, options = {}) => {
@@ -1016,7 +1071,7 @@ describe('AdminStatusPages', () => {
       expect(wrapper.find('aside').text()).toContain('Keine offenen Einladungen.')
     })
 
-    // H6: Eine späte Antwort der zuvor geöffneten Seite überschreibt die Listen der aktuellen nicht.
+    // H6: a late response of the previously opened page does not overwrite the lists of the current one.
     it('verwirft die späte Antwort einer zuvor geöffneten Seite', async () => {
       let releaseFirst
       const slowFirst = new Promise((resolve) => { releaseFirst = resolve })
@@ -1039,7 +1094,7 @@ describe('AdminStatusPages', () => {
       expect(wrapper.find('aside').text()).not.toContain('seite-eins@x.de')
     })
 
-    // H6: Scheitert die Mitgliederliste, meldet der Aufrufer den Fehler (kein stiller leerer Zustand).
+    // H6: if the member list fails, the caller reports the error (no silent empty state).
     it('meldet einen Fehler, wenn die Mitgliederliste nach dem Entfernen nicht lädt', async () => {
       stubConfirm(true)
       let removed = false
@@ -1134,7 +1189,7 @@ describe('AdminStatusPages', () => {
     })
   })
 
-  // abgelehnte Rückfragen lösen keinen Aufruf aus; das Ziel wird vor dem Dialog festgehalten.
+  // declined confirmations trigger no call; the target is captured before the dialog.
   describe('Rückfragen für Domain und Webhook-Token', () => {
     function tokenAndDomainFetch() {
       const base = makeFetchRouter()

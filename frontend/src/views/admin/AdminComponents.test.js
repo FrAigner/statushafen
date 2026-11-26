@@ -41,7 +41,7 @@ function makeFetchRouter({ compsOk = true, tagsOk = true, writeOk = true, pageTa
     if (method === 'GET' && /\/components$/.test(url)) {
       return compsOk ? jsonResponse(componentsFixture()) : jsonResponse({ error: 'kaputt' }, 500)
     }
-    // Seiten-Endpunkt für Seiten-Rollen (globale + seiteneigene Tags).
+    // Page endpoint for page roles (global + page-owned tags).
     if (method === 'GET' && /\/api\/pages\/\d+\/tags$/.test(url)) return jsonResponse(pageTags)
     if (method === 'GET' && /\/api\/tags/.test(url)) {
       return tagsOk ? jsonResponse(tagsFixture()) : jsonResponse({ error: 'tags kaputt' }, 500)
@@ -58,8 +58,8 @@ function makeFetchRouter({ compsOk = true, tagsOk = true, writeOk = true, pageTa
 
 let activeWrapper = null
 
-// Zeilenmenü: die Einträge stehen im DOM (v-show), ein Klick
-// auf den Eintrag genügt; der Knopf öffnet es für Tastatur und Maus.
+// Row menu: the entries are in the DOM (v-show), a click on the
+// entry is enough; the button opens it for keyboard and mouse.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 const clickMenuItem = (row, text) => menuItem(row, text).trigger('click')
 
@@ -125,9 +125,9 @@ describe('AdminComponents', () => {
     expect(wrapper.text()).toContain('Keine Tags vorhanden')
   })
 
-  // /api/tags ist global-admin-only. Ohne Global Admin fragt die
-  // View die Tags gar nicht erst ab und blendet das Feld aus, statt „Noch
-  // „Keine Tags vorhanden. Unter ‚Tags‘ anlegen.“ zu zeigen.
+  // /api/tags is global-admin-only. Without global admin the view
+  // does not request the tags at all and hides the field, instead of showing
+  // "No tags available. Create them under 'Tags'.".
   it('blendet das Tag-Feld für Seiten-Rollen ohne seiteneigene Tags aus und lädt nie /api/tags', async () => {
     const fetchMock = makeFetchRouter({ pageTags: [{ ID: 5, Name: 'global-region', StatusPageID: null }] })
     const { wrapper } = await mountComponents({ fetchImpl: fetchMock })
@@ -139,8 +139,8 @@ describe('AdminComponents', () => {
     expect(fetchMock.mock.calls.some(([u]) => u.includes('/api/tags'))).toBe(false)
   })
 
-  // Seiten-Rollen laden die Tags über den Seiten-Endpunkt und
-  // bekommen nur seiteneigene Tags angeboten (globale vergibt nur ein Global Admin).
+  // Page roles load the tags via the page endpoint and are only
+  // offered page-owned tags (only a global admin assigns global ones).
   it('zeigt Seiten-Rollen das Tag-Feld mit den seiteneigenen Tags der Seite', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountComponents({ fetchImpl: fetchMock })
@@ -158,7 +158,7 @@ describe('AdminComponents', () => {
 
     await wrapper.findAll('button').find(b => b.text().includes('Neue Komponente')).trigger('click')
     expect(wrapper.find('#components-tags-label').exists()).toBe(true)
-    // Chips statt Checkbox-Liste; bei einer neuen Komponente sind beide Tags wählbar.
+    // Chips instead of a checkbox list; for a new component both tags are selectable.
     expect(wrapper.find('.tag-chips__add').text()).toContain('EU')
     expect(wrapper.find('.tag-chips__add').text()).toContain('US')
   })
@@ -179,12 +179,21 @@ describe('AdminComponents', () => {
     const [url, options] = fetchMock.mock.calls.find(([u, o]) => o?.method === 'PUT')
     expect(url).toContain('/components/1')
     expect(JSON.parse(options.body)).toEqual({ status: 'major_outage' })
-    // Rückmeldung nach dem Inline-Statuswechsel.
+    // Feedback after the inline status change.
     expect(wrapper.find('.alert-success').text()).toContain('Änderungen gespeichert')
   })
 
-  // Die API liefert einen Baum; vorher listete der Admin nur die
-  // oberste Ebene, Unterkomponenten waren weder sichtbar noch bearbeitbar.
+  it('reports a failed quick status change with the server message', async () => {
+    const { wrapper } = await mountComponents({ fetchImpl: makeFetchRouter({ writeOk: false }) })
+
+    await chooseQuickStatus(wrapper.find('.quick-status__button'), 'Großstörung')
+    await flushPromises()
+
+    expect(wrapper.find('.alert-error').text()).toContain('Speichern fehlgeschlagen')
+  })
+
+  // The API returns a tree; previously the admin only listed the
+  // top level, subcomponents were neither visible nor editable.
   it('listet Unterkomponenten eingerückt in Baumreihenfolge und macht sie bearbeitbar', async () => {
     const tree = [
       {
@@ -214,10 +223,10 @@ describe('AdminComponents', () => {
     expect(url).toContain('/components/7')
   })
 
-  // Die API ersetzt den Status einer Gruppe durch den schlechtesten
-  // Kindstatus. Der Admin bot dafür einen Status-Select an und schickte den
-  // Wert beim Speichern mit; das Backend machte aus der Gruppe dann eine
-  // normale Komponente.
+  // The API replaces a group's status with the worst child status.
+  // The admin offered a status select for it and sent the value along
+  // on save; the backend then turned the group into a normal
+  // component.
   describe('Gruppen', () => {
     const groupTree = () => [
       { ID: 1, Name: 'Core', Status: 'major_outage', IsGroup: true, Tags: [], Children: [
@@ -240,10 +249,10 @@ describe('AdminComponents', () => {
       expect(rows[0].find('.quick-status').exists()).toBe(false)
       expect(rows[0].find('.st-badge--major').exists()).toBe(true)
       expect(rows[0].find('td .sr-only').text()).toBe('Gruppe')
-      // Gruppe ohne Kinder: kein Roh-Badge "group", nur das Gruppen-Label.
+      // Group without children: no raw badge "group", only the group label.
       expect(rows[2].find('.st-badge').exists()).toBe(false)
       expect(rows[2].find('td .sr-only').exists()).toBe(true)
-      // Normale Komponente behält den Schnellstatus.
+      // A normal component keeps the quick status.
       expect(rows[1].find('.quick-status').exists()).toBe(true)
       expect(rows[1].find('td .sr-only').exists()).toBe(false)
     })
@@ -386,7 +395,7 @@ describe('AdminComponents', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Stufe 4c: Das Formular ersetzte früher die Liste.
+  // Stage 4c: the form used to replace the list.
   it('zeigt Liste und Formular nebeneinander (Regression: Formular verdrängte die Tabelle)', async () => {
     const { wrapper } = await mountComponents()
     expect(wrapper.find('.split').classes()).not.toContain('split--open')
@@ -397,7 +406,7 @@ describe('AdminComponents', () => {
     expect(wrapper.find('.split').classes()).toContain('split--open')
     expect(wrapper.find('table.data-table').exists()).toBe(true)
     expect(wrapper.find('aside.form-panel').attributes('aria-label')).toBe('Komponente „API“ bearbeiten')
-    // Pflichtfeld über FormField: Stern nur in der Darstellung, nicht im Label-Text.
+    // Required field via FormField: asterisk only in the display, not in the label text.
     expect(wrapper.find('.form-field__required').exists()).toBe(true)
 
     await wrapper.findAll('button').find(b => b.text() === 'Abbrechen').trigger('click')
@@ -417,7 +426,7 @@ describe('AdminComponents', () => {
     expect(row.find('.st-badge--degraded').exists()).toBe(true)
   })
 
-  // Gruppen sollen sich klar von Komponenten absetzen (Symbol + getönte Fläche).
+  // Groups should stand out clearly from components (icon + tinted background).
   it('kennzeichnet nur Gruppenzeilen mit Gruppen-Symbol', async () => {
     const base = makeFetchRouter()
     const tree = [{ ID: 1, Name: 'Core', Status: 'operational', IsGroup: true, Tags: [], Children: [{ ID: 2 }] },
@@ -443,7 +452,7 @@ describe('AdminComponents', () => {
     expect(wrapper.find('.quick-status__button').attributes('aria-label')).toBe('Status von API')
   })
 
-  // Richtung C: Seitenkopf, Karte, Gruppen, Suche, Formular.
+  // Direction C: page header, card, groups, search, form.
   describe('Richtung C', () => {
     const ago = days => new Date(Date.now() - days * 86400000).toISOString()
     const tree = () => [
@@ -499,7 +508,7 @@ describe('AdminComponents', () => {
       const cells = wrapper.findAll('tbody tr td')
       expect(cells[1].text()).toBe('—')
       expect(cells[3].text()).toBe('—')
-      // Die Suche verträgt fehlende Tags (die API liefert dann null).
+      // The search copes with missing tags (the API then returns null).
       await wrapper.find('input[type="search"]').setValue('x')
       expect(wrapper.findAll('tbody tr')).toHaveLength(1)
     })
@@ -577,9 +586,9 @@ describe('AdminComponents', () => {
       expect(wrapper.find('.form-panel__hint').text()).toBe('Felder mit * sind Pflichtfelder.')
     })
 
-    // Ohne data-self-validates fängt der Submit-Wächter (utils/formValidation.js) den
-    // Submit mit leerem Pflichtfeld ab und zeigt nur den englischen Browser-Hinweis, die
-    // Feldmeldung der View erscheint nie (im Browser; happy-dom installiert den Wächter nicht).
+    // Without data-self-validates the submit guard (utils/formValidation.ts) intercepts the
+    // submit with an empty required field and only shows the English browser hint; the
+    // view's field message never appears (in the browser; happy-dom does not install the guard).
     it('Formular meldet sich beim Submit-Wächter als selbstprüfend an', async () => {
       const { wrapper } = await mountComponents()
       await newButton(wrapper).trigger('click')
@@ -674,7 +683,7 @@ describe('AdminComponents', () => {
       expect(wrapper.find('.quick-status').exists()).toBe(false)
       expect(wrapper.findAll('thead th').map(th => th.text())).toEqual(['Name', 'Tags', 'Status (Schnellwechsel)', 'Geändert', 'Aktionen'])
       expect(wrapper.findAll('[role="menuitem"]').every(i => ['Ansehen', 'Übersetzungen'].includes(i.text()))).toBe(true)
-      // Lesen und Suchen bleiben möglich.
+      // Reading and searching remain possible.
       await wrapper.find('input[type="search"]').setValue('webh')
       expect(names(wrapper)).toEqual(['Webhooks'])
     })
@@ -684,7 +693,7 @@ describe('AdminComponents', () => {
       expect(fetchMock.mock.calls.some(([u]) => u === '/api/pages/7/components')).toBe(true)
     })
 
-    // Gruppen anlegen und das Löschen nicht leerer Gruppen verhindern.
+    // Creating groups and preventing the deletion of non-empty groups.
     describe('Gruppen', () => {
       const groupButton = wrapper => wrapper.findAll('button').find(b => b.text().includes('Neue Gruppe'))
       const postBody = fetchMock => JSON.parse(fetchMock.mock.calls.find(([, o]) => o?.method === 'POST')[1].body)
@@ -814,7 +823,7 @@ describe('AdminComponents', () => {
   })
 })
 
-// Feldlängen (Name 60, Beschreibung 240) und Sichtbarkeitsschalter.
+// Field lengths (name 60, description 240) and the visibility switch.
 describe('AdminComponents Feldregeln', () => {
   beforeEach(() => {
     useAuth().logout()
@@ -939,7 +948,7 @@ describe('AdminComponents Feldregeln', () => {
   })
 
   it('behandelt ein fehlendes Visible (Altstand der API) als sichtbar', async () => {
-    // Weder Visible noch Tags im Datensatz: sichtbar, leere Tag-Auswahl.
+    // Neither Visible nor tags in the record: visible, empty tag selection.
     const fetchMock = withComponents([{ ID: 1, Name: 'API', Status: 'operational' }])
     const { wrapper } = await mountComponents({ fetchImpl: fetchMock })
     expect(wrapper.find('tbody tr').text()).not.toContain('Nicht öffentlich')
@@ -957,7 +966,7 @@ describe('AdminComponents Feldregeln', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Kennung (Slug).
+  // Slug.
   describe('Kennung', () => {
     const newButton = wrapper => wrapper.findAll('button').find(b => b.text().includes('Neue Komponente'))
     const slugField = wrapper => fieldByLabel(wrapper, 'Kennung')
@@ -1035,7 +1044,7 @@ describe('AdminComponents Feldregeln', () => {
       expect(slugField(wrapper).attributes('aria-invalid')).toBe('true')
       expect(wrapper.text()).toContain(text)
       expect(wrapper.find('.alert-error').exists()).toBe(false)
-      // Eingabe räumt den Fehler wieder ab.
+      // Typing clears the error again.
       await slugField(wrapper).setValue('web-2')
       expect(slugField(wrapper).attributes('aria-invalid')).not.toBe('true')
     })
@@ -1060,7 +1069,7 @@ describe('AdminComponents Feldregeln', () => {
     })
   })
 
-  // Ohne Recht zum Ändern öffnet „Ansehen“ das Formular gesperrt, ohne Speichern.
+  // Without update permission "View" opens the form locked, without saving.
   it('öffnet das Formular ohne Änderungsrecht gesperrt und ohne Speichern-Knopf', async () => {
     const { wrapper } = await mountComponents({ perms: 'components:read' })
     await wrapper.findAll('[role="menuitem"]').find(i => i.text() === 'Ansehen').trigger('click')
@@ -1069,7 +1078,7 @@ describe('AdminComponents Feldregeln', () => {
     expect(wrapper.find('.form-lock-hint').text()).toContain('Nur Lesezugriff')
     expect(wrapper.findAll('button[type="submit"]')).toHaveLength(0)
   })
-  // Löschen meldete nichts und ließ die ältere Meldung („Komponente erstellt.“) stehen.
+  // Deleting reported nothing and left the older message ("Component created.") in place.
   it('meldet das Löschen als Erfolg und entfernt die ältere Meldung', async () => {
     stubConfirm(true)
     const { wrapper } = await mountComponents()
@@ -1084,7 +1093,7 @@ describe('AdminComponents Feldregeln', () => {
   })
 })
 
-// Komponenten archivieren (Segment Aktiv/Archiviert, Leerzustand).
+// Archiving components (segment active/archived, empty state).
 describe('AdminComponents Archivieren', () => {
   beforeEach(() => {
     useAuth().logout()
@@ -1132,7 +1141,7 @@ describe('AdminComponents Archivieren', () => {
     expect(segment(wrapper, 'Aktiv').text()).toBe('Aktiv 1')
     expect(segment(wrapper, 'Aktiv').attributes('aria-pressed')).toBe('true')
     expect(segment(wrapper, 'Archiviert').text()).toBe('Archiviert 3')
-    // Untertitel zählt nur aktive Einträge
+    // the subtitle counts only active entries
     expect(wrapper.text()).toContain('1 Komponente in 0 Gruppen')
   })
 
@@ -1141,7 +1150,7 @@ describe('AdminComponents Archivieren', () => {
     await segment(wrapper, 'Archiviert').trigger('click')
     expect(names(wrapper)).toEqual(['Altsystem', 'Alt-Gruppe', 'Alt-Kind'])
     expect(wrapper.find('.quick-status').exists()).toBe(false)
-    // Mitglied bleibt unter seiner archivierten Gruppe eingerückt, Altsystem steht oben
+    // a member stays indented below its archived group, the legacy system is on top
     const depths = wrapper.findAll('tbody tr .component-name').map(n => n.attributes('data-depth'))
     expect(depths).toEqual(['0', '0', '1'])
   })
@@ -1163,7 +1172,7 @@ describe('AdminComponents Archivieren', () => {
     expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.text()).toContain('Keine archivierten Komponenten')
     expect(wrapper.text()).not.toContain('Keine Komponenten vorhanden.')
-    // Gegenprobe: im aktiven Segment ohne Einträge gilt der normale Leerzustand
+    // counter-check: in the active segment without entries the normal empty state applies
     const empty = await mountArchive({ data: [list()[1]] })
     expect(empty.wrapper.text()).toContain('Keine Komponenten vorhanden.')
     expect(empty.wrapper.text()).not.toContain('Keine archivierten Komponenten')

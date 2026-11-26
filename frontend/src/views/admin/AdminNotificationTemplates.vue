@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { sanitizeMailPreview } from '../../utils/mailPreview'
 import { OnyxButton, OnyxInput, OnyxSelect, OnyxTextarea } from 'sit-onyx'
@@ -16,18 +16,18 @@ import { languageOptions } from '../../utils/notificationTemplateOptions'
 import { NOTIFICATION_TEMPLATE_PLACEHOLDERS } from '../../utils/notificationTemplatePlaceholders'
 import { usePlaceholderInsert, placeholderToken } from '../../composables/usePlaceholderInsert'
 import { confirmDialog } from '../../composables/useConfirm'
+import type { NotificationTemplate } from '../../types/api'
 
-// Notification-Mail-Templates: per (Kind, Audience, Language)
-// editierbare Vorlagen für Incident-Benachrichtigungen. Fehlt für eine
-// Kombination ein Eintrag, versendet das Backend die hartkodierte
-// Default-Mail - "Reset" ist deshalb nur ein DELETE auf demselben
-// Quartett, danach greift wieder der Default.
+// Notification mail templates: editable templates for incident notifications
+// per (kind, audience, language). If a combination has no entry, the backend
+// sends the hard-coded default mail - "Reset" is therefore just a DELETE on the
+// same quartet, after which the default applies again.
 //
-// Audience kam mit Stage 5 der Mehrsprachigkeit dazu: vorher
-// steckte die Zielgruppe (intern/Subscriber) implizit im Language-Wert
-// (en=intern, de=Subscriber). Language ist jetzt ein echter, pro Statusseite
-// aktivierbarer Locale-Code aus dem Sprachkatalog statt einer
-// verkappten Zielgruppen-Angabe.
+// Audience was added with stage 5 of multilingual support: before, the target
+// group (internal/subscriber) was implicit in the language value
+// (en=internal, de=subscriber). Language is now a real locale code from the
+// language catalog that can be enabled per status page, instead of a
+// disguised target group.
 
 const { apiFetch } = useApi()
 const { hasPerm } = useAuth()
@@ -35,13 +35,12 @@ const { activeTenantId } = useTenant()
 const { pageLanguages, loadPageLanguages } = useContentLanguages()
 const { t } = useI18n()
 
-// Richtung C: Seitenkopf mit Brotkrumen; Editor und Vorschau stehen in Karten mit Kartenkopf.
+// Direction C: page header with breadcrumbs; editor and preview sit in cards with a card header.
 const breadcrumbs = usePageCrumbs(() => t('notificationTemplates.title'))
 
-// Drei Gruppen: Incident-Kinds, Wartungsfenster-Kinds,
-// General-Notice-Kinds. Notices lösen nur dann Mails aus, wenn
-// die Notice mit dem "Subscriber benachrichtigen"-Toggle angelegt/
-// aktualisiert wird - der Editor hier funktioniert trotzdem unabhängig.
+// Three groups: incident kinds, maintenance window kinds, general notice
+// kinds. Notices only trigger mails when the notice is created/updated with
+// the "Notify subscribers" toggle - the editor here works independently anyway.
 const kindOptions = computed(() => [
   { label: t('notificationTemplates.kindIncidentCreated'), value: 'incident_created' },
   { label: t('notificationTemplates.kindIncidentUpdated'), value: 'incident_updated' },
@@ -52,9 +51,9 @@ const kindOptions = computed(() => [
   { label: t('notificationTemplates.kindNoticeCreated'), value: 'notice_created' },
   { label: t('notificationTemplates.kindNoticeUpdated'), value: 'notice_updated' },
   { label: t('notificationTemplates.kindNoticeEnded'), value: 'notice_ended' },
-  // Bestätigungsmail des Double-Opt-in für E-Mail-Abos.
+  // Double opt-in confirmation mail for email subscriptions.
   { label: t('subscribeConfirm.templateKind'), value: 'subscription_confirm' },
-  // Meldungen externer Quellen, nur für Abonnenten.
+  // Reports from external sources, subscribers only.
   { label: t('notificationTemplates.kindExternalIncidentCreated'), value: 'external_incident_created' },
   { label: t('notificationTemplates.kindExternalIncidentUpdated'), value: 'external_incident_updated' },
   { label: t('notificationTemplates.kindExternalIncidentResolved'), value: 'external_incident_resolved' },
@@ -68,16 +67,16 @@ const audienceOptions = computed(() => [
   { label: t('notificationTemplates.audienceSubscriber'), value: 'subscriber' },
 ])
 
-// Die Platzhalter kommen aus der einen Datenquelle in
-// utils/notificationTemplatePlaceholders.js; Klickliste und
-// Autovervollständigung nutzen dieselbe Liste.
+// The placeholders come from the single data source in
+// utils/notificationTemplatePlaceholders.ts; the click list and
+// autocompletion use the same list.
 const placeholders = computed(() => NOTIFICATION_TEMPLATE_PLACEHOLDERS.map(p => ({
   name: p.name,
   key: placeholderToken(p.name),
   desc: t(p.descKey),
 })))
 
-const templates = ref([])
+const templates = ref<NotificationTemplate[]>([])
 const selectedKind = ref('incident_created')
 const selectedAudience = ref('staff')
 const selectedLanguage = ref('en')
@@ -91,41 +90,41 @@ const isSaving = ref(false)
 const isPreviewing = ref(false)
 const isResetting = ref(false)
 
-// Beispielwerte als gebundene Strings. Vorher standen sie als
-// placeholder="[ALERT] {{ '{{.ComponentNames}}' }} …" im Template; Vue
-// interpoliert in statischen Attributen nicht, im Feld stand deshalb der
-// Mustache-Code wörtlich.
+// Example values as bound strings. They used to be in the template as
+// placeholder="[ALERT] {{ '{{.ComponentNames}}' }} …"; Vue does not
+// interpolate static attributes, so the field showed the mustache code
+// literally.
 const subjectPlaceholder = '[ALERT] {{.ComponentNames}}: {{.IncidentTitle}}'
 const bodyPlaceholder = '<p>{{.Message}}</p>'
 
-// Platzhalter per Klick oder Autovervollständigung einfügen.
-// OnyxInput/OnyxTextarea geben ihr natives Element nicht heraus, deshalb
-// holt die View es aus dem umschließenden Wrapper und hängt die Handler per
-// Event-Delegation an diesen.
-const subjectField = ref(null)
-const bodyField = ref(null)
+// Insert placeholders by click or autocompletion.
+// OnyxInput/OnyxTextarea do not expose their native element, so the view
+// fetches it from the surrounding wrapper and attaches the handlers to it via
+// event delegation.
+const subjectField = ref<HTMLElement | null>(null)
+const bodyField = ref<HTMLElement | null>(null)
 const {
   suggestions, activeIndex, isOpen, listboxId, optionId, close: closeSuggestions,
   insertPlaceholder, accept, onFocus, onInput, onCaretMove, onKeydown, ariaFor,
 } = usePlaceholderInsert({
   placeholders,
   fields: {
-    subject: { model: subject, element: () => subjectField.value.querySelector('input') },
-    body: { model: body, element: () => bodyField.value.querySelector('textarea') },
+    subject: { model: subject, element: () => subjectField.value!.querySelector('input') },
+    body: { model: body, element: () => bodyField.value!.querySelector('textarea') },
   },
   defaultField: 'body',
   idPrefix: 'notification-template',
 })
 
-const showAlert = (msg, type = 'info') => {
+const showAlert = (msg: string, type = 'info') => {
   alertMsg.value = msg
   alertType.value = type
 }
 
-// Fällt auf languageOptions (en/de) zurück, solange die Statusseite noch
-// keinen eigenen Sprachkatalog konfiguriert hat (siehe Backfill/
-// Default-Seeding in database.backfillStatusPageLanguages) - identisch zum
-// Fallback in isValidNotificationLanguage im Backend.
+// Falls back to languageOptions (en/de) as long as the status page has not
+// configured its own language catalog yet (see the backfill/default seeding in
+// database.backfillStatusPageLanguages) - identical to the fallback in
+// isValidNotificationLanguage in the backend.
 const availableLanguageOptions = computed(() => {
   if (!pageLanguages.value || pageLanguages.value.length === 0) return languageOptions
   return pageLanguages.value.map(l => ({ label: l.LanguageCode, value: l.LanguageCode }))
@@ -138,7 +137,7 @@ const availableLanguageOptions = computed(() => {
 watch(availableLanguageOptions, (options) => {
   if (options.some(o => o.value === selectedLanguage.value)) return
   // options is never empty (availableLanguageOptions falls back to de/en).
-  selectedLanguage.value = pageLanguages.value.find(l => l.IsDefault)?.LanguageCode ?? options[0].value
+  selectedLanguage.value = pageLanguages.value.find(l => l.IsDefault)?.LanguageCode ?? options[0]!.value
 })
 
 const currentTemplate = computed(() =>
@@ -151,19 +150,19 @@ const loadTemplates = async () => {
   if (!activeTenantId.value) return
   try {
     const [tpls] = await Promise.all([
-      apiFetch(`/api/pages/${activeTenantId.value}/notification-templates`),
+      apiFetch<NotificationTemplate[]>(`/api/pages/${activeTenantId.value}/notification-templates`),
       loadPageLanguages(activeTenantId.value),
     ])
     templates.value = tpls
     fillEditorFromSelected()
   } catch (err) {
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   }
 }
 
-// Füllt die View die Felder selbst neu (Auswahl gewechselt, „Auf Default zurücksetzen“), sollen die
-// Pflichtfelder wieder unberührt sein. Onyx merkt sich, dass ein Wert geändert wurde, und zeigte leere
-// Felder sofort rot („Pflichtfeld“). Neuer Schlüssel = frisch gemountete Felder ohne diesen Zustand.
+// When the view refills the fields itself (selection changed, "Reset to default"), the required
+// fields should be pristine again. Onyx remembers that a value was changed and showed empty fields
+// red right away ("Required field"). A new key = freshly mounted fields without that state.
 const editorKey = ref(0)
 const fillEditorFromSelected = () => {
   editorKey.value++
@@ -179,8 +178,8 @@ const fillEditorFromSelected = () => {
 }
 
 watch(activeTenantId, (v) => { if (v) loadTemplates() }, { immediate: true })
-// Mails zu externen Meldungen gehen nur an Abonnenten; ein internes
-// Template dafür würde nie versendet, deshalb springt die Zielgruppe um.
+// Mails about external reports only go to subscribers; an internal template
+// for them would never be sent, so the audience switches over.
 watch(selectedKind, (kind) => {
   if (kind.startsWith('external_')) selectedAudience.value = 'subscriber'
 })
@@ -200,7 +199,7 @@ const save = async () => {
     showAlert(t('notificationTemplates.saved'), 'success')
     await loadTemplates()
   } catch (err) {
-    showAlert(t('common.saveError') + err.message, 'error')
+    showAlert(t('common.saveError') + (err as Error).message, 'error')
   } finally {
     isSaving.value = false
   }
@@ -221,18 +220,18 @@ const resetToDefault = async () => {
     showAlert(t('notificationTemplates.resetDone'), 'success')
     await loadTemplates()
   } catch (err) {
-    showAlert(t('notificationTemplates.resetError') + err.message, 'error')
+    showAlert(t('notificationTemplates.resetError') + (err as Error).message, 'error')
   } finally {
     isResetting.value = false
   }
 }
 
-// Nach „Vorschau“ springt die Ansicht zur Vorschau (2026-10-29): Sie steht
-// unter dem Formular, man sah nach dem Klick nur die Erfolgsmeldung oben und
-// musste selbst scrollen. Der Fokus geht auf die Überschrift, damit auch
-// Screenreader- und Tastaturnutzer dort landen (preventScroll: das Scrollen
-// übernimmt scrollIntoView, sonst springt die Ansicht doppelt).
-const previewHeading = ref(null)
+// After "Preview" the view jumps to the preview (2026-10-29): it sits below
+// the form, and after the click one only saw the success message at the top
+// and had to scroll oneself. Focus goes to the heading so that screen reader
+// and keyboard users land there too (preventScroll: scrollIntoView does the
+// scrolling, otherwise the view jumps twice).
+const previewHeading = ref<HTMLElement | null>(null)
 const scrollToPreview = async () => {
   await nextTick()
   const el = previewHeading.value
@@ -248,7 +247,7 @@ const preview = async () => {
   }
   isPreviewing.value = true
   try {
-    const resp = await apiFetch(
+    const resp: { subject: string, bodyHTML: string } = await apiFetch(
       `/api/pages/${activeTenantId.value}/notification-templates/${selectedKind.value}/${selectedAudience.value}/${selectedLanguage.value}/preview`,
       { method: 'POST', body: JSON.stringify({ Subject: subject.value, BodyHTML: body.value }) }
     )
@@ -257,21 +256,21 @@ const preview = async () => {
     showAlert(t('notificationTemplates.previewUpdated'), 'success')
     await scrollToPreview()
   } catch (err) {
-    showAlert(t('notificationTemplates.previewError') + err.message, 'error')
+    showAlert(t('notificationTemplates.previewError') + (err as Error).message, 'error')
   } finally {
     isPreviewing.value = false
   }
 }
 
-// Speichern = Ändern, Zurücksetzen = Löschen, Vorschau = Lesen (jeder Leser darf sie sehen).
+// Save = update, reset = delete, preview = read (every reader may see it).
 const canEdit = computed(() => hasPerm('notification_templates:update'))
 const canDelete = computed(() => hasPerm('notification_templates:delete'))
 
-// previewBody kommt vom Backend-Preview-Endpoint und enthält das frei
-// editierbare HTML der Vorlage. Vor dem v-html-Rendering läuft es durch die
-// Allowlist für Mail-Vorschauen (utils/mailPreview.js): kein Skript, aber auch
-// keine Formulare, Eingabefelder, Bilder oder Overlay-Styles, die anderen Admins
-// eine Anmeldemaske vortäuschen könnten.
+// previewBody comes from the backend preview endpoint and contains the freely
+// editable HTML of the template. Before v-html rendering it runs through the
+// allowlist for mail previews (utils/mailPreview.ts): no script, but also no
+// forms, input fields, images or overlay styles that could fake a login form
+// to other admins.
 const sanitizedPreviewBody = computed(() => sanitizeMailPreview(previewBody.value))
 </script>
 
@@ -298,14 +297,14 @@ const sanitizedPreviewBody = computed(() => sanitizeMailPreview(previewBody.valu
         <em>{{ t('notificationTemplates.noCustomTemplate') }}</em>
       </p>
       <p v-else class="panel-lead">
-        <em>{{ t('notificationTemplates.customTemplateActive', { date: new Date(currentTemplate.UpdatedAt).toLocaleString() }) }}</em>
+        <em>{{ t('notificationTemplates.customTemplateActive', { date: new Date(currentTemplate!.UpdatedAt!).toLocaleString() }) }}</em>
       </p>
 
-      <!-- novalidate, weil die View die Pflichtfelder selbst
-           prüft (notificationTemplates.requiredFields). Ohne novalidate zeigte
-           Chrome für die leeren required-Felder seine native Meldung „Fülle
-           dieses Feld aus.“ als Hover-Tooltip bzw. als Validierungsblase
-           unter dem Body-Feld, also über „Verfügbare Platzhalter“. -->
+      <!-- novalidate, because the view checks the required fields itself
+           (notificationTemplates.requiredFields). Without novalidate Chrome
+           showed its native "Please fill out this field." message for the
+           empty required fields as a hover tooltip or a validation bubble
+           below the body field, i.e. over "Available placeholders". -->
       <form :key="editorKey" class="edit-form" novalidate data-self-validates @submit.prevent="save">
         <div
           ref="subjectField"
@@ -390,7 +389,7 @@ const sanitizedPreviewBody = computed(() => sanitizeMailPreview(previewBody.valu
             @click="resetToDefault"
             :disabled="isResetting || !hasCustomTemplate"
           />
-          <!-- Die Vorschau rendert nur und ist im Backend eine Leseaktion
+          <!-- The preview only renders and is a read action in the backend
                (notification_templates:read, POST .../preview). -->
           <OnyxButton
             :label="isPreviewing ? t('notificationTemplates.previewing') : t('notificationTemplates.previewButton')"
@@ -430,7 +429,7 @@ const sanitizedPreviewBody = computed(() => sanitizeMailPreview(previewBody.valu
 </template>
 
 <style scoped>
-/* Anker für die Vorschlagsliste direkt unter dem Feld. */
+/* Anchor for the suggestion list directly below the field. */
 .placeholder-field {
   position: relative;
 }
@@ -490,21 +489,21 @@ const sanitizedPreviewBody = computed(() => sanitizeMailPreview(previewBody.valu
   gap: 16px;
 }
 
-/* Smartphone (480px+): 2 spalten */
+/* Smartphone (480px+): 2 columns */
 @media (min-width: 480px) {
   .form-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Tablet (768px+): 2 spalten */
+/* Tablet (768px+): 2 columns */
 @media (min-width: 768px) {
   .form-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-/* Desktop (1200px+): 3 spalten */
+/* Desktop (1200px+): 3 columns */
 @media (min-width: 1200px) {
   .form-grid {
     grid-template-columns: repeat(3, 1fr);

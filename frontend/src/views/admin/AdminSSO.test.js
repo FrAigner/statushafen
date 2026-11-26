@@ -10,10 +10,10 @@ import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 import { setConfirmHandler } from '../../composables/useConfirm'
 
-// Die View sprach früher /api/pages/:id/sso ohne Auth-Header mit
-// camelCase-Feldern an und bezog die Seite aus einem Routen-Parameter, den
-// /admin/sso gar nicht hat. Sie nutzt jetzt wie die übrigen Admin-Views die
-// aktive Statusseite aus useTenant und die oidc_*-Felder des Backends.
+// The view used to call /api/pages/:id/sso without an auth header with
+// camelCase fields and took the page from a route parameter that
+// /admin/sso does not even have. Like the other admin views it now uses the
+// active status page from useTenant and the backend's oidc_* fields.
 
 const SSO_URL = '/api/admin/pages/7/sso'
 
@@ -38,7 +38,7 @@ function ssoFixture(overrides = {}) {
   }
 }
 
-// Antwortet je Methode; Fehler werden als { status, body } übergeben.
+// Answers per method; errors are passed as { status, body }.
 function makeFetch({ get = jsonResponse(ssoFixture()), put, del, test } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
@@ -70,9 +70,9 @@ describe('AdminSSO.vue', () => {
     useAuth().setAuth('tok-123', { is_global_admin: true })
     useTenant().setActiveTenant(null)
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -100,8 +100,8 @@ describe('AdminSSO.vue', () => {
     expect(wrapper.text()).not.toContain('admin.sso.')
   })
 
-  // Stufe 4d: Titel als h2 (die Topbar trägt die h1), Felder über
-  // FormField: Pflicht-Stern + required nur bei aktivem OIDC, Hinweis per aria-describedby.
+  // Stage 4d: title as h2 (the top bar carries the h1), fields via
+  // FormField: required asterisk + required only with OIDC active, hint via aria-describedby.
   it('rendert den Titel als h2 ohne h1 und verbindet Hinweise per aria-describedby', async () => {
     const wrapper = await mountAdminSSO()
 
@@ -138,7 +138,7 @@ describe('AdminSSO.vue', () => {
     expect(wrapper.find('#sso-scopes').element.value).toBe('openid email profile')
     expect(wrapper.find('#sso-attribute-email').element.value).toBe('email')
     expect(wrapper.find('#sso-attribute-name').element.value).toBe('name')
-    // Rollen-Mapping aus einem Claim wird nicht unterstützt.
+    // Role mapping from a claim is not supported.
     expect(wrapper.find('#sso-attribute-role').exists()).toBe(false)
     expect(wrapper.find('#sso-test-login').element.checked).toBe(false)
     expect(wrapper.find('#sso-acs-url').element.value).toBe('http://localhost:8080/api/auth/oidc/callback?page=7')
@@ -379,7 +379,7 @@ describe('AdminSSO.vue', () => {
     expect(wrapper.findAll('label[for]').length).toBe(9)
   })
 
-  // Testanmeldung (test_login_enabled) aus der SSO-Seite heraus.
+  // Test login (test_login_enabled) from within the SSO page.
   describe('Testanmeldung', () => {
     it('zeigt den Knopf nur mit erlaubter Testanmeldung', async () => {
       const wrapper = await mountAdminSSO()
@@ -553,7 +553,7 @@ describe('AdminSSO.vue', () => {
     useTenant().setMyPages([])
   })
 
-  // Rechte der Ressource sso je Aktion.
+  // Permissions of the sso resource per action.
   it('sperrt das Formular ohne sso:update und blendet Speichern aus', async () => {
     useTenant().setActiveTenant(7)
     setAuthAsPageRole('tok-1', { is_global_admin: false, permissions: 'sso:read' })

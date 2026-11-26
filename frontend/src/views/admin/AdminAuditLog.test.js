@@ -35,10 +35,10 @@ async function mountView({ items = entriesFixture(), total } = {}) {
 describe('AdminAuditLog', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Default-Texte
-    // (ResponsiveTable-Kindkomponente); ohne gespeicherte Präferenz würde
-    // detectInitialLocale() in der Testumgebung (happy-dom navigator.language
-    // === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated default texts
+    // (ResponsiveTable child component); without a stored preference
+    // detectInitialLocale() in the test environment (happy-dom navigator.language
+    // === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -61,7 +61,7 @@ describe('AdminAuditLog', () => {
     expect(wrapper.find('table').exists()).toBe(false)
   })
 
-  // Stufe 4d: Titel als h2 (die Topbar trägt die h1), Untertitel im Kopf.
+  // Stage 4d: title as h2 (the top bar carries the h1), subtitle in the header.
   it('rendert den Titel als h2 ohne h1 und mit Untertitel', async () => {
     const wrapper = await mountView()
 
@@ -70,9 +70,9 @@ describe('AdminAuditLog', () => {
     expect(wrapper.find('.page-head__subtitle').text()).not.toBe('')
   })
 
-  // Stufe 4d: Die Kategoriefarben waren Inline-Styles mit Hex
-  // (#6b4de6, #fff). Jetzt stehen sie als Klassen auf Tokens; der Filter ist
-  // über aria-pressed auch ohne Farbe erkennbar.
+  // Stage 4d: the category colours were inline styles with hex
+  // (#6b4de6, #fff). Now they are classes based on tokens; the filter is
+  // recognisable via aria-pressed even without colour.
   it('färbt Kategorien über Klassen statt Inline-Styles und setzt aria-pressed am aktiven Chip', async () => {
     const wrapper = await mountView()
 
@@ -146,8 +146,8 @@ describe('AdminAuditLog', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Brotkrumen, Listenkarte mit Suche und Filter im Kopf,
-  // Zeit absolut mit relativer Angabe darunter.
+  // Direction C: breadcrumbs, list card with search and filter in the header,
+  // absolute time with the relative one below.
   it('zeigt Brotkrumen, Karte mit Suche und Kategorie-Filter und relative Zeit', async () => {
     const wrapper = await mountView({ items: [{ ...entriesFixture()[0], created_at: Math.floor(Date.now() / 1000) - 3 * 86400 }] })
 
@@ -205,8 +205,8 @@ describe('AdminAuditLog', () => {
     expect(time.find('.time-cell__rel').text()).toBe('')
   })
 
-  // Aktionen kamen als technische Schlüssel ("subscriber.deleted")
-  // und Kategorien ohne Filter-Chip als Rohwert in die Tabelle.
+  // Actions arrived in the table as technical keys ("subscriber.deleted")
+  // and categories without a filter chip as raw values.
   it('übersetzt bekannte Aktionsschlüssel und zeigt unbekannte unverändert', async () => {
     const wrapper = await mountView({ items: [
       { id: 1, created_at: 1700000000, actor_email: 'a@x.de', action: 'subscriber.deleted', target_name: 'x@y.de', category: 'subscriber', ip: '1.1.1.1' },
@@ -241,7 +241,7 @@ describe('AdminAuditLog', () => {
     ] })
     expect(wrapper.find('.a-role').text()).toBe('Automatisierung')
   })
-  // Abonnent, Ankündigung und Wartung (und System) hatten keinen Filter-Chip.
+  // Subscriber, notice and maintenance (and system) had no filter chip.
   describe('Filter-Chips aller Kategorien', () => {
     const CHIPS_DE = ['Authentifizierung', 'Vorfall', 'Konfiguration', 'Nutzer', 'Abonnent', 'Ankündigung', 'Wartung', 'System']
     const CHIPS_EN = ['Authentication', 'Incident', 'Configuration', 'User', 'Subscriber', 'Notice', 'Maintenance', 'System']
@@ -273,7 +273,7 @@ describe('AdminAuditLog', () => {
       expect(url).toContain('page=1')
       expect(chip.attributes('aria-pressed')).toBe('true')
       expect(chip.classes()).toContain(`cat--${cat}`)
-      // zweiter Klick hebt den Filter wieder auf
+      // a second click removes the filter again
       await chip.trigger('click')
       await flushPromises()
       expect(global.fetch.mock.calls.at(-1)[0]).not.toContain('category=')

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -17,11 +17,18 @@ import StatusBadge from '../../components/StatusBadge.vue'
 import RowMenu from '../../components/RowMenu.vue'
 import EmptyState from '../../components/EmptyState.vue'
 
-// Richtung C: Seitenkopf mit Brotkrumen „Seite › Vorfälle › Vorfall“,
-// Übersetzungen in einer Karte mit Zeilenmenü, neue Übersetzung als Seitenkarte.
+// Direction C: page header with breadcrumbs "Page › Incidents › Incident",
+// translations in a card with a row menu, new translation as a side card.
 
-// Stryker disable next-line all: defineProps/defineEmits/defineModel werden von Vue aus dem Setup gehoben, instrumentierter Code darf dort keine lokalen Variablen referenzieren
-const props = defineProps({ incidentId: String })
+// Stryker disable next-line all: Vue hoists defineProps/defineEmits/defineModel out of setup, so instrumented code must not reference local variables there
+const props = defineProps<{ incidentId: string }>()
+
+/** The fields of a translation row this view reads. */
+interface TranslationRow {
+  ID: number
+  Status?: string
+  LanguageCode?: string
+}
 
 const { t } = useI18n()
 const { formEl, errors, focusForm, clearErrors, clearError, validateRequired } = useFormPanel()
@@ -55,9 +62,9 @@ const columns = computed(() => [
 const openNew = () => { clearErrors(); openNewPanel(); focusForm() }
 const cancelEdit = () => { clearErrors(); cancelPanel() }
 
-// Pflichtfelder: Fehler am Feld, Fokus aufs erste Feld.
+// Required fields: error at the field, focus on the first field.
 const submit = async () => {
-  const required = (key, value, labelKey) =>
+  const required = (key: string, value: unknown, labelKey: string) =>
     ({ key, value, message: t('patterns.fieldRequired', { field: t(labelKey) }) })
   const valid = await validateRequired([
     required('language_code', formData.value.language_code, 'translations.fieldLanguage'),
@@ -67,18 +74,18 @@ const submit = async () => {
   if (valid) await saveTranslation()
 }
 
-const isConfirmed = (trans) => trans.Status === 'confirmed'
-const statusLabel = (trans) => isConfirmed(trans) ? t('translations.statusConfirmed') : t('translations.statusDraft')
+const isConfirmed = (trans: TranslationRow) => trans.Status === 'confirmed'
+const statusLabel = (trans: TranslationRow) => isConfirmed(trans) ? t('translations.statusConfirmed') : t('translations.statusDraft')
 
-// Zeilenmenü: Bestätigen nur für Entwürfe, Löschen immer.
-const menuItems = (trans) => [
+// Row menu: confirm only for drafts, delete always.
+const menuItems = (trans: TranslationRow) => [
   ...(isConfirmed(trans) || !canUpdate.value ? [] : [{
     key: 'confirm', icon: 'check', disabled: confirmingId.value === trans.ID,
     label: confirmingId.value === trans.ID ? t('translations.confirming') : t('translations.confirm'),
   }]),
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === trans.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === trans.ID }] : []),
 ]
-const onMenuSelect = (trans, key) => {
+const onMenuSelect = (trans: TranslationRow, key: string) => {
   if (key === 'confirm') handleConfirm(trans.ID)
   else handleDelete(trans.ID)
 }

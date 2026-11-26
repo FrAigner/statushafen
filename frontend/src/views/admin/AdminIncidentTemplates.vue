@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { OnyxButton } from 'sit-onyx'
 import { useI18n } from 'vue-i18n'
@@ -27,16 +27,22 @@ import { useListQuery } from '../../composables/useListQuery'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { flattenComponentTree, componentOptions } from '../../utils/componentTree'
 import { vHelp } from '../../directives/vHelp'
+import type { IncidentTemplate } from '../../types/api'
+import type { ComponentTreeNode, FlatComponent } from '../../utils/componentTree'
 
-// Vorlagen für Vorfälle/Wartungsfenster: CRUD analog zu
-// AdminComponents.vue. Werden im "Vorlage verwenden"-Dropdown von
-// AdminIncidents.vue/AdminMaintenance.vue zum Vorbefüllen genutzt - bewusst
-// ohne FK-Beziehung zurück, damit das Löschen einer Vorlage bereits
-// erstellte Incidents/Wartungsfenster nicht beeinflusst.
+// Templates for incidents/maintenance windows: CRUD like AdminComponents.vue.
+// Used in the "Use template" dropdown of AdminIncidents.vue/AdminMaintenance.vue
+// for prefilling - deliberately without a foreign key back, so that deleting a
+// template does not affect incidents/maintenance windows already created.
+
+/** Edit form: the template fields with the component IDs as a list for the multi-select. */
+interface IncidentTemplateForm extends Omit<Partial<IncidentTemplate>, 'ComponentIDs'> {
+  ComponentIDs?: string[]
+}
 
 const { apiFetch } = useApi()
-// Rechte dieses Tabs je Aktion. Ohne Ändern öffnet sich ein bestehender
-// Eintrag schreibgeschützt (formReadOnly), ohne Löschen entfällt der Eintrag im Zeilenmenü.
+// Permissions of this tab per action. Without update an existing entry opens
+// read-only (formReadOnly); without delete the row menu entry is gone.
 const { canCreate, canUpdate, canDelete } = useResourcePerms('incident_templates')
 const formReadOnly = computed(() => currentEditId.value !== null && !canUpdate.value)
 const { activeTenantId } = useTenant()
@@ -44,19 +50,19 @@ const { t } = useI18n()
 const { formEl, errors, focusForm, clearErrors, clearError, validateRequired } = useFormPanel()
 const breadcrumbs = usePageCrumbs(() => t('incidentTemplates.title'))
 
-const items          = ref([])
-const components     = ref([])
+const items          = ref<IncidentTemplate[]>([])
+const components     = ref<FlatComponent[]>([])
 const isEditing      = ref(false)
-const currentEditId  = ref(null)
-const formData       = ref({})
+const currentEditId  = ref<number | null>(null)
+const formData       = ref<IncidentTemplateForm>({})
 const alertMsg       = ref('')
 const alertType      = ref('warning')
 const isSaving       = ref(false)
-const deletingId     = ref(null)
+const deletingId     = ref<number | null>(null)
 
-// Sprachumschalter über Titel und Nachricht (weitere Sprachen der Seite).
-// Übersetzungen folgen dem Recht „Ändern“ des Tabs.
-const templateUrl = (id) => `/api/pages/${activeTenantId.value}/incident-templates/${id}/translations`
+// Language switcher above title and message (further languages of the page).
+// Translations follow the tab's "update" permission.
+const templateUrl = (id: number | string) => `/api/pages/${activeTenantId.value}/incident-templates/${id}/translations`
 const trans = useFormTranslations({
   apiFetch,
   urls: { list: templateUrl, save: (id, code) => `${templateUrl(id)}/${code}` },
@@ -71,16 +77,16 @@ const kindOptions = computed(() => [
   { label: t('incidentTemplates.kindMaintenance'), value: 'maintenance' },
 ])
 
-// Beschriftungen wie in den Vorfall-Ansichten (vorher fest englisch im Quelltext).
+// Labels as in the incident views (previously hard-coded English in the source).
 const statusOptions = computed(() => ['investigating', 'identified', 'monitoring', 'resolved']
   .map(value => ({ label: incidentBadge(value, t).label, value })))
 
-// Richtung C: Titel des Formulars nennt die Vorlage, nicht die ID.
+// Direction C: the form title names the template, not the ID.
 const formTitle = computed(() => currentEditId.value
   ? t('incidentTemplates.editTitle', { name: formData.value.Name })
   : t('incidentTemplates.createTitle'))
 
-const kindLabel = (kind) => kindOptions.value.find(o => o.value === kind)?.label ?? kind
+const kindLabel = (kind: string) => kindOptions.value.find(o => o.value === kind)?.label ?? kind
 
 const columns = computed(() => [
   { key: 'Name', label: t('incidentTemplates.tableName') },
@@ -89,7 +95,7 @@ const columns = computed(() => [
   { key: 'ComponentIDs', label: t('incidentTemplates.tableComponents') },
 ])
 
-/* ── Liste: Suche und Typfilter im Kartenkopf ── */
+/* ── List: search and kind filter in the card header ── */
 const { query, filter, rows, searching } = useListQuery(items, {
   textOf: tpl => `${tpl.Name} ${tpl.Title || ''} ${tpl.Message || ''}`,
   predicates: { incident: tpl => tpl.Kind === 'incident', maintenance: tpl => tpl.Kind === 'maintenance' },
@@ -106,13 +112,13 @@ const subtitle = computed(() => t('incidentTemplates.subtitle', {
 const loadData = async () => {
   try {
     const [tpls, comps] = await Promise.all([
-      apiFetch(`/api/pages/${activeTenantId.value}/incident-templates`),
-      apiFetch(`/api/pages/${activeTenantId.value}/components`)
+      apiFetch<IncidentTemplate[]>(`/api/pages/${activeTenantId.value}/incident-templates`),
+      apiFetch<ComponentTreeNode[]>(`/api/pages/${activeTenantId.value}/components`)
     ])
     items.value      = tpls
-    components.value = flattenComponentTree(comps) // inkl. Unterkomponenten
+    components.value = flattenComponentTree(comps) // including subcomponents
   } catch (err) {
-    showAlert(t('common.loadError') + err.message, 'error')
+    showAlert(t('common.loadError') + (err as Error).message, 'error')
   }
 }
 
@@ -124,9 +130,9 @@ watch(activeTenantId, (newId) => {
 }, { immediate: true })
 
 /* ── CRUD helpers ── */
-// vor jeder neuen Aktion die Meldung des vorigen Schritts entfernen.
+// remove the previous step's message before every new action.
 const clearAlert = () => { alertMsg.value = '' }
-const showAlert = (msg, type = 'warning') => {
+const showAlert = (msg: string, type = 'warning') => {
   alertMsg.value  = msg
   alertType.value = type
 }
@@ -140,7 +146,7 @@ const openNew = () => {
   focusForm()
 }
 
-const openEdit = (item) => {
+const openEdit = (item: IncidentTemplate) => {
   formData.value  = {
     ...item,
     ComponentIDs: (item.ComponentIDs || '').split(',').filter(Boolean),
@@ -165,8 +171,8 @@ const saveAction = useSaveAction({ apiFetch, isSaving, reload: loadData, onStart
 const deleteAction = useDeleteAction({ apiFetch, deletingId, reload: loadData, onStart: clearAlert, onDeleted: () => showAlert(t('adminFeedback.deleted'), 'success'), onError: (err) => showAlert(t('common.deleteError') + err.message, 'error') })
 
 const saveItem = async () => {
-  // Pflichtfelder: Fehler am Feld statt eines Serverfehlers, Fokus aufs erste.
-  const required = (key, labelKey) =>
+  // Required fields: error at the field instead of a server error, focus on the first one.
+  const required = (key: keyof IncidentTemplateForm, labelKey: string) =>
     ({ key, value: formData.value[key], message: t('patterns.fieldRequired', { field: t(labelKey) }) })
   const valid = await validateRequired([
     required('Name', 'incidentTemplates.fieldName'),
@@ -174,7 +180,7 @@ const saveItem = async () => {
     required('Message', 'incidentTemplates.fieldMessage'),
   ])
   if (!valid) {
-    activeLang.value = '' // die Pflichtfelder gehören zur Standardsprache
+    activeLang.value = '' // the required fields belong to the default language
     return
   }
   if (!trans.checkComplete(showAlert)) return
@@ -182,31 +188,31 @@ const saveItem = async () => {
   const url   = isNew
     ? `/api/pages/${activeTenantId.value}/incident-templates`
     : `/api/pages/${activeTenantId.value}/incident-templates/${currentEditId.value}`
-  const payload = { ...formData.value }
+  const payload: Record<string, unknown> = { ...formData.value }
   payload.ComponentIDs = (formData.value.ComponentIDs || []).join(',')
-  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved) => {
-    // Neue ID merken, bevor Übersetzungen folgen: scheitert eine, legt ein zweiter Versuch keine zweite Vorlage an.
+  await saveAction(url, isNew ? 'POST' : 'PUT', payload, async (saved: { ID?: number } | null) => {
+    // Remember the new ID before translations follow: if one fails, a second attempt does not create a second template.
     if (isNew && saved?.ID) currentEditId.value = saved.ID
-    if (showSwitcher.value) await trans.saveAll(currentEditId.value)
+    if (showSwitcher.value) await trans.saveAll(currentEditId.value!)
     showAlert(isNew ? t('incidentTemplates.created') : t('common.changesSaved'), 'success')
     cancelEdit()
   })
 }
 
-const deleteItem = (id, name) =>
+const deleteItem = (id: number, name: string) =>
   deleteAction(`/api/pages/${activeTenantId.value}/incident-templates/${id}`, id, t('incidentTemplates.confirmDelete', { name }))
 
-// Zeilenmenü: Bearbeiten, Löschen.
-const menuItems = (tpl) => [
+// Row menu: edit, delete.
+const menuItems = (tpl: IncidentTemplate) => [
   { key: 'edit', label: canUpdate.value ? t('common.edit') : t('common.view'), icon: canUpdate.value ? 'pencil' : 'eye' },
   ...(canDelete.value ? [{ key: 'delete', label: deletingId.value === tpl.ID ? t('common.deleting') : t('common.delete'), icon: 'trash', danger: true, disabled: deletingId.value === tpl.ID }] : []),
 ]
-const onMenuSelect = (tpl, key) => {
+const onMenuSelect = (tpl: IncidentTemplate, key: string) => {
   if (key === 'edit') openEdit(tpl)
   else deleteItem(tpl.ID, tpl.Name)
 }
 
-const componentNames = (ids) => {
+const componentNames = (ids?: string) => {
   const idList = (ids || '').split(',').filter(Boolean)
   return idList
     .map(id => components.value.find(c => String(c.ID) === String(id))?.Name)
@@ -235,7 +241,7 @@ const componentNames = (ids) => {
       </template>
     </PageHeader>
 
-    <!-- Richtung C: Liste und Formular nebeneinander (unter 860 px untereinander). -->
+    <!-- Direction C: list and form side by side (stacked below 860 px). -->
     <div class="split" :class="{ 'split--open': isEditing }">
       <ListCard :title="t('incidentTemplates.cardTitle')" class="split__main">
         <template #tools>
@@ -288,8 +294,8 @@ const componentNames = (ids) => {
             </select>
           </FormField>
 
-          <!-- Mehrfachauswahl im FormField-Muster (Label-Verknüpfung,
-               Pflichtfeld-Fehler am Feld). -->
+          <!-- Multi-select in the FormField pattern (label association,
+               required-field error at the field). -->
           <FormMultiSelect
             v-model="formData.ComponentIDs"
             :label="t('incidentTemplates.fieldComponents')"

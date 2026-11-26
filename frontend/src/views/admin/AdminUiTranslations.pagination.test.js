@@ -9,9 +9,9 @@ import de from '../../i18n/locales/de.json'
 import { flatten } from '../../i18n/overrides'
 import { axe } from '../../test-support/axe'
 
-// Die Liste rendert die rund 1.700 App-Texte seitenweise.
-// Die Daten sind die echten Katalog-Keys (kein Mock), damit die Größenordnung
-// stimmt.
+// The list renders the roughly 1,700 app texts page by page.
+// The data are the real catalog keys (no mock), so that the order of magnitude
+// is right.
 const TOTAL = Object.keys(flatten(de)).length
 
 function jsonResponse(body, status = 200) {

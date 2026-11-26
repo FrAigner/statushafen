@@ -18,7 +18,7 @@ function usersFixture() {
 }
 
 function rolesFixture() {
-  // GlobalOnly kommt aus GET /api/roles ("Global Admin").
+  // GlobalOnly comes from GET /api/roles ("Global Admin").
   return [{ ID: 1, Name: 'Global Admin', GlobalOnly: true }, { ID: 3, Name: 'Editor', GlobalOnly: false }]
 }
 
@@ -27,8 +27,8 @@ function pagesFixture() {
 }
 
 function tagsFixture() {
-  // zwei gleichnamige seitengebundene Tags (Acme/TechStart) neben
-  // dem globalen; Benutzer-Tags sind nur global zulässig.
+  // two page-bound tags of the same name (Acme/TechStart) next to
+  // the global one; user tags are only allowed globally.
   return [
     { ID: 6, Name: 'DE', StatusPageID: 10 },
     { ID: 5, Name: 'EU', StatusPageID: null },
@@ -63,7 +63,7 @@ function makeFetchRouter({ usersOk = true, tagsOk = true, writeOk = true, users 
 
 let activeWrapper = null
 
-// Zeilenaktionen stehen im Zeilenmenü (RowMenu), die Einträge sind auch geschlossen im DOM.
+// Row actions are in the row menu (RowMenu); the entries are in the DOM even when it is closed.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 const editRow = (wrapper, index) => menuItem(wrapper.findAll('tbody tr')[index], 'Bearbeiten').trigger('click')
 
@@ -103,7 +103,7 @@ describe('AdminUsers', () => {
     expect(rows[1].text()).toContain('EU')
   })
 
-  // Singular/Plural statt "Statusseite(n)".
+  // Singular/plural instead of "status page(s)".
   it('wählt die Pluralform der Statusseiten-Zählung (de und en)', async () => {
     const users = [{ ID: 7, Email: 'multi@acme.de', IsGlobalAdmin: false, Tags: [], UserStatusPageRoles: [{ StatusPageID: 10, RoleID: 3 }, { StatusPageID: 11, RoleID: 3 }] }]
     const { wrapper } = await mountUsers({ fetchImpl: makeFetchRouter({ users }) })
@@ -156,9 +156,9 @@ describe('AdminUsers', () => {
     await wrapper.find('#user-email').setValue('new@acme.de')
     await wrapper.find('#user-password').setValue('secret123')
     await wrapper.find('.page-select select').setValue('3')
-    // TagCheckboxList (components/TagCheckboxList.vue) rendert keine
-    // [value]-Attribute auf ihren Checkboxen - die 2. Checkbox im Formular
-    // (nach der Global-Admin-Checkbox) ist die des einzigen Fixture-Tags "EU".
+    // TagCheckboxList (components/TagCheckboxList.vue) renders no
+    // [value] attributes on its checkboxes - the 2nd checkbox in the form
+    // (after the global admin checkbox) is the one of the only fixture tag "EU".
     await wrapper.findAll('input[type="checkbox"]')[1].setValue(true)
     await wrapper.find('form.edit-form').trigger('submit.prevent')
     await flushPromises()
@@ -172,8 +172,8 @@ describe('AdminUsers', () => {
     })
   })
 
-  // Die Rolle einer Seite lässt sich wieder auf "keine" stellen; die Seite wird
-  // dann nicht mehr mitgeschickt (das Backend entfernt fehlende Seitenrollen).
+  // A page's role can be set back to "none"; the page is then no
+  // longer sent along (the backend removes missing page roles).
   it('sendet keine Seitenrolle mehr, wenn die Auswahl geleert wird', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountUsers({ fetchImpl: fetchMock })
@@ -187,8 +187,8 @@ describe('AdminUsers', () => {
     expect(JSON.parse(options.body).page_roles).toEqual([])
   })
 
-  // Fehlende Listen im Antwortkörper (null) und Benutzer ohne Tags/Admin-Flag
-  // lassen die Oberfläche nicht abstürzen.
+  // Missing lists in the response body (null) and users without tags/admin flag
+  // do not crash the UI.
   it('kommt mit leeren Antworten und Benutzern ohne Tags zurecht', async () => {
     const fetchMock = vi.fn(async (url, options = {}) => {
       const method = options.method || 'GET'
@@ -219,13 +219,13 @@ describe('AdminUsers', () => {
     await wrapper.findAll('button').find(b => b.text().includes('Neu')).trigger('click')
     expect(wrapper.find('.page-roles-list').exists()).toBe(true)
 
-    // Erste Checkbox im Formular ist "Global Admin" (vor der TagCheckboxList).
+    // The first checkbox in the form is "Global Admin" (before the TagCheckboxList).
     await wrapper.findAll('input[type="checkbox"]')[0].setValue(true)
     expect(wrapper.find('.page-roles-list').exists()).toBe(false)
   })
 
-  // Die Login-Antwort lieferte keine id, der Vergleich mit
-  // currentUser.id griff nie und die eigene Zeile hatte einen Löschen-Knopf.
+  // The login response returned no id, the comparison with
+  // currentUser.id never matched and the own row had a delete button.
   it('bietet für die eigene Zeile kein Löschen an, sondern verweist aufs Profil', async () => {
     const users = [...usersFixture(), { ID: 4, Email: 'me@acme.de', IsGlobalAdmin: true, Tags: [] }]
     const { wrapper } = await mountUsers({ fetchImpl: makeFetchRouter({ users }), currentUser: { id: 4 } })
@@ -233,7 +233,7 @@ describe('AdminUsers', () => {
     const meRow = wrapper.findAll('tbody tr')[3]
     expect(menuItem(meRow, 'Löschen')).toBeUndefined()
     expect(meRow.text()).toContain('Eigenes Konto')
-    // Zwei Global Admins: der andere bleibt löschbar.
+    // Two global admins: the other one stays deletable.
     expect(menuItem(wrapper.findAll('tbody tr')[0], 'Löschen')).toBeDefined()
   })
 
@@ -290,7 +290,7 @@ describe('AdminUsers', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/users/2', expect.objectContaining({ method: 'DELETE' }))
   })
 
-  // "Global Admin" ist eine globale Eigenschaft, keine Seitenrolle.
+  // "Global Admin" is a global property, not a page role.
   it('bietet "Global Admin" nicht als Seitenrolle an', async () => {
     const { wrapper } = await mountUsers()
 
@@ -308,8 +308,8 @@ describe('AdminUsers', () => {
     expect(wrapper.find('.page-select select').element.value).toBe('1')
   })
 
-  // seitengebundene Tags (gleichnamig je Seite) erschienen doppelt,
-  // obwohl das Backend sie für Benutzer mit 400 ablehnt.
+  // page-bound tags (same name per page) appeared twice,
+  // although the backend rejects them for users with 400.
   it('bietet nur globale Tags an, keine seitengebundenen Duplikate', async () => {
     const { wrapper } = await mountUsers()
 
@@ -318,8 +318,8 @@ describe('AdminUsers', () => {
     expect(tagLabels).toEqual(['EU'])
   })
 
-  // Richtung C: Kartenkopf, Untertitel mit Zählung, Suche,
-  // Formular als Seitenkarte mit Namen im Titel, Fehler am Feld.
+  // Direction C: card header, subtitle with a count, search,
+  // form as a side card with the name in the title, error at the field.
   it('zeigt Kartenkopf und Untertitel mit Zählung', async () => {
     const { wrapper } = await mountUsers()
     expect(wrapper.find('.comp-card__title').text()).toBe('Alle Benutzer')
@@ -347,7 +347,7 @@ describe('AdminUsers', () => {
     expect(wrapper.find('aside.form-panel').exists()).toBe(false)
   })
 
-  // Regression: fehlende Pflichtfelder gingen bisher als Serveranfrage raus.
+  // Regression: missing required fields used to go out as a server request.
   it('meldet fehlende E-Mail und fehlendes Passwort (neu) am Feld und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountUsers({ fetchImpl: fetchMock })
@@ -392,8 +392,8 @@ describe('AdminUsers', () => {
     expect(wrapper.findAll('tbody tr')).toHaveLength(1)
   })
 
-  // Stufe 4d: h2 statt h1 (die Admin-Topbar trägt die h1), Leerzustand,
-  // Formularfelder über FormField (Pflicht-Stern, Passwort-Hinweis nur beim Bearbeiten).
+  // Stage 4d: h2 instead of h1 (the admin top bar carries the h1), empty state,
+  // form fields via FormField (required asterisk, password hint only when editing).
   it('rendert den Titel als h2 ohne h1 und zeigt bei leerer Liste den Leerzustand', async () => {
     const { wrapper } = await mountUsers({ fetchImpl: makeFetchRouter({ users: [] }) })
 
@@ -437,8 +437,8 @@ describe('AdminUsers', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Passwort-Mindestlänge steht am Feld, bevor etwas gesendet wird,
-  // und ein Backend-400 password_too_short landet ebenfalls am Feld.
+  // The minimum password length is shown at the field before anything is sent,
+  // and a backend 400 password_too_short ends up at the field as well.
   it('meldet ein zu kurzes Passwort am Feld und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountUsers({ fetchImpl: fetchMock })
@@ -458,7 +458,7 @@ describe('AdminUsers', () => {
     const { wrapper } = await mountUsers({ fetchImpl: fetchMock })
     await wrapper.findAll('button').find(b => b.text().includes('Neu')).trigger('click')
     await wrapper.find('#user-email').setValue('new@acme.de')
-    // 40 Umlaute sind 80 Byte, aber nur 40 Zeichen.
+    // 40 umlauts are 80 bytes, but only 40 characters.
     await wrapper.find('#user-password').setValue('ä'.repeat(40))
     const before = fetchMock.mock.calls.length
     await wrapper.find('form.edit-form').trigger('submit.prevent')

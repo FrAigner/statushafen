@@ -8,9 +8,9 @@ import AdminLanguages from './AdminLanguages.vue'
 import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
-// Stage 1 von 5 der Mehrsprachigkeit: Component-Tests für die
-// Sprachverwaltung - globaler Katalog (global-admin-only CRUD) + pro
-// Statusseite aktivierte Sprachen inkl. Default.
+// Stage 1 of 5 of multilingual support: component tests for the
+// language management - global catalog (global-admin-only CRUD) + the
+// languages enabled per status page, including the default.
 
 function catalogFixture() {
   return [
@@ -58,12 +58,12 @@ function makeFetchRouter({ catalogOverride, pageLanguagesOverride, writeOk = tru
 
 let activeWrapper = null
 
-// Zeilenaktionen stehen im Zeilenmenü (RowMenu), die Einträge sind auch geschlossen im DOM.
+// Row actions are in the row menu (RowMenu); the entries are in the DOM even when it is closed.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 
-// Seitensprachen speichern verlangt languages:update auf der aktiven
-// Seite; ohne angemeldeten Nutzer meldet der Helfer einen Seitennutzer mit
-// pagePerms an (Standard: darf speichern).
+// Saving page languages requires languages:update on the active
+// page; without a logged-in user the helper logs in a page user with
+// pagePerms (default: may save).
 async function mountAdminLanguages({ fetchImpl, tenantId = '1', pagePerms = 'languages:update' } = {}) {
   if (!useAuth().currentUser.value) useAuth().setAuth('jwt-1', { permissions: '' })
   useTenant().setMyPages([{ ID: Number(tenantId), Permissions: pagePerms }])
@@ -110,9 +110,9 @@ describe('AdminLanguages', () => {
     useAuth().logout()
     useTenant().setActiveTenant(null)
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    // Tests assertieren auf den deutschen Wortlaut übersetzter Texte;
-    // ohne gespeicherte Präferenz würde detectInitialLocale() in der Testumgebung
-    // (happy-dom navigator.language === 'en-US') sonst auf 'en' fallen.
+    // Tests assert on the German wording of translated texts;
+    // without a stored preference detectInitialLocale() in the test environment
+    // (happy-dom navigator.language === 'en-US') would otherwise fall back to 'en'.
     i18n.global.locale.value = 'de'
   })
 
@@ -137,7 +137,7 @@ describe('AdminLanguages', () => {
     expect(checkboxes[1].element.checked).toBe(true)
   })
 
-  // Betreiber-Wunsch 31.10.: Flagge vor dem Code, Spalte „Sprache“ in der Oberflächensprache.
+  // Operator request of 31 Oct: flag before the code, column "Language" in the UI language.
   it('zeigt Flagge (aria-hidden) und den Sprachnamen in der Oberflächensprache; unbekannter Code ohne Flagge', async () => {
     const catalogOverride = [...catalogFixture(), { ID: 9, Code: 'x1', Name: 'Test', IsActive: true }]
     const { wrapper } = await mountAdminLanguages({ fetchImpl: makeFetchRouter({ catalogOverride }) })
@@ -152,7 +152,7 @@ describe('AdminLanguages', () => {
     expect(flag.attributes('aria-hidden')).toBe('true')
     expect(rows[2].find('.lang-flag').exists()).toBe(false)
     expect(rows[2].findAll('td')[1].text()).toBe('x1')
-    // Auswahl der Seitensprachen: Flagge vor dem Namen.
+    // Selection of the page languages: flag before the name.
     expect(wrapper.find('.stack-list .lang-flag').text()).toBe('\u{1F1E9}\u{1F1EA}')
 
     i18n.global.locale.value = 'en'
@@ -183,7 +183,7 @@ describe('AdminLanguages', () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountAdminLanguages({ fetchImpl: fetchMock })
 
-    await wrapper.find('button').trigger('click') // "+ Neue Sprache"
+    await wrapper.find('button').trigger('click') // "+ New language"
     await wrapper.find('#lang-code').setValue('fr')
     await wrapper.find('#lang-name').setValue('Français')
     await wrapper.find('form').trigger('submit.prevent')
@@ -196,8 +196,8 @@ describe('AdminLanguages', () => {
     expect(wrapper.text()).not.toContain('Neue Sprache anlegen')
   })
 
-  // Ein Viewer (kein languages:update) sah „Speichern“ und bekam
-  // beim Klick 403. Jetzt sind die Checkboxen gesperrt und der Knopf fehlt.
+  // A viewer (no languages:update) saw "Save" and got a 403
+  // on click. Now the checkboxes are disabled and the button is missing.
   it('sperrt die Seitensprachen ohne languages:update und blendet Speichern aus', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountAdminLanguages({ fetchImpl: fetchMock, pagePerms: 'components:read,incidents:read,notices:read' })
@@ -267,8 +267,8 @@ describe('AdminLanguages', () => {
     expect(wrapper.text()).not.toContain('Sprachen dieser Statusseite')
   })
 
-  // Laden -> Fehlerfall -> Speichern werden ausdrücklich per
-  // flushPromises abgewartet, damit die Coverage nicht vom Timing abhängt.
+  // Loading -> error case -> saving are explicitly awaited via
+  // flushPromises, so that coverage does not depend on timing.
   it('bearbeitet eine Sprache per PUT und bricht das Bearbeiten ab', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true })
     const fetchMock = makeFetchRouter()
@@ -289,7 +289,7 @@ describe('AdminLanguages', () => {
     expect(wrapper.find('form.edit-form').exists()).toBe(false)
   })
 
-  // Löschen im Zeilenmenü mit Bestätigung; der Server entscheidet über 409.
+  // Delete in the row menu with confirmation; the server decides about 409.
   it('löscht eine Sprache nach Bestätigung per DELETE und lädt den Katalog neu', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true })
     const confirm = stubConfirm(true)
@@ -387,7 +387,7 @@ describe('AdminLanguages', () => {
     )
   })
 
-  // Richtung C: Kartenkopf, Untertitel mit Zählung, Suche, Fehler am Feld.
+  // Direction C: card header, subtitle with a count, search, error at the field.
   it('zeigt Kartenkopf und Untertitel mit Zählung', async () => {
     const { wrapper } = await mountAdminLanguages()
     expect(wrapper.find('.comp-card__title').text()).toBe('Sprachkatalog')
@@ -417,7 +417,7 @@ describe('AdminLanguages', () => {
     expect(wrapper.find('aside.form-panel').exists()).toBe(false)
   })
 
-  // Regression: leerer Code/Name ging bisher als Serveranfrage raus.
+  // Regression: an empty code/name used to go out as a server request.
   it('meldet fehlenden Code und Namen am Feld und sendet nichts', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true })
     const fetchMock = makeFetchRouter()
@@ -484,7 +484,7 @@ describe('AdminLanguages', () => {
     expect(badge.text()).toBe(i18n.global.t('languages.statusInactive'))
   })
 
-  // Format des Sprachcodes (BCP47 light) am Feld, Server-400 ebenso.
+  // Format of the language code (BCP47 light) at the field, server 400 as well.
   it('meldet einen ungültigen Sprachcode am Feld und sendet nichts', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true })
     const fetchMock = makeFetchRouter()
@@ -528,7 +528,7 @@ describe('AdminLanguages', () => {
     expect(wrapper.find('#lang-code').attributes('aria-invalid')).toBe('true')
     expect(wrapper.find('.form-field__message--error').text()).toContain('Ungültiger Sprachcode')
   })
-  // Beim Anlegen blieb „Sprachauswahl gespeichert.“ vom vorigen Schritt stehen, eine eigene Meldung fehlte.
+  // When creating, "Language selection saved." from the previous step stayed; a message of its own was missing.
   it('meldet das Anlegen einer Sprache mit eigener Meldung statt der alten', async () => {
     useAuth().setAuth('jwt-1', { is_global_admin: true })
     const { wrapper } = await mountAdminLanguages()

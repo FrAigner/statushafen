@@ -12,7 +12,7 @@ import AdminIncidentTemplates from './AdminIncidentTemplates.vue'
 import AdminMaintenance from './AdminMaintenance.vue'
 import AdminIncidents from './AdminIncidents.vue'
 
-// Sprachumschalter im Vorlagen-Formular und „Vorlage verwenden“ mit den Übersetzungen der Vorlage.
+// Language switcher in the template form and "Use template" with the template's translations.
 
 const json = (body, status = 200) => ({ ok: status < 400, status, json: async () => body })
 const catalog = [{ Code: 'de', Name: 'Deutsch' }, { Code: 'en', Name: 'English' }]

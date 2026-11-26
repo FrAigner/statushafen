@@ -14,7 +14,7 @@ let activeWrapper = null
 
 function mountProfile() {
   const wrapper = mount(ProfileView, {
-    // SSOLinks lädt selbst (eigene Tests in SSOLinks.test.js).
+    // SSOLinks loads by itself (own tests in SSOLinks.test.js).
     global: { plugins: [i18n], stubs: { ...onyxFormStubs, SSOLinks: true } },
   })
   activeWrapper = wrapper
@@ -41,8 +41,8 @@ describe('ProfileView', () => {
     expect(wrapper.text()).not.toMatch(/Issue #\d+/)
   })
 
-  // Stufe 4d: /admin/profile liegt im AdminLayout, dessen Topbar die
-  // h1 trägt. Der Seitentitel ist eine h2, ohne Inline-Styles.
+  // Stage 4d: /admin/profile lives in AdminLayout, whose top bar carries the
+  // h1. The page title is an h2, without inline styles.
   it('rendert den Titel als h2 ohne h1', () => {
     const wrapper = mountProfile()
 
@@ -57,7 +57,7 @@ describe('ProfileView', () => {
     expect(wrapper.find('.profile-email').exists()).toBe(false)
   })
 
-  // Konto-löschen-Bereich im Profil.
+  // Delete-account section in the profile.
   it('bindet den Bereich zum Löschen des Kontos ein', () => {
     const wrapper = mountProfile()
 
@@ -65,14 +65,14 @@ describe('ProfileView', () => {
     expect(wrapper.text()).toContain(i18n.global.t('accountDeletion.title'))
   })
 
-  // Bereich „Mit SSO verknüpfen“.
+  // "Link with SSO" section.
   it('bindet den Bereich für SSO-Verknüpfungen ein', () => {
     const wrapper = mountProfile()
 
     expect(wrapper.findComponent({ name: 'SSOLinks' }).exists()).toBe(true)
   })
 
-  // Schalter „Hilfe-Tooltips anzeigen“ auch im Profil.
+  // "Show help tooltips" switch in the profile as well.
   it('bindet den Schalter für Hilfe-Tooltips ein (Default an)', () => {
     const wrapper = mountProfile()
 
@@ -116,7 +116,7 @@ describe('ProfileView', () => {
     )
   })
 
-  // bei serverseitigem Fehler nicht "gespeichert" melden.
+  // do not report "saved" on a server-side error.
   it('zeigt bei fehlgeschlagenem Speichern die Fehlermeldung statt der Erfolgsmeldung', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce(jsonResponse({}))
@@ -139,7 +139,7 @@ describe('ProfileView', () => {
     expect(await axe(wrapper)).toHaveNoViolations()
   })
 
-  // Richtung C: Brotkrumen und Spracheinstellung in einer Karte.
+  // Direction C: breadcrumbs and the language setting in one card.
   it('zeigt Brotkrumen und die Spracheinstellung in einer Karte mit Titel', () => {
     const wrapper = mountProfile()
 

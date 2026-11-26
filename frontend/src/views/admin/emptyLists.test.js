@@ -10,8 +10,8 @@ import AdminComponents from './AdminComponents.vue'
 import AdminIncidents from './AdminIncidents.vue'
 import AdminMaintenance from './AdminMaintenance.vue'
 
-// Auf Mandanten ohne Daten lieferte die API früher "null" statt
-// "[]" - die Views müssen beide Antworten als Leerzustand behandeln.
+// For tenants without data the API used to return "null" instead of
+// "[]" - the views must treat both responses as the empty state.
 function emptyFetch(body) {
   return vi.fn(async () => ({ ok: true, status: 200, json: async () => body }))
 }

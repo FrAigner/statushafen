@@ -42,8 +42,8 @@ function makeFetchRouter({ tagsOk = true, pagesOk = true, writeOk = true } = {})
 
 let activeWrapper = null
 
-// Zeilenaktionen stehen im Zeilenmenü (RowMenu); die Einträge sind
-// auch bei geschlossenem Menü im DOM.
+// Row actions are in the row menu (RowMenu); the entries are
+// in the DOM even when the menu is closed.
 const menuItem = (row, text) => row.findAll('[role="menuitem"]').find(i => i.text().includes(text))
 
 async function mountAdminTags({ fetchImpl, isGlobalAdmin = true } = {}) {
@@ -167,8 +167,8 @@ describe('AdminTags', () => {
     expect(wrapper.find('[role="menuitem"]').exists()).toBe(false)
   })
 
-  // Stufe 4d: h2 statt h1 (die Topbar trägt die h1), Leerzustand
-  // statt leerer Tabelle, Feldhinweis per aria-describedby über FormField.
+  // Stage 4d: h2 instead of h1 (the top bar carries the h1), empty state
+  // instead of an empty table, field hint via aria-describedby through FormField.
   it('rendert den Titel als h2 ohne h1 und die Tabelle, solange Tags vorhanden sind', async () => {
     const { wrapper } = await mountAdminTags()
     expect(wrapper.find('h2.page-head__title').exists()).toBe(true)
@@ -185,8 +185,8 @@ describe('AdminTags', () => {
     expect(wrapper.find('table').exists()).toBe(false)
   })
 
-  // Richtung C: Karte mit Kopf, Suche, Untertitel mit Zählung,
-  // Formular als Seitenkarte mit Namen im Titel und Fehler am Feld.
+  // Direction C: card with header, search, subtitle with a count,
+  // form as a side card with the name in the title and an error at the field.
   it('zeigt Kartenkopf und Untertitel mit Zählung', async () => {
     const { wrapper } = await mountAdminTags()
     expect(wrapper.find('.comp-card__title').text()).toBe('Alle Tags')
@@ -226,8 +226,8 @@ describe('AdminTags', () => {
     expect(wrapper.find('aside.form-panel').exists()).toBe(false)
   })
 
-  // Regression: Ein leerer Name ging bisher als Serveranfrage raus (Fehlermeldung
-  // vom Backend statt am Feld). Jetzt Fehler am Feld, Fokus aufs Feld, kein Request.
+  // Regression: an empty name used to go out as a server request (error message
+  // from the backend instead of at the field). Now error at the field, focus on the field, no request.
   it('meldet einen leeren Namen am Feld, fokussiert es und sendet nichts', async () => {
     const fetchMock = makeFetchRouter()
     const { wrapper } = await mountAdminTags({ fetchImpl: fetchMock })
@@ -273,7 +273,7 @@ describe('AdminTags', () => {
     await flushPromises()
     expect(await axe(wrapper)).toHaveNoViolations()
   })
-  // Die rote Fehlermeldung eines Duplikats blieb nach dem erfolgreichen Speichern stehen.
+  // The red error message of a duplicate stayed after the successful save.
   it('entfernt die Fehlermeldung beim nächsten Speichern und meldet den Erfolg', async () => {
     let failWrites = true
     const base = makeFetchRouter()
