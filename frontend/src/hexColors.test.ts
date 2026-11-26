@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
+import { stripHtmlComments } from './test-support/sourceText'
 
 // Redesign stage 1: ban on new hex colors.
 //
@@ -37,9 +38,8 @@ function sourceFiles(dir = root): string[] {
 // <!-- … --> (templates) and whole // lines or // after whitespace (JS).
 // "http://…" is left alone because a colon precedes the //.
 export function stripComments(text: string) {
-  return text
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
+  return stripHtmlComments(text
+    .replace(/\/\*[\s\S]*?\*\//g, ''))
     .replace(/(^|\s)\/\/.*$/gm, '$1')
 }
 

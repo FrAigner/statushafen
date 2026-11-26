@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { stripHtmlComments } from './test-support/sourceText'
 
 // Redesign 4a: guard for the five public files.
 // Inline styles: 0 (only exception: the customer brand on .content-area),
@@ -15,7 +16,7 @@ const FILES = [
 ]
 const read = (f: string) => readFileSync(resolve(__dirname, f), 'utf-8')
 // Strip comments (they contain reference numbers like #534).
-const code = (f: string) => read(f).replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+const code = (f: string) => stripHtmlComments(read(f).replace(/\/\*[\s\S]*?\*\//g, '')).replace(/^\s*\/\/.*$/gm, '')
 
 describe('Öffentliche Seiten (Redesign 4a)', () => {
   it.each(FILES)('%s hat keinen Inline-Style außer der Kundenmarke', (f) => {

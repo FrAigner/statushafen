@@ -10,6 +10,7 @@ import unsubscribeSource from './public/Unsubscribe.vue?raw'
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
+import { stripHtmlComments } from '../test-support/sourceText'
 
 // Redesign stage 4e "entry": login, order, confirmation and
 // unsubscribe pages share assets/entry.css and use only tokens. Previously
@@ -31,9 +32,8 @@ const VIEWS = {
   'Unsubscribe.vue': unsubscribeSource,
 }
 
-const stripComments = (text: string) => text
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/<!--[\s\S]*?-->/g, '')
+const stripComments = (text: string) => stripHtmlComments(text
+  .replace(/\/\*[\s\S]*?\*\//g, ''))
   .replace(/(^|\s)\/\/.*$/gm, '$1')
 
 describe('Einstiegsseiten (Stufe 4e)', () => {

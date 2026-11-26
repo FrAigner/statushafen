@@ -13,6 +13,7 @@ import landingSource from './LandingPage.vue?raw'
 import { axe } from '../../test-support/axe'
 import { fetchMock } from '../../test-support/fetchStub'
 import { useLandingChrome } from '../../composables/useLandingChrome'
+import { stripHtmlComments } from '../../test-support/sourceText'
 
 function pagesFixture() {
   return [
@@ -327,7 +328,7 @@ describe('LandingPage', () => {
     })
 
     it('Farben kommen aus Tokens: keine Hex-/rgb-Werte, kein Inline-Style, keine Richtung-B-Tokens', () => {
-      const code = landingSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|\s)\/\/.*$/gm, '$1')
+      const code = stripHtmlComments(landingSource.replace(/\/\*[\s\S]*?\*\//g, '')).replace(/(^|\s)\/\/.*$/gm, '$1')
       expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(code).not.toMatch(/rgba?\(/)
       expect(code).not.toMatch(/\sstyle=|:style=/)

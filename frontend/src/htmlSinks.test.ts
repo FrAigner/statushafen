@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
+import { stripHtmlComments } from './test-support/sourceText'
 
 // Guard for HTML sinks: v-html, innerHTML & co. are only allowed at the known
 // places, and each of them gets its value from a sanitizer. A new sink (or a
@@ -30,7 +31,7 @@ function sourceFiles(dir = root): string[] {
 // Only HTML comments and pure line comments: otherwise a "/*" in a template or
 // style section could swallow everything up to the next "*/", including a sink.
 export function stripComments(src: string) {
-  return src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
+  return stripHtmlComments(src).replace(/^\s*\/\/.*$/gm, '')
 }
 
 const SINK_PATTERNS = [

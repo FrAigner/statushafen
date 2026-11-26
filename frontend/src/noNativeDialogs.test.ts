@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
+import { stripHtmlComments } from './test-support/sourceText'
 
 // Ratchet against native confirm()/alert()/prompt(). Confirmations go through
 // composables/useConfirm.js (confirmDialog) and components/ConfirmDialog.vue.
@@ -33,7 +34,7 @@ function sourceFiles(dir = root): string[] {
 }
 
 export function stripComments(src: string) {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
+  return stripHtmlComments(src.replace(/\/\*[\s\S]*?\*\//g, '')).replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
 }
 
 export function findNativeDialogs(src: string) {
