@@ -63,7 +63,7 @@ func TestPrivateStatusPage(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
-		// User has no role and no default role is set: 404 wie bei einer fehlenden Seite
+		// User has no role and no default role is set: 404 as for a missing page
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 

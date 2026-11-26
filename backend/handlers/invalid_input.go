@@ -8,19 +8,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// codedError ist ein Prüffehler mit stabilem Fehlercode. Der Code
-// gehört zur Antwort (`code`), das Frontend übersetzt ihn unter
-// api.errors.<code>; msg bleibt als Rückfalltext für API-Aufrufer. Rohe
-// Go-Fehlertexte (Validator, GORM, fmt.Errorf) gehören nie in eine Antwort.
+// codedError is a validation error with a stable error code. The code
+// belongs to the response (`code`), the frontend translates it under
+// api.errors.<code>; msg remains as fallback text for API callers. Raw
+// Go error texts (validator, GORM, fmt.Errorf) never belong in a response.
 type codedError struct{ code, msg string }
 
 func (e *codedError) Error() string { return e.msg }
 
 func newCodedError(code, msg string) error { return &codedError{code: code, msg: msg} }
 
-// respondCoded beantwortet einen Prüffehler. Ein codedError wird mit status,
-// Text und Code ausgeliefert; jeder andere Fehler (z. B. ein Datenbankfehler)
-// ergibt 500 server_error, ohne den Fehlertext preiszugeben.
+// respondCoded answers a validation error. A codedError is returned with status,
+// text and code; any other error (e.g. a database error)
+// yields 500 server_error without revealing the error text.
 func respondCoded(c *gin.Context, status int, err error) {
 	var ce *codedError
 	if errors.As(err, &ce) {
@@ -31,18 +31,18 @@ func respondCoded(c *gin.Context, status int, err error) {
 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error", "code": "server_error"})
 }
 
-// respondInvalidInput beantwortet ein fehlgeschlagenes ShouldBindJSON mit einer
-// festen, verständlichen Meldung samt Fehlercode. Der rohe
+// respondInvalidInput answers a failed ShouldBindJSON with a
+// fixed, understandable message including an error code. The raw
 // Validator-Text ("Key: 'X.Name' Error:Field validation for 'Name' failed on
-// the 'required' tag") ist für Nutzer unlesbar und verrät Go-Feldnamen; das
-// Frontend übersetzt den Code `invalid_request` (api.errors.invalid_request).
+// the 'required' tag") is unreadable for users and reveals Go field names; the
+// frontend translates the code `invalid_request` (api.errors.invalid_request).
 func respondInvalidInput(c *gin.Context) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": "Ungültige Eingabe", "code": "invalid_request"})
 }
 
-// codeForStatus liefert für Antworten, deren Text tiefer im Code entsteht
-// (Prüf- und Zugriffsfunktionen mit Status und Meldung), einen groben
-// Fehlercode nach HTTP-Status. Die Meldung bleibt als Rückfalltext.
+// codeForStatus returns, for responses whose text originates deeper in the code
+// (check and access functions with status and message), a coarse
+// error code by HTTP status. The message remains as fallback text.
 func codeForStatus(status int) string {
 	switch status {
 	case http.StatusBadRequest:

@@ -10,9 +10,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Eine leere Beschreibung im PUT leert die bestehende; fehlt das
-// Feld, bleibt sie unverändert. Die Komponente einer fremden Seite bleibt
-// unberührt (404).
+// An empty description in the PUT clears the existing one; if the
+// field is missing, it stays unchanged. The component of a foreign page stays
+// untouched (404).
 func TestUpdateComponentHandler_DescriptionClear(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

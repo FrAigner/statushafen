@@ -11,10 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// tagNameList joint die Namen einer Tag-Liste komma-separiert für
-// Anzeigetexte (Notification-Mails, Webhooks) - Ersatz für das frühere
-// einzelne Country-Feld, das jetzt mehreren Tags weichen kann. Leere Liste
-// (Ressource ganz ohne Tag) ergibt einen leeren String, kein Platzhalter wie
+// tagNameList joins the names of a tag list comma-separated for
+// display texts (notification mails, webhooks) - replacement for the former
+// single Country field, which several tags can now replace. An empty list
+// (resource with no tag at all) yields an empty string, no placeholder like
 // "global".
 func tagNameList(tags []models.Tag) string {
 	names := make([]string, len(tags))
@@ -24,9 +24,9 @@ func tagNameList(tags []models.Tag) string {
 	return strings.Join(names, ", ")
 }
 
-// tagIDList extrahiert die IDs einer Tag-Liste - für API-Responses, die dem
-// Frontend nur die zugewiesenen Tag-IDs zurückgeben müssen (z.B. Login-/Me-
-// Response), nicht die vollen Tag-Objekte.
+// tagIDList extracts the IDs of a tag list - for API responses that only need to
+// return the assigned tag IDs to the frontend (e.g. login/me
+// response), not the full tag objects.
 func tagIDList(tags []models.Tag) []uint {
 	ids := make([]uint, len(tags))
 	for i, t := range tags {
@@ -35,13 +35,13 @@ func tagIDList(tags []models.Tag) []uint {
 	return ids
 }
 
-// userTagsAndAdmin lädt für den eingeloggten User (aus dem Gin-Context) einen
-// frischen Datenbank-Blick auf IsGlobalAdmin sowie die zugewiesenen Tags
-// (Schritt 4/4). Bewusst eine frische DB-Abfrage statt
-// eines JWT-Claims-Werts (wie bei der alten AllowedCountries) - Tags können
-// sich häufiger ändern als Rollen, und eine Abfrage pro Request vermeidet,
-// dass ein Nutzer nach Tag-Entzug bis zum nächsten Login weiterhin Zugriff
-// über einen veralteten Claim behält.
+// userTagsAndAdmin loads for the logged-in user (from the Gin context) a
+// fresh database view of IsGlobalAdmin and the assigned tags
+// (step 4/4). Deliberately a fresh DB query instead of
+// a JWT claims value (as with the old AllowedCountries) - tags can
+// change more often than roles, and a query per request avoids
+// a user retaining access after tag revocation until the next login
+// via a stale claim.
 func (h *Handler) userTagsAndAdmin(c *gin.Context) (tags []models.Tag, isGlobalAdmin bool) {
 	userID := getUserID(c)
 	if userID == 0 {
@@ -61,15 +61,15 @@ func (h *Handler) userTagsAndAdmin(c *gin.Context) (tags []models.Tag, isGlobalA
 	return tags, false
 }
 
-// tagsForComponent/tagsForIncident laden die aktuell zugewiesenen Tags einer
-// Ressource - für den Zugriffs-Check auf BESTEHENDE Komponenten/Incidents
-// (z.B. beim Lesen/Löschen), getrennt von den TagIDs aus einem Request-Body
-// (bei Create/Update), die erst noch validiert werden müssen.
+// tagsForComponent/tagsForIncident load the currently assigned tags of a
+// resource - for the access check on EXISTING components/incidents
+// (e.g. when reading/deleting), separate from the TagIDs from a request body
+// (on create/update), which still have to be validated.
 func (h *Handler) tagsForComponent(componentID uint) []models.Tag {
 	return tagsForComponentDB(h.DB, componentID)
 }
 
-// tagsForComponentDB liest die Tags über db (z. B. eine Transaktion).
+// tagsForComponentDB reads the tags via db (e.g. a transaction).
 func tagsForComponentDB(db *gorm.DB, componentID uint) []models.Tag {
 	var tags []models.Tag
 	db.Model(&models.Tag{}).
@@ -79,10 +79,10 @@ func tagsForComponentDB(db *gorm.DB, componentID uint) []models.Tag {
 	return tags
 }
 
-// tagsByComponentOfPage liest die Tags aller Komponenten einer Seite in einer
-// einzigen Abfrage (Unterabfrage auf die Komponenten der Seite, damit weder eine
-// Liste von IDs noch eine Abfrage je Komponente nötig ist). Gelöschte Tags,
-// Zuordnungen und Komponenten fehlen wie bei tagsForComponentDB.
+// tagsByComponentOfPage reads the tags of all components of a page in a
+// single query (subquery on the page's components, so that neither a
+// list of IDs nor a query per component is needed). Deleted tags,
+// assignments and components are absent as with tagsForComponentDB.
 func (h *Handler) tagsByComponentOfPage(pageID uint) componentTagMap {
 	var rows []struct {
 		models.Tag
@@ -102,10 +102,10 @@ func (h *Handler) tagsByComponentOfPage(pageID uint) componentTagMap {
 	return out
 }
 
-// componentTagMap ordnet Komponenten-IDs ihre Tags zu.
+// componentTagMap maps component IDs to their tags.
 type componentTagMap map[uint][]models.Tag
 
-// of liefert die Tags der Komponente, ohne Tags eine leere Liste (JSON [] statt null).
+// of returns the tags of the component, an empty list without tags (JSON [] instead of null).
 func (m componentTagMap) of(componentID uint) []models.Tag {
 	if tags := m[componentID]; tags != nil {
 		return tags
@@ -122,11 +122,11 @@ func (h *Handler) tagsForIncident(incidentID uint) []models.Tag {
 	return tags
 }
 
-// tagsForUser lädt die Tags eines bestimmten Users direkt per ID, ohne den
-// Gin-Context - für Stellen außerhalb eines Requests wie
-// DispatchNotifications, das für jeden zu benachrichtigenden internen User
-// (nicht nur den eingeloggten Aufrufer) prüfen muss, ob dessen Tags zum
-// Incident passen.
+// tagsForUser loads the tags of a specific user directly by ID, without the
+// Gin context - for places outside a request such as
+// DispatchNotifications, which for every internal user to be notified
+// (not just the logged-in caller) must check whether that user's tags match the
+// incident.
 func (h *Handler) tagsForUser(userID uint) []models.Tag {
 	var tags []models.Tag
 	h.DB.Model(&models.Tag{}).
@@ -136,20 +136,20 @@ func (h *Handler) tagsForUser(userID uint) []models.Tag {
 	return tags
 }
 
-// userHasTagAccess kombiniert userTagsAndAdmin + middleware.UserHasAccessToAnyTag.
-// Tags sind eine ZUSÄTZLICHE, optionale Eingrenzung oben auf der eigentlichen
-// Zugriffskontrolle (RequirePermission/UserStatusPageRole, main.go), nicht deren
-// Ersatz - wer per Rolle bereits Schreibrecht auf einer Statusseite hat, soll
-// dadurch nicht zusätzlich ausgesperrt werden, nur weil weder er noch die
-// Ressource (noch) Tags zugewiesen bekommen haben. Die Prüfung greift daher
-// nur dann tatsächlich einschränkend, wenn BEIDE Seiten (User UND Ressource)
-// mindestens einen Tag tragen:
-//   - Global-Admins umgehen die Prüfung komplett (wie zuvor AllowedCountries="global").
-//   - Eine Ressource ganz ohne Tag ist für jeden mit Seitenrecht sichtbar/verwaltbar.
-//   - Ein User ganz ohne Tag ist durch Tags nicht eingeschränkt (Tags sind
-//     opt-in als Filter, kein verpflichtendes Freischalt-Attribut).
-//   - Erst wenn beide Seiten Tags haben, entscheidet middleware.UserHasAccessToAnyTag
-//     über eine echte Überschneidung (inkl. globalem Wildcard-Tag).
+// userHasTagAccess combines userTagsAndAdmin + middleware.UserHasAccessToAnyTag.
+// Tags are an ADDITIONAL, optional restriction on top of the actual
+// access control (RequirePermission/UserStatusPageRole, main.go), not a
+// replacement for it - whoever already has write permission on a status page by role should
+// not be additionally locked out just because neither they nor the
+// resource have (yet) been assigned tags. The check therefore only
+// actually restricts when BOTH sides (user AND resource)
+// carry at least one tag:
+//   - Global admins bypass the check entirely (like AllowedCountries="global" before).
+//   - A resource with no tag at all is visible/manageable for anyone with page permission.
+//   - A user with no tag at all is not restricted by tags (tags are
+//     opt-in as a filter, not a mandatory unlock attribute).
+//   - Only when both sides have tags does middleware.UserHasAccessToAnyTag
+//     decide on a real overlap (incl. the global wildcard tag).
 func (h *Handler) userHasTagAccess(c *gin.Context, resourceTags []models.Tag) bool {
 	userTags, isGlobalAdmin := h.userTagsAndAdmin(c)
 	if isGlobalAdmin || len(resourceTags) == 0 || len(userTags) == 0 {
@@ -158,15 +158,15 @@ func (h *Handler) userHasTagAccess(c *gin.Context, resourceTags []models.Tag) bo
 	return middleware.UserHasAccessToAnyTag(userTags, resourceTags)
 }
 
-// resolveTagsByIDs lädt und validiert eine Menge von Tag-IDs aus einem
-// Request-Body (Create/Update von Component/Incident): jeder Tag
-// muss entweder global sein (StatusPageID == nil) oder an GENAU die
-// Statusseite gebunden, für die die Ressource angelegt/geändert wird - ein
-// Tag einer FREMDEN Statusseite darf nicht zugewiesen werden, sonst könnte
-// ein Admin mit Rechten auf Seite A eine Ressource auf Seite B über einen
-// dort fremden Tag sichtbar machen. Leere tagIDs sind erlaubt (Ressource ganz
-// ohne Tag) - das ist kein Wildcard, sondern fail-closed, also
-// bewusst restriktiver als der alte "leer = global"-Default.
+// resolveTagsByIDs loads and validates a set of tag IDs from a
+// request body (create/update of component/incident): every tag
+// must either be global (StatusPageID == nil) or bound to EXACTLY the
+// status page for which the resource is created/changed - a
+// tag of a FOREIGN status page must not be assigned, otherwise
+// an admin with rights on page A could make a resource on page B visible via a
+// tag foreign there. Empty tagIDs are allowed (resource with no
+// tag at all) - that is not a wildcard but fail-closed, i.e.
+// deliberately more restrictive than the old "empty = global" default.
 func (h *Handler) resolveTagsByIDs(tagIDs []uint, statusPageID uint) ([]models.Tag, error) {
 	if len(tagIDs) == 0 {
 		return nil, nil
@@ -180,26 +180,26 @@ func (h *Handler) resolveTagsByIDs(tagIDs []uint, statusPageID uint) ([]models.T
 	}
 	for _, t := range tags {
 		if t.StatusPageID != nil && *t.StatusPageID != statusPageID {
-			// Gleiche Antwort wie bei einer unbekannten ID und ohne Tag-Namen:
-			// sonst verriete die Meldung Existenz und Namen von Tags anderer
-			// Mandanten (Tag-IDs sind aufsteigende Ganzzahlen).
+			// Same response as for an unknown ID and without the tag name:
+			// otherwise the message would reveal the existence and names of tags of other
+			// tenants (tag IDs are ascending integers).
 			return nil, newCodedError("tag_not_found", "ein oder mehrere Tags wurden nicht gefunden")
 		}
 	}
 	return tags, nil
 }
 
-// errGlobalTagForbidden ist der Fehlercode, wenn eine Seiten-Rolle einen
-// GLOBALEN Tag vergeben will.
+// errGlobalTagForbidden is the error code when a page role tries to
+// assign a GLOBAL tag.
 const errGlobalTagForbidden = "global_tag_forbidden"
 
-// userMayAssignTags prüft, dass der Aufrufer die Tags vergeben
-// darf: Global Admins dürfen alles, Seiten-Rollen nur seiteneigene Tags.
-// Globale Tags (z. B. Regions-Tags, die auch Nutzerzugriffe steuern) bleiben
-// Global Admins vorbehalten. Globale Tags, die die Ressource bereits trägt
-// (current), dürfen beim Bearbeiten unverändert mitgeschickt werden, sonst
-// könnte eine Seiten-Rolle einen Eintrag mit globalem Tag nicht mehr
-// speichern. Bei Verstoß wird 403 mit Code geschrieben und false geliefert.
+// userMayAssignTags checks whether the caller may assign the tags.
+// Global Admins may do everything, page roles only page-owned tags.
+// Global tags (e.g. region tags, which also control user access) remain
+// reserved for Global Admins. Global tags that the resource already carries
+// (current) may be sent along unchanged when editing, otherwise
+// a page role could no longer save an entry with a global tag.
+// On violation it writes 403 with a code and returns false.
 func (h *Handler) userMayAssignTags(c *gin.Context, newTags, current []models.Tag) bool {
 	_, isGlobalAdmin := h.userTagsAndAdmin(c)
 	if isGlobalAdmin {
@@ -221,10 +221,10 @@ func (h *Handler) userMayAssignTags(c *gin.Context, newTags, current []models.Ta
 	return true
 }
 
-// resolveGlobalTagsByIDs ist die User-spezifische Variante von
-// resolveTagsByIDs: User-Tags sind - wie schon AllowedCountries
-// zuvor - bewusst seitenübergreifend, ein User bekommt also ausschließlich
-// globale Tags (StatusPageID == nil) zugewiesen, keine seitengebundenen.
+// resolveGlobalTagsByIDs is the user-specific variant of
+// resolveTagsByIDs: user tags are - as AllowedCountries
+// before - deliberately cross-page, so a user is assigned only
+// global tags (StatusPageID == nil), no page-bound ones.
 func (h *Handler) resolveGlobalTagsByIDs(tagIDs []uint) ([]models.Tag, error) {
 	if len(tagIDs) == 0 {
 		return nil, nil
@@ -244,10 +244,10 @@ func (h *Handler) resolveGlobalTagsByIDs(tagIDs []uint) ([]models.Tag, error) {
 	return tags, nil
 }
 
-// replaceComponentTags/replaceIncidentTags ersetzen die Tag-Zuordnung einer
-// Ressource vollständig (Delete-alle + Insert-neue) - dasselbe einfache,
-// konsistente Muster wie UserStatusPageRole-Neusetzung in user.go, statt
-// eines Diffs zwischen altem und neuem Tag-Set.
+// replaceComponentTags/replaceIncidentTags replace the tag assignment of a
+// resource completely (delete all + insert new) - the same simple,
+// consistent pattern as the UserStatusPageRole reassignment in user.go, instead of
+// a diff between the old and new tag set.
 func (h *Handler) replaceComponentTags(tx *gorm.DB, componentID uint, tags []models.Tag) error {
 	if err := tx.Where("component_id = ?", componentID).Delete(&models.ComponentTag{}).Error; err != nil {
 		return err
@@ -284,16 +284,16 @@ func (h *Handler) replaceUserTags(tx *gorm.DB, userID uint, tags []models.Tag) e
 	return nil
 }
 
-// incidentTagFilterScope ist das Tag-Pendant zu middleware.GeoFilterScope
-// schränkt eine Incident-Query auf die Incidents ein, die der
-// eingeloggte User laut Tag-Zugriff sehen darf. Wie userHasTagAccess ist das
-// eine ZUSÄTZLICHE, optionale Eingrenzung oben auf der eigentlichen
-// Seiten-Zugriffskontrolle, kein Ersatz dafür (siehe dortiger Kommentar) -
-// gefiltert wird nur, wenn der User TATSÄCHLICH (nicht-globale) Tags trägt.
-// Ohne Tags beim User, bei Global-Admins oder beim reservierten globalen
-// User-Tag gibt es keinen Filter (volle Sicht auf alle Incidents dieser
-// Seite). Ein Incident ganz ohne eigenen Tag bleibt zusätzlich immer
-// sichtbar, unabhängig von den Tags des Users.
+// incidentTagFilterScope is the tag counterpart to middleware.GeoFilterScope;
+// it restricts an incident query to the incidents that the
+// logged-in user may see according to tag access. Like userHasTagAccess this is
+// an ADDITIONAL, optional restriction on top of the actual
+// page access control, not a replacement for it (see the comment there) -
+// filtering only happens if the user ACTUALLY carries (non-global) tags.
+// Without tags on the user, for Global Admins or with the reserved global
+// user tag there is no filter (full view of all incidents of this
+// page). An incident with no tag of its own also always remains
+// visible, regardless of the user's tags.
 func (h *Handler) incidentTagFilterScope(c *gin.Context) func(db *gorm.DB) *gorm.DB {
 	userTags, isGlobalAdmin := h.userTagsAndAdmin(c)
 

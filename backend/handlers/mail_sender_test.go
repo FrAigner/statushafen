@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Der Absender einer Mail (Header und SMTP-Envelope) gehört dem Betreiber des
-// Servers. Eine Statusseite steuert höchstens den Anzeigenamen und eine
-// Antwortadresse (Reply-To) bei; sonst ließe sich der Server als Relais mit
-// gefälschtem Absender missbrauchen.
+// The sender of a mail (header and SMTP envelope) belongs to the operator of the
+// server. A status page contributes at most the display name and a
+// reply address (Reply-To); otherwise the server could be abused as a relay with a
+// forged sender.
 
 const operatorFrom = "Statushafen <alerts@mail.example.com>"
 
-// headerLine liefert den Wert der ersten Kopfzeile name der Mail ("" ohne).
+// headerLine returns the value of the first header line name of the mail ("" if none).
 func headerLine(msg, name string) string {
 	head, _, _ := strings.Cut(msg, "\n\n")
 	for _, l := range strings.Split(head, "\n") {
@@ -96,8 +96,8 @@ func TestMailSender_DisplayNameCannotInjectHeaders(t *testing.T) {
 	assert.Equal(t, "alerts@mail.example.com", from.Address)
 }
 
-// Admin-Weg: Seitenabsender, Vorlage mit fremdem Link und mehrfaches Anlegen
-// derselben Fremdadresse.
+// Admin path: page sender, template with a foreign link and repeated creation
+// of the same foreign address.
 func TestMailSender_AdminSubscriberFlowCannotRelay(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -118,7 +118,7 @@ func TestMailSender_AdminSubscriberFlowCannotRelay(t *testing.T) {
 	assert.Equal(t, "alerts@mail.example.com", awaitMailFrom(t, srv))
 	assert.NotContains(t, headerLine(msg, "From"), "bank.example")
 	assertReplyTo(t, msg, "security@bank.example")
-	// Fester Rahmen: Hinweis für Empfänger, die sich nicht angemeldet haben.
+	// Fixed frame: notice for recipients who did not sign up.
 	assert.Contains(t, msg, "ignoriere diese E-Mail")
 }
 
@@ -131,7 +131,7 @@ func TestNotificationTemplate_SubscriptionConfirmRequiresConfirmURL(t *testing.T
 
 func TestNotificationTemplate_SubscriptionConfirmWithConfirmURLAndOtherKinds(t *testing.T) {
 	assert.NoError(t, handlers.ValidateNotificationTemplateForKind(handlers.NotificationKindSubscriptionConfirm, "S", `<a href="{{.ConfirmURL}}">Bestätigen</a>`))
-	// Gegenprobe: andere Arten brauchen keinen Bestätigungslink.
+	// Control case: other kinds need no confirmation link.
 	assert.NoError(t, handlers.ValidateNotificationTemplateForKind(handlers.NotificationKindIncidentCreated, "S", "<p>Hallo</p>"))
 }
 
@@ -145,8 +145,8 @@ func TestFehlercodes_VorlageBestaetigungOhneLink(t *testing.T) {
 	})
 }
 
-// Eine früher gespeicherte Bestätigungsvorlage ohne Link würde nie ein Abo
-// freischalten; beim Versand gilt dann der Standardtext mit Link.
+// A previously stored confirmation template without a link would never
+// activate a subscription; when sending, the default text with a link applies.
 func TestMailSender_StoredConfirmTemplateWithoutLinkFallsBackToDefault(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -209,8 +209,8 @@ func TestAdminSubscriberCreate_PerRecipientLimitAcrossPages(t *testing.T) {
 	assert.Equal(t, []int{201, 201, 201, 429, 429}, codes)
 }
 
-// drainSMTP nimmt zugestellte Mails und Envelope-Absender entgegen, damit der
-// Fake-Server bei vielen Mails nicht an vollen Kanälen blockiert.
+// drainSMTP accepts delivered mails and envelope senders so that the
+// fake server does not block on full channels when there are many mails.
 func drainSMTP(srv *fakeSMTPServer) {
 	go func() {
 		for range srv.dataCh {

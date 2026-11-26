@@ -16,48 +16,48 @@ import (
 
 type Handler struct {
 	DB *gorm.DB
-	// ExternalStatus: Abfrage-Dienst für externe Statusseiten,
-	// von "Jetzt abrufen" genutzt und in main.go gestartet. Tests ersetzen ihn
-	// durch einen Dienst mit Fake-Provider.
+	// ExternalStatus: polling service for external status pages,
+	// used by "Jetzt abrufen" and started in main.go. Tests replace it
+	// with a service using a fake provider.
 	ExternalStatus *externalstatus.Service
 
-	// Now ersetzt die Uhr der Verfügbarkeitsberechnung, nil = time.Now.
+	// Now replaces the clock of the availability calculation, nil = time.Now.
 	Now        func() time.Time
 	availCache availabilityCache
-	// lastStatusPrune: letzte Bereinigung der Statushistorie;
-	// nur der Scheduler-Goroutine zugänglich.
+	// lastStatusPrune: last cleanup of the status history;
+	// accessible only to the scheduler goroutine.
 	lastStatusPrune time.Time
-	// translationsCache: 60-s-Cache der gebündelten Statusseiten-Übersetzungen.
+	// translationsCache: 60 s cache of the bundled status page translations.
 	translationsCache publicTranslationsCache
 
-	// dispatchWG zählt die Goroutinen von DispatchNotifications (WaitNotifications).
+	// dispatchWG counts the goroutines of DispatchNotifications (WaitNotifications).
 	dispatchWG sync.WaitGroup
 
-	// loginThrottle zählt Fehlversuche je Konto (siehe LoginHandler).
+	// loginThrottle counts failed attempts per account (see LoginHandler).
 	loginThrottle *middleware.AccountThrottle
 
-	// HTTP-Clients der Übersetzungsdienste. nil = Produktionswert
-	// (translationClient). Tests setzen sie auf Clients gegen httptest-Server.
-	// SafeClient prüft Ziele gegen SSRF (frei eingebbare Adresse),
-	// TrustedClient ruft die Adresse aus der Betreiber-Umgebung (LIBRETRANSLATE_URL,
-	// z. B. ein Compose-Dienst) ohne IP-Sperre auf. DeepLURL überschreibt den
-	// festen DeepL-Host (nur Tests).
+	// HTTP clients of the translation services. nil = production value
+	// (translationClient). Tests set them to clients against httptest servers.
+	// SafeClient checks targets against SSRF (freely enterable address),
+	// TrustedClient calls the address from the operator environment (LIBRETRANSLATE_URL,
+	// e.g. a Compose service) without an IP block. DeepLURL overrides the
+	// fixed DeepL host (tests only).
 	TranslationSafeClient    *http.Client
 	TranslationTrustedClient *http.Client
 	TranslationDeepLURL      string
 
-	// incidentMails zählt laufende Vorfall-Benachrichtigungen, siehe WaitIncidentMails.
+	// incidentMails counts running incident notifications, see WaitIncidentMails.
 	incidentMails sync.WaitGroup
-	// outageMails zählt laufende Ausfall-Mails, siehe WaitOutageMails.
+	// outageMails counts running outage mails, see WaitOutageMails.
 	outageMails sync.WaitGroup
-	// mailQ begrenzt die Bestätigungsmails im Hintergrund, siehe mail_queue.go.
+	// mailQ limits the confirmation mails in the background, see mail_queue.go.
 	mailQ mailQueue
 }
 
 func NewHandler(db *gorm.DB) *Handler {
 	h := &Handler{DB: db, loginThrottle: middleware.NewLoginThrottle()}
-	// Der Dienst meldet Quellen-Ausfälle an den Handler, der
-	// die Mails über deliverMail verschickt.
+	// The service reports source outages to the handler, which
+	// sends the mails via deliverMail.
 	h.ExternalStatus = externalstatus.NewService(db, externalstatus.Options{Outage: h, Incidents: h, Retention: externalstatus.RetentionFromEnv(os.Getenv)})
 	return h
 }
@@ -74,8 +74,8 @@ func getEmail(c *gin.Context) string {
 	return str
 }
 
-// getUserID liefert die ID des angemeldeten Users, oder 0 wenn nicht angemeldet
-// (z.B. anonymes Abonnieren über OptionalAuthMiddleware).
+// getUserID returns the ID of the logged-in user, or 0 if not logged in
+// (e.g. anonymous subscribing via OptionalAuthMiddleware).
 func getUserID(c *gin.Context) uint {
 	uid, exists := c.Get("userID")
 	if !exists || uid == nil {
@@ -88,11 +88,11 @@ func getUserID(c *gin.Context) uint {
 	return id
 }
 
-// parseTenantID liest und validiert :page_id aus der URL und antwortet bei
-// Fehlern selbst mit dem passenden JSON-Error (ok=false signalisiert dem
-// Aufrufer, sofort zurückzukehren). Ersatz für die zuvor in
-// Create-/Update-/DeleteComponentHandler (und analog bei Incidents)
-// dreifach duplizierte page_id-Parsing-Boilerplate.
+// parseTenantID reads and validates :page_id from the URL and, on
+// errors, replies itself with the appropriate JSON error (ok=false signals the
+// caller to return immediately). Replacement for the previously, in
+// Create-/Update-/DeleteComponentHandler (and analogously for incidents),
+// triplicated page_id parsing boilerplate.
 func parseTenantID(c *gin.Context) (uint, bool) {
 	tenantIDStr := c.Param("page_id")
 	if tenantIDStr == "" {

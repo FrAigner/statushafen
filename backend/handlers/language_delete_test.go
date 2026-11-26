@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Sprachen aus dem Katalog löschen.
+// Deleting languages from the catalog.
 
 func langDeleteSetup(t *testing.T) (*gorm.DB, http.Handler, map[string]models.Language, models.StatusPage) {
 	t.Helper()
@@ -72,7 +72,7 @@ func TestDeleteLanguageHandler_InBenutzungDurchMailVorlageBlockiert(t *testing.T
 
 func TestDeleteLanguageHandler_EntferntZuordnungUndSpracheUndSchreibtAudit(t *testing.T) {
 	db, r, langs, _ := langDeleteSetup(t)
-	// Übersetzungen bleiben in der DB.
+	// Translations remain in the DB.
 	require.NoError(t, db.Create(&models.IncidentTranslation{IncidentID: 1, LanguageCode: "en", Title: "t", Message: "m"}).Error)
 	code, _ := delLang(r, itoa(langs["en"].ID))
 	assert.Equal(t, http.StatusNoContent, code)
@@ -105,7 +105,7 @@ func TestDeleteLanguageHandler_GleicherCodeLaesstSichNeuAnlegen(t *testing.T) {
 	db.Unscoped().Model(&models.Language{}).Where("code = ?", "en").Count(&n)
 	assert.EqualValues(t, 1, n)
 
-	// Und ein zweites Anlegen ist wieder ein Duplikat.
+	// And creating again is a duplicate once more.
 	w = doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "x"})
 	assert.Equal(t, http.StatusConflict, w.Code)
 }
@@ -151,14 +151,14 @@ func TestCreateLanguageHandler_DatenbankfehlerBeiGrabsteinPruefung(t *testing.T)
 	db, r, langs, _ := langDeleteSetup(t)
 	code, _ := delLang(r, itoa(langs["en"].ID))
 	require.Equal(t, http.StatusNoContent, code)
-	// Wiederbeleben scheitert: 500 statt stillem Verlust.
+	// Reviving fails: 500 instead of silent loss.
 	db.Exec("CREATE TRIGGER no_upd BEFORE UPDATE ON languages BEGIN SELECT RAISE(ABORT, 'gesperrt'); END")
 	w := doTagRequest(r, "POST", "/api/languages", map[string]any{"code": "en", "name": "x"})
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-// Review-Fund: scheitert nur die Abfrage nach einer gelöschten Sprache (nicht die Duplikatprüfung davor),
-// antwortet Anlegen mit 500 statt eine zweite Zeile zu versuchen.
+// Review finding: if only the query for a deleted language fails (not the duplicate check before it),
+// creating responds with 500 instead of trying a second row.
 func TestCreateLanguageHandler_DatenbankfehlerBeiAbfrageGeloeschterSprache(t *testing.T) {
 	db, r, langs, _ := langDeleteSetup(t)
 	// Only de and en can be created: remove en entirely first, so the duplicate check passes.

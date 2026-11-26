@@ -17,13 +17,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// Admin-API für externe Statusseiten (Teil A). Alle
-// Routen hängen unter /api/pages/:page_id/…, damit RequirePermission die
-// Rolle auf genau dieser Statusseite prüft; jede Abfrage filtert zusätzlich
-// nach status_page_id (Mandantentrennung: eine fremde ID ergibt 404).
-// Lesen: components:read, Ändern/Koppeln/Abrufen: components:write - eine
-// Quelle ist Konfiguration der Komponenten, eine eigene Permission bräuchte
-// eine Rollen-Migration ohne erkennbaren Nutzen.
+// Admin API for external status pages (part A). All
+// routes hang under /api/pages/:page_id/... so RequirePermission checks the
+// role on exactly this status page; every query additionally filters
+// by status_page_id (tenant separation: a foreign ID yields 404).
+// Read: components:read, change/link/poll: components:write - a
+// source is configuration of the components, a separate permission would need
+// a role migration with no visible benefit.
 
 const (
 	errExternalSourceNotFound    = "External source not found"
@@ -34,39 +34,39 @@ const (
 	auditTargetExternalLink      = "ExternalComponentLink"
 )
 
-// externalSourceInput: Create (Name/BaseURL Pflicht) und Update (alles
-// optional, nil = unverändert). Bewusst ein DTO statt Bind in das Model
-// (siehe statusPageWritableFields).
+// externalSourceInput: create (Name/BaseURL required) and update (everything
+// optional, nil = unchanged). Deliberately a DTO instead of binding into the model
+// (see statusPageWritableFields).
 type externalSourceInput struct {
 	Name                *string `json:"name"`
 	BaseURL             *string `json:"base_url"`
 	Provider            *string `json:"provider"`
 	PollIntervalSeconds *int    `json:"poll_interval_seconds"`
 	Active              *bool   `json:"active"`
-	// OutageAfterMinutes: Frist ohne erfolgreichen Abruf bis
-	// zur Ausfall-Meldung, 10 bis 1440 Minuten.
+	// OutageAfterMinutes: period without a successful poll until
+	// the outage report, 10 to 1440 minutes.
 	OutageAfterMinutes *int `json:"outage_after_minutes"`
 }
 
-// externalSourceResponse: Quelle plus Zähler für die Admin-Liste (Teil C).
+// externalSourceResponse: source plus counters for the admin list (part C).
 type externalSourceResponse struct {
 	models.ExternalSource
 	ComponentCount int64 `json:"component_count"`
 	LinkCount      int64 `json:"link_count"`
-	// Outage: Ausfallzustand der Quelle für Liste und Banner.
+	// Outage: outage state of the source for list and banner.
 	Outage externalOutageInfo `json:"outage"`
 }
 
-// externalOutageInfo: Active = die Quelle gilt als ausgefallen, Since = Beginn
-// der Funkstille (letzter erfolgreicher Abruf), LastError = letzter Fehler.
+// externalOutageInfo: Active = the source is considered failed, Since = start
+// of the silence (last successful poll), LastError = last error.
 type externalOutageInfo struct {
 	Active    bool       `json:"active"`
 	Since     *time.Time `json:"since"`
 	LastError string     `json:"last_error"`
 }
 
-// applyExternalSourceInput übernimmt und validiert die Felder; die
-// Fehlermeldung geht als 400 an den Client.
+// applyExternalSourceInput applies and validates the fields; the
+// error message goes to the client as 400.
 func (h *Handler) applyExternalSourceInput(src *models.ExternalSource, in externalSourceInput) string {
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
@@ -81,7 +81,7 @@ func (h *Handler) applyExternalSourceInput(src *models.ExternalSource, in extern
 			return "invalid base_url: " + err.Error()
 		}
 		if base != src.BaseURL {
-			// Andere Seite: alte Validatoren gelten nicht mehr.
+			// Different site: old validators no longer apply.
 			src.ETag, src.LastModified = "", ""
 		}
 		src.BaseURL = base
@@ -112,9 +112,9 @@ func (h *Handler) applyExternalSourceInput(src *models.ExternalSource, in extern
 	return ""
 }
 
-// duplicateExternalSource meldet, ob die Statusseite schon eine andere Quelle
-// mit dieser Basis-URL hat (dieselbe Seite doppelt abzufragen ergibt nur
-// doppelte Bausteine).
+// duplicateExternalSource reports whether the status page already has another source
+// with this base URL (polling the same site twice yields only
+// duplicate components).
 func (h *Handler) duplicateExternalSource(src models.ExternalSource) bool {
 	var n int64
 	h.DB.Model(&models.ExternalSource{}).
@@ -133,7 +133,7 @@ func (h *Handler) externalSourceResponse(src models.ExternalSource) externalSour
 	return resp
 }
 
-// loadExternalSource lädt :id der Statusseite :page_id; antwortet selbst mit 400/404.
+// loadExternalSource loads :id of the status page :page_id; responds itself with 400/404.
 func (h *Handler) loadExternalSource(c *gin.Context) (models.ExternalSource, bool) {
 	var src models.ExternalSource
 	tenantID, ok := parseTenantID(c)
@@ -152,9 +152,9 @@ func (h *Handler) loadExternalSource(c *gin.Context) (models.ExternalSource, boo
 	return src, true
 }
 
-// effectiveSnapshot liefert die effektiven Status einer Seite für die
-// Ereignis-Erkennung. Best effort: Bei einem DB-Fehler gibt es kein Ereignis
-// (nil-Vorher-Stand meldet DiffEffective nicht), die Aktion selbst läuft weiter.
+// effectiveSnapshot returns the effective statuses of a page for
+// event detection. Best effort: on a DB error there is no event
+// (a nil previous state is not reported by DiffEffective), the action itself continues.
 func (h *Handler) effectiveSnapshot(pageID uint) map[uint]string {
 	m, err := externalstatus.EffectiveStatuses(h.DB, pageID)
 	if err != nil {
@@ -163,8 +163,8 @@ func (h *Handler) effectiveSnapshot(pageID uint) map[uint]string {
 	return m
 }
 
-// notifyEffectiveDiff vergleicht mit before und meldet Änderungen an den
-// Listener des Dienstes (Teil B hängt dort Benachrichtigungen an).
+// notifyEffectiveDiff compares with before and reports changes to the
+// service's listener (part B attaches notifications there).
 func (h *Handler) notifyEffectiveDiff(c *gin.Context, before map[uint]string, base externalstatus.StatusChange) {
 	externalstatus.DiffEffective(c.Request.Context(), h.ExternalStatus.Listener(), before, h.effectiveSnapshot(base.StatusPageID), base)
 }
@@ -249,7 +249,7 @@ func (h *Handler) UpdateExternalSourceHandler(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "This status page already has a source with this base_url", "code": "external_source_exists"})
 		return
 	}
-	// Aktiv/inaktiv ändert, ob die gekoppelten Komponenten zählen.
+	// Active/inactive changes whether the linked components count.
 	before := h.effectiveSnapshot(src.StatusPageID)
 	if err := h.DB.Select("Name", "BaseURL", "Provider", "PollIntervalSeconds", "OutageAfterMinutes", "Active", "ETag", "LastModified").Save(&src).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update external source", "code": "server_error"})
@@ -260,13 +260,13 @@ func (h *Handler) UpdateExternalSourceHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.externalSourceResponse(src))
 }
 
-// DELETE /api/pages/:page_id/external-sources/:id - löscht (soft) Quelle,
-// ihre externen Komponenten und deren Kopplungen in einer Transaktion.
-// Weil dabei die Kopplungen aller verknüpften Komponenten verschwinden, gilt
-// dieselbe Tag-Einschränkung wie beim Löschen einer einzelnen Kopplung
-// (DeleteExternalLinkHandler): Der Aufruf ist nur erlaubt, wenn der Nutzer auf
-// jede verknüpfte Komponente Tag-Zugriff hat, sonst 403 und nichts wird gelöscht.
-// Global Admins und Nutzer ohne Tags sind davon nicht eingeschränkt.
+// DELETE /api/pages/:page_id/external-sources/:id - deletes (soft) the source,
+// its external components and their links in one transaction.
+// Because the links of all linked components disappear in the process, the
+// same tag restriction applies as when deleting a single link
+// (DeleteExternalLinkHandler): the call is only allowed if the user has
+// tag access to every linked component, otherwise 403 and nothing is deleted.
+// Global Admins and users without tags are not restricted by this.
 func (h *Handler) DeleteExternalSourceHandler(c *gin.Context) {
 	src, ok := h.loadExternalSource(c)
 	if !ok {
@@ -310,12 +310,12 @@ func (h *Handler) DeleteExternalSourceHandler(c *gin.Context) {
 }
 
 // POST /api/pages/:page_id/external-sources/:id/fetch - "Jetzt abrufen".
-// Antwortet immer 200 mit dem Ergebnis (ok/error), damit die Oberfläche den
-// Fehler der Fremdseite anzeigen kann; 4xx/5xx nur für eigene Fehler.
+// Always responds 200 with the result (ok/error) so the UI can show
+// the third-party site's error; 4xx/5xx only for own errors.
 //
-// Läuft für die Quelle schon ein Abruf (Hintergrund-Takt, anderer
-// Klick oder eine andere Instanz), antwortet der Endpunkt sofort mit
-// result {ok:false, error:"fetch_in_progress"}, ohne zu warten - siehe
+// If a poll is already running for the source (background cycle, another
+// click or another instance), the endpoint responds immediately with
+// result {ok:false, error:"fetch_in_progress"}, without waiting - see
 // externalstatus.Service.poll.
 func (h *Handler) FetchExternalSourceHandler(c *gin.Context) {
 	src, ok := h.loadExternalSource(c)
@@ -332,8 +332,8 @@ func (h *Handler) FetchExternalSourceHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"result": res, "source": h.externalSourceResponse(src)})
 }
 
-// externalComponentResponse: externe Komponente plus IDs der gekoppelten
-// eigenen Komponenten (Teil C zeigt damit den Kopplungsstand in der Suche).
+// externalComponentResponse: external component plus IDs of the linked
+// own components (part C uses this to show the link state in the search).
 type externalComponentResponse struct {
 	models.ExternalComponent
 	LinkedComponentIDs []uint `json:"linked_component_ids"`
@@ -341,10 +341,10 @@ type externalComponentResponse struct {
 
 // GET /api/pages/:page_id/external-sources/:id/components
 //
-// Query: q (Teilstring in Name oder Gruppenname, ohne Groß-/Kleinschreibung),
-// group (externe Gruppen-ID), status (normalisierter Status),
-// include_vanished=true (Default: verschwundene ausblenden).
-// Antwort: {"groups": [Gruppen], "components": [alle Treffer, Gruppen inklusive]}.
+// Query: q (substring in name or group name, case-insensitive),
+// group (external group ID), status (normalized status),
+// include_vanished=true (default: hide vanished).
+// Response: {"groups": [groups], "components": [all hits, groups included]}.
 func (h *Handler) GetExternalComponentsHandler(c *gin.Context) {
 	src, ok := h.loadExternalSource(c)
 	if !ok {
@@ -396,7 +396,7 @@ func (h *Handler) linkedComponentIDsByExternal(pageID uint) map[uint][]uint {
 	return out
 }
 
-// externalLinkResponse: eine Kopplung mit den Namen beider Seiten.
+// externalLinkResponse: one link with the names of both sides.
 type externalLinkResponse struct {
 	ID                    uint   `json:"id"`
 	ComponentID           uint   `json:"component_id"`
@@ -408,25 +408,25 @@ type externalLinkResponse struct {
 	SourceName            string `json:"source_name"`
 	Status                string `json:"status"`
 	Vanished              bool   `json:"vanished"`
-	// IsGroup: Die Kopplung zeigt auf eine ganze externe Gruppe;
-	// Status/Worst sind dann das Schlimmste ihrer aktuellen Mitglieder.
+	// IsGroup: The link points to a whole external group;
+	// Status/Worst are then the worst of its current members.
 	IsGroup bool                  `json:"is_group"`
 	Worst   *models.ExternalWorst `gorm:"-" json:"worst,omitempty"`
-	// Warnings: "overlaps_group", wenn dieselbe Komponente eine externe Gruppe
-	// und einen ihrer Bausteine koppelt. Erlaubt und ohne Wirkung auf den
-	// Status (Maximum), das Admin-UI weist nur darauf hin.
+	// Warnings: "overlaps_group" if the same component links an external group
+	// and one of its members. Allowed and without effect on the
+	// status (maximum), the admin UI only points it out.
 	Warnings []string `gorm:"-" json:"warnings"`
-	// ExternalID/GroupExternalID nur für die Überschneidungsprüfung (nicht ausgeliefert).
+	// ExternalID/GroupExternalID only for the overlap check (not delivered).
 	ExternalID      string `json:"-"`
 	GroupExternalID string `json:"-"`
 }
 
-// warningOverlapsGroup: Doppelkopplung einer externen Gruppe und eines ihrer Bausteine.
+// warningOverlapsGroup: double link of an external group and one of its members.
 const warningOverlapsGroup = "overlaps_group"
 
-// annotateLinkWarnings setzt Warnings: je eigener Komponente und Quelle eine
-// Warnung an jeder Kopplung, die Teil einer Überschneidung ist (die Gruppe und
-// der Baustein).
+// annotateLinkWarnings sets Warnings: per own component and source, a
+// warning on every link that is part of an overlap (the group and
+// the member).
 func annotateLinkWarnings(rows []externalLinkResponse) {
 	type key struct {
 		component, source uint
@@ -448,7 +448,7 @@ func annotateLinkWarnings(rows []externalLinkResponse) {
 	}
 }
 
-// hasMemberLink: Die Komponente von group koppelt auch einen Baustein dieser Gruppe.
+// hasMemberLink: The component of group also links a member of this group.
 func hasMemberLink(rows []externalLinkResponse, group externalLinkResponse) bool {
 	for _, r := range rows {
 		if !r.IsGroup && r.ComponentID == group.ComponentID && r.SourceID == group.SourceID && r.GroupExternalID == group.ExternalID {
@@ -475,7 +475,7 @@ func (h *Handler) externalLinks(pageID uint) ([]externalLinkResponse, error) {
 	}
 	for i := range rows {
 		if rows[i].IsGroup {
-			// Der eigene Status einer Gruppe zählt nicht, nur ihre Mitglieder.
+			// A group's own status does not count, only its members.
 			rows[i].GroupName = rows[i].ExternalComponentName
 			if rows[i].Status, rows[i].Worst, err = externalstatus.GroupWorst(h.DB, rows[i].SourceID, rows[i].ExternalID); err != nil {
 				return rows, err
@@ -500,8 +500,8 @@ func (h *Handler) GetExternalLinksHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, rows)
 }
 
-// resolveLinkTargets prüft beide Enden einer neuen Kopplung auf Zugehörigkeit
-// zur Statusseite (404) und Tag-Zugriff (403); antwortet selbst.
+// resolveLinkTargets checks both ends of a new link for membership
+// of the status page (404) and tag access (403); responds itself.
 func (h *Handler) resolveLinkTargets(c *gin.Context, tenantID, componentID, externalID uint) (models.Component, models.ExternalComponent, bool) {
 	var comp models.Component
 	var ext models.ExternalComponent
@@ -509,8 +509,8 @@ func (h *Handler) resolveLinkTargets(c *gin.Context, tenantID, componentID, exte
 		c.JSON(http.StatusNotFound, gin.H{"error": "Component not found", "code": "component_not_found"})
 		return comp, ext, false
 	}
-	// Reine Gruppen erben ihren Status von den Kindern (buildTree); eine
-	// Kopplung dort hätte keine eindeutige Wirkung.
+	// Pure groups inherit their status from their children (buildTree); a
+	// link there would have no unambiguous effect.
 	if comp.Status == componentstatus.Group {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Group components cannot be linked; link one of their children", "code": "external_group_not_linkable"})
 		return comp, ext, false
@@ -529,7 +529,7 @@ func (h *Handler) resolveLinkTargets(c *gin.Context, tenantID, componentID, exte
 }
 
 // POST /api/pages/:page_id/external-links {component_id, external_component_id}
-// Idempotent: eine bestehende Kopplung ergibt 200 statt 201.
+// Idempotent: an existing link yields 200 instead of 201.
 func (h *Handler) CreateExternalLinkHandler(c *gin.Context) {
 	tenantID, ok := parseTenantID(c)
 	if !ok {
@@ -565,8 +565,8 @@ func (h *Handler) CreateExternalLinkHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link component", "code": "server_error"})
 		return
 	}
-	// Die Antwort kommt aus derselben Liste wie GET, damit Gruppenstatus und
-	// Warnungen (overlaps_group) identisch sind.
+	// The response comes from the same list as GET so group status and
+	// warnings (overlaps_group) are identical.
 	rows, err := h.externalLinks(tenantID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to link component", "code": "server_error"})
@@ -611,12 +611,12 @@ func (h *Handler) DeleteExternalLinkHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "External link deleted"})
 }
 
-// annotateEffectiveStatus setzt EffectiveStatus und
-// ExternalSources für die Listen-Antworten (Komponentenbaum, Dashboard).
-// Eigener Status = gespeicherter Status überlagert mit offenen Vorfällen
-// (componentstatus.Own); Gruppen bekommen "group" und werden in buildTree
-// aus den Kindern aggregiert. Fehlen die externen Daten (DB-Fehler), bleibt
-// der effektive Status der eigene - die Seite soll deswegen nicht ausfallen.
+// annotateEffectiveStatus sets EffectiveStatus and
+// ExternalSources for the list responses (component tree, dashboard).
+// Own status = stored status overlaid with open incidents
+// (componentstatus.Own); groups get "group" and are aggregated from
+// their children in buildTree. If the external data is missing (DB error),
+// the effective status stays the own one - the page should not fail because of it.
 func (h *Handler) annotateEffectiveStatus(pageID uint, all []models.Component, openComponentIDs map[uint]string) {
 	refs, err := externalstatus.LinkedRefs(h.DB, pageID)
 	if err != nil {
@@ -632,8 +632,8 @@ func (h *Handler) annotateEffectiveStatus(pageID uint, all []models.Component, o
 	}
 }
 
-// deleteMirroredIncidents entfernt (soft) die gespiegelten Vorfälle und
-// Wartungen einer Quelle samt Updates und betroffenen Komponenten.
+// deleteMirroredIncidents removes (soft) the mirrored incidents and
+// maintenances of a source including updates and affected components.
 func deleteMirroredIncidents(tx *gorm.DB, sourceID uint) error {
 	ids := tx.Model(&models.ExternalIncident{}).Select("id").Where("external_source_id = ?", sourceID)
 	if err := tx.Where("external_incident_id IN (?)", ids).Delete(&models.ExternalIncidentUpdate{}).Error; err != nil {

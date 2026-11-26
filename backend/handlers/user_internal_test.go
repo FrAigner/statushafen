@@ -13,8 +13,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Scheitert das Anlegen einer Seitenrolle, wird das ganze Konto zurückgerollt
-// (kein halb angelegter Nutzer).
+// If creating a page role fails, the whole account is rolled back
+// (no half-created user).
 func TestCreateUserHandler_PageRoleErrorRollsBackUser(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -36,8 +36,8 @@ func TestCreateUserHandler_PageRoleErrorRollsBackUser(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// Eine Seitenrolle mit role_id 0 bedeutet "keine Rolle": Beim Ändern wird die
-// bisherige Rolle auf dieser Seite entfernt und keine neue angelegt.
+// A page role with role_id 0 means "no role": on update, the
+// previous role on this page is removed and no new one is created.
 func TestUpdateUserHandler_RoleZeroRemovesPageRole(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

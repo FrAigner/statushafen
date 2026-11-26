@@ -9,13 +9,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// Randfälle der Sichtbarkeits-Hilfen.
+// Edge cases of the visibility helpers.
 func TestHiddenComponentIDs_ZyklusEndetUndMarkiertNachfahren(t *testing.T) {
 	one, two, three := uint(1), uint(2), uint(3)
 	comps := []models.Component{
-		{Model: gorm.Model{ID: 1}, ParentID: &two, Visible: false}, // Zyklus 1 <-> 2
+		{Model: gorm.Model{ID: 1}, ParentID: &two, Visible: false}, // cycle 1 <-> 2
 		{Model: gorm.Model{ID: 2}, ParentID: &one, Visible: true},
-		{Model: gorm.Model{ID: 3}, ParentID: &three, Visible: true}, // Selbstbezug, sichtbar
+		{Model: gorm.Model{ID: 3}, ParentID: &three, Visible: true}, // self-reference, visible
 		{Model: gorm.Model{ID: 4}, ParentID: &one, Visible: true},
 	}
 	hidden := hiddenComponentIDs(comps)

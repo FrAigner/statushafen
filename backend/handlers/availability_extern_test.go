@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// gespiegelte Meldungen externer Quellen färben den 90-Tage-
-// Verlauf der gekoppelten Komponente (vorher: nur eigene Vorfälle).
+// mirrored reports from external sources color the 90-day
+// history of the linked component (previously: only own incidents).
 
 type extAvail struct {
 	*availEnv
@@ -55,7 +55,7 @@ func (x *extAvail) add(kind, impact string, start, end *time.Time, closed bool) 
 
 func (x *extAvail) days() []availDay {
 	x.t.Helper()
-	x.now = x.now.Add(2 * time.Minute) // Cache (60 s) umgehen
+	x.now = x.now.Add(2 * time.Minute) // bypass cache (60 s)
 	_, resp := x.get("/api/public/pages/ext/availability?include=components")
 	require.Len(x.t, resp.Components, 1)
 	return resp.Components[0].Days
@@ -80,21 +80,21 @@ func TestAvailability_ExterneMeldungenFaerbenVerlauf(t *testing.T) {
 	assert.Equal(t, "partial_outage", day(t, resp.Days, "2026-10-20").Status, "auch die Gesamtseite")
 }
 
-// das `impact` der externen Meldung bestimmt Status und Gewicht
-// (Vorschlag). Rot gegen den alten Stand: dort zählte jede Meldung als
-// degraded_performance mit voller Dauer.
+// the `impact` of the external report determines status and weight
+// (suggestion). Red against the old state: there every report counted as
+// degraded_performance for its full duration.
 func TestAvailability_ExterneMeldungSchweregradAusImpact(t *testing.T) {
 	cases := []struct {
 		impact     string
 		wantStatus string
-		wantDown   int64 // 6 h gewichtet
+		wantDown   int64 // 6 h weighted
 		wantPct    float64
 	}{
 		{"minor", "degraded_performance", 6480, 100 - 100*0.3*6/24},
 		{"major", "partial_outage", 12960, 100 - 100*0.6*6/24},
 		{"critical", "major_outage", 21600, 75},
 		{"none", "operational", 0, 100},
-		{"unbekannt", "degraded_performance", 6480, 92.5}, // unbekannter Wert: vorsichtig wie bisher
+		{"unbekannt", "degraded_performance", 6480, 92.5}, // unknown value: conservative as before
 	}
 	for _, tc := range cases {
 		t.Run("impact "+tc.impact, func(t *testing.T) {
@@ -127,8 +127,8 @@ func TestAvailability_ExterneMeldungOffenLaeuftBisJetztUndEntkoppeltZaehltNicht(
 	assert.Equal(t, "operational", day(t, x.days(), "2026-10-29").Status, "ohne Kopplung betrifft die Meldung keine eigene Komponente")
 }
 
-// addRaw legt eine Meldung mit genau den übergebenen Feldern an (Randfälle der
-// Zeitabbildung: fehlender Beginn, Behebung ohne ResolvedAt, Zeiten in der Zukunft).
+// addRaw creates a report with exactly the given fields (edge cases of the
+// time mapping: missing start, resolution without ResolvedAt, times in the future).
 func (x *extAvail) addRaw(inc models.ExternalIncident) {
 	x.t.Helper()
 	inc.StatusPageID, inc.ExternalSourceID = x.page.ID, x.src.ID
@@ -142,11 +142,11 @@ func (x *extAvail) addRaw(inc models.ExternalIncident) {
 
 func TestAvailability_ExterneMeldungRandfaelleDerZeitabbildung(t *testing.T) {
 	x := newExtAvail(t)
-	// Ohne Beginn gilt die letzte Änderung als Beginn, behoben ohne ResolvedAt endet mit ihr (Länge 0 färbt den Tag).
+	// Without a start, the last change counts as the start; resolved without ResolvedAt ends with it (length 0 colors the day).
 	x.addRaw(models.ExternalIncident{ExternalID: "a", Closed: true, ExternalUpdatedAt: utc(20, 8)})
-	// Ohne jede Zeitangabe nicht auswertbar.
+	// Not evaluable without any time information.
 	x.addRaw(models.ExternalIncident{ExternalID: "b"})
-	// Ende in der Zukunft wird auf jetzt gekappt, Ende vor Beginn auf den Beginn.
+	// An end in the future is clamped to now, an end before the start to the start.
 	x.addRaw(models.ExternalIncident{ExternalID: "c", StartedAt: utc(25, 6), ResolvedAt: utc(30, 6)})
 	x.addRaw(models.ExternalIncident{ExternalID: "d", StartedAt: utc(22, 6), ResolvedAt: utc(22, 2)})
 	days := x.days()

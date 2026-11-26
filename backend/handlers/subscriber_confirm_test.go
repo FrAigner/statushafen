@@ -23,9 +23,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Double-Opt-in für E-Mail-Abos.
+// Double opt-in for email subscriptions.
 
-// Token aus crypto/rand.Text (128 Bit, Base32).
+// Token from crypto/rand.Text (128 bits, Base32).
 var confirmLinkRe = regexp.MustCompile(`/subscribe/confirm\?token=([A-Z2-7]{26})`)
 
 func sha256Hex(s string) string {
@@ -33,27 +33,27 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// doiHandlers ordnet jedem Router aus setupDOIRouter seinen Handler zu, damit
-// Tests mit waitDOIMails auf den Versand im Hintergrund warten können.
+// doiHandlers maps each router from setupDOIRouter to its handler, so that
+// tests can wait for background sending with waitDOIMails.
 var doiHandlers sync.Map
 
-// waitDOIMails blockiert, bis alle Bestätigungsmails des Routers versendet oder
-// gescheitert sind; erst danach sind Mail-Eingang, Audit und Log aussagekräftig.
+// waitDOIMails blocks until all confirmation mails of the router have been sent or
+// failed; only then are mail receipt, audit and log meaningful.
 func waitDOIMails(r http.Handler) {
 	if h, ok := doiHandlers.Load(r); ok {
 		h.(*handlers.Handler).WaitMails()
 	}
 }
 
-// setupDOIRouter registriert die Abo-Endpunkte samt einer Mock-Auth, die
-// userID/email aus X-Mock-UID/X-Mock-Email übernimmt (wie OptionalAuthMiddleware).
+// setupDOIRouter registers the subscription endpoints together with a mock auth that
+// takes userID/email from X-Mock-UID/X-Mock-Email (like OptionalAuthMiddleware).
 func setupDOIRouter(t *testing.T) (*gorm.DB, *gin.Engine, models.StatusPage) {
 	t.Helper()
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Die Bestätigungsmails laufen im Hintergrund. Vor dem Testende abwarten, damit
-	// kein Versand in den nächsten Test (SMTP-Umgebung) hineinläuft.
+	// The confirmation mails run in the background. Wait before the test ends, so that
+	// no sending leaks into the next test (SMTP environment).
 	doiHandlers.Store(r, h)
 	t.Cleanup(h.WaitMails)
 	r.Use(func(c *gin.Context) {
@@ -104,7 +104,7 @@ func responseField(t *testing.T, w *httptest.ResponseRecorder, key string) inter
 	return resp[key]
 }
 
-// expectNoSMTPMessage stellt sicher, dass innerhalb kurzer Zeit keine Mail ankommt.
+// expectNoSMTPMessage ensures that no mail arrives within a short time.
 func expectNoSMTPMessage(t *testing.T, srv *fakeSMTPServer) {
 	t.Helper()
 	select {
@@ -160,12 +160,12 @@ func TestSubscribe_AnonymousEmailStartsPendingAndSendsConfirmation(t *testing.T)
 	if !strings.Contains(msg, "https://status.example.com/subscribe/confirm?token=") {
 		t.Fatalf("Link zeigt nicht aufs Frontend: %s", msg)
 	}
-	// Absenderadresse ist die des Betreibers (SMTP_FROM), der Seitenname der Anzeigename.
+	// Sender address is the operator's (SMTP_FROM), the page name is the display name.
 	if !strings.Contains(msg, `From: "DOI Page" <alerts@statushafen.local>`) {
 		t.Fatalf("Absender der Seite fehlt: %s", msg)
 	}
 	token := extractConfirmToken(t, msg)
-	// Nur der Hash steht in der DB, nie der Klartext-Token.
+	// Only the hash is in the DB, never the plaintext token.
 	if sub.ConfirmTokenHash != sha256Hex(token) {
 		t.Fatalf("ConfirmTokenHash ist nicht sha256(token)")
 	}
@@ -181,7 +181,7 @@ func TestSubscribe_LoggedInWithOwnEmailSkipsConfirmation(t *testing.T) {
 	user := models.User{Email: "owner@example.com"}
 	db.Create(&user)
 
-	// Groß-/Kleinschreibung der Adresse spielt keine Rolle.
+	// The case of the address does not matter.
 	w := subscribeEmail(r, "Owner@Example.com", map[string]string{"X-Mock-UID": strconv.Itoa(int(user.ID)), "X-Mock-Email": "owner@example.com"})
 	requireStatusCode(t, w, http.StatusOK)
 	if got := responseField(t, w, "status"); got != models.SubscriberStatusActive {
@@ -214,7 +214,7 @@ func TestSubscribe_LoggedInWithForeignEmailNeedsConfirmation(t *testing.T) {
 	awaitSMTPMessage(t, srv)
 }
 
-// Ohne userID (z.B. kaputter Token-Claim) zählt eine passende email allein nicht.
+// Without userID (e.g. broken token claim) a matching email alone does not count.
 func TestSubscribe_EmailClaimWithoutUserIDNeedsConfirmation(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -242,7 +242,7 @@ func TestSubscribe_InvalidEmailIsRejected(t *testing.T) {
 func TestSubscribe_GoogleChatStaysActiveWithoutConfirmation(t *testing.T) {
 	db, r, _ := setupDOIRouter(t)
 
-	// Die öffentliche Anmeldung nimmt nur echte Google-Chat-Webhooks an.
+	// The public signup accepts only real Google Chat webhooks.
 	w := postJSON(r, "/api/subscribe", map[string]string{
 		"channel": "google_chat", "webhook_url": "https://chat.googleapis.com/v1/spaces/AAAA1234/messages?key=k&token=t", "component_ids": "all", "slug": "doi-page",
 	}, nil)
@@ -265,7 +265,7 @@ func TestSubscribe_PendingDuplicateDoesNotResendWhileTokenValid(t *testing.T) {
 	db.Where("email = ?", "dup@example.com").First(&before)
 
 	w := subscribeEmail(r, "dup@example.com", nil)
-	// Gleiche Antwort wie beim ersten Mal: verrät nicht, dass schon ein Abo wartet.
+	// Same response as the first time: does not reveal that a subscription is already pending.
 	requireStatusCode(t, w, http.StatusOK)
 	if got := responseField(t, w, "status"); got != models.SubscriberStatusPending {
 		t.Fatalf("status = %v, erwartet pending", got)
@@ -332,8 +332,8 @@ func TestSubscribe_PendingDuplicateByOwnerActivatesDirectly(t *testing.T) {
 	}
 }
 
-// Bewusst geändert (vorher 409): Ein aktives Abo wird wie ein neues beantwortet,
-// damit die Antwort nicht verrät, ob die Adresse abonniert ist; siehe
+// Deliberately changed (previously 409): an active subscription is answered like a new one,
+// so the response does not reveal whether the address is subscribed; see
 // subscribe_hardening_test.go.
 func TestSubscribe_ActiveDuplicateIsAnsweredLikeNewAddress(t *testing.T) {
 	db, r, page := setupDOIRouter(t)
@@ -363,7 +363,7 @@ func TestSubscribe_CreateErrorReturns500(t *testing.T) {
 	requireStatusCode(t, subscribeEmail(r, "create-err@example.com", nil), http.StatusInternalServerError)
 }
 
-// failSubscriberWrites lässt alle Updates/Creates/Deletes auf subscribers scheitern.
+// failSubscriberWrites makes all updates/creates/deletes on subscribers fail.
 func failSubscriberWrites(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	cb := func(tx *gorm.DB) {
@@ -410,7 +410,7 @@ func TestConfirmSubscription_ActivatesWithValidToken(t *testing.T) {
 		t.Fatalf("Audit subscriber.confirmed fehlt")
 	}
 
-	// Einmal-Token: ein zweiter Klick ist ungültig.
+	// One-time token: a second click is invalid.
 	requireStatusCode(t, postJSON(r, "/api/public/subscribers/confirm", map[string]string{"token": token}, nil), http.StatusBadRequest)
 }
 
@@ -476,7 +476,7 @@ func TestSubscribe_ConfirmationMailFailureIsAudited(t *testing.T) {
 	t.Setenv("SMTP_PORT", "1")
 	db, r, _ := setupDOIRouter(t)
 
-	// Das Abo bleibt trotzdem bestehen (wie bei Bestellungen), der Fehler landet im Audit-Log.
+	// The subscription remains anyway (as with orders), the error lands in the audit log.
 	requireStatusCode(t, subscribeEmail(r, "smtpfail@example.com", nil), http.StatusOK)
 	waitDOIMails(r)
 	if auditCountFor(db, "subscriber.confirmation_email_failed") != 1 {
@@ -553,7 +553,7 @@ func TestAdminUpdateSubscriber_EmailChangeRequiresNewConfirmation(t *testing.T) 
 		return w
 	}
 
-	// Nur Komponenten geändert: bleibt aktiv, keine Mail.
+	// Only components changed: stays active, no mail.
 	requireStatusCode(t, put(map[string]string{"Channel": "email", "Email": "before@example.com", "SubscribedComponentIDs": "1"}), http.StatusOK)
 	expectNoSMTPMessage(t, srv)
 	db.First(&sub, sub.ID)
@@ -561,7 +561,7 @@ func TestAdminUpdateSubscriber_EmailChangeRequiresNewConfirmation(t *testing.T) 
 		t.Fatalf("ohne Adresswechsel muss das Abo aktiv bleiben")
 	}
 
-	// Neue Adresse: muss erneut bestätigt werden.
+	// New address: must be confirmed again.
 	requireStatusCode(t, put(map[string]string{"Channel": "email", "Email": "after@example.com", "SubscribedComponentIDs": "1"}), http.StatusOK)
 	if msg := awaitSMTPMessage(t, srv); !strings.Contains(msg, "To: after@example.com") {
 		t.Fatalf("Bestätigungsmail an falschen Empfänger: %s", msg)

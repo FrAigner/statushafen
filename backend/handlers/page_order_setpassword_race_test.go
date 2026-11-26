@@ -17,8 +17,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// confirmedOrderWithFreshUser legt eine bestätigte Bestellung samt frischem Konto
-// (ohne Passwort) an, wie ConfirmOrderHandler sie hinterlässt.
+// confirmedOrderWithFreshUser creates a confirmed order together with a fresh account
+// (without password), as ConfirmOrderHandler leaves it behind.
 func confirmedOrderWithFreshUser(t *testing.T, db *gorm.DB, email, token string) (models.PageOrder, models.User) {
 	t.Helper()
 	role := models.Role{Name: "Page Admin"}
@@ -37,9 +37,9 @@ func setPasswordRequest(r http.Handler, token, password string) (int, []byte) {
 	return w.Code, w.Body.Bytes()
 }
 
-// failOnce registriert einen Hook, der genau einmal fn ausführt, sobald eine
-// Abfrage (after=query) bzw. ein Update auf die Tabelle läuft. So lässt sich
-// die Reihenfolge "ein zweiter Request war schneller" deterministisch nachstellen.
+// failOnce registers a hook that runs fn exactly once as soon as a
+// query (after=query) or an update on the table runs. This makes it possible to
+// deterministically recreate the sequence "a second request was faster".
 func afterQueryOnce(t *testing.T, db *gorm.DB, table string, fn func(tx *gorm.DB)) {
 	t.Helper()
 	done := false
@@ -54,8 +54,8 @@ func afterQueryOnce(t *testing.T, db *gorm.DB, table string, fn func(tx *gorm.DB
 	t.Cleanup(func() { _ = db.Callback().Query().Remove(name) })
 }
 
-// Hat ein gleichzeitiger Request den Link zwischen Laden und Schreiben verbraucht,
-// wird dieser Request abgewiesen und überschreibt das Passwort nicht.
+// If a concurrent request consumed the link between loading and writing,
+// this request is rejected and does not overwrite the password.
 func TestSetOrderPassword_LinkConsumedByConcurrentRequestIsRejected(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupOrderRouter(handlers.NewHandler(db))
@@ -73,8 +73,8 @@ func TestSetOrderPassword_LinkConsumedByConcurrentRequestIsRejected(t *testing.T
 	assert.Empty(t, reloaded.PasswordHash, "der unterlegene Request darf kein Passwort setzen")
 }
 
-// Scheitert das Schreiben des Passworts, bleibt der Link benutzbar (Transaktion
-// wird zurückgerollt): kein verbrannter Link ohne gesetztes Passwort.
+// If writing the password fails, the link stays usable (transaction
+// is rolled back): no burned link without a password set.
 func TestSetOrderPassword_FailedPasswordWriteKeepsLinkUsable(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupOrderRouter(handlers.NewHandler(db))
@@ -104,8 +104,8 @@ func TestSetOrderPassword_FailedPasswordWriteKeepsLinkUsable(t *testing.T) {
 	assert.True(t, database.CheckPasswordHash("langes-sicheres-passwort", reloaded.PasswordHash))
 }
 
-// Bekommt das Konto zwischen Prüfung und Schreiben anderweitig ein Passwort,
-// wird es nicht überschrieben (409), und der Link bleibt unverbraucht.
+// If the account otherwise receives a password between check and write,
+// it is not overwritten (409), and the link remains unconsumed.
 func TestSetOrderPassword_AccountSecuredInBetweenIsNotOverwritten(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupOrderRouter(handlers.NewHandler(db))
@@ -128,8 +128,8 @@ func TestSetOrderPassword_AccountSecuredInBetweenIsNotOverwritten(t *testing.T) 
 	assert.Equal(t, models.HashToken("tok-dazwischen-1"), reloadedOrder.SetPasswordTokenHash)
 }
 
-// Ändert sich die Bestellung zwischen Laden und Einlösen (anderer Token, anderer
-// Status), gilt der Link nicht mehr: Das bedingte Update trifft keine Zeile.
+// If the order changes between loading and redeeming (different token, different
+// status), the link is no longer valid: the conditional update hits no row.
 func TestSetOrderPassword_OrderChangedInBetweenIsRejected(t *testing.T) {
 	for name, set := range map[string]string{
 		"anderer Token":  "set_password_token = 'tok-neu-und-anders'",
@@ -154,9 +154,9 @@ func TestSetOrderPassword_OrderChangedInBetweenIsRejected(t *testing.T) {
 	}
 }
 
-// Wird das Konto zwischen Laden und Schreiben an SSO gebunden oder zum Global
-// Admin, setzt der Link kein Passwort (409): Er darf kein bestehendes oder
-// privilegiertes Konto übernehmen.
+// If the account is bound to SSO or becomes Global
+// Admin between loading and writing, the link sets no password (409): it must not take over an existing or
+// privileged account.
 func TestSetOrderPassword_AccountBecameSSOOrAdminInBetweenIsNotTouched(t *testing.T) {
 	for name, set := range map[string]string{
 		"SSO-Konto":    "sso_provider = 'oidc'",
@@ -184,8 +184,8 @@ func TestSetOrderPassword_AccountBecameSSOOrAdminInBetweenIsNotTouched(t *testin
 	}
 }
 
-// Ein Datenbankfehler beim Einlösen des Links ist ein 500, kein "Link ungültig":
-// Der Nutzer soll es erneut versuchen können, und der Fehler fällt im Betrieb auf.
+// A database error when redeeming the link is a 500, not "link invalid":
+// the user should be able to retry, and the error is noticed in operation.
 func TestSetOrderPassword_ClaimDatabaseErrorIsServerError(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := setupOrderRouter(handlers.NewHandler(db))

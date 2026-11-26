@@ -33,9 +33,9 @@ func doJSONRequest(r http.Handler, method, path string, body any) *httptest.Resp
 	return w
 }
 
-// doJSONRequestExpect ist doJSONRequest plus sofortiger Status-Code-Prüfung -
-// spart die immer gleiche if-w.Code-Fehlerbehandlung in jedem einzelnen
-// t.Run-Block dieser Datei.
+// doJSONRequestExpect is doJSONRequest plus an immediate status code check -
+// saves the always identical if-w.Code error handling in every single
+// t.Run block of this file.
 func doJSONRequestExpect(t *testing.T, r http.Handler, method, path string, body any, wantCode int) *httptest.ResponseRecorder {
 	t.Helper()
 	w := doJSONRequest(r, method, path, body)
@@ -45,8 +45,8 @@ func doJSONRequestExpect(t *testing.T, r http.Handler, method, path string, body
 	return w
 }
 
-// assertCustomDomainState lädt die Statusseite neu und prüft Domain+Status -
-// gemeinsame Nachbedingung mehrerer Set/Delete-Testfälle.
+// assertCustomDomainState reloads the status page and checks domain+status -
+// a shared postcondition of several Set/Delete test cases.
 func assertCustomDomainState(t *testing.T, db *gorm.DB, pageID uint, wantDomain, wantStatus string) {
 	t.Helper()
 	var reloaded models.StatusPage
@@ -57,8 +57,8 @@ func assertCustomDomainState(t *testing.T, db *gorm.DB, pageID uint, wantDomain,
 	}
 }
 
-// decodeJSON entpackt den Response-Body als map - gemeinsame Vorbedingung
-// mehrerer Verify-Testfälle, die nur einzelne Felder daraus prüfen.
+// decodeJSON unpacks the response body as a map - a shared precondition
+// of several Verify test cases that check only individual fields from it.
 func decodeJSON(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 	t.Helper()
 	var resp map[string]any
@@ -78,9 +78,9 @@ func setupCustomDomainRouter(h *Handler) http.Handler {
 	return r
 }
 
-// TestSetCustomDomainHandler: Domain setzen versetzt den
-// Status immer auf "pending", ein Domain-Konflikt mit einer anderen
-// Statusseite wird abgelehnt, leerer String löscht die Domain.
+// TestSetCustomDomainHandler: setting a domain always resets the
+// status to "pending", a domain conflict with another
+// status page is rejected, an empty string deletes the domain.
 func TestSetCustomDomainHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -127,8 +127,8 @@ func TestSetCustomDomainHandler(t *testing.T) {
 		}
 	})
 
-	// Bewusst geändert: Eine unbewiesene Eintragung reserviert die Domain nicht
-	// mehr (Squatting); der Konflikt wird erst beim Verifizieren entschieden, siehe
+	// Deliberately changed: an unproven entry no longer reserves the domain
+	// (squatting); the conflict is decided only on verification, see
 	// custom_domain_reservation_test.go.
 	t.Run("Domain, die eine andere Seite unbewiesen trägt, lässt sich eintragen", func(t *testing.T) {
 		doJSONRequestExpect(t, r, "PUT", "/api/admin/pages/"+strconv.Itoa(int(pageB.ID))+"/custom-domain",
@@ -175,9 +175,9 @@ func TestSetCustomDomainHandler(t *testing.T) {
 	})
 }
 
-// TestVerifyCustomDomainHandler deckt die TXT-basierte Owner-Verifikation
-// ab, indem lookupTXT für den Test durch eine Fake-
-// Implementierung ersetzt wird - kein echter Netzwerk-Zugriff nötig.
+// TestVerifyCustomDomainHandler covers the TXT-based owner verification
+// by replacing lookupTXT for the test with a fake
+// implementation - no real network access needed.
 func TestVerifyCustomDomainHandler(t *testing.T) {
 	origLookup := lookupTXT
 	origTarget := os.Getenv("CUSTOM_DOMAIN_CNAME_TARGET")
@@ -245,8 +245,8 @@ func TestVerifyCustomDomainHandler(t *testing.T) {
 	})
 
 	t.Run("DNS-Fehler (SERVFAIL) -> check_failed mit Grund dns_lookup_failed", func(t *testing.T) {
-		// Vorheriger Schritt hat verified gesetzt; verified würde bei einem
-		// Fehler bewusst bleiben, hier geht es um eine neue Domain.
+		// The previous step set verified; verified would deliberately remain on an
+		// error, here it is about a new domain.
 		require.NoError(t, db.Model(&page).Update("custom_domain_status", "pending").Error)
 		lookupTXT = func(_ context.Context, host string) ([]string, error) {
 			return nil, &net.DNSError{Err: "server misbehaving", Name: host, IsTemporary: true}
@@ -272,9 +272,9 @@ func TestVerifyCustomDomainHandler(t *testing.T) {
 	})
 }
 
-// TestVerifyCustomDomainHandler_SaveErrorReturns500: scheitert
-// das Speichern des Prüfergebnisses, muss das als 500 sichtbar werden statt
-// stillschweigend einen veralteten Zustand zu melden (vorher ungeprüftes Save).
+// TestVerifyCustomDomainHandler_SaveErrorReturns500: if
+// saving the check result fails, this must become visible as a 500 instead of
+// silently reporting a stale state (previously an unchecked save).
 func TestVerifyCustomDomainHandler_SaveErrorReturns500(t *testing.T) {
 	origLookup := lookupTXT
 	defer func() { lookupTXT = origLookup }()
@@ -297,8 +297,8 @@ func TestVerifyCustomDomainHandler_SaveErrorReturns500(t *testing.T) {
 	}
 }
 
-// TestResolvePublicDomainHandler deckt die öffentliche Domain->Slug-Auflösung
-// ab; die Hochstufung "verified" -> "active" macht nur der interne Check.
+// TestResolvePublicDomainHandler covers the public domain->slug resolution;
+// the promotion "verified" -> "active" is done only by the internal check.
 func TestResolvePublicDomainHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -309,8 +309,8 @@ func TestResolvePublicDomainHandler(t *testing.T) {
 	pendingPage := models.StatusPage{Name: "Beta", Slug: "beta", CustomDomain: "status.beta.example", CustomDomainStatus: "pending"}
 	db.Create(&pendingPage)
 
-	// Bewusst geändert: Der anonyme Aufruf stuft den Status nicht mehr hoch,
-	// das geschieht nur über den internen Check (custom_domain_gate_test.go).
+	// Deliberately changed: the anonymous call no longer promotes the status,
+	// that happens only via the internal check (custom_domain_gate_test.go).
 	t.Run("Verified Domain löst zu Slug auf, der Status bleibt verified", func(t *testing.T) {
 		w := doJSONRequestExpect(t, r, "GET", "/api/public/resolve-domain?host=status.acme.example", nil, http.StatusOK)
 		resp := decodeJSON(t, w)
@@ -333,11 +333,11 @@ func TestResolvePublicDomainHandler(t *testing.T) {
 	})
 }
 
-// TestInternalCustomDomainCheckHandler deckt den von Caddys On-Demand-TLS
-// genutzten "ask"-Endpunkt ab.
+// TestInternalCustomDomainCheckHandler covers the endpoint called by Caddy's
+// "ask" endpoint.
 func TestInternalCustomDomainCheckHandler(t *testing.T) {
-	// Ohne Token antwortet der Endpunkt nur in einer Entwicklungsumgebung;
-	// das Verhalten ohne diese Ausnahme prüft custom_domain_gate_test.go.
+	// Without a token, the endpoint answers only in a development environment;
+	// the behavior without this exception is tested by custom_domain_gate_test.go.
 	t.Setenv("APP_ENV", "test")
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -380,8 +380,8 @@ func TestInternalCustomDomainCheckHandler(t *testing.T) {
 	})
 }
 
-// customDomainCheckFixture legt eine Statusseite mit Domain/Token in einem
-// Ausgangsstatus an und liefert Router, DB und den Verify-Pfad.
+// customDomainCheckFixture creates a status page with domain/token in an
+// initial status and returns the router, DB and the verify path.
 func customDomainCheckFixture(t *testing.T, status string) (http.Handler, *gorm.DB, models.StatusPage, string) {
 	t.Helper()
 	db := testutils.SetupTestDB()
@@ -398,9 +398,9 @@ func stubLookup(t *testing.T, fn func(context.Context, string) ([]string, error)
 	t.Cleanup(func() { lookupTXT = orig })
 }
 
-// TestVerifyCustomDomainHandler_ErrorClasses (Fund 3): ein
-// fehlender TXT-Eintrag ist in Go ein *net.DNSError{IsNotFound} und muss als
-// txt_not_found gelten; nur Timeout/SERVFAIL/andere Fehler als Lookup-Fehler.
+// TestVerifyCustomDomainHandler_ErrorClasses (finding 3): a
+// missing TXT record is a *net.DNSError{IsNotFound} in Go and must count as
+// txt_not_found; only timeout/SERVFAIL/other errors as lookup errors.
 func TestVerifyCustomDomainHandler_ErrorClasses(t *testing.T) {
 	cases := map[string]struct {
 		err  error
@@ -427,12 +427,12 @@ func TestVerifyCustomDomainHandler_ErrorClasses(t *testing.T) {
 	}
 }
 
-// TestVerifyCustomDomainHandler_LiveStatusKept (Fund 4): eine
-// fehlgeschlagene Prüfung darf verified/active nicht herabstufen (sonst löst
-// ResolvePublicDomainHandler die Domain nicht mehr auf und Caddy erneuert das
-// Zertifikat nicht); es werden nur CheckedAt/CheckError geschrieben.
+// TestVerifyCustomDomainHandler_LiveStatusKept (finding 4): a
+// failed check must not downgrade verified/active (otherwise
+// ResolvePublicDomainHandler no longer resolves the domain and Caddy does not renew the
+// certificate); only CheckedAt/CheckError are written.
 func TestVerifyCustomDomainHandler_LiveStatusKept(t *testing.T) {
-	t.Setenv("APP_ENV", "test") // interner Check ohne Token nur in der Entwicklung
+	t.Setenv("APP_ENV", "test") // internal check without token only in development
 	failures := map[string]error{
 		"TXT fehlt":     &net.DNSError{Err: "no such host", IsNotFound: true},
 		"DNS-Aussetzer": &net.DNSError{Err: "i/o timeout", IsTimeout: true},
@@ -450,7 +450,7 @@ func TestVerifyCustomDomainHandler_LiveStatusKept(t *testing.T) {
 				require.Equal(t, status, reloaded.CustomDomainStatus)
 				require.NotNil(t, reloaded.CustomDomainCheckedAt)
 				require.NotEmpty(t, reloaded.CustomDomainCheckError)
-				// Die Domain wird weiter aufgelöst und von Caddy freigegeben.
+				// The domain continues to be resolved and approved by Caddy.
 				doJSONRequestExpect(t, r, "GET", "/api/internal/custom-domain-check?domain=s.a.example", nil, http.StatusOK)
 				doJSONRequestExpect(t, r, "GET", "/api/public/resolve-domain?host=s.a.example", nil, http.StatusOK)
 			})
@@ -472,10 +472,10 @@ func TestVerifyCustomDomainHandler_LiveStatusKept(t *testing.T) {
 	})
 }
 
-// TestVerifyCustomDomainHandler_ConcurrentChange (Fund 5): wird
-// Domain oder Token während des Lookups geändert/entfernt, antwortet der
-// Handler 409 und überschreibt nichts (vorher: Save der ganzen Zeile brachte
-// eine entfernte Domain als "verified" zurück).
+// TestVerifyCustomDomainHandler_ConcurrentChange (finding 5): if
+// the domain or token is changed/removed during the lookup, the
+// handler answers 409 and overwrites nothing (previously: saving the whole row brought
+// a removed domain back as "verified").
 func TestVerifyCustomDomainHandler_ConcurrentChange(t *testing.T) {
 	changes := map[string]map[string]any{
 		"Domain entfernt":    {"custom_domain": "", "custom_domain_status": "", "custom_domain_verification_token": ""},
@@ -507,9 +507,9 @@ func TestVerifyCustomDomainHandler_ConcurrentChange(t *testing.T) {
 	}
 }
 
-// TestVerifyCustomDomainHandler_LookupTimeout (Fund 5): der Lookup
-// läuft mit Frist; ein hängender Resolver blockiert den Request nicht
-// unbegrenzt, das Ergebnis ist dns_lookup_failed.
+// TestVerifyCustomDomainHandler_LookupTimeout (finding 5): the lookup
+// runs with a deadline; a hanging resolver does not block the request
+// indefinitely, the result is dns_lookup_failed.
 func TestVerifyCustomDomainHandler_LookupTimeout(t *testing.T) {
 	origTimeout := customDomainLookupTimeout
 	customDomainLookupTimeout = 30 * time.Millisecond
@@ -536,8 +536,8 @@ func TestVerifyCustomDomainHandler_LookupTimeout(t *testing.T) {
 	require.Equal(t, "dns_lookup_failed", reloaded.CustomDomainCheckError)
 }
 
-// customDomainCNAMETarget: CUSTOM_DOMAIN_CNAME_TARGET gewinnt; ohne Angabe leitet
-// sich der Zielhost als "edge.<Host aus FRONTEND_URL>" ab (kein fest verdrahteter
+// customDomainCNAMETarget: CUSTOM_DOMAIN_CNAME_TARGET wins; without a setting the
+// target host is derived as "edge.<host from FRONTEND_URL>" (no hard-wired
 // Betreibername).
 func TestCustomDomainCNAMETarget(t *testing.T) {
 	t.Run("explizite Einstellung gewinnt", func(t *testing.T) {

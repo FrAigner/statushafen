@@ -8,18 +8,18 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Teil 1: Versandsprache der Benachrichtigungen an Abonnenten.
+// Part 1: sending language of the notifications to subscribers.
 //
-// Vorher war "de" fest verdrahtet (Vorfälle, Ankündigungen, Abo-Bestätigung);
-// Vorlagen in anderen Sprachen ließen sich anlegen, wurden aber nie versendet.
-// Jetzt gilt die Reihenfolge: gewünschte Sprache (Subscriber.Language,
-// nur wenn die Seite sie aktiv hat) -> Standardsprache der
-// Statusseite -> eingebauter Standardtext. Die eingebauten Texte gibt es in de
-// und en (outageMailLang); jede andere Standardsprache bekommt dort Englisch
-// bzw. ihre eigene Vorlage, falls eine gepflegt ist.
+// Previously "de" was hard-wired (incidents, announcements, subscription confirmation);
+// templates in other languages could be created but were never sent.
+// Now the order applies: desired language (Subscriber.Language,
+// only if the page has it active) -> default language of the
+// status page -> built-in default text. The built-in texts exist in de
+// and en (outageMailLang); any other default language gets English there
+// or its own template, if one is maintained.
 
-// pageDefaultLanguageCode liefert den Code der Standardsprache der Seite, ohne
-// Pflege "de" (wie die Backfill-Vorbelegung bestehender Seiten).
+// pageDefaultLanguageCode returns the code of the page's default language, or
+// "de" if none is maintained (like the backfill preset of existing pages).
 func (h *Handler) pageDefaultLanguageCode(pageID uint) string {
 	var l models.StatusPageLanguage
 	if err := h.DB.Where("status_page_id = ? AND is_default = ?", pageID, true).First(&l).Error; err != nil || l.LanguageCode == "" {
@@ -28,18 +28,18 @@ func (h *Handler) pageDefaultLanguageCode(pageID uint) string {
 	return l.LanguageCode
 }
 
-// subscriberMailTemplate wählt die Vorlage (Audience subscriber) für einen
-// Abonnenten: zuerst die gewünschte Sprache preferred (leer = keine Angabe),
-// dann die Standardsprache der Seite. Ohne Treffer ist die Vorlage nil und der
-// Aufrufer nimmt den eingebauten Standardtext. lang ist die Sprache de/en für
-// diesen eingebauten Text bzw. die Platzhalter ({{.Language}}, {{.StatusLabel}}).
+// subscriberMailTemplate selects the template (audience subscriber) for a
+// subscriber: first the desired language preferred (empty = not given),
+// then the page's default language. Without a match the template is nil and the
+// caller uses the built-in default text. lang is the language de/en for
+// this built-in text and the placeholders ({{.Language}}, {{.StatusLabel}}).
 func (h *Handler) subscriberMailTemplate(pageID uint, kind, preferred string) (tmpl *models.NotificationTemplate, lang string) {
 	def := h.pageDefaultLanguageCode(pageID)
 	candidates := []string{def}
-	// eine inzwischen deaktivierte oder aus dem Katalog entfernte
-	// Sprache gilt nicht mehr; der Abonnent fällt dann auf die Seitenstandard-
-	// sprache zurück (die Sprache bleibt am Abo gespeichert und wirkt wieder,
-	// sobald sie reaktiviert wird).
+	// a language that has since been disabled or removed from the catalog
+	// no longer applies; the subscriber then falls back to the page default
+	// language (the language stays stored on the subscription and takes effect again
+	// as soon as it is reactivated).
 	if preferred = h.validSubscriberLanguage(pageID, preferred); preferred != "" && preferred != def {
 		candidates = []string{preferred, def}
 	}
@@ -51,10 +51,10 @@ func (h *Handler) subscriberMailTemplate(pageID uint, kind, preferred string) (t
 	return nil, outageMailLang(candidates[0])
 }
 
-// memoSubscriberTemplate liefert subscriberMailTemplate für eine Art, gemerkt je
-// gewünschter Sprache: Ein Versandlauf an viele Abonnenten schlägt Vorlage und
-// Seitensprache so nur einmal je Sprache nach. Nicht für nebenläufigen Zugriff
-// gedacht (die Versandschleifen laufen nacheinander).
+// memoSubscriberTemplate returns subscriberMailTemplate for a kind, memoized per
+// desired language: a send run to many subscribers thus looks up the template and
+// page language only once per language. Not intended for concurrent access
+// (the send loops run sequentially).
 func (h *Handler) memoSubscriberTemplate(pageID uint, kind string) func(preferred string) (*models.NotificationTemplate, string) {
 	type result struct {
 		tmpl *models.NotificationTemplate
@@ -71,9 +71,9 @@ func (h *Handler) memoSubscriberTemplate(pageID uint, kind string) func(preferre
 	}
 }
 
-// validSubscriberLanguage normalisiert die vom Abonnenten gewünschte Mailsprache:
-// nur eine bei der Seite aktive Sprache wird übernommen, alles andere (leer,
-// unbekannt, nicht aktiviert) ergibt "" = Seitenstandardsprache.
+// validSubscriberLanguage normalizes the mail language desired by the subscriber:
+// only a language active on the page is accepted, everything else (empty,
+// unknown, not enabled) yields "" = page default language.
 func (h *Handler) validSubscriberLanguage(pageID uint, code string) string {
 	// With the switch off every mail goes out in the page default; the stored
 	// preference is kept and applies again once the switch is on.
@@ -82,18 +82,18 @@ func (h *Handler) validSubscriberLanguage(pageID uint, code string) string {
 	}
 	lang, err := h.resolveSubscriberLanguage(pageID, code)
 	if err != nil {
-		// Lesefehler ist nicht "ungültig". Der Versand fällt auf die
-		// Seitenstandardsprache zurück; der Fehlertext bleibt aus dem Log.
+		// A read error is not "invalid". Sending falls back to the
+		// page default language; the error text stays out of the log.
 		slog.Error("Abonnentensprache nicht prüfbar", "status_page_id", pageID)
 		return ""
 	}
 	return lang
 }
 
-// resolveSubscriberLanguage wie validSubscriberLanguage, unterscheidet aber einen
-// Lesefehler (err != nil) von "ungültig" (leer, err == nil). Schreibende Pfade
-// antworten bei einem Fehler mit 500, statt eine gültige Sprache still zu
-// überschreiben.
+// resolveSubscriberLanguage is like validSubscriberLanguage, but distinguishes a
+// read error (err != nil) from "invalid" (empty, err == nil). Writing paths
+// respond with 500 on an error instead of silently
+// overwriting a valid language.
 func (h *Handler) resolveSubscriberLanguage(pageID uint, code string) (string, error) {
 	code = strings.ToLower(strings.TrimSpace(code))
 	// Only content languages (de/en); anything else means the page default.
@@ -101,8 +101,8 @@ func (h *Handler) resolveSubscriberLanguage(pageID uint, code string) (string, e
 		return "", nil
 	}
 	var n int64
-	// auch im Sprachkatalog aktiv (Language.IsActive), nicht nur der
-	// Seite zugeordnet - eine deaktivierte Katalogsprache wird nicht mehr angeboten.
+	// also active in the language catalog (Language.IsActive), not just
+	// assigned to the page - a disabled catalog language is no longer offered.
 	if err := h.DB.Model(&models.StatusPageLanguage{}).
 		Where("status_page_id = ? AND language_code = ? AND language_code IN (?)", pageID, code,
 			h.DB.Model(&models.Language{}).Select("code").Where("is_active = ?", true)).
@@ -115,9 +115,9 @@ func (h *Handler) resolveSubscriberLanguage(pageID uint, code string) (string, e
 	return code, nil
 }
 
-// subscriberChatLang ist die Sprache (de/en) für Chat-Texte: die effektive
-// Sprache des Abonnenten (gültig und aktiv, sonst Seitenstandard), unabhängig
-// davon, welche Mail-Vorlage existiert. Gemerkt je gewünschter Sprache.
+// subscriberChatLang is the language (de/en) for chat texts: the effective
+// language of the subscriber (valid and active, otherwise page default), regardless
+// of which mail template exists. Memoized per desired language.
 func (h *Handler) memoSubscriberChatLang(pageID uint) func(preferred string) string {
 	cache := map[string]string{}
 	return func(preferred string) string {
@@ -134,9 +134,9 @@ func (h *Handler) memoSubscriberChatLang(pageID uint) func(preferred string) str
 	}
 }
 
-// staffMailLang bildet User.PreferredLanguage auf die Sprache der Mails an interne
-// Nutzer ab: "de" -> de, alles andere inkl. leer -> en (bisheriges
-// Verhalten, damit Nutzer ohne gespeicherte Sprache nichts Neues erleben).
+// staffMailLang maps User.PreferredLanguage to the language of mails to internal
+// users: "de" -> de, everything else incl. empty -> en (previous
+// behavior, so that users without a stored language experience nothing new).
 func staffMailLang(preferred string) string {
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(preferred)), "de") {
 		return "de"
@@ -144,10 +144,10 @@ func staffMailLang(preferred string) string {
 	return "en"
 }
 
-// staffNotificationTemplate wählt die Vorlage (Audience staff) für interne
-// Nutzer: erst in deren Sprache, dann die englische (Vorlagen, die vor der Umstellung nur
-// auf Englisch gepflegt wurden, gelten weiter). tmplLang ist die Sprache für die
-// Platzhalter. Ohne Treffer ist die Vorlage nil (eingebauter Text in lang).
+// staffNotificationTemplate selects the template (audience staff) for internal
+// users: first in their language, then English (templates that were maintained only
+// in English before the changeover continue to apply). tmplLang is the language for the
+// placeholders. Without a match the template is nil (built-in text in lang).
 func (h *Handler) staffNotificationTemplate(pageID uint, kind, lang string) (tmpl *models.NotificationTemplate, tmplLang string) {
 	if t := h.lookupNotificationTemplate(pageID, kind, NotificationAudienceStaff, lang); t != nil {
 		return t, lang

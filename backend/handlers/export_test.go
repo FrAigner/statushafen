@@ -6,12 +6,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// RunMaintenanceTickForTest macht den Scheduler-Tick für die externen
-// Handler-Tests (package handlers_test) aufrufbar.
+// RunMaintenanceTickForTest makes the scheduler tick accessible to the external
+// handler tests (package handlers_test).
 func (h *Handler) RunMaintenanceTickForTest() { h.runMaintenanceTick() }
 
-// LockedPageComponentsForTest macht die Baum-Lesung mit Zeilensperre
-// für Statement-Tests aufrufbar.
+// LockedPageComponentsForTest makes the tree read with row lock
+// callable for statement tests.
 func LockedPageComponentsForTest(tx *gorm.DB, tenantID uint) ([]models.Component, error) {
 	return lockedPageComponents(tx, tenantID)
 }

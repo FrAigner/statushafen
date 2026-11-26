@@ -11,25 +11,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Wiederholte Literale (go:S1192).
+// Repeated literals (go:S1192).
 const (
 	errInvalidIncidentID   = "Invalid incident ID"
 	errIncidentNotFound    = "Incident not found"
 	whereIDAndStatusPageID = "id = ? AND status_page_id = ?"
 	whereIncidentIDEquals  = "incident_id = ?"
-	// Fehlermeldungen der Statusprüfung.
+	// Error messages of the status check.
 	errInvalidIncidentSeverity  = "Ungültiger Schweregrad: erlaubt sind degraded_performance, partial_outage, major_outage"
 	errInvalidIncidentStatus    = "Ungültiger Status: erlaubt sind investigating, identified, monitoring, resolved"
 	errInvalidMaintenanceStatus = "Ungültiger Status für Wartungsfenster: erlaubt sind scheduled, in_progress, resolved"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Incident-Detail: Timeline (IncidentUpdate) + Post-Mortem
+// Incident detail: timeline (IncidentUpdate) + post-mortem
 //
-// Routen (main.go):
-//   // öffentlich lesbar wie die Incident-Liste:
+// Routes (main.go):
+//   // publicly readable like the incident list:
 //   r.GET("/api/pages/:page_id/incidents/:id", h.GetIncidentDetailHandler)
-//   // schreibend, unter incAdmin (RequirePermission "incidents:write"):
+//   // writing, under incAdmin (RequirePermission "incidents:write"):
 //   incAdmin.POST("/:id/updates", h.AddIncidentUpdateHandler)
 //   incAdmin.PUT("/:id/postmortem", h.UpsertPostMortemHandler)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,12 +40,12 @@ type incidentDetail struct {
 	PostMortem *models.PostMortem   `json:"post_mortem"`
 }
 
-// incidentUpdateView ist ein Timeline-Eintrag in der Detail-Antwort.
-// GetIncidentDetailHandler ist öffentlich und
-// lieferte author_email an jeden Besucher - damit waren die E-Mail-Adressen
-// des Teams öffentlich. AuthorEmail wird nur noch für Nutzer mit
-// incidents:write auf der Seite gesetzt (Admin-Ansicht), sonst fällt das Feld
-// per omitempty ganz weg.
+// incidentUpdateView is a timeline entry in the detail response.
+// GetIncidentDetailHandler is public and
+// used to return author_email to every visitor - which made the team's
+// email addresses public. AuthorEmail is now only set for users with
+// incidents:write on the page (admin view), otherwise the field is dropped
+// entirely via omitempty.
 type incidentUpdateView struct {
 	ID          uint      `json:"id"`
 	CreatedAt   time.Time `json:"created_at"`
@@ -97,14 +97,14 @@ func (h *Handler) GetIncidentDetailHandler(c *gin.Context) {
 		return
 	}
 
-	// Nicht mehr "irgendein valides JWT" (getEmail(c) != ""),
-	// sondern nur eine Rolle mit incidents:write auf GENAU dieser page_id
-	// darf Post-Mortem-Entwürfe und die Autoren-E-Mails der
-	// Timeline sehen - dieselbe Berechtigung, die auch zum Schreiben nötig
-	// ist (UpsertPostMortemHandler/AddIncidentUpdateHandler).
+	// No longer "any valid JWT" (getEmail(c) != ""),
+	// but only a role with incidents:write on EXACTLY this page_id
+	// may see post-mortem drafts and the author emails of the
+	// timeline - the same permission that is also required for writing
+	// (UpsertPostMortemHandler/AddIncidentUpdateHandler).
 	canEdit := h.userHasPermissionOnPrivatePage(c, page.ID, permissions.Perm(incidentResource(inc.IsMaintenance), permissions.Update))
 
-	// archivierte und unsichtbare Komponenten nur für Verwalter.
+	// archived and invisible components only for managers.
 	one := []models.Incident{inc}
 	h.stripHiddenComponentsForCaller(c, page.ID, one)
 	inc = one[0]
@@ -116,10 +116,10 @@ func (h *Handler) GetIncidentDetailHandler(c *gin.Context) {
 
 	var pm models.PostMortem
 	if err := h.DB.Preload("Actions").Where(whereIncidentIDEquals, inc.ID).First(&pm).Error; err == nil {
-		// "Irgendeine Rolle" (frühere Fassung: userHasRoleOnPrivatePage)
-		// reichte nicht: nach Auto-Join per DefaultRoleID hat JEDER
-		// eingeloggte User irgendeine Rolle, auch ein reiner Read-Only-Viewer
-		// (per unabhängigem Review gefunden).
+		// "Any role" (earlier version: userHasRoleOnPrivatePage)
+		// was not enough: after auto-join via DefaultRoleID EVERY
+		// logged-in user has some role, even a read-only viewer
+		// (found by independent review).
 		if pm.PublishedAt != nil || canEdit {
 			detail.PostMortem = &pm
 		}
@@ -162,8 +162,8 @@ func (h *Handler) AddIncidentUpdateHandler(c *gin.Context) {
 	if !requireMessageLength(c, body.Message) {
 		return
 	}
-	// Status gegen die erlaubte Menge prüfen (Vorfall bzw.
-	// Wartung); vorher wurde jeder String übernommen (auch completed).
+	// Check the status against the allowed set (incident or
+	// maintenance); previously any string was accepted (even completed).
 	if msg := validateIncidentStatusChange(inc, body.Status); msg != "" {
 		respondIncidentValidation(c, msg)
 		return
@@ -180,11 +180,11 @@ func (h *Handler) AddIncidentUpdateHandler(c *gin.Context) {
 		return
 	}
 
-	// Incident-Hauptstatus mitziehen und Benachrichtigungen auslösen.
-	// Incident.Message bleibt die Erstmeldung und wird nie durch ein
-	// Update überschrieben; die Update-Nachricht steht nur in IncidentUpdate.
-	// Die Benachrichtigung bekommt eine Kopie mit der Update-Nachricht, die
-	// nicht gespeichert wird.
+	// Carry the incident's main status along and trigger notifications.
+	// Incident.Message remains the initial report and is never overwritten by an
+	// update; the update message exists only in IncidentUpdate.
+	// The notification gets a copy with the update message, which
+	// is not saved.
 	applyIncidentStatus(&inc, body.Status)
 	h.DB.Save(&inc)
 	notifyInc := inc
@@ -243,7 +243,7 @@ func (h *Handler) UpsertPostMortemHandler(c *gin.Context) {
 	}
 
 	var pm models.PostMortem
-	h.DB.Where(whereIncidentIDEquals, inc.ID).First(&pm) // legt an, falls nicht vorhanden
+	h.DB.Where(whereIncidentIDEquals, inc.ID).First(&pm) // creates it if it does not exist
 	pm.IncidentID = inc.ID
 	pm.Summary = body.Summary
 	pm.RootCause = body.RootCause
@@ -259,7 +259,7 @@ func (h *Handler) UpsertPostMortemHandler(c *gin.Context) {
 		return
 	}
 
-	// Action-Items neu setzen (einfachste konsistente Strategie: ersetzen).
+	// Reset action items (simplest consistent strategy: replace).
 	h.DB.Where("post_mortem_id = ?", pm.ID).Delete(&models.ActionItem{})
 	for _, a := range body.Actions {
 		if a.Text == "" {

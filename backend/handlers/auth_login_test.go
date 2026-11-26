@@ -67,7 +67,7 @@ func TestAuthLoginAndMeHandlers(t *testing.T) {
 		if resp["token"] == nil {
 			t.Errorf("Expected JWT token in response")
 		}
-		// ohne id erkennt die Benutzerverwaltung die eigene Zeile nicht.
+		// without id the user management does not recognize its own row.
 		if resp["id"] != float64(testUser.ID) {
 			t.Errorf("Expected id %d in login response, got %v", testUser.ID, resp["id"])
 		}

@@ -18,14 +18,14 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Update-/DeleteComponentHandler hatten nur den Normalfall getestet.
-// Ergänzt: ungültige Parameter, Mandantentrennung, Tag-Zugriff, Validierung,
-// Aufräumen der Incident-Verknüpfungen, Audit-Einträge und Datenbankfehler.
+// Update-/DeleteComponentHandler had only been tested for the normal case.
+// Added: invalid parameters, tenant isolation, tag access, validation,
+// cleanup of incident links, audit entries and database errors.
 func TestUpdateAndDeleteComponentHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Der Aufrufer wird per Header simuliert, wie es die AuthMiddleware mit dem JWT täte.
+	// The caller is simulated via header, as AuthMiddleware would do with the JWT.
 	r.Use(func(c *gin.Context) {
 		if v := c.GetHeader("X-Test-User"); v != "" {
 			id, _ := strconv.ParseUint(v, 10, 32)

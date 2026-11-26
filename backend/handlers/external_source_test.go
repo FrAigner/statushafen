@@ -25,15 +25,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// Admin-API externer Statusseiten. Zwei Statusseiten über Kreuz,
-// damit jeder Handler gegen die Mandantengrenze geprüft wird.
+// Admin API of external status pages. Two status pages crosswise,
+// so every handler is checked against the tenant boundary.
 
 type extFakeProvider struct {
 	mu   sync.Mutex
 	sum  *externalstatus.Summary
 	err  error
 	reqs []externalstatus.FetchRequest
-	// Feeds je Art (incident/maintenance); feedErr lässt sie scheitern.
+	// Feeds per kind (incident/maintenance); feedErr makes them fail.
 	feeds   map[string][]externalstatus.Incident
 	feedErr error
 }
@@ -73,7 +73,7 @@ type extFixture struct {
 	r                      *gin.Engine
 	provider               *extFakeProvider
 	listener               *extListener
-	clock                  time.Time // Fake-Uhr des Dienstes; Null = echte Zeit
+	clock                  time.Time // Fake clock of the service; zero = real time
 	page, other            models.StatusPage
 	adminTok, pageAdminTok string
 	viewerTok, otherTok    string
@@ -106,7 +106,7 @@ func newExtFixture(t *testing.T) *extFixture {
 	f.r = testutils.SetupRouter()
 	auth := f.r.Group("/api")
 	auth.Use(middleware.AuthMiddleware())
-	// Ressource external_sources; die echte Zuordnung je Aktion prüft main_route_permissions_test.go.
+	// Resource external_sources; the real mapping per action is checked by main_route_permissions_test.go.
 	read, write := middleware.RequirePermission("external_sources:read"), middleware.RequirePermission("external_sources:update")
 	src := auth.Group("/pages/:page_id/external-sources")
 	src.GET("", read, f.h.GetExternalSourcesHandler)
@@ -199,7 +199,7 @@ func (f *extFixture) linksPath(p models.StatusPage) string {
 	return "/api/pages/" + pid(p) + "/external-links"
 }
 
-// createSource legt per API eine Quelle an und gibt ihre ID zurück.
+// createSource creates a source via the API and returns its ID.
 func (f *extFixture) createSource(p models.StatusPage, tok, base string) uint {
 	f.t.Helper()
 	w := f.do(http.MethodPost, f.sourcesPath(p), tok, map[string]any{"name": "Example Cloud", "base_url": base})
@@ -209,7 +209,7 @@ func (f *extFixture) createSource(p models.StatusPage, tok, base string) uint {
 	return resp.ID
 }
 
-// extComp legt direkt eine externe Komponente der Quelle an.
+// extComp directly creates an external component of the source.
 func (f *extFixture) extComp(srcID uint, externalID, name, status string) models.ExternalComponent {
 	f.t.Helper()
 	ec := models.ExternalComponent{ExternalSourceID: srcID, ExternalID: externalID, Name: name, Status: status, RawStatus: status,
@@ -232,7 +232,7 @@ func (f *extFixture) auditActions() []string {
 	return out
 }
 
-// extFailOn lässt GORM-Operationen op auf table scheitern (Fehlerpfade → 500).
+// extFailOn makes GORM operations op on table fail (error paths -> 500).
 func extFailOn(t *testing.T, db *gorm.DB, op, table string) {
 	t.Helper()
 	name := "test:extfail:" + op + ":" + table
@@ -280,7 +280,7 @@ func TestExternalSources_CRUD(t *testing.T) {
 	assert.NotContains(t, created, "ETag", "Validatoren sind intern")
 	id := uint(created["ID"].(float64))
 
-	// Doppelte Basis-URL auf derselben Seite → 409, auf einer anderen Seite erlaubt.
+	// Duplicate base URL on the same page -> 409, allowed on another page.
 	w = f.do(http.MethodPost, f.sourcesPath(f.page), f.pageAdminTok, map[string]any{"name": "x", "base_url": "https://status.example.com"})
 	assert.Equal(t, http.StatusConflict, w.Code)
 	otherID := f.createSource(f.other, f.otherTok, "https://status.example.com")
@@ -297,7 +297,7 @@ func TestExternalSources_CRUD(t *testing.T) {
 	w = f.do(http.MethodGet, f.sourcesPath(f.page)+"/"+uid(id), f.viewerTok, nil)
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	// Update: Intervall, aktiv, neue Basis-URL setzt Validatoren zurück.
+	// Update: interval, active, new base URL resets validators.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", id).Updates(map[string]any{"e_tag": "alt", "last_modified": "gestern"}).Error)
 	w = f.do(http.MethodPut, f.sourcesPath(f.page)+"/"+uid(id), f.pageAdminTok, map[string]any{"poll_interval_seconds": 300, "active": false, "base_url": "https://www.githubstatus.com", "name": "GitHub"})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -310,19 +310,19 @@ func TestExternalSources_CRUD(t *testing.T) {
 	assert.Empty(t, src.ETag)
 	assert.Empty(t, src.LastModified)
 
-	// Gleiche URL wie vorher: Validatoren bleiben.
+	// Same URL as before: validators stay.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", id).Update("e_tag", "neu").Error)
 	w = f.do(http.MethodPut, f.sourcesPath(f.page)+"/"+uid(id), f.pageAdminTok, map[string]any{"base_url": "https://www.githubstatus.com/"})
 	require.Equal(t, http.StatusOK, w.Code)
 	require.NoError(t, f.db.First(&src, id).Error)
 	assert.Equal(t, "neu", src.ETag)
 
-	// Update auf eine schon vorhandene Basis-URL derselben Seite → 409.
+	// Update to an already existing base URL of the same page -> 409.
 	secondID := f.createSource(f.page, f.pageAdminTok, "https://www.cloudflarestatus.com")
 	w = f.do(http.MethodPut, f.sourcesPath(f.page)+"/"+uid(secondID), f.pageAdminTok, map[string]any{"base_url": "https://www.githubstatus.com"})
 	assert.Equal(t, http.StatusConflict, w.Code)
 
-	// Löschen: Quelle, Komponenten und Kopplungen weg; fremde Quelle bleibt.
+	// Delete: source, components and links gone; foreign source stays.
 	w = f.linkVia(f.page, f.pageAdminTok, f.comp.ID, f.extComp(id, "db", "DB", "operational").ID)
 	require.Equal(t, http.StatusCreated, w.Code)
 	w = f.do(http.MethodDelete, f.sourcesPath(f.page)+"/"+uid(id), f.pageAdminTok, nil)
@@ -398,8 +398,8 @@ func TestExternalSources_Berechtigungen(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, f.do(http.MethodGet, path, f.otherTok, nil).Code, "Rolle nur auf der anderen Seite")
 }
 
-// Über Kreuz: Die Admin der anderen Seite adressiert Quelle, Komponenten und
-// Kopplungen von Seite 1 über die URL ihrer eigenen Seite → überall 404.
+// Crosswise: The admin of the other site addresses source, components and
+// links of site 1 via their own site's URL -> 404 everywhere.
 func TestExternalSources_MandantentrennungUeberKreuz(t *testing.T) {
 	f := newExtFixture(t)
 	id := f.createSource(f.page, f.pageAdminTok, "https://status.example.com")
@@ -422,12 +422,12 @@ func TestExternalSources_MandantentrennungUeberKreuz(t *testing.T) {
 	} {
 		assert.Equal(t, http.StatusNotFound, f.do(tc.method, tc.path, f.otherTok, map[string]any{"name": "gekapert"}).Code, "%s %s", tc.method, tc.path)
 	}
-	// Koppeln über Kreuz: fremde eigene Komponente bzw. fremde externe Komponente.
+	// Linking crosswise: foreign own component or foreign external component.
 	assert.Equal(t, http.StatusNotFound, f.linkVia(f.other, f.otherTok, f.comp.ID, otherEC.ID).Code, "eigene Komponente einer fremden Seite")
 	assert.Equal(t, http.StatusNotFound, f.linkVia(f.other, f.otherTok, f.otherComp.ID, ec.ID).Code, "externe Komponente einer fremden Quelle")
 	assert.Equal(t, http.StatusNotFound, f.linkVia(f.page, f.adminTok, f.comp.ID, otherEC.ID).Code, "auch der Global Admin koppelt nicht über Kreuz")
 
-	// Die Liste der anderen Seite enthält nichts von Seite 1.
+	// The other site's list contains nothing of site 1.
 	w = f.do(http.MethodGet, f.linksPath(f.other), f.otherTok, nil)
 	assert.Equal(t, "[]", strings.TrimSpace(w.Body.String()))
 	var src models.ExternalSource
@@ -540,7 +540,7 @@ func TestExternalLinks_KoppelnUndEntkoppeln(t *testing.T) {
 	assert.Equal(t, externalstatus.StatusChange{StatusPageID: f.page.ID, ComponentID: f.comp.ID, Previous: "operational",
 		Current: "major_outage", Cause: externalstatus.CauseLink, SourceID: id}, f.listener.changes[0])
 
-	// Idempotent: zweites POST → 200, dieselbe ID, keine zweite Zeile, kein Ereignis.
+	// Idempotent: second POST -> 200, same ID, no second row, no event.
 	w = f.linkVia(f.page, f.pageAdminTok, f.comp.ID, ec.ID)
 	require.Equal(t, http.StatusOK, w.Code)
 	var again map[string]any
@@ -572,13 +572,13 @@ func TestExternalLinks_KoppelnUndEntkoppeln(t *testing.T) {
 	assert.Equal(t, "operational", f.listener.changes[1].Current)
 	assert.Equal(t, http.StatusNotFound, f.do(http.MethodDelete, f.linksPath(f.page)+"/"+linkID, f.pageAdminTok, nil).Code)
 
-	// Nach dem Entkoppeln erneut koppelbar (Soft-Delete blockiert nicht).
+	// Linkable again after unlinking (soft delete does not block).
 	assert.Equal(t, http.StatusCreated, f.linkVia(f.page, f.pageAdminTok, f.comp.ID, ec.ID).Code)
 	assert.Subset(t, f.auditActions(), []string{"external_link.created", "external_link.deleted"})
 }
 
-// Tag-Prüfung wie beim Bearbeiten einer Komponente: Ein Seiten-Admin, dessen
-// Tags die Komponente nicht abdecken, darf sie weder koppeln noch entkoppeln.
+// Tag check as when editing a component: A site admin whose
+// tags do not cover the component may neither link nor unlink it.
 func TestExternalLinks_TagZugriff(t *testing.T) {
 	f := newExtFixture(t)
 	id := f.createSource(f.page, f.adminTok, "https://status.example.com")
@@ -603,9 +603,9 @@ func TestExternalLinks_TagZugriff(t *testing.T) {
 	assert.Equal(t, http.StatusOK, f.do(http.MethodDelete, f.linksPath(f.page)+"/"+uid(link.ID), f.adminTok, nil).Code)
 }
 
-// Eine Quelle zu löschen entfernt die Kopplungen all ihrer Komponenten. Das ist nur
-// erlaubt, wenn der Nutzer auf jede davon Tag-Zugriff hat; sonst wäre der Tag-Schutz
-// des einzelnen Entkoppelns über das Löschen der Quelle zu umgehen.
+// Deleting a source removes the links of all its components. This is only
+// allowed if the user has tag access to each of them; otherwise the tag protection
+// of single unlinking could be bypassed by deleting the source.
 func TestDeleteExternalSource_TagZugriff(t *testing.T) {
 	f := newExtFixture(t)
 	eu := models.Tag{Name: "eu", StatusPageID: &f.page.ID}
@@ -657,7 +657,7 @@ func TestDeleteExternalSource_TagZugriff(t *testing.T) {
 	})
 }
 
-// Schlägt die Abfrage der verknüpften Komponenten fehl, wird nichts gelöscht (fail closed).
+// If the query for the linked components fails, nothing is deleted (fail closed).
 func TestDeleteExternalSource_TagPruefungDBFehler(t *testing.T) {
 	f := newExtFixture(t)
 	id := f.createSource(f.page, f.adminTok, "https://status.example.com")
@@ -718,7 +718,7 @@ func TestEffectiveStatus_InKomponentenbaumUndDashboard(t *testing.T) {
 	assert.Equal(t, "under_maintenance", findNode(tree, "Kind").EffectiveStatus)
 	assert.NotContains(t, w.Body.String(), `"external_sources":null`)
 
-	// Dashboard: Status behält seine Bedeutung (gespeichert + offene Vorfälle).
+	// Dashboard: status keeps its meaning (stored + open incidents).
 	inc := models.Incident{StatusPageID: f.page.ID, Title: "t", Message: "m", Status: "investigating"}
 	require.NoError(t, f.db.Create(&inc).Error)
 	require.NoError(t, f.db.Create(&models.IncidentComponent{IncidentID: inc.ID, ComponentID: f.child.ID}).Error)
@@ -734,7 +734,7 @@ func TestEffectiveStatus_InKomponentenbaumUndDashboard(t *testing.T) {
 	assert.Equal(t, "degraded_performance", kind.Status, "Vorfall-Überlagerung wie bisher")
 	assert.Equal(t, "degraded_performance", kind.EffectiveStatus, "Störung schlägt Wartung")
 
-	// Inaktive Quelle zählt nicht mehr.
+	// Inactive source no longer counts.
 	require.Equal(t, http.StatusOK, f.do(http.MethodPut, f.sourcesPath(f.page)+"/"+uid(id), f.adminTok, map[string]any{"active": false}).Code)
 	w = f.do(http.MethodGet, "/api/pages/"+pid(f.page)+"/components", "", nil)
 	var after []treeNode
@@ -832,8 +832,8 @@ func TestExternalStatus_DBFehler(t *testing.T) {
 	}
 }
 
-// Fällt die Berechnung des effektiven Status aus, laufen Aktion und Antwort
-// trotzdem: kein Ereignis, Komponentenbaum mit eigenem Status.
+// If the computation of the effective status fails, action and response continue
+// anyway: no event, component tree with own status.
 func TestExternalStatus_EffektiverStatusNichtBerechenbar(t *testing.T) {
 	f := newExtFixture(t)
 	srcID := f.createSource(f.page, f.adminTok, "https://status.example.com")
@@ -860,8 +860,8 @@ func TestExternalStatus_EffektiverStatusNichtBerechenbar(t *testing.T) {
 	assert.Len(t, f.listener.changes, 1, "ohne Vorher-Stand kein Ereignis")
 }
 
-// Global Admins überspringen in RequirePermission das page_id-Parsing; die
-// Handler lehnen eine ungültige page_id deshalb selbst mit 400 ab.
+// In RequirePermission, Global Admins skip the page_id parsing; the
+// handlers therefore reject an invalid page_id themselves with 400.
 func TestExternalStatus_UngueltigePageID(t *testing.T) {
 	f := newExtFixture(t)
 	for _, tc := range []struct{ method, path string }{

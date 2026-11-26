@@ -176,11 +176,11 @@ func TestDeleteSSO(t *testing.T) {
 	})
 }
 
-// UpdateSSO legte bei jedem PUT eine neue Zeile an. Der
-// Unique-Index auf status_page_id ließ deshalb jeden zweiten PUT (und jeden PUT
-// nach DELETE, weil das Soft-Delete die Zeile stehen lässt) mit 500 scheitern –
-// Admins konnten ihre OIDC-Einstellungen nach dem ersten Speichern nicht mehr
-// ändern.
+// UpdateSSO created a new row on every PUT. The
+// unique index on status_page_id therefore made every second PUT (and every PUT
+// after DELETE, because the soft delete leaves the row in place) fail with 500 –
+// admins could no longer change their OIDC settings after the first
+// save.
 func TestUpdateSSO_Upsert(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -281,8 +281,8 @@ func TestUpdateSSO_Upsert(t *testing.T) {
 	})
 }
 
-// Fehlerpfade des Upserts – Lesen der bestehenden Zeile bzw.
-// Speichern scheitert → 500 statt eines halben Zustands.
+// Error paths of the upsert – reading the existing row or
+// saving fails → 500 instead of a half-written state.
 func TestUpdateSSO_DBErrors(t *testing.T) {
 	payload := map[string]interface{}{"oidc_enabled": false}
 

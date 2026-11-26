@@ -8,11 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// injectDBError lässt die Operation op (query, create, update, delete) auf table
-// scheitern, nachdem skip Aufrufe durchgelaufen sind (so bleiben vorbereitende
-// Abfragen desselben Handlers unberührt). Die zurückgegebene Funktion entfernt
-// den Hook (idempotent, läuft zusätzlich nach dem Test), damit Nachprüfungen den
-// Fehler nicht auslösen.
+// injectDBError makes operation op (query, create, update, delete) on table
+// fail after skip calls have gone through (so preparatory
+// queries of the same handler remain unaffected). The returned function removes
+// the hook (idempotent, also runs after the test) so that follow-up checks do not
+// trigger the error.
 func injectDBError(t *testing.T, db *gorm.DB, op, table string, skip int) (remove func()) {
 	t.Helper()
 	name := "test:intern:" + op + ":" + table

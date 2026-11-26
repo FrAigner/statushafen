@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Lokale SSO-Tests gegen den Mock-OIDC-Dienst aus
-// docker-compose.yml. Der läuft ohne TLS auf localhost, beides lehnt der
-// Seiten-SSO-Login sonst ab (https-Pflicht, SSRF-Schutz). Ausnahmen gibt es
-// nur für ausdrücklich in OIDC_DEV_INSECURE_ISSUERS genannte Issuer und nie
-// mit APP_ENV=production.
+// Local SSO tests against the mock OIDC service from
+// docker-compose.yml. It runs without TLS on localhost, both of which the
+// page SSO login otherwise rejects (https requirement, SSRF protection). Exceptions exist
+// only for issuers explicitly listed in OIDC_DEV_INSECURE_ISSUERS and never
+// with APP_ENV=production.
 
 func TestOIDCDevIssuer_PlainHTTPLoginWorksWhenAllowlisted(t *testing.T) {
 	idp := newPlainHTTPTestIdP(t)
@@ -52,10 +52,10 @@ func TestOIDCDevIssuer_IgnoredInProduction(t *testing.T) {
 	assert.Zero(t, idp.hits())
 }
 
-// Fail closed: Nur eine ausdrücklich benannte Entwicklungsumgebung schaltet die
-// Ausnahme frei. Eine vergessene oder abweichend geschriebene APP_ENV ("prod",
-// leer) darf sie nicht öffnen, sonst erreichte ein Seiten-Admin per
-// Discovery-URL interne Dienste.
+// Fail closed: only an explicitly named development environment enables the
+// exception. A forgotten or differently spelled APP_ENV ("prod",
+// empty) must not open it, otherwise a page admin could reach
+// internal services via the discovery URL.
 func TestOIDCDevIssuer_IgnoredOutsideDevelopmentEnvironments(t *testing.T) {
 	for _, env := range []string{"", "prod", "staging", "live", "devel"} {
 		t.Run("APP_ENV="+env, func(t *testing.T) {
@@ -71,8 +71,8 @@ func TestOIDCDevIssuer_IgnoredOutsideDevelopmentEnvironments(t *testing.T) {
 	}
 }
 
-// Nur der exakte Issuer zählt, kein Präfix (sonst käme z. B. ein anderer
-// Port oder Pfad auf demselben Host mit durch).
+// Only the exact issuer counts, not a prefix (otherwise e.g. another
+// port or path on the same host would slip through).
 func TestOIDCDevIssuer_RequiresExactMatch(t *testing.T) {
 	idp := newPlainHTTPTestIdP(t)
 	t.Setenv("APP_ENV", "test")
@@ -87,7 +87,7 @@ func TestOIDCDevIssuer_RequiresExactMatch(t *testing.T) {
 	assert.Zero(t, idp.hits())
 }
 
-// Andere Issuer behalten den SSRF-Schutz, auch wenn die Liste gesetzt ist.
+// Other issuers keep the SSRF protection even if the list is set.
 func TestOIDCDevIssuer_OtherIssuersKeepSSRFProtection(t *testing.T) {
 	idp := newTestIdP(t)
 	oidcHTTPClient = defaultOIDCHTTPClient()
@@ -105,7 +105,7 @@ func TestOIDCDevHTTPClient_HasTimeout(t *testing.T) {
 	assert.Equal(t, 10*time.Second, oidcDevHTTPClient().Timeout)
 }
 
-// Leere Einträge (z. B. abschließendes Komma) erlauben keinen leeren Issuer.
+// Empty entries (e.g. a trailing comma) do not allow an empty issuer.
 func TestOIDCDevIssuer_EmptyEntriesAllowNothing(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("OIDC_DEV_INSECURE_ISSUERS", "http://localhost:8090/statushafen, ,")
@@ -113,10 +113,10 @@ func TestOIDCDevIssuer_EmptyEntriesAllowNothing(t *testing.T) {
 	assert.True(t, oidcDevIssuerAllowed("http://localhost:8090/statushafen"))
 }
 
-// Die Adressen im Discovery-Dokument stammen vom Anbieter, den der Seiten-Admin
-// einträgt. Ein authorization_endpoint wie javascript: oder data: würde als
-// Weiterleitungsziel an den Browser gehen; nur https ist erlaubt (http nur für
-// den ausdrücklich benannten Entwicklungs-Issuer).
+// The addresses in the discovery document come from the provider that the page admin
+// enters. An authorization_endpoint like javascript: or data: would go to
+// the browser as a redirect target; only https is allowed (http only for
+// the explicitly named development issuer).
 func TestOIDCLogin_UnsichereEndpunkteImDiscoveryDokument(t *testing.T) {
 	cases := map[string]struct{ auth, token string }{
 		"javascript im authorization_endpoint": {auth: "javascript:alert(1)"},
@@ -152,7 +152,7 @@ func TestOIDCLogin_UnsichereEndpunkteImDiscoveryDokument(t *testing.T) {
 	})
 }
 
-// Der Entwicklungs-Issuer darf mit http-Endpunkten laufen, nur er.
+// The development issuer may run with http endpoints, and only it.
 func TestOIDCLogin_DevIssuerDarfHTTPEndpunkte(t *testing.T) {
 	idp := newPlainHTTPTestIdP(t)
 	t.Setenv("APP_ENV", "test")
@@ -164,7 +164,7 @@ func TestOIDCLogin_DevIssuerDarfHTTPEndpunkte(t *testing.T) {
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code)
 	assert.True(t, strings.HasPrefix(w.Header().Get("Location"), idp.srv.URL+"/authorize?"))
 
-	// auch im Entwicklungsmodus bleibt javascript: verboten
+	// even in development mode javascript: stays forbidden
 	resetOIDCProviderCache()
 	idp.authEndpoint = "javascript:alert(1)"
 	w = serveOIDC(f.h.OIDCLoginHandler, http.MethodGet, "/api/auth/oidc/login?"+f.pageQuery(), nil, 0)

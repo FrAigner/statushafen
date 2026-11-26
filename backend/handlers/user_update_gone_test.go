@@ -1,11 +1,11 @@
 package handlers_test
 
-// SQLite-Gegenstück zu user_update_postgres_test.go: Wird das Konto
-// zwischen der Prüfung und dem Schreiben gelöscht, antworten PUT
-// /api/users/:id (page_roles) und POST /users (Global Admin, anlegen und Rolle
-// wechseln) mit 404 user_not_found und legen keine Rolle an. Die Löschung wird
-// hier in genau dem Moment eingespielt, in dem der Handler die Benutzerzeile
-// sperrt (FOR UPDATE; SQLite lässt die Klausel weg, sie steht aber im Statement).
+// SQLite counterpart to user_update_postgres_test.go: if the account is
+// deleted between the check and the write, PUT
+// /api/users/:id (page_roles) and POST /users (Global Admin, create and change
+// role) answer with 404 user_not_found and create no role. The deletion is
+// injected here at exactly the moment the handler locks the
+// user row (FOR UPDATE; SQLite omits the clause, but it is in the statement).
 
 import (
 	"net/http"
@@ -19,9 +19,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// deleteUserOnLock soft-löscht das Konto in der Verbindung der Transaktion, kurz
-// bevor die Sperrabfrage läuft: das Ergebnis der Löschung durch einen
-// gleichzeitigen Aufruf, den Postgres nach dem Warten neu auswertet.
+// deleteUserOnLock soft-deletes the account in the transaction's connection, shortly
+// before the lock query runs: the result of the deletion by a
+// concurrent call, which Postgres re-evaluates after waiting.
 func deleteUserOnLock(t *testing.T, db *gorm.DB, userID uint) {
 	t.Helper()
 	err := db.Callback().Query().Before("gorm:query").Register("test:delete_user_on_lock", func(tx *gorm.DB) {

@@ -14,23 +14,23 @@ import (
 
 const codeLastPageOwner = "last_page_owner"
 
-// deleteSSOIdentitiesOnPage entfernt die Seiten-SSO-Verknüpfungen
-// eines Kontos auf GENAU dieser Seite. Endet die Mitgliedschaft,
-// bliebe die Verknüpfung sonst verwaist stehen: Sie blockiert später die
-// SSO-Anmeldung und das Anhängen an andere Seiten (hasSSOIdentityOnOtherPage,
-// errOIDCOtherPageRole). UserSSOIdentity hat kein Soft-Delete, das Löschen ist
-// endgültig. Identitäten auf anderen Seiten bleiben unberührt. Läuft in der
-// Transaktion des Aufrufers. liefert die Anzahl gelöschter
-// Verknüpfungen für den Audit-Eintrag.
+// deleteSSOIdentitiesOnPage removes the page SSO links
+// of an account on EXACTLY this page. When the membership ends,
+// the link would otherwise remain orphaned: It later blocks
+// SSO login and attaching to other pages (hasSSOIdentityOnOtherPage,
+// errOIDCOtherPageRole). UserSSOIdentity has no soft delete, so deletion is
+// permanent. Identities on other pages remain untouched. Runs in the
+// caller's transaction. It returns the number of deleted
+// links for the audit entry.
 func deleteSSOIdentitiesOnPage(tx *gorm.DB, userID, pageID uint) (int64, error) {
 	res := tx.Where("user_id = ? AND status_page_id = ?", userID, pageID).
 		Delete(&models.UserSSOIdentity{})
 	return res.RowsAffected, res.Error
 }
 
-// deleteSSOIdentitiesForRoles entfernt die Seiten-SSO-Verknüpfungen zu den
-// übergebenen Mitgliedschaften. Je (Konto, Seite) gibt es dank
-// Unique-Index höchstens eine aktive Zeile.
+// deleteSSOIdentitiesForRoles removes the page SSO links for the
+// given memberships. Thanks to the unique index there is at most
+// one active row per (account, page).
 func deleteSSOIdentitiesForRoles(tx *gorm.DB, rows []models.UserStatusPageRole) error {
 	for _, r := range rows {
 		if _, err := deleteSSOIdentitiesOnPage(tx, r.UserID, r.StatusPageID); err != nil {
@@ -40,10 +40,10 @@ func deleteSSOIdentitiesForRoles(tx *gorm.DB, rows []models.UserStatusPageRole) 
 	return nil
 }
 
-// dedupePageRoleInputs behält je Seite nur den letzten Eintrag:
-// Der partielle Unique-Index (user_id, status_page_id) erlaubt je Seite genau
-// eine Rolle; doppelte Seiten im Request würden sonst mit 500 scheitern.
-// Einträge ohne Rolle (RoleID 0) bleiben unverändert erhalten.
+// dedupePageRoleInputs keeps only the last entry per page:
+// The partial unique index (user_id, status_page_id) allows exactly one
+// role per page; duplicate pages in the request would otherwise fail with 500.
+// Entries without a role (RoleID 0) are kept unchanged.
 func dedupePageRoleInputs(in []PageRoleInput) []PageRoleInput {
 	last := map[uint]int{}
 	for i, pr := range in {
@@ -60,18 +60,18 @@ func dedupePageRoleInputs(in []PageRoleInput) []PageRoleInput {
 	return out
 }
 
-// errLastPageOwner: die Änderung ließe die Seite ohne Mitglied mit pages:update.
+// errLastPageOwner: the change would leave the page without a member with pages:update.
 var errLastPageOwner = errors.New("last page owner")
 
-// ensureOtherPageOwner liefert errLastPageOwner, wenn neben userID
-// kein weiteres aktives Mitglied der Seite pages:update hat. Konten, die
-// soft-gelöscht sind, zählen nicht (wie soleAdminPages in me_delete.go). Läuft
-// in der Transaktion des Aufrufers; die Mitgliedszeilen der Seite werden unter
-// Postgres mit FOR UPDATE gesperrt, damit zwei Owner nicht gleichzeitig beide
-// "den anderen" sehen (SQLite serialisiert Schreiber ohnehin).
+// ensureOtherPageOwner returns errLastPageOwner if, besides userID,
+// no other active member of the page has pages:update. Accounts that
+// are soft-deleted do not count (like soleAdminPages in me_delete.go). Runs
+// in the caller's transaction; the page's membership rows are locked under
+// Postgres with FOR UPDATE so that two owners do not both
+// see "the other one" at the same time (SQLite serializes writers anyway).
 func ensureOtherPageOwner(tx *gorm.DB, pageID, userID uint) error {
 	var rows []models.UserStatusPageRole
-	// SQLite kennt FOR UPDATE nicht, GORMs Dialekt lässt die Klausel dort weg.
+	// SQLite does not know FOR UPDATE, GORM's dialect omits the clause there.
 	q := tx.Preload("Role").
 		Joins("JOIN users ON users.id = user_status_page_roles.user_id AND users.deleted_at IS NULL").
 		Where("user_status_page_roles.status_page_id = ?", pageID).
@@ -88,17 +88,17 @@ func ensureOtherPageOwner(tx *gorm.DB, pageID, userID uint) error {
 	return errLastPageOwner
 }
 
-// lockOutApplies: Betrifft die Änderung die Sperrregel? Das gilt
-// für einen Nicht-Global-Admin, der sich selbst entfernt (newRole == nil) oder
-// auf eine Rolle ohne pages:update herabstuft, obwohl er jetzt pages:update hat.
-// Global Admins sind nie betroffen (sie können jederzeit reparieren).
+// lockOutApplies: Does the change affect the lock-out rule? That holds
+// for a non-global admin who removes themselves (newRole == nil) or
+// downgrades to a role without pages:update although they currently have pages:update.
+// Global admins are never affected (they can repair at any time).
 func (h *Handler) lockOutApplies(c *gin.Context, targetID uint, current models.Role, newRole *models.Role) bool {
 	if targetID != getUserID(c) || h.isEffectiveGlobalAdmin(c) {
 		return false
 	}
 	upd := permissions.Perm("pages", permissions.Update)
 	if !permissions.Has(current.Permissions, upd) {
-		return false // war schon kein Owner, nichts geht verloren
+		return false // was not an owner anyway, nothing is lost
 	}
 	return newRole == nil || !permissions.Has(newRole.Permissions, upd)
 }

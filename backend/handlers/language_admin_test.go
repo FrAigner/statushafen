@@ -16,9 +16,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Stage 1 von 5 der Mehrsprachigkeit: CRUD-Tests für den
-// globalen Sprachkatalog (Language) und die pro Statusseite aktivierten
-// Sprachen (StatusPageLanguage).
+// Stage 1 of 5 of multilingual support: CRUD tests for the
+// global language catalog (Language) and the languages activated per status page
+// languages (StatusPageLanguage).
 
 func itoa(id uint) string {
 	return strconv.FormatUint(uint64(id), 10)
@@ -111,9 +111,9 @@ func TestPageLanguagesHandlers(t *testing.T) {
 		t.Fatalf("failed to seed status page: %v", err)
 	}
 
-	// Der globale Katalog existiert im Test bewusst nicht automatisch (siehe
-	// TestLanguageCatalogHandlers) - PutPageLanguagesHandler validiert die
-	// gewünschten Codes dagegen, sie müssen also erst angelegt werden.
+	// The global catalog deliberately does not exist automatically in the test (see
+	// TestLanguageCatalogHandlers) - PutPageLanguagesHandler validates the
+	// requested codes against it, so they must be created first.
 	doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "de", "name": "Deutsch"})
 	doTagRequest(r, "POST", "/api/languages", map[string]interface{}{"code": "en", "name": "English"})
 
@@ -194,8 +194,8 @@ func TestPageLanguagesHandlers(t *testing.T) {
 	})
 }
 
-// is_active=false beim Anlegen darf nicht durch den Spalten-Default (true)
-// überschrieben werden; Antwort und gespeicherte Zeile bleiben inaktiv.
+// is_active=false on creation must not be overridden by the column default (true);
+// response and stored row stay inactive.
 func TestCreateLanguageHandler_IsActiveWirdUebernommen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -238,7 +238,7 @@ func TestCreateLanguageHandler_IsActiveWirdUebernommen(t *testing.T) {
 	})
 }
 
-// Schlägt das nachträgliche Setzen von is_active fehl, wird nichts als Erfolg gemeldet.
+// If the subsequent setting of is_active fails, nothing is reported as success.
 func TestCreateLanguageHandler_InaktivSetzenScheitertGibt500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

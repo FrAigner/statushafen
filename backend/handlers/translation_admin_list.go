@@ -9,25 +9,25 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Admin-Listen der Übersetzungen mit allen Status.
+// Admin lists of translations with all statuses.
 //
-// Die öffentlichen Routen GET /api/{incidents,components,notices}/:id/translations
-// liefern bewusst nur status = 'confirmed' (Entwürfe sind nicht öffentlich).
-// Die Admin-Übersetzungsseiten luden ihre Tabelle aber genau darüber - neu
-// angelegte Übersetzungen (immer 'draft') verschwanden nach dem Speichern,
-// "Bestätigen" erschien nie. Statt die öffentliche Route um einen Admin-Modus
-// zu erweitern (dann hinge "Entwurf sichtbar?" an einer Abfrage im Handler),
-// gibt es eine eigene Route .../translations/all - nach dem Muster von
-// GET /api/pages/:page_id/notices/all. Die Mandantentrennung übernimmt die
-// vorgeschaltete *PageScope-Middleware (Seite aus der Ressource, 404 für
-// unbekannte IDs), RequirePermission prüft dann *:read auf genau dieser Seite
-// (fremde Seite → 403). Lesen reicht, weil die Seite auch für reine
-// Leserollen (Viewer) Entwürfe anzeigt; die Schreibknöpfe blendet das
-// Frontend über canWrite aus, die Schreibrouten verlangen weiter *:write.
+// The public routes GET /api/{incidents,components,notices}/:id/translations
+// deliberately return only status = 'confirmed' (drafts are not public).
+// The admin translation pages, however, loaded their table from exactly those - newly
+// created translations (always 'draft') vanished after saving,
+// "Bestätigen" never appeared. Instead of extending the public route with an admin mode
+// (which would make "draft visible?" depend on a query in the handler),
+// there is a dedicated route .../translations/all - following the pattern of
+// GET /api/pages/:page_id/notices/all. Tenant separation is handled by the
+// upstream *PageScope middleware (page from the resource, 404 for
+// unknown IDs), RequirePermission then checks *:read on exactly this page
+// (other page → 403). Read suffices because the page also shows drafts for
+// read-only roles (viewer); the frontend hides the write buttons
+// via canWrite, and the write routes still require *:write.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// listAllTranslations lädt alle Übersetzungen (Entwurf und bestätigt) des
-// Elternobjekts, dessen ID parse aus dem Pfad liest, sortiert nach Sprache.
+// listAllTranslations loads all translations (draft and confirmed) of the
+// parent object whose ID parse reads from the path, sorted by language.
 func listAllTranslations[T any](h *Handler, c *gin.Context, parse func(*gin.Context) (uint, bool), parentColumn string) {
 	parentID, ok := parse(c)
 	if !ok {
@@ -41,20 +41,20 @@ func listAllTranslations[T any](h *Handler, c *gin.Context, parse func(*gin.Cont
 	c.JSON(http.StatusOK, translations)
 }
 
-// GetAllIncidentTranslationsHandler liefert alle Übersetzungen eines Vorfalls
-// für den Admin-Bereich.
+// GetAllIncidentTranslationsHandler returns all translations of an incident
+// for the admin area.
 func (h *Handler) GetAllIncidentTranslationsHandler(c *gin.Context) {
 	listAllTranslations[models.IncidentTranslation](h, c, parseIncidentID, "incident_id")
 }
 
-// GetAllComponentTranslationsHandler liefert alle Übersetzungen einer
-// Komponente für den Admin-Bereich.
+// GetAllComponentTranslationsHandler returns all translations of a
+// component for the admin area.
 func (h *Handler) GetAllComponentTranslationsHandler(c *gin.Context) {
 	listAllTranslations[models.ComponentTranslation](h, c, parseComponentID, "component_id")
 }
 
-// GetAllGeneralNoticeTranslationsHandler liefert alle Übersetzungen einer
-// Ankündigung für den Admin-Bereich.
+// GetAllGeneralNoticeTranslationsHandler returns all translations of a
+// notice for the admin area.
 func (h *Handler) GetAllGeneralNoticeTranslationsHandler(c *gin.Context) {
 	listAllTranslations[models.GeneralNoticeTranslation](h, c, parseNoticeID, "general_notice_id")
 }

@@ -15,14 +15,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// externe Bausteine direkt in den eigenen Komponentenbaum
-// übernehmen (Komponente anlegen + koppeln in einem Schritt).
+// adopt external building blocks directly into your own component tree
+// (create component + link in one step).
 
 const (
-	// maxExternalImportItems begrenzt die Menge pro Aufruf (eine Transaktion).
+	// maxExternalImportItems limits the amount per call (one transaction).
 	maxExternalImportItems = 200
-	// maxImportedComponentNameLen: Namenslimit der übernommenen Komponenten
-	// (Component.Name hat kein DB-Limit; der Wert entspricht dem der Quellen).
+	// maxImportedComponentNameLen: name limit of the adopted components
+	// (Component.Name has no DB limit; the value matches that of the sources).
 	maxImportedComponentNameLen = maxExternalSourceNameLen
 
 	skipAlreadyLinked = "already_linked"
@@ -32,7 +32,7 @@ const (
 
 type externalImportInput struct {
 	ExternalComponentIDs []uint `json:"external_component_ids"`
-	// ParentID: eigene Gruppe als Ziel; nil/0 = oberste Ebene.
+	// ParentID: own group as target; nil/0 = top level.
 	ParentID *uint  `json:"parent_id"`
 	TagIDs   []uint `json:"tag_ids"`
 }
@@ -49,8 +49,8 @@ type externalImportSkipped struct {
 	Reason              string `json:"reason"`
 }
 
-// importName kürzt den externen Namen auf das Limit (rune-sicher); leer
-// ergibt die externe ID, weil Component.Name nicht leer sein darf.
+// importName shortens the external name to the limit (rune-safe); empty
+// yields the external ID, because Component.Name must not be empty.
 func importName(ec models.ExternalComponent) string {
 	name := strings.TrimSpace(ec.Name)
 	if name == "" {
@@ -62,7 +62,7 @@ func importName(ec models.ExternalComponent) string {
 	return name
 }
 
-// importer hält den Zustand eines Übernahme-Laufs innerhalb einer Transaktion.
+// importer holds the state of an adoption run within a transaction.
 type importer struct {
 	h        *Handler
 	tx       *gorm.DB
@@ -85,8 +85,8 @@ func (im *importer) newComponent(name, status string, parentID *uint, sortOrder 
 	return comp, im.h.replaceComponentTags(im.tx, comp.ID, im.tags)
 }
 
-// importOne legt für einen externen Baustein eine eigene Komponente an und
-// koppelt sie (gleiche Kopplung wie CreateExternalLinkHandler).
+// importOne creates its own component for an external building block and
+// links it (same linking as CreateExternalLinkHandler).
 func (im *importer) importOne(ec models.ExternalComponent, parentID *uint, sortOrder int) error {
 	comp, err := im.newComponent(importName(ec), "operational", parentID, sortOrder)
 	if err != nil {
@@ -102,9 +102,9 @@ func (im *importer) importOne(ec models.ExternalComponent, parentID *uint, sortO
 	return nil
 }
 
-// importGroup legt die Gruppenkomponente an und übernimmt die noch nicht
-// gekoppelten, aktuellen Mitglieder als Kinder. Die Gruppe selbst wird nicht
-// gekoppelt (ihr Status ergibt sich aus den Kindern).
+// importGroup creates the group component and adopts the not yet
+// linked, current members as children. The group itself is not
+// linked (its status results from the children).
 func (im *importer) importGroup(g models.ExternalComponent, parentID *uint, sortOrder int) error {
 	var members []models.ExternalComponent
 	if err := im.tx.Where("external_source_id = ? AND group_external_id = ? AND is_group = ? AND vanished = ?",
@@ -122,7 +122,7 @@ func (im *importer) importGroup(g models.ExternalComponent, parentID *uint, sort
 		todo = append(todo, m)
 	}
 	if len(todo) == 0 {
-		// Nichts zu übernehmen: nur die Gruppe melden, nicht jedes Mitglied einzeln.
+		// Nothing to adopt: report only the group, not every member individually.
 		reason := skipEmptyGroup
 		if len(members) > 0 {
 			reason = skipAlreadyLinked
@@ -144,8 +144,8 @@ func (im *importer) importGroup(g models.ExternalComponent, parentID *uint, sort
 	return nil
 }
 
-// run übernimmt erst alle gewählten Gruppen, dann die Einzelbausteine (so
-// werden Mitglieder einer gewählten Gruppe nicht doppelt angelegt).
+// run first adopts all selected groups, then the individual building blocks (so
+// members of a selected group are not created twice).
 func (im *importer) run(sortOrder int, parentID *uint, selection []models.ExternalComponent) error {
 	im.created = []externalImportCreated{}
 	im.skipped = []externalImportSkipped{}
@@ -183,7 +183,7 @@ func (im *importer) run(sortOrder int, parentID *uint, selection []models.Extern
 	return nil
 }
 
-// importTarget prüft das Ziel: eigene Gruppe derselben Seite (oder oberste Ebene).
+// importTarget checks the target: own group of the same page (or top level).
 func (h *Handler) importTarget(tenantID uint, in externalImportInput) (*uint, error) {
 	if in.ParentID == nil || *in.ParentID == 0 {
 		return nil, nil
@@ -198,8 +198,8 @@ func (h *Handler) importTarget(tenantID uint, in externalImportInput) (*uint, er
 	return in.ParentID, nil
 }
 
-// loadImportSelection lädt die gewählten externen Bausteine der Quelle
-// (ohne Dubletten, in Anfragereihenfolge). Fremde/unbekannte IDs ergeben false.
+// loadImportSelection loads the selected external building blocks of the source
+// (without duplicates, in request order). Foreign/unknown IDs yield false.
 func (h *Handler) loadImportSelection(src models.ExternalSource, ids []uint) ([]models.ExternalComponent, bool) {
 	seen := map[uint]bool{}
 	uniq := make([]uint, 0, len(ids))
@@ -224,7 +224,7 @@ func (h *Handler) loadImportSelection(src models.ExternalSource, ids []uint) ([]
 	return out, true
 }
 
-// linkedExternalIDs: alle externen Bausteine der Seite, die schon gekoppelt sind.
+// linkedExternalIDs: all external building blocks of the page that are already linked.
 func linkedExternalIDs(tx *gorm.DB, pageID uint) (map[uint]bool, error) {
 	var ids []uint
 	if err := tx.Model(&models.ExternalComponentLink{}).Where(whereStatusPageIDEquals, pageID).Pluck("external_component_id", &ids).Error; err != nil {
@@ -240,12 +240,12 @@ func linkedExternalIDs(tx *gorm.DB, pageID uint) (map[uint]bool, error) {
 // POST /api/pages/:page_id/external-sources/:id/import
 // {external_component_ids, parent_id?, tag_ids?}
 //
-// Pro gewähltem Baustein: eigene Komponente (Name = externer Name,
-// operational) unter parent_id anlegen und koppeln; eine Gruppe wird als
-// Gruppenkomponente mit ihren aktuellen Mitgliedern übernommen. Bereits
-// gekoppelte und verschwundene Bausteine werden übersprungen (Doppelklick-
-// Schutz). Alles in einer Transaktion. Antwort 201 (mind. eine Komponente
-// angelegt) bzw. 200 (nichts zu tun): {created, skipped}.
+// Per selected building block: create its own component (name = external name,
+// operational) under parent_id and link it; a group is adopted as a
+// group component with its current members. Already
+// linked and vanished building blocks are skipped (double-click
+// protection). All in one transaction. Response 201 (at least one component
+// created) or 200 (nothing to do): {created, skipped}.
 func (h *Handler) ImportExternalComponentsHandler(c *gin.Context) {
 	src, ok := h.loadExternalSource(c)
 	if !ok {

@@ -22,7 +22,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Audit-Trail-Lücken und Request-ID-Korrelation.
+// Audit trail gaps and request ID correlation.
 
 func captureAuditLog(t *testing.T) *bytes.Buffer {
 	t.Helper()
@@ -54,9 +54,9 @@ func auditActions(t *testing.T, db *gorm.DB) []string {
 	return actions
 }
 
-// RecordAudit schreibt zusätzlich eine Logzeile mit der Request-ID, damit ein
-// Audit-Eintrag (Model ohne Request-ID-Feld) mit dem Access-Log korreliert
-// werden kann. Die E-Mail aus TargetName gehört nicht ins Log.
+// RecordAudit additionally writes a log line with the request ID so that an
+// audit entry (model without a request ID field) can be correlated
+// with the access log. The email from TargetName does not belong in the log.
 func TestRecordAudit_LogsRequestID(t *testing.T) {
 	buf := captureAuditLog(t)
 	db := testutils.SetupTestDB()
@@ -100,8 +100,8 @@ func postLogin(r *gin.Engine, email, password string) *httptest.ResponseRecorder
 	return w
 }
 
-// Erfolgreiche Passwort-Logins fehlten bisher im Audit-Log (nur
-// auth.login_failed und SSO-Logins wurden erfasst).
+// Successful password logins were previously missing from the audit log (only
+// auth.login_failed and SSO logins were recorded).
 func TestLoginHandler_SuccessIsAudited(t *testing.T) {
 	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	db := testutils.SetupTestDB()
@@ -123,9 +123,9 @@ func TestLoginHandler_SuccessIsAudited(t *testing.T) {
 	assert.Equal(t, user.Email, entry.ActorEmail)
 }
 
-// Passwortänderung und Global-Admin-Wechsel sind sicherheitsrelevant und
-// müssen als eigene Aktionen im Audit-Log erkennbar sein, nicht nur als
-// unspezifisches user.updated.
+// Password change and global admin switch are security-relevant and
+// must be recognizable as their own actions in the audit log, not only as
+// unspecific user.updated.
 func TestUpdateUserHandler_AuditsPasswordAndAdminChanges(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -133,8 +133,8 @@ func TestUpdateUserHandler_AuditsPasswordAndAdminChanges(t *testing.T) {
 	r.PUT("/api/users/:id", h.UpdateUserHandler)
 	user := models.User{Email: "audit-update@example.com"}
 	require.NoError(t, db.Create(&user).Error)
-	// Ohne weiteren Global Admin wäre das Herabstufen unten 409
-	// (letzter Global Admin).
+	// Without another global admin, the demotion below would be 409
+	// (last global admin).
 	require.NoError(t, db.Create(&models.User{Email: "audit-other-admin@example.com", IsGlobalAdmin: true}).Error)
 	path := "/api/users/" + strconv.FormatUint(uint64(user.ID), 10)
 
@@ -148,7 +148,7 @@ func TestUpdateUserHandler_AuditsPasswordAndAdminChanges(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	}
 
-	// Ohne Änderung an Passwort/Admin-Flag: nur user.updated.
+	// Without a change to password/admin flag: only user.updated.
 	put(map[string]any{"email": user.Email})
 	assert.Equal(t, []string{"user.updated"}, auditActions(t, db))
 

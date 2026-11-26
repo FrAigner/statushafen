@@ -19,10 +19,10 @@ func randomToken(nBytes int) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// ssoCodeStore hält kurzlebige Einmal-Codes, gegen die das Frontend das fertige JWT
-// eintauscht (S5 — Token wandert nicht mehr per Redirect-Query durch Browser-History/
-// Referrer/Logs). Bewusst simpel gehalten (in-memory, Prozess-lokal), analog zum
-// Visitor-Store in middleware.NewRateLimiter.
+// ssoCodeStore holds short-lived one-time codes against which the frontend exchanges the finished JWT
+// (S5 — the token no longer travels through browser history/
+// referrer/logs via the redirect query). Deliberately kept simple (in-memory, process-local), analogous to the
+// visitor store in middleware.NewRateLimiter.
 //
 // returnTo is the validated frontend path the login started from (see
 // sanitizeReturnTo), "" if none.
@@ -63,29 +63,29 @@ func consumeSSOCode(code string) (ssoCodeEntry, bool) {
 	return entry, true
 }
 
-// StartSSOCleanupWorker startet den periodischen ssoCodeStore-Aufräum-Loop
-// im Hintergrund und liefert die zugehörige CancelFunc zurück,
-// die der Aufrufer per defer beim Application-Shutdown auslösen muss -
-// vorher lief die Goroutine unkontrolliert aus init() los: sie startete
-// auch in jedem Testprozess, der dieses Package importiert
-// (Goroutine-Leak/Race-Risiko bei -race), und konnte nie
-// sauber beendet werden. Erzeugt den Context selbst (statt ihn entgegen-
-// zunehmen), damit main() nur eine einzige Zeile braucht
-// (defer StartSSOCleanupWorker(...)()) - main() selbst lässt sich nicht
-// sinnvoll unit-testen und würde sonst die SonarCloud-New-Code-Coverage
-// unnötig belasten.
+// StartSSOCleanupWorker starts the periodic ssoCodeStore cleanup loop
+// in the background and returns the corresponding CancelFunc,
+// which the caller must trigger via defer at application shutdown -
+// previously the goroutine ran off uncontrolled from init(): it also started
+// in every test process that imports this package
+// (goroutine leak/race risk with -race), and could never
+// be stopped cleanly. Creates the context itself (instead of accepting
+// one) so that main() needs only a single line
+// (defer StartSSOCleanupWorker(...)()) - main() itself cannot be
+// meaningfully unit-tested and would otherwise burden the SonarCloud new-code coverage
+// unnecessarily.
 func StartSSOCleanupWorker(parent context.Context) context.CancelFunc {
 	ctx, cancel := context.WithCancel(parent)
 	go cleanupSSOCodeStore(ctx)
 	return cancel
 }
 
-// cleanupSSOCodeStore entfernt abgelaufene, nie eingelöste SSO-Codes
-// regelmäßig, analog zu rateLimiter.cleanupStaleVisitors
-// (middleware/security.go). Ohne das wächst ssoCodeStore unbegrenzt, wenn
-// ein Nutzer den Browser vor dem finalen Redirect schließt und
-// consumeSSOCode dadurch nie aufgerufen wird. Beendet sich, sobald ctx
-// gecancelt wird (Graceful Shutdown).
+// cleanupSSOCodeStore regularly removes expired SSO codes that were never
+// redeemed, analogous to rateLimiter.cleanupStaleVisitors
+// (middleware/security.go). Without it ssoCodeStore grows without bound if
+// a user closes the browser before the final redirect and
+// consumeSSOCode is therefore never called. Exits as soon as ctx
+// is cancelled (graceful shutdown).
 func cleanupSSOCodeStore(ctx context.Context) {
 	ticker := time.NewTicker(ssoCleanupInterval())
 	defer ticker.Stop()
@@ -99,9 +99,9 @@ func cleanupSSOCodeStore(ctx context.Context) {
 	}
 }
 
-// sweepExpiredSSOCodes führt einen einzelnen Aufräumdurchlauf aus - aus der
-// Sleep-Schleife ausgelagert, damit Tests ihn ohne Wartezeit direkt
-// aufrufen können.
+// sweepExpiredSSOCodes performs a single cleanup pass - extracted from the
+// sleep loop so that tests can call it directly without
+// waiting.
 func sweepExpiredSSOCodes() {
 	ssoCodeMu.Lock()
 	defer ssoCodeMu.Unlock()
@@ -129,8 +129,8 @@ func getFrontendURL() string {
 	return frontendURL
 }
 
-// isBootstrapAdminEmail prüft, ob die E-Mail in SSO_BOOTSTRAP_ADMIN_EMAILS
-// (kommagetrennt, case-insensitive) hinterlegt ist.
+// isBootstrapAdminEmail checks whether the email is listed in SSO_BOOTSTRAP_ADMIN_EMAILS
+// (comma-separated, case-insensitive).
 func isBootstrapAdminEmail(email string) bool {
 	list := os.Getenv("SSO_BOOTSTRAP_ADMIN_EMAILS")
 	if list == "" {
@@ -144,8 +144,8 @@ func isBootstrapAdminEmail(email string) bool {
 	return false
 }
 
-// isEmailDomainAllowed prüft die Domain einer E-Mail gegen SSO_ALLOWED_DOMAINS
-// (S8). Leere Env-Var bedeutet "keine Einschränkung".
+// isEmailDomainAllowed checks the domain of an email against SSO_ALLOWED_DOMAINS
+// (S8). An empty env var means "no restriction".
 func isEmailDomainAllowed(email string) bool {
 	allowed := os.Getenv("SSO_ALLOWED_DOMAINS")
 	if allowed == "" {
@@ -163,8 +163,8 @@ func isEmailDomainAllowed(email string) bool {
 	return false
 }
 
-// SSOExchangeHandler tauscht einen per SSO-Redirect ausgegebenen Einmal-Code gegen das
-// eigentliche JWT ein. POST /api/auth/sso-exchange (öffentlich, rate-limitiert).
+// SSOExchangeHandler exchanges a one-time code issued via SSO redirect for the
+// actual JWT. POST /api/auth/sso-exchange (public, rate-limited).
 func (h *Handler) SSOExchangeHandler(c *gin.Context) {
 	var req struct {
 		Code string `json:"code" binding:"required"`

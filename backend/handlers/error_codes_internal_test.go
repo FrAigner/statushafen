@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Hilfsfunktionen für Fehlercodes.
+// Helper functions for error codes.
 
 func codeTestContext() (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
@@ -33,8 +33,8 @@ func TestCodedError(t *testing.T) {
 	assert.JSONEq(t, `{"error":"Text","code":"parent_cycle"}`, w.Body.String())
 }
 
-// Ein Fehler ohne Code (z. B. aus der Datenbank) wird nie im Wortlaut
-// ausgeliefert, sondern als 500 server_error.
+// An error without a code (e.g. from the database) is never delivered verbatim,
+// but as 500 server_error.
 func TestRespondCoded_UnbekannterFehlerLiefertKeinenFehlertext(t *testing.T) {
 	c, w := codeTestContext()
 	respondCoded(c, http.StatusBadRequest, errors.New("pq: relation \"users\" does not exist"))

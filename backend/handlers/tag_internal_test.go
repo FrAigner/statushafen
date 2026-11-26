@@ -13,9 +13,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Fehlerpfade der Tag-Verwaltung: kaputte Eingaben und Datenbankfehler führen zu
-// einer Antwort mit Fehlercode, ohne rohen Fehlertext, und ändern nichts, was
-// nicht schon geschrieben war.
+// Error paths of tag management: broken inputs and database errors lead to
+// a response with an error code, without raw error text, and change nothing that
+// was not already written.
 func TestTagHandlers_ErrorPaths(t *testing.T) {
 	type call func(h *Handler, c *gin.Context)
 	tagID := func(id uint) gin.Params { return gin.Params{{Key: "id", Value: strconv.Itoa(int(id))}} }
@@ -85,9 +85,9 @@ func TestTagHandlers_ErrorPaths(t *testing.T) {
 	}
 }
 
-// Beim Umbenennen eines globalen Tags zählt nur der globale Namensraum: Ein
-// gleichnamiger seitengebundener Tag blockiert nicht, ein gleichnamiger
-// globaler schon.
+// When renaming a global tag only the global namespace counts: a
+// page-bound tag of the same name does not block, a global one of the same name
+// does.
 func TestUpdateTagHandler_GlobalScopeDuplicateCheck(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

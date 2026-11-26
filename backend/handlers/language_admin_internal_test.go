@@ -13,9 +13,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Fehlerpfade des Sprachkatalogs und der Seitensprachen: kaputte Eingaben und
-// Datenbankfehler ergeben einen Fehlercode ohne rohen Fehlertext; bei einem
-// Fehler im Speichervorgang bleibt die bisherige Sprachauswahl der Seite erhalten.
+// Error paths of the language catalog and page languages: broken inputs and
+// database errors yield an error code without raw error text; on an
+// error during saving, the page's previous language selection is preserved.
 func TestLanguageHandlers_ErrorPaths(t *testing.T) {
 	langID := func(l models.Language, _ models.StatusPage) gin.Params {
 		return gin.Params{{Key: "id", Value: strconv.Itoa(int(l.ID))}}
@@ -90,8 +90,8 @@ func TestLanguageHandlers_ErrorPaths(t *testing.T) {
 	}
 }
 
-// Ein mit is_active angelegter Katalogeintrag wird gespeichert, und leere
-// Einträge in der Codeliste der Seite werden übersprungen.
+// A catalog entry created with is_active is saved, and empty
+// entries in the page's code list are skipped.
 func TestLanguageHandlers_CreateWithActiveFlagAndBlankCodes(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestTranslationPageScopes: jede Scope-Middleware
-// leitet :page_id aus der Ressource ab (400 bei kaputter ID, 404 bei
-// unbekannter/gelöschter Ressource). Die Verdrahtung mit RequirePermission
-// prüft main_translation_scope_test.go über den echten Router.
+// TestTranslationPageScopes: each scope middleware
+// derives :page_id from the resource (400 for a broken ID, 404 for an
+// unknown/deleted resource). The wiring with RequirePermission is
+// checked by main_translation_scope_test.go via the real router.
 func TestTranslationPageScopes(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

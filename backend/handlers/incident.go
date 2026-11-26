@@ -28,15 +28,15 @@ import (
 	"gorm.io/gorm"
 )
 
-// IncidentResponse flacht IncidentComponents zu einer sortierten
-// Components-Liste ab, damit das Frontend nicht die interne
-// Join-Struktur (IncidentComponents[].Component) kennen muss.
+// IncidentResponse flattens IncidentComponents into a sorted
+// Components list so that the frontend does not need to know the internal
+// join structure (IncidentComponents[].Component).
 type IncidentResponse struct {
 	models.Incident
 	Components []models.Component `json:"Components"`
-	// Tags (Ersatz für das frühere Country-Feld) - analog zu
-	// Components oben manuell befüllt, da Incident keine GORM-Tags-Relation
-	// hat (explizites IncidentTag-Join-Modell, siehe tagsForIncident).
+	// Tags (replacement for the former Country field) - populated manually
+	// like Components above, since Incident has no GORM tags relation
+	// (explicit IncidentTag join model, see tagsForIncident).
 	Tags []models.Tag `json:"Tags"`
 }
 
@@ -59,8 +59,8 @@ func (h *Handler) toIncidentResponses(incs []models.Incident) []IncidentResponse
 	return out
 }
 
-// componentNames extrahiert die Namen für Notification-Texte (ein
-// Incident kann jetzt mehrere Komponenten betreffen).
+// componentNames extracts the names for notification texts (an
+// incident can now affect several components).
 func componentNames(comps []models.Component) string {
 	names := make([]string, 0, len(comps))
 	for _, c := range comps {
@@ -69,8 +69,8 @@ func componentNames(comps []models.Component) string {
 	return strings.Join(names, ", ")
 }
 
-// componentIDsWithOpenIncidents: offene, normale Vorfälle je Komponente
-// seit der Umstellung in componentstatus.OpenIncidentComponentIDs.
+// componentIDsWithOpenIncidents: open, regular incidents per component
+// since the switch in componentstatus.OpenIncidentComponentIDs.
 func (h *Handler) componentIDsWithOpenIncidents(tenantID uint) map[uint]string {
 	return componentstatus.OpenIncidentComponentIDs(h.DB, tenantID)
 }
@@ -90,13 +90,13 @@ func (h *Handler) GetIncidentsHandler(c *gin.Context) {
 		return
 	}
 
-	// Wartungsfenster nutzen dasselbe Incident-Modell, aber einen
-	// eigenen Admin-Menüpunkt statt in der normalen Incident-Liste
-	// aufzutauchen. ?is_maintenance=true schaltet auf die Wartungsfenster-Sicht,
-	// ?is_maintenance=any liefert beides (Verlauf der öffentlichen Seite),
-	// Default false hält die bestehende Incident-Liste unverändert.
-	// ?state=open|resolved filtert nach offen/behoben; limit/offset blättern
-	// (Standard 50, höchstens 200), die Liste ist nie unbegrenzt.
+	// Maintenance windows use the same incident model but have their own
+	// admin menu entry instead of showing up in the regular incident list.
+	// ?is_maintenance=true switches to the maintenance window view,
+	// ?is_maintenance=any returns both (history of the public page),
+	// the default false leaves the existing incident list unchanged.
+	// ?state=open|resolved filters by open/resolved; limit/offset paginate
+	// (default 50, at most 200), the list is never unbounded.
 	limit, offset, ok := parseIncidentWindow(c)
 	if !ok {
 		return
@@ -130,16 +130,16 @@ func (h *Handler) GetIncidentsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, h.toIncidentResponses(incidents))
 }
 
-// stripHiddenComponentsForCaller entfernt archivierte und unsichtbare
-// Komponenten aus den Zuordnungen der Vorfälle, wenn der
-// Aufrufer sie nicht verwalten darf: die Vorfall-Routen sind anonym lesbar.
+// stripHiddenComponentsForCaller removes archived and invisible
+// components from the incidents' assignments if the
+// caller may not manage them: the incident routes are anonymously readable.
 func (h *Handler) stripHiddenComponentsForCaller(c *gin.Context, pageID uint, incidents []models.Incident) {
 	if h.callerMaySeeHiddenComponents(c, pageID) {
 		return
 	}
 	var comps []models.Component
 	if err := h.DB.Select("id", "parent_id", "visible", "archived_at").Where("status_page_id = ?", pageID).Find(&comps).Error; err != nil {
-		// Fail-closed: lieber keine Komponenten nennen als versteckte preiszugeben.
+		// Fail closed: better to name no components than to reveal hidden ones.
 		for i := range incidents {
 			incidents[i].IncidentComponents = nil
 		}
@@ -152,23 +152,23 @@ type createIncidentReq struct {
 	Title        string `json:"Title" binding:"required"`
 	Message      string `json:"Message" binding:"required"`
 	Status       string `json:"Status"`
-	Severity     string `json:"Severity"` // leer = degraded_performance
+	Severity     string `json:"Severity"` // empty = degraded_performance
 	ComponentIDs []uint `json:"ComponentIDs" binding:"required,min=1"`
 	TagIDs       []uint `json:"TagIDs"`
-	// Wartungsfenster: Status wird bei IsMaintenance vom
-	// Scheduler verwaltet, nicht vom Client vorgegeben.
+	// Maintenance windows: for IsMaintenance the status is managed by the
+	// scheduler, not dictated by the client.
 	IsMaintenance       bool       `json:"IsMaintenance"`
 	ScheduledStartAt    *time.Time `json:"ScheduledStartAt"`
 	ScheduledEndAt      *time.Time `json:"ScheduledEndAt"`
 	ReminderLeadMinutes int        `json:"ReminderLeadMinutes"`
-	// Ereigniszeiten normaler Vorfälle.
+	// Event times of regular incidents.
 	StartedAt  *time.Time `json:"StartedAt"`
 	ResolvedAt *time.Time `json:"ResolvedAt"`
 }
 
-// deriveMaintenanceStatus leitet den Status eines Wartungsfensters aus seinen
-// Zeiten ab: Ende <= jetzt -> resolved, Start <= jetzt < Ende ->
-// in_progress, sonst scheduled. Dieselben Grenzen wie der Scheduler.
+// deriveMaintenanceStatus derives the status of a maintenance window from its
+// times: end <= now -> resolved, start <= now < end ->
+// in_progress, otherwise scheduled. Same boundaries as the scheduler.
 func deriveMaintenanceStatus(start, end, now time.Time) string {
 	if !end.After(now) {
 		return "resolved"
@@ -179,8 +179,8 @@ func deriveMaintenanceStatus(start, end, now time.Time) string {
 	return "scheduled"
 }
 
-// validateIncidentTimes prüft StartedAt/ResolvedAt eines normalen Vorfalls
-// ResolvedAt nur bei Status resolved, Ende nicht vor Beginn.
+// validateIncidentTimes checks StartedAt/ResolvedAt of a regular incident:
+// ResolvedAt only with status resolved, end not before start.
 func validateIncidentTimes(status string, startedAt, resolvedAt *time.Time) string {
 	if resolvedAt == nil {
 		return ""
@@ -194,8 +194,8 @@ func validateIncidentTimes(status string, startedAt, resolvedAt *time.Time) stri
 	return ""
 }
 
-// incidentValidationCode ordnet den festen Texten der Status-/Zeitprüfungen
-// einen Fehlercode zu.
+// incidentValidationCode maps the fixed texts of the status/time checks
+// to an error code.
 var incidentValidationCodes = map[string]string{
 	errInvalidIncidentStatus:                                        "invalid_incident_status",
 	errInvalidMaintenanceStatus:                                     "invalid_maintenance_status",
@@ -207,8 +207,8 @@ var incidentValidationCodes = map[string]string{
 	"Endzeitpunkt muss nach dem Startzeitpunkt liegen":              "maintenance_end_before_start",
 }
 
-// respondIncidentValidation beantwortet eine fehlgeschlagene Status-/Zeitprüfung
-// mit 400, Text und Code.
+// respondIncidentValidation answers a failed status/time check
+// with 400, text and code.
 func respondIncidentValidation(c *gin.Context, msg string) {
 	code, ok := incidentValidationCodes[msg]
 	if !ok {
@@ -217,10 +217,10 @@ func respondIncidentValidation(c *gin.Context, msg string) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": msg, "code": code})
 }
 
-// resolveCreateIncidentStatus validiert/berechnet den initialen Status je
-// nachdem, ob es sich um ein Wartungsfenster handelt. Ausgelagert aus
-// CreateIncidentHandler, damit dessen kognitive Komplexität die
-// SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// resolveCreateIncidentStatus validates/computes the initial status depending
+// on whether it is a maintenance window. Extracted from
+// CreateIncidentHandler so that its cognitive complexity does not exceed
+// the SonarCloud limit (go:S3776).
 func resolveCreateIncidentStatus(req *createIncidentReq) (string, bool) {
 	if !req.IsMaintenance {
 		if req.Severity != "" && !models.IsValidIncidentSeverity(req.Severity) {
@@ -249,8 +249,8 @@ func resolveCreateIncidentStatus(req *createIncidentReq) (string, bool) {
 	return "", true
 }
 
-// createIncidentWithComponents legt den Incident, seine Komponenten-
-// Zuordnungen und Tags in einer Transaktion an.
+// createIncidentWithComponents creates the incident, its component
+// assignments and tags in one transaction.
 func (h *Handler) createIncidentWithComponents(incident *models.Incident, components []models.Component, tags []models.Tag) error {
 	return h.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(incident).Error; err != nil {
@@ -291,8 +291,8 @@ func (h *Handler) CreateIncidentHandler(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// Die Route hat die Art schon aus dem Body geprüft; die Art, die
-	// der Handler tatsächlich anlegt, wird hier unabhängig davon erneut geprüft.
+	// The route has already checked the kind from the body; the kind that
+	// the handler actually creates is checked again here independently.
 	if req.IsMaintenance && !h.userHasPermissionOnPrivatePage(c, tenantID, permissions.Perm(resourceMaintenance, permissions.Create)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden: You are not authorized to create maintenance windows", "code": "forbidden"})
 		return
@@ -337,13 +337,13 @@ func (h *Handler) CreateIncidentHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create incident", "code": "server_error"})
 		return
 	}
-	// eine bereits laufend angelegte Wartung setzt ihre Komponenten
-	// sofort; der Scheduler fasst nur scheduled/in_progress an, vergangene
-	// (resolved) Wartungen lassen die Komponenten unberührt.
+	// a maintenance created already in progress sets its components
+	// immediately; the scheduler only touches scheduled/in_progress, past
+	// (resolved) maintenances leave the components untouched.
 	if incident.IsMaintenance && incident.Status == "in_progress" {
 		for _, comp := range components {
-			// Gruppen behalten ihren Status "group".
-			// über die Historie, damit der Wechsel protokolliert wird.
+			// Groups keep their status "group"; the status is set
+			// via the history, so that the change is logged.
 			if _, err := statushistory.Set(h.DB, comp.ID, "", componentstatus.UnderMaintenance, models.StatusSourceMaintenance, time.Now()); err != nil {
 				slog.Error("Failed to set component under maintenance", "incident_id", incident.ID, "component_id", comp.ID, "error", err)
 			}
@@ -364,26 +364,26 @@ type updateIncidentReq struct {
 	Title               string       `json:"title"`
 	Message             string       `json:"message" binding:"required"`
 	Status              string       `json:"status" binding:"required"`
-	Severity            *string      `json:"Severity"` // nil = unverändert
+	Severity            *string      `json:"Severity"` // nil = unchanged
 	ComponentIDs        []uint       `json:"ComponentIDs"`
-	TagIDs              *[]uint      `json:"TagIDs"` // nil = unverändert lassen, [] = Tags entfernen
+	TagIDs              *[]uint      `json:"TagIDs"` // nil = leave unchanged, [] = remove tags
 	ScheduledStartAt    *time.Time   `json:"ScheduledStartAt"`
 	ScheduledEndAt      *time.Time   `json:"ScheduledEndAt"`
 	ReminderLeadMinutes *int         `json:"ReminderLeadMinutes"`
-	StartedAt           OptionalTime `json:"StartedAt"`  // fehlt = unverändert, null = zurücksetzen
-	ResolvedAt          OptionalTime `json:"ResolvedAt"` // fehlt = unverändert, null = zurücksetzen
+	StartedAt           OptionalTime `json:"StartedAt"`  // missing = unchanged, null = reset
+	ResolvedAt          OptionalTime `json:"ResolvedAt"` // missing = unchanged, null = reset
 }
 
-// OptionalTime unterscheidet ein fehlendes JSON-Feld (Set=false, Wert bleibt)
-// von einem ausdrücklichen null (Set=true, Time=nil, Wert wird geleert).
-// Das Bearbeiten-Formular schickt ein geleertes Feld als null.
+// OptionalTime distinguishes a missing JSON field (Set=false, value stays)
+// from an explicit null (Set=true, Time=nil, value is cleared).
+// The edit form sends a cleared field as null.
 type OptionalTime struct {
 	Set  bool
 	Time *time.Time
 }
 
-// UnmarshalJSON wird von encoding/json nur aufgerufen, wenn das Feld im Body
-// steht (auch bei null), daher genügt es, Set hier zu setzen.
+// UnmarshalJSON is called by encoding/json only if the field is present in the
+// body (also for null), so it is enough to set Set here.
 func (o *OptionalTime) UnmarshalJSON(b []byte) error {
 	o.Set = true
 	if string(b) == "null" {
@@ -398,10 +398,10 @@ func (o *OptionalTime) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// applyIncidentStatus setzt den Status eines normalen Vorfalls und hält die
-// Regel „ein offener Vorfall hat kein Ende" an einer Stelle ein:
-// jeder Status außer resolved leert ResolvedAt. Wartungsfenster verwalten ihre
-// Zeiten selbst und bleiben unberührt.
+// applyIncidentStatus sets the status of a regular incident and enforces the
+// rule "an open incident has no end" in one place:
+// every status except resolved clears ResolvedAt. Maintenance windows manage their
+// times themselves and are left untouched.
 func applyIncidentStatus(incident *models.Incident, status string) {
 	incident.Status = status
 	if incident.IsMaintenance {
@@ -410,16 +410,16 @@ func applyIncidentStatus(incident *models.Incident, status string) {
 	if !models.IsResolvedIncidentStatus(status) {
 		incident.ResolvedAt = nil
 	} else if incident.ResolvedAt == nil {
-		// Schließen eines Vorfalls hält das Ende fest, egal über
-		// welchen Weg (Update-Timeline oder Bearbeiten).
+		// Closing an incident records the end, regardless of
+		// the path taken (update timeline or edit).
 		now := time.Now()
 		incident.ResolvedAt = &now
 	}
 }
 
-// validateIncidentStatusChange prüft einen neuen Status gegen die erlaubte
-// Menge (Vorfall bzw. Wartung). Der unveränderte Bestandswert bleibt erlaubt,
-// damit das Bearbeiten alter Datensätze mit unbekanntem Status nicht scheitert.
+// validateIncidentStatusChange checks a new status against the allowed
+// set (incident or maintenance). The unchanged existing value remains allowed,
+// so that editing old records with an unknown status does not fail.
 func validateIncidentStatusChange(incident models.Incident, status string) string {
 	if status == incident.Status {
 		return ""
@@ -433,9 +433,9 @@ func validateIncidentStatusChange(incident models.Incident, status string) strin
 	return ""
 }
 
-// resolveUpdateIncidentTags löst req.TagIDs (falls gesetzt) zu Tags auf und
-// prüft die Zugriffsberechtigung darauf. ok=true mit newTags=nil bedeutet
-// "TagIDs war nil, Tags unverändert lassen".
+// resolveUpdateIncidentTags resolves req.TagIDs (if set) to tags and
+// checks access permission for them. ok=true with newTags=nil means
+// "TagIDs was nil, leave tags unchanged".
 func (h *Handler) resolveUpdateIncidentTags(c *gin.Context, req updateIncidentReq, tenantID uint, current []models.Tag) (newTags []models.Tag, ok bool) {
 	if req.TagIDs == nil {
 		return nil, true
@@ -455,11 +455,11 @@ func (h *Handler) resolveUpdateIncidentTags(c *gin.Context, req updateIncidentRe
 	return newTags, true
 }
 
-// applyIncidentUpdateFields überträgt die einfachen Felder von req auf
-// incident. Der Wartungsfenster-Zeitplan bleibt vor dem automatischen Start
-// änderbar; der Status selbst wird für Wartungsfenster vom
-// Scheduler verwaltet, das Frontend schickt hier den unveränderten aktuellen
-// Status mit.
+// applyIncidentUpdateFields copies the simple fields from req to
+// incident. The maintenance window schedule stays changeable before the
+// automatic start; the status itself is managed by the scheduler for
+// maintenance windows, the frontend sends the unchanged current
+// status along here.
 func applyIncidentUpdateFields(incident *models.Incident, req updateIncidentReq) {
 	if req.Title != "" {
 		incident.Title = req.Title
@@ -489,9 +489,9 @@ func applyIncidentUpdateFields(incident *models.Incident, req updateIncidentReq)
 	}
 }
 
-// replaceIncidentComponents ersetzt die Komponenten-Zuordnung (newComponents,
-// vorab per resolveIncidentComponents geladen) eines Incidents, sofern nicht leer, und gibt die
-// aktuellen Komponenten zurück (unverändert, falls componentIDs leer war).
+// replaceIncidentComponents replaces the component assignment (newComponents,
+// loaded beforehand via resolveIncidentComponents) of an incident, unless empty, and returns the
+// current components (unchanged if componentIDs was empty).
 func (h *Handler) replaceIncidentComponents(c *gin.Context, incident models.Incident, newComponents []models.Component, current []models.Component) ([]models.Component, bool) {
 	if len(newComponents) == 0 {
 		return current, true
@@ -514,10 +514,10 @@ func (h *Handler) replaceIncidentComponents(c *gin.Context, incident models.Inci
 	return newComponents, true
 }
 
-// resolveIncidentComponents lädt die im Update genannten Komponenten der Seite.
-// Es läuft vor jedem Schreibzugriff: ein Verweis auf eine unbekannte oder
-// fremde Komponente beantwortet die Anfrage mit 404, ohne dass am Vorfall
-// etwas verändert wurde.
+// resolveIncidentComponents loads the components of the page named in the update.
+// It runs before any write access: a reference to an unknown or
+// foreign component answers the request with 404 without anything
+// having been changed on the incident.
 func (h *Handler) resolveIncidentComponents(c *gin.Context, componentIDs []uint, tenantID uint) ([]models.Component, bool) {
 	if len(componentIDs) == 0 {
 		return nil, true
@@ -647,9 +647,9 @@ func (h *Handler) DeleteIncidentHandler(c *gin.Context) {
 		return
 	}
 
-	// Explizites Aufräumen der Join-Zeilen: Incident nutzt Soft-Delete
-	// (gorm.Model → UPDATE statt DELETE), ein DB-seitiges OnDelete:CASCADE würde
-	// dabei nie feuern.
+	// Explicit cleanup of the join rows: Incident uses soft delete
+	// (gorm.Model → UPDATE instead of DELETE), a DB-side OnDelete:CASCADE would
+	// never fire in that case.
 	if err := h.DB.Where("incident_id = ?", inc.ID).Delete(&models.IncidentComponent{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clean up component links", "code": "server_error"})
 		return
@@ -671,8 +671,8 @@ func (h *Handler) DeleteIncidentHandler(c *gin.Context) {
 // runtime).
 var headerInjectionPattern = regexp.MustCompile(`[\r\n]`)
 
-// foldBodyLines faltet CR/LF (auch CRLF) im Mail-Body zu je einem Leerzeichen;
-// in HTML ist Zeilenumbruch ohnehin nur Leerraum (Umbrüche setzen <br>/<p>).
+// foldBodyLines folds CR/LF (also CRLF) in the mail body into one space each;
+// in HTML a line break is just whitespace anyway (breaks are made with <br>/<p>).
 func foldBodyLines(s string) string {
 	return bodyLineBreakPattern.ReplaceAllString(s, " ")
 }
@@ -717,11 +717,11 @@ type notificationEmailParams struct {
 	title       string // HTML-escaped
 	status      string // raw incident status, looked up in incidentStatusMeta (not itself rendered raw)
 	country     string // HTML-escaped
-	message     string // fertiges, einzeiliges Mail-HTML aus richtext.ToMailHTML
+	message     string // finished, single-line mail HTML from richtext.ToMailHTML
 	frontendURL string
-	// unsubscribeURL: nur für Subscriber-Mails gesetzt (leer bei
-	// internen Usern, die kein Subscriber-Token haben) - rendert einen
-	// zusätzlichen Abbestellen-Link im Footer, wenn nicht leer.
+	// unsubscribeURL: only set for subscriber mails (empty for
+	// internal users who have no subscriber token) - renders an
+	// additional unsubscribe link in the footer if not empty.
 	unsubscribeURL string
 }
 
@@ -825,8 +825,8 @@ func buildNotificationEmailHTML(p notificationEmailParams) string {
 // CR/LF, closing the header-injection sink CodeQL flags on the raw msg string
 // below (go/email-injection) - callers are expected to have already validated
 // the incident fields that feed subjectText/bodyHTML via hasHeaderInjectionChars.
-// extraHeaders: optionale, vollständige
-// Header-Zeilen wie List-Unsubscribe; auch sie dürfen kein CR/LF enthalten.
+// extraHeaders: optional, complete
+// header lines like List-Unsubscribe; they must not contain CR/LF either.
 func (h *Handler) sendAlertEmail(smtpCfg smtpConfig, recipientEmail, subjectText, bodyHTML, logLabel string, incID uint, incTitle string, extraHeaders ...string) {
 	addr, err := mail.ParseAddress(recipientEmail)
 	if err != nil {
@@ -835,9 +835,9 @@ func (h *Handler) sendAlertEmail(smtpCfg smtpConfig, recipientEmail, subjectText
 	}
 	recipient := addr.Address
 
-	// Der Body darf mehrzeilig sein (Vorlagen, mehrzeilige
-	// {{.Message}}); er wird zu einer Zeile gefaltet, statt die Mail zu
-	// verwerfen. Betreff und Absender sind Header und bleiben streng.
+	// The body may be multi-line (templates, multi-line
+	// {{.Message}}); it is folded into one line instead of
+	// discarding the mail. Subject and sender are headers and stay strict.
 	bodyHTML = foldBodyLines(bodyHTML)
 	if hasHeaderInjectionChars(subjectText) || hasHeaderInjectionChars(bodyHTML) || hasHeaderInjectionChars(smtpCfg.From) {
 		slog.Error("Skipping notification: subject/body/sender contain invalid CR/LF characters", "email", recipient)
@@ -854,10 +854,10 @@ func (h *Handler) sendAlertEmail(smtpCfg smtpConfig, recipientEmail, subjectText
 
 	subject := "Subject: " + subjectText + "\n"
 	mime := "MIME-Version: 1.0\nContent-Type: text/html; charset=UTF-8\n\n"
-	// smtpCfg.From liegt bereits im vollständigen "Anzeigename <adresse>"-Format vor
-	// (SMTP_FROM-Env-Var, siehe loadSMTPConfig) - ein zusätzliches Wrapping hier
-	// erzeugte verschachtelte spitze Klammern (ungültiger RFC-5322-From-Header),
-	// die viele Empfänger (u.a. Outlook.com) kommentarlos verwerfen.
+	// smtpCfg.From is already in the full "Display Name <address>" format
+	// (SMTP_FROM env var, see loadSMTPConfig) - additional wrapping here
+	// produced nested angle brackets (invalid RFC 5322 From header),
+	// which many recipients (including Outlook.com) silently discard.
 	msg := smtpCfg.fromHeaders() +
 		"To: " + recipient + "\n" +
 		subject + extra + mime + bodyHTML
@@ -876,12 +876,12 @@ func (h *Handler) sendAlertEmail(smtpCfg smtpConfig, recipientEmail, subjectText
 }
 
 // DispatchNotifications sends real SMTP emails and calls the Google Chat webhook.
-// comps: alle betroffenen Komponenten (vorher eine einzelne Component).
-// notificationDispatchContext bündelt alle Werte, die DispatchNotifications
-// einmalig berechnet und die anschließend von den einzelnen Empfänger-
-// Benachrichtigungspfaden (interne User, Subscriber, globaler Webhook)
-// benötigt werden. Ausgelagert aus DispatchNotifications, damit dessen
-// kognitive Komplexität die SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// comps: all affected components (previously a single Component).
+// notificationDispatchContext bundles all values that DispatchNotifications
+// computes once and that the individual recipient
+// notification paths (internal users, subscribers, global webhook)
+// need. Extracted from DispatchNotifications so that its
+// cognitive complexity does not exceed the SonarCloud limit (go:S3776).
 type notificationDispatchContext struct {
 	inc          models.Incident
 	action       string
@@ -892,20 +892,20 @@ type notificationDispatchContext struct {
 	smtpCfg      smtpConfig
 	frontendURL  string
 	incidentTags []models.Tag
-	// staffMail liefert Betreff und Text für einen internen Nutzer in seiner
-	// UI-Sprache (User.PreferredLanguage); leer/unbekannt = Englisch.
+	// staffMail returns subject and text for an internal user in their
+	// UI language (User.PreferredLanguage); empty/unknown = English.
 	staffMail func(preferred string) (subject, body string)
-	// subscriberMail liefert Vorlage, Platzhalterdaten und Standardtext-Parameter
-	// in der Sprache eines Abonnenten; "" = Seitenstandardsprache.
+	// subscriberMail returns the template, placeholder data and default text parameters
+	// in a subscriber's language; "" = site default language.
 	subscriberMail func(preferred string) incidentSubscriberMail
-	// chatLang: effektive Sprache (de/en) des Abonnenten für Chat-Texte,
-	// unabhängig von vorhandenen Mail-Vorlagen.
+	// chatLang: effective language (de/en) of the subscriber for chat texts,
+	// independent of existing mail templates.
 	chatLang       func(preferred string) string
 	defaultSubject string
 }
 
-// subscriberLang ist die Mail-/Textsprache (de/en) für einen Abonnenten; ohne
-// vorbereitete Sprachwahl bleibt es beim bisherigen Englisch.
+// subscriberLang is the mail/text language (de/en) for a subscriber; without a
+// prepared language choice it stays at the previous English.
 func (ctx notificationDispatchContext) subscriberLang(preferred string) string {
 	if ctx.chatLang == nil {
 		return "en"
@@ -913,28 +913,28 @@ func (ctx notificationDispatchContext) subscriberLang(preferred string) string {
 	return ctx.chatLang(preferred)
 }
 
-// incidentSubscriberMail ist der sprachabhängige Teil der Abonnentenmail.
+// incidentSubscriberMail is the language-dependent part of the subscriber mail.
 type incidentSubscriberMail struct {
 	tmpl       *models.NotificationTemplate
 	dataBase   NotificationTemplateData
 	bodyParams notificationEmailParams
 }
 
-// buildNotificationDispatchContext berechnet einmalig alle für den Versand
-// nötigen Werte (SMTP-Konfig, Templates, HTML-escapte Felder), bevor die
-// Empfänger-Schleifen darauf zugreifen.
+// buildNotificationDispatchContext computes once all values needed for
+// sending (SMTP config, templates, HTML-escaped fields) before the
+// recipient loops access them.
 func (h *Handler) buildNotificationDispatchContext(inc models.Incident, action, compNames string, componentIDs []uint) notificationDispatchContext {
 	smtpCfg := loadSMTPConfig()
-	// eine Statusseite kann einen eigenen Absender hinterlegen
-	// (StatusPage.NotificationFromAddress), der dann statt des globalen
-	// SMTP_FROM verwendet wird. Nur das From-Feld wird überschrieben - Host/
-	// Port/Auth bleiben die zentrale SMTP-Verbindung, da nur der Absender
-	// mandantenspezifisch ist, nicht der komplette Mailversand. Ist nichts
-	// hinterlegt, greift statt SMTP_FROM ein seitenspezifischer Default aus
+	// a status page can store its own sender
+	// (StatusPage.NotificationFromAddress), which is then used instead of the global
+	// SMTP_FROM. Only the From field is overridden - host/
+	// port/auth stay the central SMTP connection, since only the sender
+	// is tenant-specific, not the entire mail delivery. If nothing is
+	// stored, a page-specific default from
 	// Slug + Domain (resolveNotificationFromAddress).
-	// wird gebraucht, um zu wissen, ob die Statusseite privat ist
-	// (dann bekommt der "Statusseite ansehen"-Link im Subscriber-Mail einen
-	// Zugriffs-Token) und für den slug-genauen Link selbst.
+	// is needed to know whether the status page is private
+	// (then the "view status page" link in the subscriber mail gets an
+	// access token) and for the slug-specific link itself.
 	var page models.StatusPage
 	h.DB.First(&page, inc.StatusPageID)
 	smtpCfg.applyPageSender(page)
@@ -942,30 +942,30 @@ func (h *Handler) buildNotificationDispatchContext(inc models.Incident, action, 
 	incidentTags := h.tagsForIncident(inc.ID)
 	tagNames := tagNameList(incidentTags)
 
-	// bodyEN/bodyDE sind text/html-E-Mail-Bodies - Titel, Nachricht,
-	// Komponentennamen und Tags kommen aus Nutzereingaben (Incident-Formular)
-	// und müssen deshalb HTML-escaped werden, bevor sie hier eingesetzt werden.
-	// Ohne das könnte ein Editor mit incidents:write beliebiges HTML/Markup in
-	// die an Abonnenten/User verschickten Mails einschleusen. Die Subjects
-	// bleiben unescaped, da sie in einen SMTP-Header (kein HTML) eingesetzt
-	// werden - dort schützt bereits hasHeaderInjectionChars vor CR/LF.
+	// bodyEN/bodyDE are text/html email bodies - title, message,
+	// component names and tags come from user input (incident form)
+	// and must therefore be HTML-escaped before being inserted here.
+	// Without that, an editor with incidents:write could inject arbitrary HTML/markup into
+	// the mails sent to subscribers/users. The subjects
+	// stay unescaped because they are inserted into an SMTP header (not HTML) -
+	// there hasHeaderInjectionChars already protects against CR/LF.
 	escCompNames := html.EscapeString(compNames)
 	escTitle := html.EscapeString(inc.Title)
 	escTagNames := html.EscapeString(tagNames)
-	// Die Nachricht ist eingeschränktes Markdown; richtext.ToMailHTML
-	// maskiert allen Text und erzeugt nur feste Tags (kein Roh-HTML) und ist
-	// immer einzeilig, passiert also den CR/LF-Guard von sendAlertEmail.
+	// The message is restricted Markdown; richtext.ToMailHTML
+	// escapes all text and produces only fixed tags (no raw HTML) and is
+	// always single-line, so it passes the CR/LF guard of sendAlertEmail.
 	messageHTML := richtext.ToMailHTML(inc.Message)
 
-	// pro Statusseite kann ein Custom-Template hinterlegt sein.
-	// Lookup einmal pro Sprache vor den Empfänger-Schleifen, damit die
-	// Renderpfade unten pro Empfänger nur noch das Custom-Template
-	// anwenden bzw. den vorbereiteten Default zurückgeben.
+	// a custom template can be stored per status page.
+	// Lookup once per language before the recipient loops, so that the
+	// render paths below only have to apply the custom template per recipient
+	// or return the prepared default.
 	notifKind := resolveIncidentKind(action, inc.Status)
-	// Interne Nutzer bekommen die Mail in ihrer UI-Sprache
-	// (de/en); Vorlage (Audience staff) in dieser Sprache, sonst die englische
-	// Vorlage der Seite, sonst der eingebaute Text in ihrer Sprache. Gemerkt je
-	// Sprache, weil die Schleife über alle Nutzer läuft.
+	// Internal users get the mail in their UI language
+	// (de/en); template (audience staff) in that language, otherwise the English
+	// template of the page, otherwise the built-in text in their language. Cached per
+	// language because the loop runs over all users.
 	subTemplate := h.memoSubscriberTemplate(inc.StatusPageID, notifKind)
 	actionVerb := strings.ToLower(action)
 
@@ -1002,10 +1002,10 @@ func (h *Handler) buildNotificationDispatchContext(inc models.Incident, action, 
 		return subject, body
 	}
 
-	// Der Betreff bleibt für alle Subscriber gleich, der Body dagegen wird
-	// pro Subscriber frisch gebaut (siehe notifySubscriberEmail) - er enthält
-	// seit der Umstellung einen individuellen Abbestellen-Token und, bei privaten
-	// Seiten, einen individuellen Zugriffs-Token im "Statusseite ansehen"-Link.
+	// The subject stays the same for all subscribers, whereas the body is
+	// built fresh per subscriber (see notifySubscriberEmail) - since the switch it contains
+	// an individual unsubscribe token and, for private
+	// pages, an individual access token in the "view status page" link.
 	subscriberMail := func(preferred string) incidentSubscriberMail {
 		tmpl, subLang := subTemplate(preferred)
 		return incidentSubscriberMail{
@@ -1044,8 +1044,8 @@ func (h *Handler) buildNotificationDispatchContext(inc models.Incident, action, 
 	}
 }
 
-// notifyInternalUsers benachrichtigt nur User, die entweder
-// Global Admin sind oder eine Rolle auf genau dieser Statusseite haben.
+// notifyInternalUsers notifies only users who are either
+// global admins or have a role on exactly this status page.
 func (h *Handler) notifyInternalUsers(ctx notificationDispatchContext) {
 	var users []models.User
 	h.DB.Where(
@@ -1054,13 +1054,13 @@ func (h *Handler) notifyInternalUsers(ctx notificationDispatchContext) {
 		h.DB.Model(&models.UserStatusPageRole{}).Select("user_id").Where(whereStatusPageIDEquals, ctx.inc.StatusPageID),
 	).FindInBatches(&users, 100, func(tx *gorm.DB, batch int) error {
 		for _, user := range users {
-			// Tag-basierter Nachfolger von UserHasAccessToCountry.
-			// Dieselbe "nur einschränken, wenn beide Seiten Tags haben"-Logik
-			// wie userHasTagAccess: Global-Admins, User ohne eigene Tags und
-			// Incidents ohne eigenen Tag umgehen die Prüfung - die bereits
-			// erfolgte Seiten-Rollen-Filterung oben (is_global_admin OR
-			// UserStatusPageRole) ist die eigentliche Zugriffskontrolle, Tags
-			// sind nur eine zusätzliche, optionale Eingrenzung.
+			// Tag-based successor of UserHasAccessToCountry.
+			// Same "only restrict if both sides have tags" logic
+			// as userHasTagAccess: global admins, users without their own tags and
+			// incidents without their own tag bypass the check - the already
+			// completed page-role filtering above (is_global_admin OR
+			// UserStatusPageRole) is the actual access control, tags
+			// are only an additional, optional narrowing.
 			userTags := h.tagsForUser(user.ID)
 			if user.IsGlobalAdmin || len(userTags) == 0 || len(ctx.incidentTags) == 0 || middleware.UserHasAccessToAnyTag(userTags, ctx.incidentTags) {
 				subject, body := ctx.staffMail(user.PreferredLanguage)
@@ -1071,13 +1071,13 @@ func (h *Handler) notifyInternalUsers(ctx notificationDispatchContext) {
 	})
 }
 
-// incidentGoogleChatPayload baut den Google-Chat-Nachrichtentext, der sowohl
-// für einzelne Subscriber-Webhooks als auch den globalen Fallback-Webhook
-// verwendet wird. Die Nachricht geht als Klartext raus (Markdown
-// wird zu lesbarem Text, Links als "Text (URL)"), nicht als rohes Markdown.
+// incidentGoogleChatPayload builds the Google Chat message text that is used both
+// for individual subscriber webhooks and for the global fallback webhook.
+// The message goes out as plain text (Markdown
+// becomes readable text, links as "Text (URL)"), not as raw Markdown.
 //
-// lang (de/en) wählt die festen Beschriftungen; Abonnenten bekommen
-// ihre gewählte Sprache bzw. die der Seite, der globale Webhook bleibt englisch.
+// lang (de/en) selects the fixed labels; subscribers get
+// their chosen language or that of the page, the global webhook stays English.
 func incidentGoogleChatPayload(ctx notificationDispatchContext, lang string) map[string]interface{} {
 	if lang == "de" {
 		return map[string]interface{}{
@@ -1091,32 +1091,32 @@ func incidentGoogleChatPayload(ctx notificationDispatchContext, lang string) map
 	}
 }
 
-// notifySubscriberGoogleChat verschickt die Google-Chat-Webhook-Nachricht an
-// einen einzelnen Subscriber.
+// notifySubscriberGoogleChat sends the Google Chat webhook message to
+// a single subscriber.
 func (h *Handler) notifySubscriberGoogleChat(ctx notificationDispatchContext, sub models.Subscriber) {
 	if sub.WebhookURL == "" {
 		slog.Error("Subscriber has google_chat channel but no WebhookURL", "subscriber_id", sub.ID)
 		return
 	}
-	// SSRF-Schutz (Nachzügler): postWebhook sendet über
-	// webhookTestClient, damit die aufgelöste IP direkt vor dem Connect erneut
-	// gegen die Blockliste geprüft wird (siehe safeDialContext in
-	// subscriber.go) - ein normaler http.Client würde den Host beim
-	// eigentlichen Request erneut auflösen und wäre damit anfällig für
-	// DNS-Rebinding zwischen Abo-Anlage und Incident-Dispatch.
-	// Ratenlimit/Retry/Logging zentral dort.
+	// SSRF protection (late addition): postWebhook sends via
+	// webhookTestClient so that the resolved IP is checked against the blocklist
+	// again right before connecting (see safeDialContext in
+	// subscriber.go) - a normal http.Client would resolve the host again during
+	// the actual request and would thus be vulnerable to
+	// DNS rebinding between subscription creation and incident dispatch.
+	// Rate limit/retry/logging centrally there.
 	res := postWebhook(context.Background(), sub.WebhookURL, incidentGoogleChatPayload(ctx, ctx.subscriberLang(sub.Language)), webhookModeNotify)
 	if !res.OK() {
 		slog.Error("Failed to send webhook to subscriber", "subscriber_id", sub.ID, "status", res.Status, "class", res.Class)
-		// Admins sehen Ratenlimit und dauerhafte Ablehnung in der Glocke.
+		// Admins see rate limiting and permanent rejection in the bell.
 		h.reportWebhookProblem(sub.StatusPageID, sub.ID, "google_chat", res)
 		return
 	}
 	slog.Info("Webhook triggered for subscriber", "subscriber_id", sub.ID, "response_status", res.Status)
 }
 
-// notifySubscriberEmail baut den individuellen (Token/Unsubscribe-Link)
-// Mailinhalt für einen Email-Subscriber und verschickt ihn.
+// notifySubscriberEmail builds the individual (token/unsubscribe link)
+// mail content for an email subscriber and sends it.
 func (h *Handler) notifySubscriberEmail(ctx notificationDispatchContext, sub models.Subscriber) {
 	mail := ctx.subscriberMail(sub.Language)
 	body := mail.bodyParams
@@ -1128,11 +1128,11 @@ func (h *Handler) notifySubscriberEmail(ctx notificationDispatchContext, sub mod
 		extraHeaders = listUnsubscribeHeaders(ctx.frontendURL, token)
 		body.unsubscribeURL = ctx.frontendURL + "/unsubscribe?token=" + url.QueryEscape(token)
 		perSubData.UnsubscribeURL = body.unsubscribeURL
-		// bei privaten Seiten reicht der bisherige, nicht-slug-
-		// spezifische frontendURL-Link nicht - ohne Login (den ein reiner
-		// Abonnent nicht hat) würde er sonst nur auf eine Login-Aufforderung
-		// treffen. Der Token im Link gewährt stattdessen direkten Lesezugriff
-		// auf genau diese Seite (siehe subscriberTokenGrantsPageAccess).
+		// for private pages the previous, non-slug-specific
+		// frontendURL link is not enough - without login (which a mere
+		// subscriber does not have) it would only lead to a login
+		// prompt. The token in the link instead grants direct read access
+		// to exactly this page (see subscriberTokenGrantsPageAccess).
 		if ctx.page.IsPrivate {
 			body.frontendURL = ctx.frontendURL + "/status/" + ctx.page.Slug + "?token=" + url.QueryEscape(token)
 			perSubData.FrontendURL = body.frontendURL
@@ -1144,15 +1144,15 @@ func (h *Handler) notifySubscriberEmail(ctx notificationDispatchContext, sub mod
 	h.sendAlertEmail(ctx.smtpCfg, sub.Email, perSubSubject, perSubBody, "public subscriber", ctx.inc.ID, ctx.inc.Title, extraHeaders...)
 }
 
-// notifySubscriber benachrichtigt einen einzelnen Subscriber über
-// den beim Abo gewählten Kanal, sofern er eine der betroffenen Komponenten
-// abonniert hat.
+// notifySubscriber notifies a single subscriber via
+// the channel chosen at subscription time, provided they subscribed to one of the affected
+// components.
 func (h *Handler) notifySubscriber(ctx notificationDispatchContext, sub models.Subscriber) {
 	if !SubscriberHasAnyComponent(sub.SubscribedComponentIDs, ctx.componentIDs) {
 		return
 	}
-	// Vorfälle privater Seiten nur an Abos, deren
-	// Ersteller die Seite noch sehen darf (siehe subscriberCreatorMayReadPage).
+	// Incidents of private pages only to subscriptions whose
+	// creator may still see the page (see subscriberCreatorMayReadPage).
 	if ctx.page.IsPrivate && !h.subscriberCreatorMayReadPage(sub, ctx.page.ID) {
 		slog.Info("Skipping subscriber on private page without authorized creator", "subscriber_id", sub.ID)
 		return
@@ -1164,11 +1164,11 @@ func (h *Handler) notifySubscriber(ctx notificationDispatchContext, sub models.S
 	h.notifySubscriberEmail(ctx, sub)
 }
 
-// notifySubscribers benachrichtigt alle Email-/Webhook-
-// Subscriber der betroffenen Statusseite.
+// notifySubscribers notifies all email/webhook
+// subscribers of the affected status page.
 func (h *Handler) notifySubscribers(ctx notificationDispatchContext) {
 	var subscribers []models.Subscriber
-	// unbestätigte (pending) Abos bekommen keine Benachrichtigungen.
+	// unconfirmed (pending) subscriptions get no notifications.
 	h.DB.Where("status_page_id = ? AND status = ?", ctx.inc.StatusPageID, models.SubscriberStatusActive).FindInBatches(&subscribers, 100, func(tx *gorm.DB, batch int) error {
 		for _, sub := range subscribers {
 			h.notifySubscriber(ctx, sub)
@@ -1177,13 +1177,13 @@ func (h *Handler) notifySubscribers(ctx notificationDispatchContext) {
 	})
 }
 
-// dispatchGlobalGoogleChatWebhook verschickt zusätzlich an den (optionalen)
-// prozessweiten Google-Chat-Webhook aus GOOGLE_CHAT_WEBHOOK_URL, unabhängig
-// von Subscriber-spezifischen Webhooks. Der Webhook gehört dem Betreiber und
-// sieht Vorfälle aller Mandanten; deshalb gehen nur Vorfälle öffentlicher
-// Seiten hinein, deren Inhalt ohnehin jeder lesen kann. Vorfälle privater
-// Seiten bleiben beim Mandanten. Ist die Seite nicht geladen (ID 0, etwa nach
-// einem Datenbankfehler), wird nichts gesendet (fail closed).
+// dispatchGlobalGoogleChatWebhook additionally sends to the (optional)
+// process-wide Google Chat webhook from GOOGLE_CHAT_WEBHOOK_URL, independent
+// of subscriber-specific webhooks. The webhook belongs to the operator and
+// sees incidents of all tenants; therefore only incidents of public
+// pages go into it, whose content anyone can read anyway. Incidents of private
+// pages stay with the tenant. If the page is not loaded (ID 0, e.g. after
+// a database error), nothing is sent (fail closed).
 func dispatchGlobalGoogleChatWebhook(ctx notificationDispatchContext) {
 	webhookURL := os.Getenv("GOOGLE_CHAT_WEBHOOK_URL")
 	if webhookURL == "" {
@@ -1201,7 +1201,7 @@ func dispatchGlobalGoogleChatWebhook(ctx notificationDispatchContext) {
 }
 
 // DispatchNotifications sends real SMTP emails and calls the Google Chat webhook.
-// comps: alle betroffenen Komponenten (vorher eine einzelne Component).
+// comps: all affected components (previously a single Component).
 func (h *Handler) DispatchNotifications(inc models.Incident, comps []models.Component, action string) {
 	compNames := componentNames(comps)
 	componentIDs := make([]uint, len(comps))
@@ -1224,9 +1224,9 @@ func (h *Handler) DispatchNotifications(inc models.Incident, comps []models.Comp
 	}()
 }
 
-// WaitNotifications blockiert, bis alle mit DispatchNotifications gestarteten
-// Versände beendet sind. Tests warten damit ab, bevor sie ersetzte Variablen
-// zurücksetzen; im Betrieb wird es nicht gebraucht.
+// WaitNotifications blocks until all dispatches started with DispatchNotifications
+// have finished. Tests wait with it before they reset replaced variables;
+// it is not needed in production.
 func (h *Handler) WaitNotifications() { h.dispatchWG.Wait() }
 
 func SubscriberHasComponent(subscribedIDs string, targetID uint) bool {
@@ -1243,9 +1243,9 @@ func SubscriberHasComponent(subscribedIDs string, targetID uint) bool {
 	return false
 }
 
-// SubscriberHasAnyComponent: ein Incident kann jetzt mehrere
-// Komponenten betreffen - ein Subscriber wird benachrichtigt, wenn er
-// mindestens eine davon abonniert hat.
+// SubscriberHasAnyComponent: an incident can now affect several
+// components - a subscriber is notified if they subscribed to
+// at least one of them.
 func SubscriberHasAnyComponent(subscribedIDs string, targetIDs []uint) bool {
 	for _, id := range targetIDs {
 		if SubscriberHasComponent(subscribedIDs, id) {

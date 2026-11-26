@@ -41,9 +41,9 @@ func TestMonitoringHandler(t *testing.T) {
 	db.Create(&regularUser)
 	regularToken, _ := middleware.GenerateToken(regularUser.ID, regularUser.Email, "", "", false)
 
-	// Registry isoliert füllen statt über echte Requests, um die Zahlen im
-	// Response deterministisch prüfen zu können (Registry.Observe ist die
-	// gleiche Einstiegsstelle, die middleware.GoldenSignals in main.go nutzt).
+	// Fill the registry in isolation instead of via real requests, so the numbers in the
+	// response can be checked deterministically (Registry.Observe is the
+	// same entry point that middleware.GoldenSignals in main.go uses).
 	metrics.Default.Reset()
 	metrics.Default.Observe("GET", "/api/monitoring-test-route", 200, 10*time.Millisecond)
 	metrics.Default.Observe("GET", "/api/monitoring-test-route", 200, 20*time.Millisecond)
@@ -69,9 +69,9 @@ func TestMonitoringHandler(t *testing.T) {
 		assert.Contains(t, body, `"p95_latency_ms"`)
 		assert.Contains(t, body, `"requests_per_minute"`)
 		assert.Contains(t, body, `"totals"`)
-		assert.Contains(t, body, `"request_count":3`) // totals.request_count (nur eine Route beobachtet)
+		assert.Contains(t, body, `"request_count":3`) // totals.request_count (only one route observed)
 
-		// Saturation (Golden Signals Schritt 4/4): goroutine/memory
+		// Saturation (Golden Signals step 4/4): goroutine/memory
 		// stats are always present, DB pool stats reflect
 		// DBStatsAvailable=false since no DBStatsProvider is registered in
 		// this test setup.
@@ -110,8 +110,8 @@ func TestMonitoringHandler_SaturationReflectsDBStatsProvider(t *testing.T) {
 	assert.Contains(t, body, `"db_max_open_connections":17`)
 }
 
-// Der Grafana-Link kommt aus GRAFANA_DASHBOARD_URL (vorher im Frontend
-// fest auf staging verdrahtet). Nur http(s)-URLs werden durchgereicht.
+// The Grafana link comes from GRAFANA_DASHBOARD_URL (previously hard-wired
+// in the frontend to staging). Only http(s) URLs are passed through.
 func TestMonitoringHandler_GrafanaDashboardURL(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -147,8 +147,8 @@ func TestMonitoringHandler_GrafanaDashboardURL(t *testing.T) {
 	}
 }
 
-// Regression: 4xx (404 ohne Abo, 409, 422, 429) duerfen die Fehlerquote nicht
-// anheben, nur 5xx zaehlen (Betreiber-Entscheidung 1.11.2026).
+// Regression: 4xx (404 without subscription, 409, 422, 429) must not raise the error
+// rate, only 5xx count (operator decision 1.11.2026).
 func TestMonitoringHandler_ErrorRateCountsOnly5xx(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -186,8 +186,8 @@ func TestMonitoringHandler_ErrorRateCountsOnly5xx(t *testing.T) {
 	assert.InDelta(t, 0.1, resp.Routes[0].ErrorRate, 1e-9)
 }
 
-// Registrierte, nie aufgerufene Routen erscheinen mit 0 Requests,
-// ohne Fehlerquote/Latenz (keine NaN/Inf im JSON) und hinter den genutzten.
+// Registered routes that were never called appear with 0 requests,
+// without error rate/latency (no NaN/Inf in the JSON) and after the used ones.
 func TestMonitoringHandler_ListsUnusedRoutesWithZeros(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

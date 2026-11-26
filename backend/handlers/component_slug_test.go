@@ -17,9 +17,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Kennung (Slug) für Komponenten und Gruppen. Anlegen erzeugt sie
-// aus dem Namen, sie ist je Statusseite eindeutig, formgeprüft und nach dem
-// Anlegen unveränderlich.
+// Identifier (slug) for components and groups. Creation generates it
+// from the name, it is unique per status page, format-checked and immutable after
+// creation.
 func TestComponentSlug(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -143,7 +143,7 @@ func TestComponentSlug(t *testing.T) {
 		assert.Equal(t, "Umbenannt", stored.Name)
 		assert.Equal(t, "fest-577", stored.Slug, "Umbenennen ändert die Kennung nicht")
 
-		// Ohne slug im Body bleibt sie ebenfalls.
+		// Without slug in the body it likewise stays.
 		w = doTemplateRequest(r, "PUT", path, map[string]interface{}{"name": "Nochmal", "status": "operational"})
 		requireStatusCode(t, w, http.StatusOK)
 		require.NoError(t, db.First(&stored, c.ID).Error)
@@ -174,9 +174,9 @@ func TestComponentSlug(t *testing.T) {
 	})
 }
 
-// Unique-Race: schiebt eine parallele Anfrage zwischen
-// Vorabprüfung und INSERT dieselbe Kennung ein, antwortet der Handler mit 409
-// slug_taken statt 500. Bei automatischer Kennung wird stattdessen wiederholt.
+// Unique race: if a parallel request inserts the same identifier between
+// pre-check and INSERT, the handler responds with 409
+// slug_taken instead of 500. With an automatic identifier it retries instead.
 func TestComponentSlug_UniqueRace(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -186,7 +186,7 @@ func TestComponentSlug_UniqueRace(t *testing.T) {
 	require.NoError(t, db.Create(&page).Error)
 	path := "/api/pages/" + strconv.Itoa(int(page.ID)) + "/components"
 
-	// Vor dem ersten INSERT einer Komponente legt der "Wettbewerber" dieselbe Kennung an.
+	// Before the first INSERT of a component the "competitor" creates the same identifier.
 	var done int
 	inject := func(slug string, times int) {
 		done = 0
@@ -207,9 +207,9 @@ func TestComponentSlug_UniqueRace(t *testing.T) {
 		requireBodyContains(t, w, `"code":"slug_taken"`)
 	})
 	t.Run("Automatische Kennung: Wiederholung führt zum Erfolg", func(t *testing.T) {
-		// BeforeCreate (Kennung berechnen) läuft vor "gorm:create"-Callbacks der
-		// Anwendung nicht zwingend; der Wettbewerber legt "wett" erst an, wenn die
-		// Komponente diese Kennung schon trägt.
+		// BeforeCreate (compute identifier) does not necessarily run before the "gorm:create"
+		// callbacks of the application; the competitor creates "wett" only when the
+		// component already carries this identifier.
 		inject("wett", 1)
 		defer func() { _ = db.Callback().Create().Remove("race577") }()
 		w := doTemplateRequest(r, "POST", path, map[string]interface{}{"name": "Wett"})
@@ -228,7 +228,7 @@ func TestComponentSlug_UniqueRace(t *testing.T) {
 	})
 }
 
-// Lesefehler bei der Eindeutigkeitsprüfung: 500 mit Code, nichts wird angelegt.
+// Read error in the uniqueness check: 500 with code, nothing is created.
 func TestComponentSlug_PruefungDatenbankfehler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

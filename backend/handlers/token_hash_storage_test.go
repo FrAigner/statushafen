@@ -23,8 +23,8 @@ func extractOrderConfirmToken(t *testing.T, msg string) string {
 	return m[1]
 }
 
-// rawColumn liest eine Spalte ohne Modell, damit der Test den gespeicherten
-// Wert sieht und nicht die Interpretation durch das Feld.
+// rawColumn reads a column without a model so that the test sees the stored
+// value and not the interpretation by the field.
 func rawColumn(t *testing.T, h *handlers.Handler, query string, args ...any) string {
 	t.Helper()
 	var v string
@@ -32,10 +32,10 @@ func rawColumn(t *testing.T, h *handlers.Handler, query string, args ...any) str
 	return v
 }
 
-// Der Webhook-Token liegt nur als SHA-256 in der Datenbank: Der Klartext wird
-// einmal bei der Erzeugung geliefert, ein Datenbank- oder Backup-Leck liefert
-// keinen verwendbaren Token. Der gespeicherte Hash selbst ist als Token wertlos
-// (Gegenprobe), der Klartext funktioniert, ein neuer Token macht den alten ungültig.
+// The webhook token is stored in the database only as SHA-256: the plaintext is
+// delivered once at creation, so a database or backup leak yields
+// no usable token. The stored hash itself is worthless as a token
+// (control check), the plaintext works, and a new token invalidates the old one.
 func TestWebhookToken_NurAlsHashGespeichert(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -68,9 +68,9 @@ func TestWebhookToken_NurAlsHashGespeichert(t *testing.T) {
 	assert.Equal(t, http.StatusOK, slugWebhookPost(r, "api", "operational", neu).Code)
 }
 
-// Der Bestätigungs- und der Passwort-Token einer Bestellung liegen ebenfalls
-// nur als Hash in der Datenbank; die Mail trägt den Klartext, die Einlösung
-// vergleicht den Hash.
+// The confirmation and password tokens of an order are likewise stored
+// only as a hash in the database; the mail carries the plaintext, redemption
+// compares the hash.
 func TestOrderTokens_NurAlsHashGespeichert(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -105,5 +105,5 @@ func TestOrderTokens_NurAlsHashGespeichert(t *testing.T) {
 	requireStatusCode(t, doStatusPageRequest(r, "POST", "/api/public/orders/set-password", map[string]interface{}{"token": pwToken, "password": orderTestPass}), http.StatusOK)
 }
 
-// orderTestPass: erfundenes Testkennwort für das Setzen des Bestellpassworts.
+// orderTestPass: made-up test password for setting the order password.
 const orderTestPass = "Sehr-gutes-Passwort-42"

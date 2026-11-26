@@ -13,11 +13,11 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// GET /components ersetzt den Status einer Gruppe durch den
-// schlechtesten Kindstatus. Der Admin schickte diesen Wert beim Speichern
-// zurück, und der Update-Handler machte aus der Gruppe eine normale
-// Komponente mit festem Status. Jetzt kennzeichnet GET Gruppen per IsGroup,
-// und das Update behält bei Gruppen den Status "group".
+// GET /components replaces the status of a group with the
+// worst child status. The admin sent this value back on saving,
+// and the update handler turned the group into a normal
+// component with a fixed status. Now GET marks groups via IsGroup,
+// and the update keeps the status "group" for groups.
 func TestUpdateComponentHandler_GroupKeepsGroupStatus(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -80,8 +80,8 @@ func TestUpdateComponentHandler_GroupKeepsGroupStatus(t *testing.T) {
 		}
 	})
 
-	// status ist nicht mehr binding:"required"; der Bind-Fehlerzweig greift
-	// deshalb nur noch bei kaputtem JSON.
+	// status is no longer binding:"required"; the bind error branch
+	// therefore only triggers on broken JSON.
 	t.Run("Update mit ungültigem JSON gibt 400 und lässt die Gruppe unverändert", func(t *testing.T) {
 		grp := newGroup("Kaputt")
 		req, _ := http.NewRequest("PUT", base+"/"+strconv.Itoa(int(grp.ID)), strings.NewReader("{kein json"))

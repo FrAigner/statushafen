@@ -15,8 +15,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// doNoticeRequest führt einen Request gegen den Test-Router aus; body wird
-// nur bei Nicht-Leere als Content-Type: application/json gesetzt.
+// doNoticeRequest runs a request against the test router; body is
+// set as Content-Type: application/json only when non-empty.
 func doNoticeRequest(r http.Handler, method, path string, body []byte) *httptest.ResponseRecorder {
 	var reqBody io.Reader
 	if body != nil {
@@ -31,10 +31,10 @@ func doNoticeRequest(r http.Handler, method, path string, body []byte) *httptest
 	return w
 }
 
-// TestGetActiveNoticesHandler ist der geforderte Regressionstest:
-// eine aktive Notice (ohne Zeitfenster) muss über den öffentlichen Lesepfad
-// erscheinen, eine abgelaufene (EndAt in der Vergangenheit) oder inaktive
-// (IsActive=false) Notice darf dort NICHT auftauchen.
+// TestGetActiveNoticesHandler is the required regression test:
+// an active notice (without time window) must appear via the public read path,
+// an expired (EndAt in the past) or inactive
+// (IsActive=false) notice must NOT show up there.
 func TestGetActiveNoticesHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -77,7 +77,7 @@ func TestGetActiveNoticesHandler(t *testing.T) {
 	}
 	db.Create(&inactive)
 
-	// Notice einer anderen Statusseite darf nicht mit auftauchen (Mandantentrennung).
+	// A notice of another status page must not show up (tenant separation).
 	otherPage := models.StatusPage{Name: "Other Page", Slug: "other-page"}
 	db.Create(&otherPage)
 	otherPageNotice := models.GeneralNotice{
@@ -110,8 +110,8 @@ func TestGetActiveNoticesHandler(t *testing.T) {
 	}
 }
 
-// TestGetActiveNoticesHandler_FutureStartNotYetVisible: eine Notice, deren
-// StartAt in der Zukunft liegt, darf noch nicht erscheinen.
+// TestGetActiveNoticesHandler_FutureStartNotYetVisible: a notice whose
+// StartAt lies in the future must not appear yet.
 func TestGetActiveNoticesHandler_FutureStartNotYetVisible(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -148,7 +148,7 @@ func TestGetActiveNoticesHandler_FutureStartNotYetVisible(t *testing.T) {
 	}
 }
 
-// TestNoticeCRUDHandlers deckt die Admin-CRUD-Endpunkte ab.
+// TestNoticeCRUDHandlers covers the admin CRUD endpoints.
 func TestNoticeCRUDHandlers(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

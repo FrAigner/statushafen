@@ -14,11 +14,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Zwischen der Vorabprüfung (SELECT) und dem Insert kann eine
-// zweite Anfrage denselben Namen/Slug anlegen; dann greift der Unique-Index.
-// Der Handler antwortete mit 500 statt 409. Die Tests erzwingen diese Lücke
-// deterministisch: ein GORM-Callback legt direkt vor dem ersten Schreibzugriff
-// auf die Zieltabelle die kollidierende Zeile an (gleiche Transaktion).
+// Between the pre-check (SELECT) and the insert, a
+// second request can create the same name/slug; then the unique index kicks in.
+// The handler answered with 500 instead of 409. The tests force this gap
+// deterministically: a GORM callback creates the colliding row right before the first write
+// to the target table (same transaction).
 func forceConflictOnce(t *testing.T, db *gorm.DB, table, insertSQL string) {
 	t.Helper()
 	var once sync.Once
@@ -28,8 +28,8 @@ func forceConflictOnce(t *testing.T, db *gorm.DB, table, insertSQL string) {
 			return
 		}
 		once.Do(func() {
-			// Direkt über die Verbindung der laufenden Transaktion, ein
-			// verschachtelter GORM-Aufruf würde in SQLite blockieren.
+			// Directly via the connection of the running transaction, a
+			// nested GORM call would block in SQLite.
 			_, err := tx.Statement.ConnPool.ExecContext(tx.Statement.Context, insertSQL)
 			require.NoError(t, err)
 		})
@@ -61,8 +61,8 @@ func TestUniqueRace_UpdateStatusPageSlug(t *testing.T) {
 	db, r := setupUniqueRaceRouter(t)
 	page := models.StatusPage{Name: "Alt", Slug: "alt"}
 	require.NoError(t, db.Create(&page).Error)
-	// Save läuft als UPDATE; der Konflikt entsteht durch einen parallel
-	// angelegten Datensatz mit dem Ziel-Slug.
+	// Save runs as UPDATE; the conflict arises from a record with the target slug
+	// created in parallel.
 	require.NoError(t, db.Callback().Update().Before("gorm:update").Register("test:race:upd", func(tx *gorm.DB) {
 		if tx.Statement.Table == "status_pages" {
 			_, err := tx.Statement.ConnPool.ExecContext(tx.Statement.Context,
@@ -109,8 +109,8 @@ func TestUniqueRace_CreateRoleName(t *testing.T) {
 	requireErrorCode(t, w.Body.Bytes(), "role_name_taken")
 }
 
-// Ohne Vorabprüfung antwortete das Ändern auf einen vergebenen Namen schon
-// sequentiell mit 500.
+// Without the pre-check, changing to an already taken name already answered
+// 500 sequentially.
 func TestUpdateRole_DuplicateNameReturns409(t *testing.T) {
 	db, r := setupUniqueRaceRouter(t)
 	a, b := models.Role{Name: "A"}, models.Role{Name: "B"}
@@ -135,8 +135,8 @@ func TestUniqueRace_CreateUserEmail(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 }
 
-// Bestellung bestätigen: Slug bzw. E-Mail werden in der Transaktion geprüft,
-// aber erst der Index fängt die Race zwischen Prüfung und Insert ab.
+// Confirm order: slug and email are checked in the transaction,
+// but only the index catches the race between check and insert.
 func TestUniqueRace_ConfirmOrder(t *testing.T) {
 	cases := []struct {
 		name, table, insertSQL, msg, slug string

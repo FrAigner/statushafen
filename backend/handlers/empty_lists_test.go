@@ -13,8 +13,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Listen-Endpunkte müssen bei leerem Ergebnis "[]" statt "null"
-// liefern, sonst stürzen die Admin-Views (.length/.map auf null) ab.
+// List endpoints must return "[]" instead of "null" for an empty
+// result, otherwise the admin views crash (.length/.map on null).
 func TestListEndpoints_EmptyResultIsEmptyArray(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -23,7 +23,7 @@ func TestListEndpoints_EmptyResultIsEmptyArray(t *testing.T) {
 	page := models.StatusPage{Name: "Leer", Slug: "leer"}
 	db.Create(&page)
 	pid := strconv.Itoa(int(page.ID))
-	// Alle Sprachen entfernen, damit auch der Sprachkatalog leer ist.
+	// Remove all languages so that the language catalog is empty too.
 	db.Unscoped().Where("1 = 1").Delete(&models.Language{})
 
 	r.GET("/api/pages/:page_id/components", h.GetComponentsHandler)

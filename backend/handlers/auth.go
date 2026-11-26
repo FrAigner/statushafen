@@ -31,12 +31,12 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// Sperre je Konto und Quelle plus Verzögerung bei verteiltem Raten (siehe
-	// middleware.AccountThrottle). Prüfen und Zählen sind ein Schritt: Der
-	// Versuch zählt ab hier als Fehlversuch, bis er gelingt. Die Prüfung steht
-	// vor der Kontosuche und gilt für bekannte wie unbekannte Adressen gleich,
-	// sie verrät also nichts über die Existenz eines Kontos. Die Sperre gilt nur
-	// für die Quelle des Angreifers: Der Nutzer von einer anderen Adresse bleibt
+	// Lockout per account and source plus delay for distributed guessing (see
+	// middleware.AccountThrottle). Checking and counting are one step: the
+	// attempt counts as a failed attempt from here on until it succeeds. The check sits
+	// before the account lookup and applies equally to known and unknown addresses,
+	// so it reveals nothing about the existence of an account. The lockout only applies
+	// to the attacker's source: the user from a different address remains
 	// zugelassen.
 	email := limitEmail(req.Email)
 	admission := h.loginThrottle.Admit(email, c.ClientIP())
@@ -46,18 +46,18 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 		return
 	}
 	if !waitForThrottle(c.Request.Context(), admission.Delay) {
-		c.Abort() // Client hat die Verbindung geschlossen
+		c.Abort() // client closed the connection
 		return
 	}
 
 	var user models.User
-	// Eine Adresse über der RFC-Grenze kann kein Konto haben: keine Suche.
+	// An address above the RFC limit cannot have an account: no lookup.
 	err := gorm.ErrRecordNotFound
 	if len(req.Email) <= maxEmailLength {
 		err = h.DB.Preload("Role").Where("email = ?", req.Email).First(&user).Error
 	}
-	// Bei unbekanntem Konto trotzdem einen vollen Hash-Vergleich rechnen
-	// (leerer Hash = Dummy), sonst verrät die Laufzeit, ob es das Konto gibt.
+	// For an unknown account, still compute a full hash comparison
+	// (empty hash = dummy), otherwise the runtime reveals whether the account exists.
 	hash := ""
 	if err == nil {
 		hash = user.PasswordHash
@@ -80,17 +80,17 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// erfolgreiche Passwort-Logins fehlten im Audit-Log. Der
-	// Request ist ab hier authentifiziert - Akteur ist der User selbst
-	// (auch für user_id im Access-Log).
+	// successful password logins were missing from the audit log. The
+	// request is authenticated from here on - the actor is the user themselves
+	// (also for user_id in the access log).
 	c.Set("userID", user.ID)
 	c.Set("email", user.Email)
 	h.RecordAudit(c, "auth.login", "auth", "User", strconv.FormatUint(uint64(user.ID), 10), user.Email, "")
 
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
-		// id fehlte (anders als bei /api/me), dadurch erkannte die
-		// Benutzerverwaltung nach einem Passwort-Login die eigene Zeile nicht.
+		// id was missing (unlike /api/me), as a result the
+		// user management did not recognize its own row after a password login.
 		"id":                 user.ID,
 		"email":              user.Email,
 		"role":               user.Role.Name,
@@ -102,8 +102,8 @@ func (h *Handler) LoginHandler(c *gin.Context) {
 	})
 }
 
-// waitForThrottle wartet die vom Throttle verlangte Zeit, ohne ein Schloss zu
-// halten, und bricht ab, sobald der Client die Verbindung schließt (false).
+// waitForThrottle waits the time demanded by the throttle without holding a lock
+// and aborts as soon as the client closes the connection (false).
 func waitForThrottle(ctx context.Context, d time.Duration) bool {
 	if d <= 0 {
 		return true
@@ -119,7 +119,7 @@ func waitForThrottle(ctx context.Context, d time.Duration) bool {
 }
 
 func (h *Handler) MeHandler(c *gin.Context) {
-	// Sicheres Auslesen mit "ok" pattern
+	// Safe lookup with the "ok" pattern
 	var userID uint
 	if uid, exists := c.Get("userID"); exists && uid != nil {
 		if val, ok := uid.(uint); ok {
@@ -141,7 +141,7 @@ func (h *Handler) MeHandler(c *gin.Context) {
 		}
 	}
 
-	// Diese Funktion ist bereits sicher implementiert!
+	// This function is already implemented safely!
 	email := getEmail(c)
 
 	var user models.User
@@ -159,27 +159,27 @@ func (h *Handler) MeHandler(c *gin.Context) {
 	})
 }
 
-// UpdateMeRequest: bewusst nur die Einstellungen des eigenen Kontos, kein
-// voller Profil-PATCH, da es noch keine echte Profilverwaltung
-// gibt. Beide Felder sind optional (Zeiger, damit "nicht gesendet" von
-// false/"" unterscheidbar ist), mindestens eines muss gesetzt sein:
+// UpdateMeRequest: deliberately only the settings of the own account, not a
+// full profile PATCH, since there is no real profile management
+// yet. Both fields are optional (pointers, so that "not sent" can be distinguished from
+// false/""), at least one must be set:
 // - preferred_language: UI-Sprache
-// - help_tooltips: Hilfe-Tooltips im Admin-Bereich an/aus
+// - help_tooltips: help tooltips in the admin area on/off
 type UpdateMeRequest struct {
 	PreferredLanguage *string `json:"preferred_language"`
 	HelpTooltips      *bool   `json:"help_tooltips"`
 }
 
-// meUpdates prüft den Request und baut daraus die zu schreibenden Spalten und
-// die Antwort. Liefert eine Fehlermeldung für 400, wenn nichts oder etwas
-// Ungültiges gesendet wurde.
+// meUpdates validates the request and builds from it the columns to be written and
+// the response. Returns an error message for 400 if nothing or something
+// invalid was sent.
 func meUpdates(req UpdateMeRequest) (map[string]any, gin.H, string) {
 	columns := map[string]any{}
 	resp := gin.H{}
 	if req.PreferredLanguage != nil {
 		lang := *req.PreferredLanguage
-		// nur die zwei im Frontend wählbaren Sprachen zulassen,
-		// sonst landet beliebiger Text in der Spalte.
+		// allow only the two languages selectable in the frontend,
+		// otherwise arbitrary text ends up in the column.
 		if lang != "de" && lang != "en" {
 			return nil, nil, "Unsupported language, expected de or en"
 		}
@@ -196,9 +196,9 @@ func meUpdates(req UpdateMeRequest) (map[string]any, gin.H, string) {
 	return columns, resp, ""
 }
 
-// UpdateMeHandler: PATCH-artiger Endpunkt an /api/me zum Speichern der
-// Einstellungen des eingeloggten Users (Sprache, Hilfe-Tooltips). Anonyme Besucher persistieren ihre Sprachwahl stattdessen
-// client-seitig im localStorage - dafür ist kein Backend-Endpunkt nötig.
+// UpdateMeHandler: PATCH-style endpoint at /api/me for saving the
+// settings of the logged-in user (language, help tooltips). Anonymous visitors persist their language choice instead
+// client-side in localStorage - no backend endpoint is needed for that.
 func (h *Handler) UpdateMeHandler(c *gin.Context) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -228,9 +228,9 @@ func (h *Handler) UpdateMeHandler(c *gin.Context) {
 		return
 	}
 
-	// gezieltes Update der gesendeten Spalten statt Save() des
-	// ganzen Users. Save schreibt alle Spalten (und Assoziationen) zurück und
-	// kann an Daten scheitern, die mit diesen Einstellungen nichts zu tun haben.
+	// targeted update of the sent columns instead of Save() on the
+	// whole user. Save writes all columns (and associations) back and
+	// can fail on data that has nothing to do with these settings.
 	if err := h.DB.Model(&models.User{}).Where("id = ?", user.ID).Updates(columns).Error; err != nil {
 		slog.Error("Kontoeinstellungen konnten nicht gespeichert werden", "user_id", user.ID, "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save settings", "code": "server_error"})
@@ -240,9 +240,9 @@ func (h *Handler) UpdateMeHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// myPageEntry hängt die auf dieser Seite geltenden Permissions an die Statusseite an,
-// damit das Frontend seitenbezogene Rechte (UserStatusPageRole) tatsächlich auswerten
-// kann, statt nur die globale Rolle zu kennen.
+// myPageEntry attaches the permissions that apply on this page to the status page,
+// so that the frontend can actually evaluate page-specific rights (UserStatusPageRole)
+// instead of only knowing the global role.
 type myPageEntry struct {
 	models.StatusPage
 	Permissions string `json:"Permissions"`
@@ -275,11 +275,11 @@ func (h *Handler) GetMyPagesHandler(c *gin.Context) {
 			pages = append(pages, myPageEntry{StatusPage: p, RoleName: "Global Admin"})
 		}
 	} else {
-		// Fetch pages where user has a role, inkl. Name und Permissions dieser Rolle –
-		// das Frontend braucht RoleName, um dem Nutzer seine tatsächliche Rolle je
-		// Statusseite anzuzeigen (statt der u.U. veralteten globalen Rolle aus dem JWT).
-		// Eine Seiten-SSO-Sitzung sieht nur die Seite ihres IdP
-		// (Tenant-Auswahl im Admin-Bereich).
+		// Fetch pages where user has a role, incl. name and permissions of that role -
+		// the frontend needs RoleName to show the user their actual role per
+		// status page (instead of the possibly outdated global role from the JWT).
+		// A page SSO session only sees the page of its IdP
+		// (tenant selection in the admin area).
 		q := h.DB.Preload("StatusPage").Preload("Role").Where("user_id = ?", userID)
 		if scope := middleware.SSOPageID(c); scope != 0 {
 			q = q.Where("status_page_id = ?", scope)

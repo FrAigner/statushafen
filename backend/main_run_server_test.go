@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// runServer startet den Server auf PORT, beantwortet Anfragen und kehrt nach
-// SIGTERM zurück.
+// runServer starts the server on PORT, answers requests and returns after
+// SIGTERM.
 func TestRunServer_ServesAndStopsOnSIGTERM(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -40,7 +40,7 @@ func TestRunServer_ServesAndStopsOnSIGTERM(t *testing.T) {
 		_ = resp.Body.Close()
 		return resp.StatusCode == http.StatusOK
 	}, 10*time.Second, 50*time.Millisecond)
-	// signal.Notify wird direkt nach dem Start des Listeners registriert.
+	// signal.Notify is registered right after the listener starts.
 	time.Sleep(300 * time.Millisecond)
 	require.NoError(t, syscall.Kill(os.Getpid(), syscall.SIGTERM))
 

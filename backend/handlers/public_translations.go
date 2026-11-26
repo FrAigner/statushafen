@@ -15,32 +15,32 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// gebündelter öffentlicher Lese-Endpunkt für die Übersetzungen
-// einer Statusseite.
+// bundled public read endpoint for the translations
+// of a status page.
 //
 //	GET /api/public/pages/:slug/translations?lang=xx
 //
-// Die Statusseite zeigt ein Vielfaches an Objekten; ein Abruf je Komponente/
-// Vorfall/Ankündigung (die Einzel-Endpunkte unter /api/{components,incidents,
-// notices}/:id/translations) wären zig Requests pro Seitenaufruf. Dieser
-// Endpunkt liefert alles in einer Antwort, Schlüssel = ID des Objekts.
+// The status page shows many more objects; one request per component/
+// incident/notice (the single endpoints under /api/{components,incidents,
+// notices}/:id/translations) would be dozens of requests per page view. This
+// endpoint returns everything in one response, key = ID of the object.
 //
-// Auswahl je Objekt und Feldpaar (Titel+Text zusammen, nie gemischt):
-//  1. bestätigte Übersetzung in der gewünschten Sprache lang,
-//  2. sonst bestätigte Übersetzung in der Standardsprache der Seite,
-//  3. sonst fehlt der Eintrag - das Frontend zeigt das Original.
+// Selection per object and field pair (title+text together, never mixed):
+//  1. confirmed translation in the requested language lang,
+//  2. otherwise confirmed translation in the page's default language,
+//  3. otherwise the entry is missing - the frontend shows the original.
 //
-// Entwürfe (Status draft) kommen nie vor. Berücksichtigt werden nur die Objekte,
-// die auch das Dashboard ausliefert: sichtbare Komponenten (Visible, samt
-// Gruppen-Nachfahren), Vorfälle der Seite und aktive Ankündigungen
-// im Zeitfenster. Zugriff wie das Dashboard (authorizePublicPageRead).
+// Drafts (status draft) never appear. Only the objects are considered
+// that the dashboard also delivers: visible components (Visible, including
+// group descendants), incidents of the page and active notices
+// within the time window. Access like the dashboard (authorizePublicPageRead).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const publicTranslationsCacheTTL = 60 * time.Second
 
-// langCodePattern erlaubt die Codes des Sprachkatalogs ("de", "zh-hant-tw", klein
-// geschrieben; Eingaben werden in Kleinbuchstaben gewandelt); die endgültige
-// Prüfung ist der Abgleich mit den Sprachen der Seite.
+// langCodePattern allows the codes of the language catalog ("de", "zh-hant-tw", lowercase;
+// inputs are converted to lowercase); the final
+// check is the comparison with the page's languages.
 var langCodePattern = regexp.MustCompile(`^[a-z]{2,3}(-[a-z0-9]{2,8})*$`)
 
 type publicTitleText struct {
@@ -48,8 +48,8 @@ type publicTitleText struct {
 	Text  string `json:"text"`
 }
 
-// publicTranslationsResponse: je Typ eine Map ID (als Zeichenkette) -> Texte.
-// Bei Komponenten ist Text die Beschreibung, bei Vorfällen und Ankündigungen die
+// publicTranslationsResponse: per type a map ID (as string) -> texts.
+// For components, text is the description; for incidents and notices the
 // Meldung.
 type publicTranslationsResponse struct {
 	Language        string                     `json:"language"`
@@ -69,9 +69,9 @@ type publicTranslationsCacheEntry struct {
 	resp publicTranslationsResponse
 }
 
-// publicTranslationsCache hält die Antwort je (Seite, Sprache) kurz vor. Die
-// Zugriffsprüfung passiert VOR dem Cache; der Schlüssel enthält nur validierte
-// Sprachen der Seite, die Map ist also durch die Zahl der Seitensprachen begrenzt.
+// publicTranslationsCache keeps the response per (page, language) briefly. The
+// access check happens BEFORE the cache; the key contains only validated
+// languages of the page, so the map is bounded by the number of page languages.
 type publicTranslationsCache struct {
 	mu      sync.Mutex
 	entries map[publicTranslationsCacheKey]publicTranslationsCacheEntry
@@ -96,7 +96,7 @@ func (c *publicTranslationsCache) put(k publicTranslationsCacheKey, now time.Tim
 	c.entries[k] = publicTranslationsCacheEntry{at: now, resp: r}
 }
 
-// GetPublicTranslationsHandler: siehe Kopfkommentar.
+// GetPublicTranslationsHandler: see the header comment.
 func (h *Handler) GetPublicTranslationsHandler(c *gin.Context) {
 	var page models.StatusPage
 	if err := h.DB.Where(slugWhereClause, c.Param("slug")).First(&page).Error; err != nil {
@@ -130,11 +130,11 @@ func (h *Handler) GetPublicTranslationsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// resolvePublicLanguage ermittelt die Sprache für die öffentliche Auslieferung
-// (Query lang, leer = Standardsprache der Seite) und die Standardsprache. Sie
-// antwortet selbst bei Fehlern (500 bei DB-Fehler, 400 für eine nicht aktive
-// Sprache) und liefert dann false. Gemeinsam genutzt von den Übersetzungen der
-// Seite und der Vorfall-Updates.
+// resolvePublicLanguage determines the language for public delivery
+// (query lang, empty = the page's default language) and the default language. It
+// itself responds on errors (500 on DB error, 400 for an inactive
+// language) and then returns false. Shared by the page's translations
+// and the incident updates.
 func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) (lang, def string, ok bool) {
 	langs, err := h.pageContentLanguages(page.ID)
 	if err != nil {
@@ -160,8 +160,8 @@ func (h *Handler) resolvePublicLanguage(c *gin.Context, page models.StatusPage) 
 	return lang, def, true
 }
 
-// pickTranslation wählt je Objekt die Übersetzung: gewünschte Sprache vor
-// Standardsprache. rows[objektID][sprache] -> Texte.
+// pickTranslation selects the translation per object: requested language before
+// default language. rows[objectID][language] -> texts.
 func pickTranslation(rows map[uint]map[string]publicTitleText, id uint, lang, def string) (publicTitleText, bool) {
 	byLang := rows[id]
 	if t, ok := byLang[lang]; ok {
@@ -185,7 +185,7 @@ func (h *Handler) buildPublicTranslations(page models.StatusPage, lang, def stri
 		wanted = append(wanted, def)
 	}
 
-	// Sichtbare Komponenten wie im Dashboard.
+	// Visible components as in the dashboard.
 	var comps []models.Component
 	if err := h.DB.Select("id", "parent_id", "visible", "archived_at").Where(whereStatusPageIDEquals, page.ID).Find(&comps).Error; err != nil {
 		return resp, err

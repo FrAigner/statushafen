@@ -14,9 +14,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// safeDialContext verbindet nie ungeprüft: ungültige Adressen, Fehler der
-// eigenen Auflösung und leere Ergebnisse enden als Fehler, ohne dass ein
-// Verbindungsversuch stattfindet.
+// safeDialContext never connects unchecked: invalid addresses, errors of the
+// own resolution and empty results end as errors, without a
+// connection attempt taking place.
 func TestSafeDialContext_ErrorPaths(t *testing.T) {
 	orig := webhookLookupIP
 	t.Cleanup(func() { webhookLookupIP = orig })
@@ -47,16 +47,16 @@ func TestSafeDialContext_ErrorPaths(t *testing.T) {
 	})
 }
 
-// Der Webhook-Test folgt keinen Weiterleitungen: Ein 302 auf eine interne
-// Adresse würde sonst die Sperrliste umgehen.
+// The webhook test follows no redirects: a 302 to an internal
+// address would otherwise bypass the blocklist.
 func TestWebhookTestClient_DoesNotFollowRedirects(t *testing.T) {
 	err := webhookTestClient.CheckRedirect(&http.Request{}, nil)
 	assert.ErrorIs(t, err, http.ErrUseLastResponse)
 }
 
-// Eine ungeprüfte Sprachwahl scheitert nicht still: Ein Datenbankfehler beim
-// Prüfen der Sprache bricht das Anlegen ab, und bei Google-Chat-Abos übernimmt
-// die E-Mail des angemeldeten Nutzers die Zuordnung.
+// An unchecked language choice does not fail silently: a database error while
+// checking the language aborts creation, and for Google Chat subscriptions
+// the email of the signed-in user takes over the assignment.
 func TestCreateSubscriberFromRequest_LanguageErrorAndChatEmailFallback(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

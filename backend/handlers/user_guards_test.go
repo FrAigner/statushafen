@@ -18,16 +18,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Regressionstests der Benutzerverwaltung (Selbstlöschung,
-// Selbst-Herabstufung, letzter Global Admin, "Global Admin" als Seitenrolle).
+// Regression tests of user management (self-deletion,
+// self-demotion, last global admin, "Global Admin" as a page role).
 
 type userGuardEnv struct {
 	db *gorm.DB
 	r  *gin.Engine
 }
 
-// newUserGuardEnv registriert die Benutzer-Handler; X-Test-User setzt die ID
-// des angemeldeten Nutzers (statt eines echten JWT).
+// newUserGuardEnv registers the user handlers; X-Test-User sets the ID
+// of the logged-in user (instead of a real JWT).
 func newUserGuardEnv(t *testing.T) userGuardEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
@@ -175,8 +175,8 @@ func TestUpdateUserHandler_OtherGlobalAdminCanBeDemoted(t *testing.T) {
 	assert.False(t, isGlobalAdmin(e.db, other.ID))
 }
 
-// globalAdminRoleFixture legt die Rolle "Global Admin", eine normale Rolle und
-// eine Statusseite an.
+// globalAdminRoleFixture creates the role "Global Admin", a normal role and
+// a status page.
 func globalAdminRoleFixture(t *testing.T, db *gorm.DB) (models.Role, models.Role, models.StatusPage) {
 	t.Helper()
 	ga := models.Role{Name: models.GlobalAdminRoleName, Permissions: "pages:write"}
@@ -250,8 +250,8 @@ func TestUpdateUserHandler_RejectsNewGlobalAdminPageRole(t *testing.T) {
 	assert.Zero(t, n)
 }
 
-// Altbestand: Eine schon vorhandene Zuordnung bleibt beim Speichern erhalten,
-// statt das Speichern des Nutzers zu blockieren oder ihm Rechte zu entziehen.
+// Legacy data: an already existing assignment is kept on saving,
+// instead of blocking the saving of the user or stripping their rights.
 func TestUpdateUserHandler_KeepsExistingGlobalAdminPageRole(t *testing.T) {
 	e := newUserGuardEnv(t)
 	ga, _, page := globalAdminRoleFixture(t, e.db)
@@ -295,7 +295,7 @@ func TestAddStatusPageUserHandler_AcceptsNormalRole(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 }
 
-// Konto per E-Mail (Global Admin) und Zugriff ohne Seitenrolle.
+// Account by email (Global Admin) and access without a page role.
 func TestAddStatusPageUserHandler_GlobalAdminByEmail(t *testing.T) {
 	e := newUserGuardEnv(t)
 	_, editor, page := globalAdminRoleFixture(t, e.db)
@@ -321,10 +321,10 @@ func TestAddStatusPageUserHandler_ActorWithoutPageRoleIsRejected(t *testing.T) {
 	u := e.user(t, "u@example.com", false)
 	stranger := e.user(t, "stranger@example.com", false)
 
-	// Unbekannter Aufrufer (kein Konto): wie ein Nicht-Admin ohne Rolle.
+	// Unknown caller (no account): like a non-admin without a role.
 	w := e.do(t, http.MethodPost, pageUsersPath(page), 99999, map[string]any{"email": u.Email, "role_id": editor.ID})
 	requireCode(t, w, http.StatusForbidden, "role_exceeds_own_permissions")
-	// Bekanntes Konto ohne Rolle auf der Seite.
+	// Known account without a role on the page.
 	w = e.do(t, http.MethodPost, pageUsersPath(page), stranger.ID, map[string]any{"email": u.Email, "role_id": editor.ID})
 	requireCode(t, w, http.StatusForbidden, "role_exceeds_own_permissions")
 	var n int64

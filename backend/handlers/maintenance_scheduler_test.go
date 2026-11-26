@@ -11,14 +11,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// White-Box-Tests (package handlers statt handlers_test) für den
-// Wartungsfenster-Scheduler: runMaintenanceTick() und seine
-// Teilschritte sind unexportiert, ein externes _test-Package hätte keinen
-// Zugriff.
+// White-box tests (package handlers instead of handlers_test) for the
+// maintenance window scheduler: runMaintenanceTick() and its
+// sub-steps are unexported, an external _test package would have no
+// access.
 
-// requireIncidentStatus lädt den Incident neu und bricht den (Sub-)Test ab,
-// wenn der Status nicht wie erwartet ist - reduziert die sonst pro Testfall
-// wiederholte Reload/if/Errorf-Boilerplate.
+// requireIncidentStatus reloads the incident and aborts the (sub)test
+// if the status is not as expected - reduces the otherwise per-test-case
+// repeated reload/if/Errorf boilerplate.
 func requireIncidentStatus(t *testing.T, db *gorm.DB, incidentID uint, want string) {
 	t.Helper()
 	var reloaded models.Incident
@@ -28,8 +28,8 @@ func requireIncidentStatus(t *testing.T, db *gorm.DB, incidentID uint, want stri
 	}
 }
 
-// requireComponentStatus lädt die Komponente neu und bricht den (Sub-)Test
-// ab, wenn der Status nicht wie erwartet ist.
+// requireComponentStatus reloads the component and aborts the (sub)test
+// if the status is not as expected.
 func requireComponentStatus(t *testing.T, db *gorm.DB, componentID uint, want string) {
 	t.Helper()
 	var reloaded models.Component
@@ -39,8 +39,8 @@ func requireComponentStatus(t *testing.T, db *gorm.DB, componentID uint, want st
 	}
 }
 
-// requireAuditLogCount zählt AuditLog-Einträge für die gegebene Action und
-// TargetID und bricht den (Sub-)Test ab, wenn die Anzahl nicht übereinstimmt.
+// requireAuditLogCount counts AuditLog entries for the given action and
+// TargetID and aborts the (sub)test if the count does not match.
 func requireAuditLogCount(t *testing.T, db *gorm.DB, action string, targetID uint, want int64) {
 	t.Helper()
 	var count int64
@@ -103,7 +103,7 @@ func TestMaintenanceScheduler(t *testing.T) {
 	})
 
 	t.Run("sendDueMaintenanceReminders setzt ReminderSentAt und verschickt nur einmal", func(t *testing.T) {
-		start := time.Now().Add(30 * time.Minute) // Reminder-Fenster (60min vorher) ist erreicht
+		start := time.Now().Add(30 * time.Minute) // Reminder window (60 min before) has been reached
 		end := time.Now().Add(2 * time.Hour)
 		inc := models.Incident{
 			StatusPageID: page.ID, Title: "Wartung C", Message: "m", Status: "scheduled",
@@ -122,7 +122,7 @@ func TestMaintenanceScheduler(t *testing.T) {
 		}
 		firstSentAt := *reloaded.ReminderSentAt
 
-		// Zweiter Tick darf die Erinnerung nicht erneut verschicken/überschreiben.
+		// A second tick must not send/overwrite the reminder again.
 		h.runMaintenanceTick()
 		db.First(&reloaded, inc.ID)
 		if !reloaded.ReminderSentAt.Equal(firstSentAt) {
@@ -146,10 +146,10 @@ func TestMaintenanceScheduler(t *testing.T) {
 	})
 }
 
-// seedTriggerTestFixtures legt eine StatusPage samt einer Komponente und
-// einem daran verknüpften Incident an - gemeinsame Fixture für die beiden
-// Trigger-basierten Fehlerpfad-Tests unten, die sich sonst nur
-// im Tabellennamen des blockierenden Triggers unterscheiden.
+// seedTriggerTestFixtures creates a StatusPage with a component and
+// an incident linked to it - shared fixture for the two
+// trigger-based error-path tests below, which otherwise differ only
+// in the table name of the blocking trigger.
 func seedTriggerTestFixtures(db *gorm.DB, slug string) (models.Component, models.Incident) {
 	page := models.StatusPage{Name: slug, Slug: slug}
 	db.Create(&page)
@@ -166,12 +166,12 @@ func seedTriggerTestFixtures(db *gorm.DB, slug string) (models.Component, models
 	return comp, inc
 }
 
-// withBlockedTableWrites installiert einen SQLite-Trigger, der jedes UPDATE
-// auf der gegebenen Tabelle mit einem Fehler abbricht, führt fn aus und
-// entfernt den Trigger danach wieder - simuliert einen DB-Fehler isoliert
-// auf genau einer Tabelle, ohne (wie ein pauschal read-only
-// gemachtes DB-File) auch nachgelagerte Schreibvorgänge zu blockieren, die
-// eigentlich genau NICHT passieren dürfen.
+// withBlockedTableWrites installs a SQLite trigger that aborts every UPDATE
+// on the given table with an error, runs fn and
+// removes the trigger afterwards - simulates a DB error isolated
+// to exactly one table, without (like a blanket read-only
+// DB file) also blocking downstream writes that
+// actually must NOT happen.
 func withBlockedTableWrites(t *testing.T, db *gorm.DB, table string, fn func()) {
 	t.Helper()
 	triggerName := "block_" + table + "_update"
@@ -229,7 +229,7 @@ func TestApplyMaintenanceStatusTransition_ComponentUpdateErrorAborts(t *testing.
 	requireComponentStatus(t, db, comp.ID, "operational")
 }
 
-// Der Scheduler darf den Status einer Gruppe nicht ersetzen.
+// The scheduler must not replace the status of a group.
 func TestMaintenanceScheduler_KeepsGroupStatus(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -253,10 +253,10 @@ func TestMaintenanceScheduler_KeepsGroupStatus(t *testing.T) {
 	requireComponentStatus(t, db, child.ID, "under_maintenance")
 }
 
-// Save(inc) im Scheduler scheiterte unter SQLite mit "near DEFAULT"
-// im Assoziations-Upsert, sobald die verknüpften Komponenten teils parent_id
-// NULL hatten und teils nicht. Ohne Umgehung (gemischte Elternknoten) muss der
-// Wechsel gelingen; die Komponentenzeilen bleiben bis auf den Status unberührt.
+// Save(inc) in the scheduler failed under SQLite with "near DEFAULT"
+// in the association upsert as soon as the linked components partly had parent_id
+// NULL and partly did not. Without a workaround (mixed parent nodes) the
+// switch must succeed; the component rows remain untouched except for the status.
 func TestMaintenanceScheduler_GemischteElternknotenOhneAssoziationsUpsert(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -288,7 +288,7 @@ func TestMaintenanceScheduler_GemischteElternknotenOhneAssoziationsUpsert(t *tes
 		t.Errorf("parent_id der Komponente darf der Scheduler nicht verändern, got %v", reloaded.ParentID)
 	}
 
-	// Ende des Fensters: ebenfalls ohne Umgehung.
+	// End of the window: likewise without a workaround.
 	end := time.Now().Add(-time.Minute)
 	db.Model(&models.Incident{}).Where("id = ?", inc.ID).Update("scheduled_end_at", end)
 	h.runMaintenanceTick()

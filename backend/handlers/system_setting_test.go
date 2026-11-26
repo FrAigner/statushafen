@@ -15,14 +15,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// Tests für die globalen Systemeinstellungen (Self-Service-
-// Bestellung an/aus). Abgedeckt: Default "an" bei fehlendem Key, Umschalten
-// per PUT (Anlegen + Aktualisieren), öffentlicher Flag-Endpunkt, Global-Admin-
-// Gating und der 403-Pfad in CreateOrderHandler bei deaktivierter Bestellung.
+// Tests for the global system settings (self-service
+// ordering on/off). Covered: default "on" when the key is missing, toggling
+// via PUT (create + update), public flag endpoint, Global Admin
+// gating and the 403 path in CreateOrderHandler when ordering is disabled.
 
-// setupSettingsAdminRouter baut einen Router mit derselben Middleware-Kette wie
-// main.go (RequireGlobalAdmin). isAdmin steuert, ob der injizierte Nutzer ein
-// Global Admin ist - so lässt sich das Gating prüfen.
+// setupSettingsAdminRouter builds a router with the same middleware chain as
+// main.go (RequireGlobalAdmin). isAdmin controls whether the injected user is a
+// Global Admin - this allows checking the gating.
 func setupSettingsAdminRouter(t *testing.T, db *gorm.DB, h *handlers.Handler, isAdmin bool) *gin.Engine {
 	t.Helper()
 	role := models.Role{Name: "Settings Role (Test)", Permissions: ""}
@@ -72,7 +72,7 @@ func TestSettingsHandlers(t *testing.T) {
 		requireStatusCode(t, w, http.StatusOK)
 		requireBodyContains(t, w, `"orders_enabled":false`)
 
-		// Ein Audit-Eintrag muss geschrieben worden sein.
+		// An audit entry must have been written.
 		var auditCount int64
 		db.Model(&models.AuditLog{}).Where("action = ?", "system_setting.updated").Count(&auditCount)
 		if auditCount == 0 {
@@ -82,7 +82,7 @@ func TestSettingsHandlers(t *testing.T) {
 		w = doStatusPageRequest(r, "GET", "/api/settings", nil)
 		requireBodyContains(t, w, `"orders_enabled":false`)
 
-		// Zweites PUT trifft den Update-Zweig des Upserts.
+		// The second PUT hits the update branch of the upsert.
 		w = doStatusPageRequest(r, "PUT", "/api/settings", map[string]interface{}{"orders_enabled": true})
 		requireStatusCode(t, w, http.StatusOK)
 		requireBodyContains(t, w, `"orders_enabled":true`)
@@ -90,7 +90,7 @@ func TestSettingsHandlers(t *testing.T) {
 		w = doStatusPageRequest(r, "GET", "/api/settings", nil)
 		requireBodyContains(t, w, `"orders_enabled":true`)
 
-		// Es darf nur eine Zeile für den Key existieren (Upsert, kein Duplikat).
+		// Only one row may exist for the key (upsert, no duplicate).
 		var rows int64
 		db.Model(&models.SystemSetting{}).Where("key = ?", "orders.enabled").Count(&rows)
 		if rows != 1 {
@@ -117,8 +117,8 @@ func TestUpdateSettingsHandler_SaveErrorReturns500(t *testing.T) {
 	h := handlers.NewHandler(db)
 	r := setupSettingsAdminRouter(t, db, h, true)
 
-	// Tabelle droppen: der Upsert in setSystemSettingBool scheitert dann, der
-	// Handler muss mit 500 antworten (deckt den Fehlerpfad ab).
+	// Drop the table: the upsert in setSystemSettingBool then fails, the
+	// handler must respond with 500 (covers the error path).
 	if err := db.Migrator().DropTable(&models.SystemSetting{}); err != nil {
 		t.Fatalf("drop table: %v", err)
 	}
@@ -165,14 +165,14 @@ func TestCreateOrderHandler_DisabledReturns403(t *testing.T) {
 	h := handlers.NewHandler(db)
 	r := setupOrderRouter(h)
 
-	// Default (kein Setting): Bestellung funktioniert weiterhin.
+	// Default (no setting): ordering continues to work.
 	w := doStatusPageRequest(r, "POST", "/api/public/orders", map[string]interface{}{
 		"company_name": "Enabled GmbH",
 		"email":        "enabled@example.com",
 	})
 	requireStatusCode(t, w, http.StatusCreated)
 
-	// Explizit deaktiviert: 403, und es entsteht keine neue Bestellung.
+	// Explicitly disabled: 403, and no new order is created.
 	if err := db.Create(&models.SystemSetting{Key: "orders.enabled", Value: "false"}).Error; err != nil {
 		t.Fatalf("seed setting: %v", err)
 	}

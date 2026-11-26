@@ -10,10 +10,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// White-Box-Test (package handlers statt handlers_test): SSOExchangeHandler
-// prüft ausschließlich den unexportierten In-Memory-Code-Store
-// (storeSSOCode/consumeSSOCode), auf den ein externes _test-Package keinen
-// Zugriff hat.
+// White-box test (package handlers instead of handlers_test): SSOExchangeHandler
+// exclusively checks the unexported in-memory code store
+// (storeSSOCode/consumeSSOCode), to which an external _test package has no
+// access.
 func TestSSOExchangeHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -84,8 +84,8 @@ func TestSSOExchangeHandler(t *testing.T) {
 	})
 }
 
-// isBootstrapAdminEmail ist ebenfalls unexportiert; White-Box-Test für die
-// SSO_BOOTSTRAP_ADMIN_EMAILS-Allowlist-Logik (case-insensitive, kommagetrennt).
+// isBootstrapAdminEmail is also unexported; white-box test for the
+// SSO_BOOTSTRAP_ADMIN_EMAILS allowlist logic (case-insensitive, comma-separated).
 func TestIsBootstrapAdminEmail(t *testing.T) {
 	t.Setenv("SSO_BOOTSTRAP_ADMIN_EMAILS", "Admin@Example.com, second@example.com")
 

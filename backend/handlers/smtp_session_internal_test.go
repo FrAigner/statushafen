@@ -12,17 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// scriptedSMTP ist ein SMTP-Test-Double, dessen Antworten pro Befehl vorgegeben
-// werden. So lässt sich jeder Fehlerpfad der Sitzung (EHLO, STARTTLS, AUTH,
-// MAIL, RCPT, DATA) einzeln auslösen. Schlüssel von replies sind
-// Befehlsanfänge in Großbuchstaben (EHLO, STARTTLS, AUTH, MAIL, RCPT, DATA,
-// END für das Ende der Nachricht, QUIT); fehlt ein Eintrag, antwortet der Server
-// mit 250.
+// scriptedSMTP is an SMTP test double whose replies are specified per command.
+// This way every error path of the session (EHLO, STARTTLS, AUTH,
+// MAIL, RCPT, DATA) can be triggered individually. Keys of replies are
+// command prefixes in uppercase (EHLO, STARTTLS, AUTH, MAIL, RCPT, DATA,
+// END for the end of the message, QUIT); if an entry is missing, the server
+// answers with 250.
 type scriptedSMTP struct {
 	greeting string
 	replies  map[string]string
-	// closeAfterData beendet die Verbindung direkt nach "354", sodass das
-	// Schreiben der Nachricht fehlschlägt.
+	// closeAfterData closes the connection right after "354", so that
+	// writing the message fails.
 	closeAfterData bool
 
 	mu   sync.Mutex
@@ -118,8 +118,8 @@ func runScripted(t *testing.T, s *scriptedSMTP, auth *testAuth, msg []byte) erro
 	return sendMailWithTimeout(addr, host, auth.auth(host), "from@example.com", "to@example.org", msg)
 }
 
-// testAuth bündelt Zugangsdaten für PlainAuth gegen 127.0.0.1 (PlainAuth
-// erlaubt unverschlüsselte Verbindungen nur zu Loopback-Adressen).
+// testAuth bundles credentials for PlainAuth against 127.0.0.1 (PlainAuth
+// allows unencrypted connections only to loopback addresses).
 type testAuth struct{ user, password string }
 
 func (a *testAuth) auth(host string) smtp.Auth {
@@ -155,8 +155,8 @@ func TestSendMailWithTimeout_ErrorPaths(t *testing.T) {
 		{"RCPT abgelehnt", &scriptedSMTP{replies: map[string]string{"RCPT": "550 recipient refused"}}, nil, nil, "550", ""},
 		{"DATA abgelehnt", &scriptedSMTP{replies: map[string]string{"DATA": "451 try later"}}, nil, nil, "451", ""},
 		{"Ende der Nachricht abgelehnt", &scriptedSMTP{replies: map[string]string{"END": "554 rejected"}}, nil, []byte("body"), "554", ""},
-		// Der Server schließt nach "354"; der Client schreibt mehr, als in die
-		// Socket-Puffer passt, und muss einen Fehler melden.
+		// The server closes after "354"; the client writes more than fits into the
+		// socket buffer and must report an error.
 		{"Verbindung bricht beim Schreiben ab", &scriptedSMTP{closeAfterData: true}, nil, big, "", ""},
 	}
 	for _, tc := range cases {

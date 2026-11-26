@@ -10,15 +10,15 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Bei mehreren @ trennt das letzte die Domain, auch bei Gmail: Der Teil davor
-// gehört zum lokalen Teil und verliert dort seine Punkte.
+// With multiple @, the last one separates the domain, also for Gmail: the part before it
+// belongs to the local part and loses its dots there.
 func TestMailboxKey_LetztesATrenntDieDomainAuchBeiGmail(t *testing.T) {
 	assert.Equal(t, "ab@c"+gmail, mailboxKey("a.b@c"+gmail))
 	assert.Equal(t, "ab@c"+gmail, mailboxKey("A.B@c"+googlemail))
 }
 
-// Die Suche nach gespeicherten Varianten folgt demselben Schnitt: Mit mehreren @
-// trifft sie die Punkt-Variante desselben Gmail-Postfachs.
+// The lookup of stored variants follows the same split: with multiple @
+// it matches the dotted variant of the same Gmail mailbox.
 func TestMailboxMatch_MehrereATreffenDiePunktVarianteBeiGmail(t *testing.T) {
 	db := testutils.SetupTestDB()
 	require.NoError(t, db.Create(&models.Subscriber{Channel: "email", Email: "a.b@c" + gmail}).Error)
@@ -28,9 +28,9 @@ func TestMailboxMatch_MehrereATreffenDiePunktVarianteBeiGmail(t *testing.T) {
 	assert.EqualValues(t, 1, n)
 }
 
-// Die Gmail-Regel (Punkte entfallen) gilt nur für die ganze Domain gmail.com
-// bzw. googlemail.com. Eine Domain, die nach Entfernen der Punkte so aussieht
-// (".gmail.com" mit führendem Punkt), ist ein anderes Postfach.
+// The Gmail rule (dots are dropped) applies only to the entire domain gmail.com
+// or googlemail.com. A domain that looks like that after removing the dots
+// (".gmail.com" with a leading dot) is a different mailbox.
 func TestMailboxMatch_GmailDomainMussGanzUebereinstimmen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	for _, e := range []string{"victim@." + gmailDom, "victim@.googlemail.com"} {
@@ -49,7 +49,7 @@ func TestMailboxMatch_GmailDomainMussGanzUebereinstimmen(t *testing.T) {
 	assert.EqualValues(t, 1, count("victim"+gmail), "Gegenprobe: die echte Gmail-Variante wird gefunden")
 }
 
-// isASCII trennt bei 0x80: 0x7f ist noch ASCII, ein einzelnes Byte ab 0x80 nicht.
+// isASCII splits at 0x80: 0x7f is still ASCII, a single byte from 0x80 on is not.
 func TestIsASCII_Grenze(t *testing.T) {
 	assert.True(t, isASCII("a\x7f"))
 	assert.False(t, isASCII("a\x80"))

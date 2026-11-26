@@ -418,7 +418,7 @@ func TestCreateIncidentTranslationHandler_InvalidIncidentID(t *testing.T) {
 	}
 }
 
-// Speichern je Sprache aus dem Bearbeiten-Formular.
+// Saving per language from the edit form.
 func saveTransSetup(t *testing.T) (*gorm.DB, http.Handler, string) {
 	t.Helper()
 	db, r, h := newTestSetup()
@@ -455,7 +455,7 @@ func TestSaveIncidentTranslationHandler_CreatesThenUpdates(t *testing.T) {
 
 func TestSaveIncidentTranslationHandler_RejectsDefaultAndInactiveLanguage(t *testing.T) {
 	_, r, base := saveTransSetup(t)
-	for _, code := range []string{"de", "fr"} { // Standardsprache bzw. nicht aktiv auf der Seite
+	for _, code := range []string{"de", "fr"} { // default language or not active on the page
 		if c := putTrans(r, base+code, "draft"); c != http.StatusBadRequest {
 			t.Errorf("%s: erwartet 400, war %d", code, c)
 		}
@@ -480,12 +480,12 @@ func TestSaveIncidentTranslationHandler_RejectsInvalidInput(t *testing.T) {
 
 func TestSaveIncidentTranslationHandler_DatabaseErrorsReturn500(t *testing.T) {
 	db, r, base := saveTransSetup(t)
-	// Speichern scheitert: ein Trigger weist das Einfügen ab.
+	// Saving fails: a trigger rejects the insert.
 	db.Exec("CREATE TRIGGER no_insert BEFORE INSERT ON incident_translations BEGIN SELECT RAISE(ABORT, 'gesperrt'); END")
 	if c := putTrans(r, base+"en", "draft"); c != http.StatusInternalServerError {
 		t.Errorf("Speichern: erwartet 500, war %d", c)
 	}
-	// Lesen scheitert: Tabelle fehlt.
+	// Reading fails: table missing.
 	db.Exec("DROP TRIGGER no_insert")
 	if err := db.Migrator().DropTable(&models.IncidentTranslation{}); err != nil {
 		t.Fatal(err)

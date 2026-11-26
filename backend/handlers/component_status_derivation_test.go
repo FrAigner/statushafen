@@ -12,10 +12,10 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Ein offener, nicht gelöster Vorfall mit zugeordneter Komponente
-// muss sich auf den auf der öffentlichen Statusseite (Dashboard-Endpunkt)
-// angezeigten Komponentenstatus auswirken, ohne den in der DB gespeicherten
-// (manuell gesetzten) Status destruktiv zu überschreiben.
+// An open, unresolved incident with an assigned component
+// must affect the component status shown on the public status page (dashboard endpoint)
+// without destructively overwriting the status stored in the DB
+// (manually set).
 func TestComponentStatusDerivationOnPublicDashboard(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -60,8 +60,8 @@ func TestComponentStatusDerivationOnPublicDashboard(t *testing.T) {
 			t.Errorf("expected degraded_performance while incident is open, got %q", got)
 		}
 
-		// Gelöster Vorfall: der angezeigte Status muss auf den manuell
-		// gesetzten ("operational") zurückfallen.
+		// Resolved incident: the displayed status must fall back to the manually
+		// set one ("operational").
 		db.Model(&incident).Update("status", "resolved")
 		if got := fetchDashboardComponentStatus(t, comp.ID); got != "operational" {
 			t.Errorf("expected operational after incident resolved, got %q", got)
@@ -115,11 +115,11 @@ func TestComponentStatusDerivationOnPublicDashboard(t *testing.T) {
 		}
 	})
 
-	// Regressionstest für die bewusste Design-Entscheidung:
-	// der Admin-Endpunkt GetComponentsHandler liefert weiterhin
-	// den unveränderten, manuell gesetzten Status - nicht den abgeleiteten -
-	// damit das Admin-Formular beim Speichern keinen aus einem offenen
-	// Vorfall abgeleiteten Status versehentlich als neuen manuellen Status
+	// Regression test for the deliberate design decision:
+	// the admin endpoint GetComponentsHandler still returns
+	// the unchanged, manually set status - not the derived one -
+	// so that the admin form on save does not accidentally take a status
+	// derived from an open incident as the new manual status
 	// persistiert.
 	t.Run("Admin-Komponentenliste zeigt weiterhin den manuell gesetzten Status, nicht den abgeleiteten", func(t *testing.T) {
 		comp := models.Component{StatusPageID: page.ID, Name: "Auth-Service", Status: "operational"}

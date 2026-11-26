@@ -2,9 +2,9 @@ package handlers
 
 import "testing"
 
-// TestLoadSMTPConfig_FallsBackToMailpitDefaults: ohne gesetzte
-// SMTP_* Env-Vars muss das bestehende lokale Verhalten (Mailpit via
-// docker-compose.yml, localhost:1025, kein Auth) unverändert bleiben.
+// TestLoadSMTPConfig_FallsBackToMailpitDefaults: without any
+// SMTP_* env vars set, the existing local behavior (Mailpit via
+// docker-compose.yml, localhost:1025, no auth) must remain unchanged.
 func TestLoadSMTPConfig_FallsBackToMailpitDefaults(t *testing.T) {
 	for _, key := range []string{"SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM"} {
 		t.Setenv(key, "")
@@ -23,9 +23,9 @@ func TestLoadSMTPConfig_FallsBackToMailpitDefaults(t *testing.T) {
 	}
 }
 
-// TestLoadSMTPConfig_UsesEnvVarsWhenSet: sind SMTP_HOST/SMTP_PORT
-// gesetzt, muss der konfigurierte Wert verwendet werden, nicht der Hardcode
-// localhost:1025 (Kern des gemeldeten Bugs).
+// TestLoadSMTPConfig_UsesEnvVarsWhenSet: if SMTP_HOST/SMTP_PORT are
+// set, the configured value must be used, not the hardcoded
+// localhost:1025 (core of the reported bug).
 func TestLoadSMTPConfig_UsesEnvVarsWhenSet(t *testing.T) {
 	t.Setenv("SMTP_HOST", "smtp.example-provider.com")
 	t.Setenv("SMTP_PORT", "587")
@@ -49,10 +49,10 @@ func TestLoadSMTPConfig_UsesEnvVarsWhenSet(t *testing.T) {
 	}
 }
 
-// TestEnvelopeFrom: der Envelope-Absender (MAIL FROM) muss die
-// nackte Adresse sein, auch wenn SMTP_FROM im Format "Anzeigename <adresse>"
-// vorliegt (strikte Anbieter wie Brevo lehnen sonst mit 501 ab). Der From:-
-// Header (cfg.From) bleibt davon unberührt.
+// TestEnvelopeFrom: the envelope sender (MAIL FROM) must be the
+// bare address, even if SMTP_FROM is in the format "Display Name <address>"
+// (strict providers such as Brevo otherwise reject with 501). The From:
+// header (cfg.From) remains unaffected.
 func TestEnvelopeFrom(t *testing.T) {
 	tests := []struct {
 		name string
@@ -76,7 +76,7 @@ func TestEnvelopeFrom(t *testing.T) {
 			if got := cfg.envelopeFrom(); got != tt.want {
 				t.Errorf("envelopeFrom() = %q, want %q", got, tt.want)
 			}
-			// cfg.From selbst darf nie verändert werden (bleibt für From:-Header).
+			// cfg.From itself must never be modified (it stays for the From: header).
 			if cfg.From != tt.from {
 				t.Errorf("envelopeFrom() hat cfg.From verändert: %q (erwartet %q)", cfg.From, tt.from)
 			}
@@ -84,9 +84,9 @@ func TestEnvelopeFrom(t *testing.T) {
 	}
 }
 
-// TestLoadSMTPConfig_PartialCredentialsMeanNoAuth: nur SMTP_USER oder nur
-// SMTP_PASSWORD gesetzt darf keine (unvollständige) Auth erzeugen, sonst
-// würde smtp.SendMail mit einer kaputten PlainAuth fehlschlagen.
+// TestLoadSMTPConfig_PartialCredentialsMeanNoAuth: only SMTP_USER or only
+// SMTP_PASSWORD set must not produce (incomplete) auth, otherwise
+// smtp.SendMail would fail with a broken PlainAuth.
 func TestLoadSMTPConfig_PartialCredentialsMeanNoAuth(t *testing.T) {
 	t.Setenv("SMTP_HOST", "")
 	t.Setenv("SMTP_PORT", "")

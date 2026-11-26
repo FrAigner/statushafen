@@ -20,9 +20,9 @@ import (
 // Statuspage-Admin manually deleting them via
 // DELETE /api/pages/:page_id/subscribers/:id.
 //
-// Abbestellen läuft nur noch per POST (Token als
-// JSON-Body von Unsubscribe.vue oder als ?token= aus dem RFC-8058-One-Click-
-// Header List-Unsubscribe). GET verändert nichts mehr, siehe
+// Unsubscribing now only works via POST (token as
+// JSON body from Unsubscribe.vue or as ?token= from the RFC 8058 one-click
+// header List-Unsubscribe). GET no longer changes anything, see
 // TestUnsubscribeRedirectHandler.
 func TestUnsubscribeHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
@@ -111,11 +111,11 @@ func TestUnsubscribeHandler(t *testing.T) {
 	})
 }
 
-// TestUnsubscribeRedirectHandler: GET auf den
-// alten Abbestell-Endpunkt löschte das Abo direkt - Link-Scanner und
-// Mail-Prefetcher beendeten so Abos ungewollt. Bereits versendete Links
-// funktionieren weiter, führen aber nur noch auf die Frontend-Seite, die per
-// Knopf POST auslöst.
+// TestUnsubscribeRedirectHandler: GET on the
+// old unsubscribe endpoint deleted the subscription directly - link scanners and
+// mail prefetchers thus ended subscriptions unintentionally. Links already sent
+// keep working, but now only lead to the frontend page, which triggers POST via a
+// button.
 func TestUnsubscribeRedirectHandler(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -164,8 +164,8 @@ func TestPrivateStatusPage_SubscriberToken(t *testing.T) {
 	privatePage := models.StatusPage{Name: "Private Token Page", Slug: "private-token-page", IsPrivate: true}
 	db.Create(&privatePage)
 
-	// Seit braucht das Token einen Ersteller, der die
-	// private Seite selbst sehen darf.
+	// Since then the token needs a creator who may
+	// see the private page itself.
 	creator := models.User{Email: "creator@example.com", IsGlobalAdmin: true}
 	db.Create(&creator)
 	sub := models.Subscriber{StatusPageID: privatePage.ID, Channel: "email", Email: "sub@example.com", SubscribedComponentIDs: "all", CreatedByUserID: &creator.ID}

@@ -15,14 +15,14 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Ereigniszeiten (StartedAt/ResolvedAt) bei Vorfällen, Status beim
-// Anlegen von Wartungen.
+// Event times (StartedAt/ResolvedAt) for incidents, status when
+// creating maintenances.
 func TestIncidentEventTimes(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 	r := testutils.SetupRouter()
-	// Wartungen prüft der Handler selbst gegen maintenance:create;
-	// ohne Kopf handelt die Anfrage als Global Admin.
+	// For maintenances the handler itself checks against maintenance:create;
+	// without a header the request acts as global admin.
 	admin := models.User{Email: "admin-zeiten@example.com", IsGlobalAdmin: true}
 	db.Create(&admin)
 	r.Use(func(c *gin.Context) {
@@ -197,7 +197,7 @@ func TestIncidentEventTimes(t *testing.T) {
 		db.Create(&c2)
 		old := time.Now().Add(-48 * time.Hour)
 		recent := time.Now().Add(-1 * time.Hour)
-		// Erstellt zuletzt, aber ältester Beginn -> muss hinten stehen.
+		// Created last, but oldest start -> must be at the end.
 		db.Create(&models.Incident{StatusPageID: p2.ID, Title: "nachgetragen", Message: "m", Status: "resolved", StartedAt: &old})
 		db.Create(&models.Incident{StatusPageID: p2.ID, Title: "ohne-start", Message: "m", Status: "investigating"})
 		db.Create(&models.Incident{StatusPageID: p2.ID, Title: "mit-start", Message: "m", Status: "investigating", StartedAt: &recent})

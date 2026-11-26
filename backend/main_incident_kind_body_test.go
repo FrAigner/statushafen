@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Arterkennung (Vorfall/Wartung) las nur die ersten 1 MiB des
-// Bodys und fiel bei größeren Bodys still auf "incidents" zurück. Wer nur
-// incidents:create hatte, legte mit aufgeblähtem Body trotzdem eine Wartung an.
+// The kind detection (incident/maintenance) read only the first 1 MiB of the
+// body and silently fell back to "incidents" for larger bodies. Anyone who only
+// had incidents:create still created a maintenance with an inflated body.
 
 const maintenanceBodyFmt = `{"Title":"W","Message":"m","ComponentIDs":[%d],"IsMaintenance":true,` +
 	`"ScheduledStartAt":"2099-01-01T10:00:00Z","ScheduledEndAt":"2099-01-01T11:00:00Z"%s}`
@@ -47,7 +47,7 @@ func TestIncidentCreate_GrosserBodyUmgehtDieWartungsPruefungNicht(t *testing.T) 
 	w := newPermWorld(t)
 	onlyIncidents := w.user(listOf("incidents:create"))
 
-	// Über dem alten Arterkennungs-Limit (1 MiB) und knapp über dem neuen (64 KiB).
+	// Above the old kind-detection limit (1 MiB) and just above the new one (64 KiB).
 	for _, pad := range []int{(1 << 20) + 10, 70 << 10} {
 		rec := w.postIncident(onlyIncidents, maintenanceBody(w.a.component, pad))
 		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, "pad=%d", pad)

@@ -65,8 +65,8 @@ func (f *revocationFixture) do(method, path, token string, body any) *httptest.R
 	return w
 }
 
-// victimRoutes sind Routen mit und ohne eigene Datenbankprüfung: /api/me und
-// /api/languages lasen früher nur das Token.
+// victimRoutes are routes with and without their own database check: /api/me and
+// /api/languages used to read only the token.
 func (f *revocationFixture) victimStatus(token string) map[string]int {
 	out := map[string]int{}
 	for _, p := range []string{"/api/me", "/api/languages", "/api/me/pages"} {
@@ -82,12 +82,12 @@ func (f *revocationFixture) updateVictim(t *testing.T, body map[string]any) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
-// changedTestPass: erfundenes Testkennwort für den Passwortwechsel.
+// changedTestPass: made-up test password for the password change.
 const changedTestPass = "GanzNeuesPasswort99"
 
 func TestTokenRevocation_AllRoutesRejectOldTokenAfterPasswordChange(t *testing.T) {
 	f := newRevocationFixture(t)
-	// Gegenprobe: vor der Änderung gilt das Token überall.
+	// Control case: before the change the token is valid everywhere.
 	for p, code := range f.victimStatus(f.victimTk) {
 		require.Equal(t, http.StatusOK, code, p)
 	}
@@ -98,7 +98,7 @@ func TestTokenRevocation_AllRoutesRejectOldTokenAfterPasswordChange(t *testing.T
 		assert.Equal(t, http.StatusUnauthorized, code, "%s nach Passwortwechsel", p)
 	}
 
-	// Ein neuer Login stellt ein Token mit der neuen Version aus.
+	// A new login issues a token with the new version.
 	w := f.do(http.MethodPost, "/api/login", "", map[string]string{"email": f.victim.Email, "password": changedTestPass})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	var resp struct {
@@ -114,13 +114,13 @@ func TestTokenRevocation_GlobalAdminDemotionRevokesButPageRoleChangeKeepsSession
 	f := newRevocationFixture(t)
 	require.NoError(t, f.db.Model(&f.victim).Update("is_global_admin", true).Error)
 
-	// Entzug der Global-Admin-Rechte widerruft das Token.
+	// Revoking Global Admin rights revokes the token.
 	f.updateVictim(t, map[string]any{"is_global_admin": false})
 	assert.Equal(t, http.StatusUnauthorized, f.do(http.MethodGet, "/api/me", f.victimTk, nil).Code)
 
-	// Seitenrollen werden bei jeder Anfrage aus der Datenbank gelesen; eine
-	// Änderung wirkt sofort und muss die Sitzung nicht beenden (sonst würde ein
-	// gleichzeitiges Löschen des eigenen Kontos mit 401 scheitern).
+	// Page roles are read from the database on every request; a
+	// change takes effect immediately and must not end the session (otherwise a
+	// simultaneous deletion of the own account would fail with 401).
 	var v models.User
 	require.NoError(t, f.db.First(&v, f.victim.ID).Error)
 	tok, err := middleware.GenerateToken(v.ID, v.Email, "", "", false, middleware.WithTokenVersion(v.TokenVersion))
@@ -132,8 +132,8 @@ func TestTokenRevocation_GlobalAdminDemotionRevokesButPageRoleChangeKeepsSession
 
 func TestTokenRevocation_UnrelatedUpdateKeepsSession(t *testing.T) {
 	f := newRevocationFixture(t)
-	// Nur die E-Mail-Schreibweise der Anzeige ändert sich nicht, kein Passwort,
-	// keine Rechte: die Sitzung soll bestehen bleiben.
+	// Only the email spelling of the display changes, no password,
+	// no permissions: the session should persist.
 	f.updateVictim(t, map[string]any{})
 	assert.Equal(t, http.StatusOK, f.do(http.MethodGet, "/api/me", f.victimTk, nil).Code)
 }
@@ -149,7 +149,7 @@ func TestTokenRevocation_AdminDeleteAndSelfDeleteRevoke(t *testing.T) {
 	require.NoError(t, f.db.Unscoped().First(&gone, f.victim.ID).Error)
 	assert.Positive(t, gone.TokenVersion, "Löschung erhöht die Token-Version")
 
-	// Selbstlöschung: Konto ist weg, das Token danach wertlos.
+	// Self-deletion: the account is gone, the token worthless afterwards.
 	other := models.User{Email: "selbst@example.com"}
 	require.NoError(t, f.db.Create(&other).Error)
 	tok, err := middleware.GenerateToken(other.ID, other.Email, "", "", false)

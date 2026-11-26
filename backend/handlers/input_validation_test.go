@@ -15,9 +15,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Das Backend prüft, was das Frontend prüft (leerer Name,
-// Passwort-Mindestlänge, Sprachcode-Format, reservierte Slugs). Jeder Verstoß
-// liefert 400 mit `code`, ohne etwas anzulegen oder zu ändern.
+// The backend checks what the frontend checks (empty name,
+// minimum password length, language code format, reserved slugs). Every violation
+// yields 400 with `code`, without creating or changing anything.
 
 func newInputValidationRouter(t *testing.T) (*gorm.DB, http.Handler) {
 	t.Helper()
@@ -78,7 +78,7 @@ func TestStatusPageCreate_ReservedSlugRejected(t *testing.T) {
 	}
 	assert.Zero(t, count(db, &models.StatusPage{}, "1 = 1"))
 
-	// Ein freier Slug und ein aus dem Namen erzeugter Slug bleiben möglich.
+	// A free slug and a slug generated from the name remain possible.
 	w := doStatusPageRequest(r, "POST", "/api/admin/pages", map[string]any{"Name": "Acme", "Slug": "acme"})
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 }
@@ -95,8 +95,8 @@ func TestStatusPageUpdate_ReservedSlugOnlyBlockedWhenChanged(t *testing.T) {
 	require.NoError(t, db.First(&page, page.ID).Error)
 	assert.Equal(t, "acme", page.Slug)
 
-	// Bestandsdaten: eine Seite, die schon einen reservierten Slug trägt, darf
-	// ihn behalten und weiter bearbeitet werden.
+	// Existing data: a page that already carries a reserved slug may
+	// keep it and continue to be edited.
 	legacy := models.StatusPage{Name: "Alt", Slug: "docs"}
 	require.NoError(t, db.Create(&legacy).Error)
 	w = doStatusPageRequest(r, "PUT", "/api/admin/pages/"+itoa(legacy.ID), map[string]any{"Name": "Alt neu", "Slug": "docs"})
@@ -121,7 +121,7 @@ func TestUserPassword_MinLength(t *testing.T) {
 	requireErrorCode(t, w.Body.Bytes(), "password_too_short")
 	assert.Zero(t, count(db, &models.User{}, "email = ?", "kurz@example.com"))
 
-	// Genau 8 Zeichen (Umlaute zählen als ein Zeichen) sind erlaubt.
+	// Exactly 8 characters (umlauts count as one character) are allowed.
 	w = doStatusPageRequest(r, "POST", "/api/users", map[string]any{"email": "ok@example.com", "password": "äöüäöüäö"})
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	w = doStatusPageRequest(r, "POST", "/api/users", map[string]any{"email": "sieben@example.com", "password": "äöüäöüä"})
@@ -140,7 +140,7 @@ func TestUserUpdate_PasswordMinLengthOnlyWhenSet(t *testing.T) {
 	require.NoError(t, db.First(&user, user.ID).Error)
 	assert.Equal(t, "alt-hash", user.PasswordHash)
 
-	// Leer = unverändert.
+	// Empty = unchanged.
 	w = doStatusPageRequest(r, "PUT", path, map[string]any{"email": "u@example.com", "password": ""})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, db.First(&user, user.ID).Error)

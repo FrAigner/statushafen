@@ -12,16 +12,16 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Übersetzungen von Vorlagen: Titel und Nachricht einer Vorlage in
-// den weiteren Sprachen der Seite. Die Routen hängen unter
-// /pages/:page_id/incident-templates/:id/translations; die Seite steht damit im
-// Pfad, die Vorlage wird gegen sie geprüft (fremde Vorlage → 404). Rechte wie
-// die Vorlage selbst: incident_templates:read bzw. :update.
+// Template translations: title and message of a template in
+// the other languages of the page. The routes hang under
+// /pages/:page_id/incident-templates/:id/translations; the page is thus in the
+// path, and the template is checked against it (foreign template → 404). Permissions like
+// the template itself: incident_templates:read and :update respectively.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const errTemplateNotFound = "Incident template not found"
 
-// templateOfPage lädt die Vorlage aus :id/:page_id oder beantwortet die Anfrage mit dem Fehler.
+// templateOfPage loads the template from :id/:page_id or answers the request with the error.
 func (h *Handler) templateOfPage(c *gin.Context) (models.IncidentTemplate, bool) {
 	var tmpl models.IncidentTemplate
 	tmplID, ok := parseTemplateIDParam(c)
@@ -39,7 +39,7 @@ func (h *Handler) templateOfPage(c *gin.Context) (models.IncidentTemplate, bool)
 	return tmpl, true
 }
 
-// GetIncidentTemplateTranslationsHandler liefert alle Übersetzungen einer Vorlage (Entwürfe inklusive).
+// GetIncidentTemplateTranslationsHandler returns all translations of a template (drafts included).
 func (h *Handler) GetIncidentTemplateTranslationsHandler(c *gin.Context) {
 	tmpl, ok := h.templateOfPage(c)
 	if !ok {
@@ -53,8 +53,8 @@ func (h *Handler) GetIncidentTemplateTranslationsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, translations)
 }
 
-// SaveIncidentTemplateTranslationHandler speichert die Übersetzung einer Vorlage
-// für genau eine weitere Sprache der Seite (anlegen oder ändern).
+// SaveIncidentTemplateTranslationHandler saves the translation of a template
+// for exactly one other language of the page (create or update).
 func (h *Handler) SaveIncidentTemplateTranslationHandler(c *gin.Context) {
 	tmpl, ok := h.templateOfPage(c)
 	if !ok {

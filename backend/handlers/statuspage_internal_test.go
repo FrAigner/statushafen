@@ -15,7 +15,7 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// pageTestContext liefert Kontext und Recorder für einen direkten Handleraufruf.
+// pageTestContext returns context and recorder for a direct handler call.
 func pageTestContext(method, body string, userID any) (*gin.Context, *httptest.ResponseRecorder) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -55,8 +55,8 @@ func TestUniqueSlug_EmptyBaseUsesDefaultAndCounts(t *testing.T) {
 	assert.Equal(t, "statusseite-2", h.uniqueSlug(""))
 }
 
-// Nutzer-IDs im Kontext, die keine uint sind oder zu keinem Konto gehören,
-// geben nie Zugriff auf eine private Seite (fail closed).
+// User IDs in the context that are not a uint or belong to no account
+// never grant access to a private page (fail closed).
 func TestPrivatePageAccess_InvalidIdentityIsDenied(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -78,8 +78,8 @@ func TestPrivatePageAccess_InvalidIdentityIsDenied(t *testing.T) {
 	}
 }
 
-// Scheitert das Anlegen der Auto-Join-Rolle (kein Unique-Konflikt), bekommt der
-// Nutzer 500 statt Zugriff.
+// If creating the auto-join role fails (not a unique conflict), the
+// user gets 500 instead of access.
 func TestPrivatePageAccess_AutoJoinCreateErrorIs500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

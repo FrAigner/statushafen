@@ -17,12 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Abonnentenliste gab mit CreatedBy das ganze User-Objekt des
-// anlegenden Kontos heraus (E-Mail, SSO-Kennung, IsGlobalAdmin, Rolle samt
-// Permissions, Sprache) – auch von Konten fremder Mandanten, die die Seite nur
-// abonniert haben. Die Tests gehen über den echten Router (newRouter).
+// The subscriber list returned the whole user object of the creating
+// account via CreatedBy (email, SSO identifier, IsGlobalAdmin, role including
+// permissions, language) - even of accounts of other tenants that merely
+// subscribed to the page. The tests go through the real router (newRouter).
 
-// verbotene Schlüssel/Werte in jeder Abonnenten-Antwort
+// forbidden keys/values in every subscriber response
 var subscriberLeakKeys = []string{
 	"SSOSubject", "SSOProvider", "IsGlobalAdmin", "Permissions", "PreferredLanguage",
 	"RoleID", "Role\"", "UserStatusPageRoles", "PasswordHash",
@@ -43,7 +43,7 @@ func TestRouter_Abonnentenliste_CreatedByLeaktKeinKonto(t *testing.T) {
 	require.NoError(t, db.Create(&models.UserStatusPageRole{UserID: staff.ID, StatusPageID: page.ID, RoleID: adminRole.ID}).Error)
 	staffTok, _ := middleware.GenerateToken(staff.ID, staff.Email, "", adminRole.Permissions, false)
 
-	// Fremdes Konto eines anderen Mandanten: globaler Admin, SSO, Sprache.
+	// Foreign account of another tenant: global admin, SSO, language.
 	gaRole := models.Role{Name: "GA797", Permissions: "*:*"}
 	require.NoError(t, db.Create(&gaRole).Error)
 	foreign := models.User{Email: "konto-fremd797@example.com", RoleID: gaRole.ID, SSOProvider: "okta-geheim", SSOSubject: "sub-geheim-797",
@@ -69,7 +69,7 @@ func TestRouter_Abonnentenliste_CreatedByLeaktKeinKonto(t *testing.T) {
 		}
 	}
 
-	// Fremdes Konto abonniert Seite A mit abweichender Abo-Adresse.
+	// A foreign account subscribes to page A with a different subscription address.
 	w := call(http.MethodPost, "/api/subscribe", foreignTok,
 		`{"channel":"email","email":"abo-adresse797@example.com","component_ids":"all","slug":"sub-797"}`)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
@@ -83,7 +83,7 @@ func TestRouter_Abonnentenliste_CreatedByLeaktKeinKonto(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &subs))
 		require.Len(t, subs, 1)
 		assert.Equal(t, "abo-adresse797@example.com", subs[0]["Email"])
-		// Frontend braucht die Information "Abo ist mit einem Konto verknüpft"
+		// the frontend needs the information "subscription is linked to an account"
 		assert.NotNil(t, subs[0]["CreatedBy"])
 	})
 

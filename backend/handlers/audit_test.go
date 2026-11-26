@@ -92,7 +92,7 @@ func TestAuditLogHandlers(t *testing.T) {
 		assert.Contains(t, w.Body.String(), `"limit":2`)
 	})
 
-	// Filter für die Kategorien Abonnent, Ankündigung, Wartung, System.
+	// Filter for the categories subscriber, announcement, maintenance, system.
 	t.Run("Filter per neue Kategorie liefert nur deren Einträge", func(t *testing.T) {
 		for cat, action := range map[string]string{
 			"subscriber": "subscriber.deleted", "notice": "notice.created",
@@ -119,8 +119,8 @@ func TestAuditLogHandlers(t *testing.T) {
 	})
 }
 
-// Fehlgeschlagene Logins und der Honeypot der Bestellung speichern
-// Nutzereingaben im Audit-Log. Sie dürfen dort nicht unbegrenzt landen.
+// Failed logins and the order honeypot store
+// user input in the audit log. It must not end up there unbounded.
 func TestAudit_UntrustedInputStoredBounded(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -149,15 +149,15 @@ func TestAudit_UntrustedInputStoredBounded(t *testing.T) {
 	assert.NoError(t, db.Where("action = ?", "pageorder.honeypot_triggered").First(&honey).Error)
 	assert.Len(t, honey.TargetName, 254)
 
-	// Gegenprobe: eine normale Adresse wird unverändert gespeichert.
+	// Control check: a normal address is stored unchanged.
 	post("/api/login", `{"email":"normal@example.com","password":"egal-egal"}`)
 	var normal models.AuditLog
 	assert.NoError(t, db.Where("action = ? AND target_name = ?", "auth.login_failed", "normal@example.com").First(&normal).Error)
 }
 
-// Eine Adresse über der RFC-Grenze kann kein Konto haben: Der Login beantwortet
-// sie wie jede unbekannte Adresse, ohne die Konten-Tabelle abzufragen (kein
-// Suchlauf mit Megabyte-Parametern).
+// An address above the RFC limit cannot have an account: the login answers
+// it like any unknown address, without querying the accounts table (no
+// search with megabyte-sized parameters).
 func TestLogin_OversizedEmailDoesNotQueryUsers(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -184,7 +184,7 @@ func TestLogin_OversizedEmailDoesNotQueryUsers(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, post(strings.Repeat("a", 300)+"@example.com"))
 	assert.Zero(t, userQueries, "überlange Adresse: keine Kontensuche")
 
-	// Gegenprobe: eine normale unbekannte Adresse wird gesucht.
+	// Control check: a normal unknown address is looked up.
 	assert.Equal(t, http.StatusUnauthorized, post("unbekannt@example.com"))
 	assert.Positive(t, userQueries)
 }

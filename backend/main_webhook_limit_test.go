@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// ID- und Kennungs-Weg des Monitoring-Webhooks teilen EINEN
-// Rate-Limit-Zähler je IP (sonst 40 Token-Versuche pro Minute).
+// The ID and identifier paths of the monitoring webhook share ONE
+// rate-limit counter per IP (otherwise 40 token attempts per minute).
 func TestRouter_WebhookRateLimitGemeinsam(t *testing.T) {
 	r := newRouter(handlers.NewHandler(testutils.SetupTestDB()))
 	paths := []string{"/api/webhooks/components/1/status", "/api/webhooks/component-slugs/x/status"}

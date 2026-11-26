@@ -15,18 +15,18 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Das Frontend zeigt je Audit-Kategorie einen Filter-Chip. Wer im
-// Backend eine neue Kategorie schreibt, ohne sie in models.AuditCategories
-// und im Frontend einzutragen, würde sie nie filtern können (so fehlten
-// Abonnent, Ankündigung und Wartung). Der Test liest das GANZE backend/ per AST
-// (ohne Testdateien) und sammelt alle Kategorien, die geschrieben werden:
+// The frontend shows a filter chip per audit category. Anyone who writes a
+// new category in the backend without adding it to models.AuditCategories
+// and the frontend would never be able to filter it (this is how
+// subscriber, announcement and maintenance were missing). The test reads the WHOLE backend/ via AST
+// (without test files) and collects all categories that are written:
 //   - RecordAudit(c, action, CATEGORY, ...) / RecordSystemAudit(action, CATEGORY, ...)
-//   - Category: ... in models.AuditLog{} und mailAuditTarget{}
+//   - Category: ... in models.AuditLog{} and mailAuditTarget{}
 //
-// Literale werden gesammelt. Alles andere (Konstante, Variable) wäre eine
-// Kategorie, die der Test nicht sieht, und wird als Fehler gemeldet; erlaubt
-// sind nur die Durchreichungen x.Category (stammen aus einem gescannten
-// Literal) und audit.go selbst (die Funktionen, die den Parameter weitergeben).
+// Literals are collected. Anything else (constant, variable) would be a
+// category the test does not see and is reported as an error; only
+// the pass-throughs x.Category (originating from a scanned
+// literal) and audit.go itself (the functions that pass on the parameter) are allowed.
 func scanAuditCategories(t *testing.T, root string) (found map[string]string, nonLiteral []string) {
 	t.Helper()
 	found = map[string]string{}
@@ -113,7 +113,7 @@ func TestAuditCategories_CoverEveryWrittenCategory(t *testing.T) {
 			t.Errorf("Audit-Kategorie %q (%s) fehlt in models.AuditCategories", cat, file)
 		}
 	}
-	// Gegenrichtung: kein toter Eintrag in der Liste.
+	// Reverse direction: no dead entry in the list.
 	for _, cat := range models.AuditCategories {
 		if _, ok := found[cat]; !ok {
 			t.Errorf("models.AuditCategories enthält %q, das nirgends geschrieben wird", cat)
@@ -121,8 +121,8 @@ func TestAuditCategories_CoverEveryWrittenCategory(t *testing.T) {
 	}
 }
 
-// Gegenprobe: ein Fixture mit Konstante als Kategorie und einem Schreiber in
-// einem fremden Paket muss auffallen.
+// Control check: a fixture with a constant as category and a writer in
+// a foreign package must be noticed.
 func TestScanAuditCategories_FindetKonstantenUndFremdePakete(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "database"), 0o755); err != nil {
@@ -142,10 +142,10 @@ func TestScanAuditCategories_FindetKonstantenUndFremdePakete(t *testing.T) {
 	}
 }
 
-// Die Chips der Oberfläche (CATS in AdminAuditLog.vue) und
-// models.AuditCategories müssen übereinstimmen. Liest die Vue-Datei wie
-// database/system_capabilities_test.go die Hilfeseiten; bei 0 Treffern schlägt
-// der Test fehl statt still grün zu sein.
+// The UI chips (CATS in AdminAuditLog.vue) and
+// models.AuditCategories must match. Reads the Vue file like
+// database/system_capabilities_test.go reads the help pages; with 0 hits
+// the test fails instead of silently being green.
 func TestAuditCategories_MatchFrontendChips(t *testing.T) {
 	raw, err := os.ReadFile("../../frontend/src/views/admin/AdminAuditLog.vue")
 	if err != nil {
@@ -178,7 +178,7 @@ func TestAuditCategories_MatchFrontendChips(t *testing.T) {
 	}
 }
 
-// Die OpenAPI-Beschreibung des Filters nennt genau die gültigen Kategorien.
+// The OpenAPI description of the filter names exactly the valid categories.
 func TestAuditCategories_MatchOpenAPIEnum(t *testing.T) {
 	raw, err := os.ReadFile("../../docs/api/openapi.yaml")
 	if err != nil {

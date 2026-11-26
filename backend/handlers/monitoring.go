@@ -14,20 +14,20 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// In-App Monitoring-Dashboard (Golden Signals Schritt 3/4)
+// In-app monitoring dashboard (Golden Signals step 3/4)
 //
-// Liest ausschließlich aus der in Schritt 1/4 geschaffenen
-// Aggregationsschicht backend/metrics/ (metrics.Default). Unabhängig vom
-// Prometheus-Export aus Schritt 2/4 — dient als in-App-Fallback,
-// falls Grafana Cloud nicht verfügbar/eingerichtet ist.
+// Reads exclusively from the aggregation layer backend/metrics/
+// (metrics.Default) created in step 1/4. Independent of the
+// Prometheus export from step 2/4 — serves as an in-app fallback
+// if Grafana Cloud is unavailable/not set up.
 //
-// Route (in main.go, innerhalb der authGroup):
+// Route (in main.go, inside the authGroup):
 //   authGroup.GET("/admin/monitoring", middleware.RequireGlobalAdmin(), h.GetMonitoringHandler)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// processStartedAt wird beim Programmstart (Var-Initialisierung) gesetzt und
-// dient als Basis für die "Requests/Minute"-Rate: die Registry zählt nur
-// kumulative Totals seit Prozessstart, kennt aber keine Zeitdimension.
+// processStartedAt is set at program start (var initialization) and
+// serves as the basis for the "requests/minute" rate: the registry only counts
+// cumulative totals since process start, but has no time dimension.
 var processStartedAt = time.Now()
 
 type monitoringRouteMetrics struct {
@@ -56,7 +56,7 @@ type monitoringTotals struct {
 }
 
 // monitoringSaturation mirrors metrics.SaturationSnapshot (Golden Signals
-// Schritt 4/4) for the JSON response, alongside the
+// step 4/4) for the JSON response, alongside the
 // Latency/Traffic/Error signals above. Kept as its own nested struct (rather
 // than flattened into monitoringResponse) so the frontend can treat it as one
 // self-contained "Saturation" section, matching the shape of Totals/Routes.
@@ -87,16 +87,16 @@ type monitoringResponse struct {
 	Totals        monitoringTotals         `json:"totals"`
 	Routes        []monitoringRouteMetrics `json:"routes"`
 	Saturation    monitoringSaturation     `json:"saturation"`
-	// GrafanaDashboardURL: Link auf das Grafana-Dashboard der jeweiligen Umgebung
-	// (vorher im Frontend fest auf "statushafen-staging" verdrahtet).
-	// Leer, wenn GRAFANA_DASHBOARD_URL nicht (oder nicht als http(s)-URL) gesetzt
-	// ist; das Frontend blendet den Link dann aus.
+	// GrafanaDashboardURL: link to the Grafana dashboard of the respective environment
+	// (previously hard-wired in the frontend to "statushafen-staging").
+	// Empty if GRAFANA_DASHBOARD_URL is not set (or not set as an http(s) URL);
+	// the frontend then hides the link.
 	GrafanaDashboardURL string `json:"grafana_dashboard_url"`
 }
 
-// grafanaDashboardURL liest GRAFANA_DASHBOARD_URL. Nur absolute http(s)-URLs
-// werden durchgereicht, damit eine Fehlkonfiguration (z.B. "javascript:...")
-// nie als href im Admin-Bereich landet.
+// grafanaDashboardURL reads GRAFANA_DASHBOARD_URL. Only absolute http(s) URLs
+// are passed through, so that a misconfiguration (e.g. "javascript:...")
+// never ends up as an href in the admin area.
 func grafanaDashboardURL() string {
 	raw := strings.TrimSpace(os.Getenv("GRAFANA_DASHBOARD_URL"))
 	u, err := url.Parse(raw)
@@ -150,9 +150,9 @@ func (h *Handler) GetMonitoringHandler(c *gin.Context) {
 		}
 	}
 
-	// Nach Traffic sortieren (wichtigste Routen zuerst) statt der
-	// Route/Methode-Sortierung aus Registry.Snapshot(), die für Tests
-	// deterministisch, für ein Dashboard aber weniger nützlich ist.
+	// Sort by traffic (most important routes first) instead of the
+	// route/method sorting from Registry.Snapshot(), which is
+	// deterministic for tests but less useful for a dashboard.
 	sort.Slice(resp.Routes, func(i, j int) bool {
 		if resp.Routes[i].RequestCount != resp.Routes[j].RequestCount {
 			return resp.Routes[i].RequestCount > resp.Routes[j].RequestCount
@@ -215,12 +215,12 @@ func safeDiv(numerator float64, denominator uint64) float64 {
 	return numerator / float64(denominator)
 }
 
-// estimateQuantileMs schätzt die Latenz am gegebenen Quantil (z.B. 0.95 für
-// p95) aus den Histogramm-Buckets, analog zur linearen Interpolation von
-// Prometheus' histogram_quantile(). Exakte Perzentile bräuchten die rohen
-// Einzelmessungen, die die Registry bewusst nicht vorhält (siehe
-// backend/metrics/metrics.go) — das Ergebnis ist daher eine Näherung,
-// begrenzt durch die Bucket-Granularität in LatencyBucketsMs.
+// estimateQuantileMs estimates the latency at the given quantile (e.g. 0.95 for
+// p95) from the histogram buckets, analogous to the linear interpolation of
+// Prometheus' histogram_quantile(). Exact percentiles would need the raw
+// individual measurements, which the registry deliberately does not retain (see
+// backend/metrics/metrics.go) — the result is therefore an approximation,
+// limited by the bucket granularity in LatencyBucketsMs.
 func estimateQuantileMs(bounds []float64, bucketCounts []uint64, total uint64, maxMs float64, quantile float64) float64 {
 	if total == 0 {
 		return 0
@@ -238,8 +238,8 @@ func estimateQuantileMs(bounds []float64, bucketCounts []uint64, total uint64, m
 			continue
 		}
 		if i >= len(bounds) {
-			// "+Inf"-Bucket ohne Obergrenze: bester bekannter Wert ist das
-			// tatsächlich beobachtete Maximum.
+			// "+Inf" bucket without an upper bound: the best known value is the
+			// maximum actually observed.
 			return maxMs
 		}
 		upperBound := bounds[i]

@@ -12,19 +12,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// Wiederholtes Literal (go:S1192).
+// Repeated literal (go:S1192).
 const errComponentNotFound = "Component not found"
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ComponentTranslation: Stage 3 der Mehrsprachigkeit - Component-
-// Namen und Beschreibungen in mehreren Sprachen mit Draft/Confirmed-Workflow.
+// ComponentTranslation: stage 3 of multilingual support - component
+// names and descriptions in several languages with a draft/confirmed workflow.
 //
-// Draft-Translations sind nur für Admins sichtbar; Confirmed-Translations
-// werden über die öffentliche API auch für Subscriber sichtbar.
-// Source wird zum Tracking gesetzt (manual vs. deepl).
+// Draft translations are visible to admins only; confirmed translations
+// also become visible to subscribers through the public API.
+// Source is set for tracking (manual vs. deepl).
 //
-// Routen (main.go):
-//   öffentlich: r.GET("/api/components/:component_id/translations", h.GetComponentTranslationsHandler)
+// Routes (main.go):
+//   public: r.GET("/api/components/:component_id/translations", h.GetComponentTranslationsHandler)
 //   admin:      translationAdmin (RequirePermission "components:write")
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ func (h *Handler) GetComponentTranslationsHandler(c *gin.Context) {
 		return
 	}
 
-	// siehe incident_translation.go - status_page_id-Join fehlte.
+	// see incident_translation.go - the status_page_id join was missing.
 	var page models.StatusPage
 	if err := h.DB.First(&page, component.StatusPageID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": errComponentNotFound, "code": "component_not_found"})
@@ -68,8 +68,8 @@ func (h *Handler) GetComponentTranslationsHandler(c *gin.Context) {
 		return
 	}
 
-	// Review: archivierte und unsichtbare Komponenten (samt
-	// Gruppen-Nachfahren) sind für Unberechtigte nicht abrufbar (fortlaufende IDs).
+	// Review: archived and invisible components (including their group
+	// descendants) cannot be fetched by unauthorized users (sequential IDs).
 	if !h.callerMaySeeHiddenComponents(c, page.ID) {
 		var siblings []models.Component
 		if err := h.DB.Select("id", "parent_id", "visible", "archived_at").Where("status_page_id = ?", page.ID).Find(&siblings).Error; err != nil {
@@ -201,13 +201,13 @@ func (h *Handler) DeleteComponentTranslationHandler(c *gin.Context) {
 	c.JSON(http.StatusNoContent, nil)
 }
 
-// SaveComponentTranslationHandler speichert die Übersetzung einer Komponente
-// bzw. Gruppe für genau eine Sprache: anlegen oder ändern, Stand
-// draft oder confirmed. Gegenstück zu SaveIncidentTranslationHandler.
+// SaveComponentTranslationHandler saves the translation of a component
+// or group for exactly one language: create or update, state
+// draft or confirmed. Counterpart to SaveIncidentTranslationHandler.
 //
-// Anders als beim Anlegen (CreateComponentTranslationHandler) ist die
-// Beschreibung optional: Sie ist auch an der Komponente selbst optional und
-// Gruppen haben gar keine. Die Spalte ist not null, daher genügt der leere String.
+// Unlike on creation (CreateComponentTranslationHandler), the
+// description is optional: it is also optional on the component itself and
+// groups have none at all. The column is not null, so the empty string suffices.
 func (h *Handler) SaveComponentTranslationHandler(c *gin.Context) {
 	componentID, ok := parseComponentID(c)
 	if !ok {

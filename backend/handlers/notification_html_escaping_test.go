@@ -19,18 +19,18 @@ import (
 // for assertions. There is no real SMTP server available in the test
 // environment, so this is the only way to observe the composed email body.
 //
-// Der Server ist bei MAIL FROM so strikt wie Brevo und lehnt alles
-// außer der nackten Adresse in spitzen Klammern mit 501 ab. Damit prüft jeder
-// Versandtest automatisch mit, dass der Envelope-Absender keinen Anzeigenamen
-// trägt; die Argumente landen zusätzlich in mailFromCh.
+// The server is as strict at MAIL FROM as Brevo and rejects anything
+// other than the bare address in angle brackets with 501. This way every
+// dispatch test automatically also verifies that the envelope sender carries no display name;
+// the arguments additionally end up in mailFromCh.
 type fakeSMTPServer struct {
 	listener   net.Listener
 	dataCh     chan string
 	mailFromCh chan string
 }
 
-// strictMailFromRe entspricht der RFC-5321-Form "MAIL FROM:<adresse>" ohne
-// Anzeigenamen, optional gefolgt von ESMTP-Parametern.
+// strictMailFromRe corresponds to the RFC 5321 form "MAIL FROM:<address>" without
+// display name, optionally followed by ESMTP parameters.
 var strictMailFromRe = regexp.MustCompile(`^MAIL FROM:<([^<>"\s]*)>( .*)?$`)
 
 func startFakeSMTPServer(t *testing.T) *fakeSMTPServer {
@@ -216,9 +216,9 @@ func TestDispatchNotifications_FromHeaderIsValid(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
 
-	// Die Seitenadresse wirkt nur als Reply-To; der From-Header besteht aus dem
-	// Seitennamen und der Adresse aus SMTP_FROM. Dieser Test sichert, dass dabei
-	// keine verschachtelten spitzen Klammern entstehen.
+	// The page address acts only as Reply-To; the From header consists of the
+	// page name and the address from SMTP_FROM. This test ensures that no
+	// nested angle brackets arise in the process.
 	page := models.StatusPage{
 		Name:                    "From Header Page",
 		Slug:                    "from-header-page",

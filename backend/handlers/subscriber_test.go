@@ -118,9 +118,9 @@ func TestSubscriberHandlers(t *testing.T) {
 		}
 	})
 
-	// page_id-Parse-Fehler wurde verworfen (tenantID=0), sodass
-	// GetSubscribersHandler bei ungültigem page_id einfach eine leere Liste
-	// statt eines klaren 400 zurückgab.
+	// The page_id parse error was discarded (tenantID=0), so that
+	// GetSubscribersHandler simply returned an empty list for an invalid page_id
+	// instead of a clear 400.
 	t.Run("Get Subscribers mit ungültiger page_id gibt 400", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/api/pages/not-a-number/subscribers", nil)
 		w := httptest.NewRecorder()
@@ -150,10 +150,10 @@ func TestSubscriberHandlers(t *testing.T) {
 		}
 	})
 
-	// Regression: UpdateSubReq markierte SubscribedComponentIDs früher als required
-	// mit snake_case-JSON-Tags, die nie zum PascalCase-Payload des Frontends passten
-	// (AdminSubscribers.vue sendet formData direkt) - jede Bearbeitung schlug mit
-	// "Invalid fields" fehl, sobald das Feld leer war ("leer = alle Komponenten").
+	// Regression: UpdateSubReq used to mark SubscribedComponentIDs as required
+	// with snake_case JSON tags that never matched the frontend's PascalCase payload
+	// (AdminSubscribers.vue sends formData directly) - every edit failed with
+	// "Invalid fields" as soon as the field was empty ("empty = all components").
 	t.Run("Update Subscriber mit leerem SubscribedComponentIDs (alle Komponenten)", func(t *testing.T) {
 		payload := map[string]interface{}{
 			"Channel":                "email",
@@ -194,12 +194,12 @@ func TestSubscriberHandlers(t *testing.T) {
 	})
 }
 
-// TestSubscriberOwnership ist ein Regressionstest für den gemeldeten Bug: Ein
-// Admin legt über die CMS-Oberfläche ein Google-Chat-Webhook-Abo ohne Email an.
-// Vorher wurde dabei nirgends gespeichert, welcher User das Abo angelegt hat,
-// wodurch dieser User es später nicht über /me/subscription wiederfinden bzw.
-// bearbeiten konnte (der Abgleich lief rein über den Email-String, der bei
-// Webhook-Abos aber leer bleibt).
+// TestSubscriberOwnership is a regression test for the reported bug: An
+// admin creates a Google Chat webhook subscription without email via the CMS UI.
+// Previously nothing recorded which user created the subscription,
+// so that user could later not find or edit it via /me/subscription
+// (the match ran purely on the email string, which for
+// webhook subscriptions, however, stays empty).
 func TestSubscriberOwnership(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -221,8 +221,8 @@ func TestSubscriberOwnership(t *testing.T) {
 	admin := models.User{Email: "page-admin@example.com"}
 	db.Create(&admin)
 	adminToken, _ := middleware.GenerateToken(admin.ID, admin.Email, "", "", false)
-	// Wie in Produktion (Route hinter RequirePermission) gehört der Ersteller
-	// zur Seite; das Ersteller-Recht gilt nur, solange die Rolle besteht.
+	// As in production (route behind RequirePermission) the creator belongs
+	// to the page; the creator right only applies as long as the role exists.
 	adminRole := models.Role{Name: "Ownership Admin", Permissions: "subscribers:create"}
 	db.Create(&adminRole)
 	db.Create(&models.UserStatusPageRole{UserID: admin.ID, StatusPageID: page.ID, RoleID: adminRole.ID})
@@ -298,10 +298,10 @@ func TestSubscriberOwnership(t *testing.T) {
 		}
 	})
 
-	// "exists := email != ''; if !exists || email == ''" war eine
-	// redundante Tautologie (beide Bedingungen sind identisch) - vereinfacht
-	// zu "if email == ''", ohne Verhaltensänderung. Ein gültiger Token ohne
-	// Email-Claim (z.B. bestimmte SSO-Flows) muss weiterhin 401 auslösen.
+	// "exists := email != ''; if !exists || email == ''" was a
+	// redundant tautology (both conditions are identical) - simplified
+	// to "if email == ''", without a behavior change. A valid token without an
+	// email claim (e.g. certain SSO flows) must still trigger 401.
 	t.Run("Gültiger Token ohne Email gibt 401", func(t *testing.T) {
 		noEmailUser := models.User{Email: "noemail-carrier@example.com"}
 		db.Create(&noEmailUser)
@@ -373,9 +373,9 @@ func TestSubscribeHandler_DedupIsScopedPerStatusPage(t *testing.T) {
 	})
 
 	t.Run("Erneutes Abo derselben Seite legt kein zweites an und antwortet wie ein neues", func(t *testing.T) {
-		// Bewusst geändert (vorher 409): Bestätigte Abos antworten wie neue
-		// (200, pending), damit die Antwort nicht verrät, ob die Adresse
-		// abonniert ist.
+		// Deliberately changed (previously 409): confirmed subscriptions respond like new ones
+		// (200, pending), so that the response does not reveal whether the address
+		// is subscribed.
 		db.Model(&models.Subscriber{}).Where("email = ? AND status_page_id = ?", "a@b.de", pageAcme.ID).Update("status", models.SubscriberStatusActive)
 		w := doSubscribe("a@b.de", "acme-dedup")
 		if w.Code != http.StatusOK {
@@ -390,10 +390,10 @@ func TestSubscribeHandler_DedupIsScopedPerStatusPage(t *testing.T) {
 }
 
 // TestSubscriberLifecycle_RecordsAuditEntries: Subscribe,
-// Admin-Update, Admin-Delete und der Token-basierte Unsubscribe-Flow müssen
-// jeweils einen Audit-Log-Eintrag hinterlassen, damit Subscriber-Änderungen
-// im Audit-Log nachvollziehbar sind (vorher gab es dort keinen einzigen
-// Eintrag für den gesamten Subscriber-Lebenszyklus).
+// Admin update, admin delete and the token-based unsubscribe flow must each
+// leave an audit log entry so that subscriber changes
+// are traceable in the audit log (previously there was not a single
+// entry for the entire subscriber lifecycle).
 func TestSubscriberLifecycle_RecordsAuditEntries(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

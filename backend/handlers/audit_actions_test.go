@@ -14,19 +14,19 @@ import (
 	"testing"
 )
 
-// Jede im Backend geschriebene Audit-Aktion braucht eine Beschriftung
-// in de.json UND en.json (auditLog.actions.<gruppe>.<schluessel>), sonst zeigt die
-// Liste den Rohschluessel. rohwerte.test.js prueft das im Frontend per Regex;
-// dieser Test liest per AST (wie scanAuditCategories) und faengt auch Aufrufe
-// ausserhalb von handlers/. Erfasst werden:
+// Every audit action written in the backend needs a label
+// in de.json AND en.json (auditLog.actions.<group>.<key>), otherwise the
+// list shows the raw key. rohwerte.test.js checks this in the frontend via regex;
+// this test reads via AST (like scanAuditCategories) and also catches calls
+// outside handlers/. Covered are:
 //   - RecordAudit(c, ACTION, ...) / RecordSystemAudit(ACTION, ...)
-//   - Action: ... in AuditLog{}-Literalen (auch models.AuditLog)
+//   - Action: ... in AuditLog{} literals (also models.AuditLog)
 //
-// Konstanten (const auditActionX = "a.b") werden aufgeloest. Variablen als Aktion
-// (z. B. action := "x.y" je nach Zweig) sieht der Test nicht direkt; solche Dateien
-// stehen in auditActionVariablen, und dort zaehlen ALLE Literale der Form
-// gruppe.schluessel, deren Gruppe in auditLog.actions existiert, als Aktion.
-// Jede andere Nicht-Literal-Aktion macht den Test rot.
+// Constants (const auditActionX = "a.b") are resolved. Variables as the action
+// (e.g. action := "x.y" depending on the branch) are not seen directly by the test; such files
+// are listed in auditActionVariablen, and there ALL literals of the form
+// group.key whose group exists in auditLog.actions count as an action.
+// Any other non-literal action turns the test red.
 var auditActionVariablen = map[string]string{
 	"selfmonitor/monitor.go":                  "Durchreichung in der Hilfsmethode audit; die Aufrufer sind Literale",
 	"handlers/incident_detail.go":             "action je nach Zweig",
@@ -120,7 +120,7 @@ func scanAuditActions(t *testing.T, root string) (found map[string]string, nonLi
 				case "RecordAudit":
 					idx = 1
 				case "RecordSystemAudit", "audit":
-					// audit: Hilfsmethode der Selbstueberwachung (monitor.audit(action, ...))
+					// audit: helper method of the self-monitoring (monitor.audit(action, ...))
 					idx = 0
 				}
 				if idx >= 0 && len(x.Args) > idx {
@@ -141,7 +141,7 @@ func scanAuditActions(t *testing.T, root string) (found map[string]string, nonLi
 			return true
 		})
 	}
-	// Variablen-Dateien: Literale der Form gruppe.schluessel einer bekannten Gruppe.
+	// Variable files: literals of the form group.key of a known group.
 	groups := map[string]bool{}
 	for k := range found {
 		g, _, _ := strings.Cut(k, ".")
@@ -172,7 +172,7 @@ func isAuditLogType(e ast.Expr) bool {
 	return false
 }
 
-// missingAuditLabels liefert die Aktionen ohne Beschriftung in messages.
+// missingAuditLabels returns the actions without a label in messages.
 func missingAuditLabels(actions []string, messages map[string]any) []string {
 	var missing []string
 	for _, a := range actions {
@@ -224,7 +224,7 @@ func TestAuditActions_HaveLabelsInDeAndEn(t *testing.T) {
 	}
 }
 
-// Gegenprobe: eine fehlende Beschriftung und ein Fixture-Schreiber muessen auffallen.
+// Control check: a missing label and a fixture writer must be noticed.
 func TestAuditActions_Gegenprobe(t *testing.T) {
 	de := loadLocale(t, "de")
 	if m := missingAuditLabels([]string{"statuspage.created"}, de); len(m) != 0 {

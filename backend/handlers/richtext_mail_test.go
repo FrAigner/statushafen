@@ -14,13 +14,13 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Formatierte Nachrichten in E-Mails. Geprüft wird der tatsächlich
-// über SMTP gesendete Text (Fake-Server), also auch der CR/LF-Guard von
-// sendAlertEmail: Eine mehrzeilige Nachricht darf die Mail nicht verwerfen.
+// Formatted messages in emails. What is checked is the text actually
+// sent via SMTP (fake server), so also the CR/LF guard of
+// sendAlertEmail: a multi-line message must not cause the mail to be discarded.
 
 const richMessage = "Wir untersuchen **Fehler**.\nZweite Zeile\n\n- eins\n- *zwei*\n\n[Status](https://status.example.com/p) <script>alert(1)</script> [böse](javascript:alert(2)) <img src=x onerror=alert(3)>"
 
-// mailBody liefert den HTML-Teil einer gesendeten Mail (nach den Kopfzeilen).
+// mailBody returns the HTML part of a sent mail (after the headers).
 func mailBody(t *testing.T, msg string) string {
 	t.Helper()
 	parts := strings.SplitN(msg, "\n\n", 2)
@@ -28,9 +28,9 @@ func mailBody(t *testing.T, msg string) string {
 	return parts[1]
 }
 
-// requireNoActiveMarkup prüft mit dem HTML-Tokenizer, dass der Mailtext weder
-// script/img/iframe-Tags noch Ereignis-Attribute noch Links mit anderem Schema
-// als http(s) (javascript:, data:, ...) enthält.
+// requireNoActiveMarkup uses the HTML tokenizer to check that the mail text contains neither
+// script/img/iframe tags nor event attributes nor links with a scheme other
+// than http(s) (javascript:, data:, ...).
 func requireNoActiveMarkup(t *testing.T, body string) {
 	t.Helper()
 	z := html.NewTokenizer(strings.NewReader(body))
@@ -45,7 +45,7 @@ func requireNoActiveMarkup(t *testing.T, body string) {
 			k, v, hasAttr = z.TagAttr()
 			assert.False(t, strings.HasPrefix(string(k), "on"), "Ereignis-Attribut %s", k)
 			if string(k) == "href" {
-				// Die festen Links der Mail (Statusseite, Abbestellen) dürfen http sein (lokale Umgebung).
+				// The fixed links of the mail (status page, unsubscribe) may be http (local environment).
 				assert.Regexp(t, `^https?://`, string(v), "href %s", v)
 			}
 		}
@@ -58,7 +58,7 @@ func TestDispatchNotifications_StandardMailZeigtFormatierteNachricht(t *testing.
 
 	h.DispatchNotifications(inc, []models.Component{comp}, "CREATED")
 
-	body := mailBody(t, waitForEmail(t, srv)) // angekommen = CR/LF-Guard bestanden
+	body := mailBody(t, waitForEmail(t, srv)) // arrived = CR/LF guard passed
 	assert.Contains(t, body, "<strong>Fehler</strong>")
 	assert.Contains(t, body, "Zweite Zeile")
 	assert.Contains(t, body, "<br>Zweite Zeile")
@@ -70,8 +70,8 @@ func TestDispatchNotifications_StandardMailZeigtFormatierteNachricht(t *testing.
 	requireNoActiveMarkup(t, body)
 }
 
-// Regression: Eine mehrzeilige Nachricht ließ bisher den CR/LF-Guard von
-// sendAlertEmail anschlagen; die Mail wurde still verworfen.
+// Regression: A multi-line message used to trigger the CR/LF guard of
+// sendAlertEmail; the mail was silently discarded.
 func TestDispatchNotifications_MehrzeiligeAltNachrichtWirdZugestellt(t *testing.T) {
 	srv, h, _, page, comp := setupNotificationDispatch(t, "rt-legacy", "rt-legacy@example.com")
 	legacy := "Wir untersuchen das Problem.\r\nBitte um Geduld.\n\n* Punkt\n_ Unterstrich\n# Raute\n- Strich\nsnake_case_name"
@@ -96,17 +96,17 @@ func TestDispatchNotifications_EigeneVorlage_MessageBleibtKlartextMessageHTMLFor
 
 	msg := waitForEmail(t, srv)
 	body := mailBody(t, msg)
-	// {{.Message}}: unveränderter Klartext (Markdown-Quelltext), maskiert wie bisher.
+	// {{.Message}}: unchanged plain text (Markdown source), escaped as before.
 	assert.Contains(t, body, `<section id="klar">Das ist **fett** &amp; &lt;b&gt;roh&lt;/b&gt; mit [Link](https://example.com/x)</section>`)
-	// {{.MessageHTML}}: formatiert und bereinigt, nicht ein zweites Mal maskiert.
+	// {{.MessageHTML}}: formatted and sanitized, not escaped a second time.
 	assert.Contains(t, body, `<section id="html"><p style="margin:0 0 10px;">Das ist <strong>fett</strong> &amp; &lt;b&gt;roh&lt;/b&gt; mit <a href="https://example.com/x"`)
 	assert.NotContains(t, body, "&lt;strong&gt;")
 	assert.NotContains(t, body, "&amp;lt;")
 	assert.Contains(t, msg, "Subject: S :: Titel")
 }
 
-// Eine Vorlage nur mit {{.MessageHTML}} übersteht auch eine mehrzeilige Nachricht
-// (einzeilige Ausgabe), anders als {{.Message}} mit Zeilenumbruch.
+// A template with only {{.MessageHTML}} also survives a multi-line message
+// (single-line output), unlike {{.Message}} with a line break.
 func TestDispatchNotifications_EigeneVorlage_MessageHTMLPassiertCRLFGuard(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "rt-tpl-nl", "rt-tpl-nl@example.com")
 	seedTemplate(t, db, page.ID, handlers.NotificationKindIncidentCreated, handlers.NotificationAudienceStaff, "en",
@@ -118,9 +118,9 @@ func TestDispatchNotifications_EigeneVorlage_MessageHTMLPassiertCRLFGuard(t *tes
 	assert.Contains(t, mailBody(t, waitForEmail(t, srv)), "eins<br>zwei<br>drei")
 }
 
-// Zeilenumbruch in der Vorlage verwirft die Mail nicht mehr, der
-// Body wird zu einer Zeile gefaltet. Der Guard für Betreff/Absender/Header
-// bleibt (siehe send_alert_headers_internal_test.go).
+// A line break in the template no longer discards the mail, the
+// body is folded into one line. The guard for subject/sender/header
+// remains (see send_alert_headers_internal_test.go).
 func TestDispatchNotifications_MehrzeiligeVorlageWirdGefaltetGesendet(t *testing.T) {
 	srv, h, db, page, comp := setupNotificationDispatch(t, "rt-guard", "rt-guard@example.com")
 	seedTemplate(t, db, page.ID, handlers.NotificationKindIncidentCreated, handlers.NotificationAudienceStaff, "en",
@@ -170,7 +170,7 @@ func TestPreview_MessageHTMLPlatzhalterIstBelegt(t *testing.T) {
 	assert.Contains(t, out["bodyHTML"], `<div><p style="margin:0 0 10px;">We are investigating elevated error rates on the payment API.</p></div>`)
 }
 
-// Chat/Webhook: Klartext statt rohem Markdown.
+// Chat/webhook: plain text instead of raw Markdown.
 func TestGoogleChatPayload_NachrichtAlsKlartext(t *testing.T) {
 	payload := handlers.IncidentGoogleChatPayloadForTest(models.Incident{
 		Title: "T", Status: "investigating",

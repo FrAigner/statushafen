@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Der Server hat Grenzen für Header, Body, Antwort und Leerlauf. Ohne sie hält
-// jede Verbindung, die nie fertig sendet, einen Goroutine- und Dateideskriptor-
-// Platz belegt (Slowloris).
+// The server has limits for header, body, response and idle time. Without them,
+// every connection that never finishes sending occupies a goroutine and a file
+// descriptor (Slowloris).
 func TestNewHTTPServer_SetsAllTimeouts(t *testing.T) {
 	srv := newHTTPServer(":0", gin.New(), defaultServerTimeouts)
 	assert.Equal(t, defaultServerTimeouts.ReadHeader, srv.ReadHeaderTimeout)
@@ -25,7 +25,7 @@ func TestNewHTTPServer_SetsAllTimeouts(t *testing.T) {
 	assert.Positive(t, srv.ReadHeaderTimeout)
 	assert.LessOrEqual(t, srv.ReadHeaderTimeout, 15*time.Second, "Header kommen in Sekunden, nicht Minuten")
 	assert.GreaterOrEqual(t, srv.ReadTimeout, srv.ReadHeaderTimeout)
-	// Handler rufen externe Dienste auf (Übersetzung 15 s, Webhook-Test), die Antwort darf nicht davor abreißen.
+	// Handlers call external services (translation 15 s, webhook test); the response must not be cut off before that.
 	assert.GreaterOrEqual(t, srv.WriteTimeout, 45*time.Second)
 	assert.Positive(t, srv.IdleTimeout)
 }
@@ -50,7 +50,7 @@ func TestNewHTTPServer_ClosesStalledHeaderConnection(t *testing.T) {
 	timedOut := errors.As(err, &ne) && ne.Timeout()
 	assert.False(t, timedOut, "Server muss die unvollständige Anfrage selbst beenden, Fehler: %v", err)
 
-	// Gegenprobe: eine vollständige Anfrage wird normal beantwortet.
+	// Control case: a complete request is answered normally.
 	resp, err := http.Get("http://" + ln.Addr().String() + "/nichts")
 	require.NoError(t, err)
 	_ = resp.Body.Close()

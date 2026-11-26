@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-// Grenzen der Vorlagen-Engine. Vorlagen kommen von Seiten-Admins und werden
-// beim Versand je Empfänger ausgeführt; ohne Grenzen ließe sich mit wenigen
-// Zeichen (Schleifen, printf mit Breite, Unterschablonen) der ganze Prozess
-// auslasten. Deshalb sind nur Feldzugriffe auf die Platzhalter und einfache
-// Bedingungen erlaubt, und Länge, Ausgabe und Laufzeit sind begrenzt.
+// Limits of the template engine. Templates come from page admins and are
+// executed per recipient when sending; without limits, a few characters
+// (loops, printf with width, sub-templates) could tie up the whole process.
+// Therefore only field accesses on the placeholders and simple conditions
+// are allowed, and length, output and runtime are bounded.
 const (
-	// MaxTemplateSubjectLen und MaxTemplateBodyLen begrenzen den Quelltext
-	// der Vorlage in Bytes.
+	// MaxTemplateSubjectLen and MaxTemplateBodyLen limit the template source
+	// text in bytes.
 	MaxTemplateSubjectLen = 500
 	MaxTemplateBodyLen    = 64 * 1024
 
@@ -24,15 +24,15 @@ const (
 	maxTemplateBodyOutput    = 512 * 1024
 )
 
-// templateExecTimeout ist die Obergrenze für das Rendern einer Vorlage.
-// Variable statt Konstante, damit Tests sie verkürzen können.
+// templateExecTimeout is the upper bound for rendering a template.
+// A variable rather than a constant so tests can shorten it.
 var templateExecTimeout = 2 * time.Second
 
-// allowedTemplateFuncs sind die einzigen Funktionen in Bedingungen
-// ({{if eq .Status "resolved"}}); sie erzeugen selbst keine Ausgabe.
+// allowedTemplateFuncs are the only functions allowed in conditions
+// ({{if eq .Status "resolved"}}); they produce no output themselves.
 var allowedTemplateFuncs = map[string]bool{"eq": true, "ne": true, "not": true, "and": true, "or": true}
 
-// allowedTemplateFields sind die Platzhalter, die eine Vorlage lesen darf.
+// allowedTemplateFields are the placeholders a template may read.
 var allowedTemplateFields = func() map[string]bool {
 	m := map[string]bool{}
 	t := reflect.TypeOf(NotificationTemplateData{})
@@ -42,8 +42,8 @@ var allowedTemplateFields = func() map[string]bool {
 	return m
 }()
 
-// TemplateErrorCode liefert den Fehlercode eines Vorlagen-Prüffehlers
-// (leer, wenn es keiner ist).
+// TemplateErrorCode returns the error code of a template validation error
+// (empty if it is not one).
 func TemplateErrorCode(err error) string {
 	var ce *codedError
 	if errors.As(err, &ce) {
@@ -60,15 +60,15 @@ func errTemplateNotAllowed(what string) error {
 	return newCodedError("template_construct_not_allowed", "In Vorlagen sind nur Platzhalter und einfache Bedingungen erlaubt: "+what)
 }
 
-// parseAllowedTemplate parst eine Vorlage und lehnt zu lange Quelltexte sowie
-// alle Konstrukte außerhalb der Allowlist ab.
+// parseAllowedTemplate parses a template and rejects overly long source texts
+// as well as all constructs outside the allowlist.
 func parseAllowedTemplate(name, raw string, maxLen int) (*htmltemplate.Template, error) {
 	t, _, err := parseAllowedTemplateFields(name, raw, maxLen)
 	return t, err
 }
 
-// parseAllowedTemplateFields wie parseAllowedTemplate; liefert zusätzlich die
-// Platzhalter, die die Vorlage unbedingt (außerhalb von Bedingungen) ausgibt.
+// parseAllowedTemplateFields is like parseAllowedTemplate; it additionally returns the
+// placeholders the template outputs unconditionally (outside of conditions).
 func parseAllowedTemplateFields(name, raw string, maxLen int) (*htmltemplate.Template, map[string]bool, error) {
 	if len(raw) > maxLen {
 		return nil, nil, newCodedError("template_too_long", "Die Vorlage ist zu lang")
@@ -81,17 +81,17 @@ func parseAllowedTemplateFields(name, raw string, maxLen int) (*htmltemplate.Tem
 		return nil, nil, errTemplateNotAllowed("define/block")
 	}
 	used := map[string]bool{}
-	// Nach erfolgreichem Parsen hat die Vorlage immer einen Baum mit Wurzel
-	// (auch die leere), eine nil-Prüfung wäre unerreichbar.
+	// After successful parsing the template always has a tree with a root
+	// (even the empty one), so a nil check would be unreachable.
 	if err := checkTemplateNode(t.Tree.Root, 0, used); err != nil {
 		return nil, nil, err
 	}
 	return t, used, nil
 }
 
-// checkTemplateNode prüft einen Knoten gegen die Allowlist. In used landen die
-// Platzhalter, die auf oberster Ebene (depth 0, nicht in einer Bedingung)
-// ausgegeben werden.
+// checkTemplateNode checks a node against the allowlist. used collects the
+// placeholders that are output at the top level (depth 0, not inside a
+// condition).
 func checkTemplateNode(n parse.Node, depth int, used map[string]bool) error {
 	switch v := n.(type) {
 	case nil:
@@ -132,7 +132,7 @@ func checkTemplateNode(n parse.Node, depth int, used map[string]bool) error {
 	}
 }
 
-// checkTemplateCondition prüft die Pipeline einer Bedingung.
+// checkTemplateCondition checks the pipeline of a condition.
 func checkTemplateCondition(p *parse.PipeNode) error {
 	if p == nil || len(p.Decl) > 0 || len(p.Cmds) != 1 {
 		return errTemplateNotAllowed("Pipeline")
@@ -158,8 +158,8 @@ func checkTemplateCondition(p *parse.PipeNode) error {
 	return checkTemplateOperand(cmd.Args[0], true)
 }
 
-// checkTemplateOperand erlaubt Platzhalter, in Bedingungen zusätzlich
-// Literale und Klammerausdrücke.
+// checkTemplateOperand allows placeholders, and in conditions additionally
+// literals and parenthesized expressions.
 func checkTemplateOperand(n parse.Node, cond bool) error {
 	switch v := n.(type) {
 	case *parse.FieldNode:
@@ -179,7 +179,7 @@ func checkTemplateOperand(n parse.Node, cond bool) error {
 	return errTemplateNotAllowed(n.String())
 }
 
-// limitedWriter bricht ab, sobald mehr als max Bytes geschrieben werden.
+// limitedWriter aborts as soon as more than max bytes are written.
 type limitedWriter struct {
 	buf      bytes.Buffer
 	max      int
@@ -198,8 +198,8 @@ func (w *limitedWriter) Write(p []byte) (int, error) {
 	return w.buf.Write(p)
 }
 
-// runWithTimeout führt fn aus und bricht das Warten nach d ab. Die
-// Ausgabegrenze beendet eine weiterlaufende Ausführung ohnehin zeitnah.
+// runWithTimeout runs fn and stops waiting after d. The
+// output limit ends an execution that keeps running promptly anyway.
 func runWithTimeout(d time.Duration, fn func() (string, error)) (string, error) {
 	type result struct {
 		s   string

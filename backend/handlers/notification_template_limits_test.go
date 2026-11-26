@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Vorlagen-Engine darf keine Konstrukte ausführen, mit denen sich aus
-// einer kurzen Vorlage riesige Ausgaben oder lange Laufzeiten erzeugen lassen
-// (Schleifen, Unterschablonen, printf mit Breite). Erlaubt sind nur Feldzugriffe
-// auf die dokumentierten Platzhalter und einfache Bedingungen.
+// The template engine must not execute constructs that could produce huge
+// outputs or long runtimes from a short template
+// (loops, sub-templates, printf with width). Only field accesses
+// on the documented placeholders and simple conditions are allowed.
 
 func TestValidateNotificationTemplate_RejectsAmplifyingConstructs(t *testing.T) {
 	cases := map[string]string{
@@ -66,7 +66,7 @@ func TestValidateNotificationTemplate_LengthLimits(t *testing.T) {
 	err = handlers.ValidateNotificationTemplate(tooLongSubject, "<p>x</p>")
 	assert.Equal(t, "template_too_long", handlers.TemplateErrorCode(err))
 
-	// Gegenprobe: genau am Limit ist erlaubt.
+	// Control check: exactly at the limit is allowed.
 	assert.NoError(t, handlers.ValidateNotificationTemplate(strings.Repeat("a", handlers.MaxTemplateSubjectLen), strings.Repeat("a", handlers.MaxTemplateBodyLen)))
 }
 
@@ -82,7 +82,7 @@ func TestFehlercodes_VorlagenLimits(t *testing.T) {
 		{"Speichern: Betreff mit range", "PUT", url, adminTok, map[string]any{"Subject": "{{range 5}}x{{end}}", "BodyHTML": "<p>x</p>"}, 400, "template_construct_not_allowed"},
 		{"Vorschau: zu lang", "POST", url + "/preview", adminTok, map[string]any{"Subject": "S", "BodyHTML": strings.Repeat("a", handlers.MaxTemplateBodyLen+1)}, 400, "template_too_long"},
 		{"Speichern: zu lang", "PUT", url, adminTok, map[string]any{"Subject": "S", "BodyHTML": strings.Repeat("a", handlers.MaxTemplateBodyLen+1)}, 400, "template_too_long"},
-		// Gegenprobe: normale Vorlage funktioniert weiter.
+		// Control: a normal template keeps working.
 		{"Vorschau: normale Vorlage", "POST", url + "/preview", adminTok, map[string]any{"Subject": "[{{.StatusLabel}}] {{.Title}}", "BodyHTML": "<p>{{.Message}}</p>"}, 200, ""},
 	})
 }

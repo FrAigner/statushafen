@@ -19,10 +19,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Das Verzeichnis GET /api/public/pages ist anonym lesbar. Es liefert höchstens
-// 200 Seiten je Aufruf (limit/offset zum Blättern) und kürzt Name und
-// Beschreibung, damit eine einzelne riesige Beschreibung die Antwort nicht auf
-// Megabyte aufbläht.
+// The directory GET /api/public/pages is readable anonymously. It returns at most
+// 200 pages per call (limit/offset for paging) and truncates name and
+// description, so that a single huge description does not inflate the response to
+// megabytes.
 
 type directoryPage struct {
 	ID          uint
@@ -95,7 +95,7 @@ func TestPublicPagesDirectory_RejectsInvalidWindow(t *testing.T) {
 
 func TestPublicPagesDirectory_TruncatesNameAndDescription(t *testing.T) {
 	db, r := directoryEnv(t)
-	// „ä“ belegt zwei Byte: Eine Kürzung nach Byte würde ein Zeichen zerschneiden.
+	// „ä“ takes two bytes: truncating by byte would cut a character in half.
 	longName := strings.Repeat("ä", 400)
 	longDescription := strings.Repeat("ö", 600_000)
 	require.NoError(t, db.Create(&models.StatusPage{Name: longName, Slug: "riesig", Description: longDescription, IsPublicIndexed: true}).Error)
@@ -111,7 +111,7 @@ func TestPublicPagesDirectory_TruncatesNameAndDescription(t *testing.T) {
 	assert.Less(t, len(body), 4096, "die Antwort bleibt klein")
 }
 
-// Gegenprobe: Normale Werte bleiben unverändert, auch genau an der Grenze.
+// Control case: normal values remain unchanged, also exactly at the limit.
 func TestPublicPagesDirectory_KeepsNormalAndBoundaryValues(t *testing.T) {
 	db, r := directoryEnv(t)
 	atLimitName := strings.Repeat("n", 120)
@@ -127,7 +127,7 @@ func TestPublicPagesDirectory_KeepsNormalAndBoundaryValues(t *testing.T) {
 	assert.Equal(t, atLimitDescription, pages[1].Description)
 }
 
-// capturedQueries sammelt den SQL-Text der Lese-Abfragen, solange der Test läuft.
+// capturedQueries collects the SQL text of read queries while the test runs.
 func capturedQueries(t *testing.T, db *gorm.DB) func() []string {
 	t.Helper()
 	var mu sync.Mutex
@@ -146,10 +146,10 @@ func capturedQueries(t *testing.T, db *gorm.DB) func() []string {
 	}
 }
 
-// Die Begrenzung geschieht in der Datenbank, nicht erst danach: feste
-// Reihenfolge nach ID (sonst blättert offset in Postgres unvorhersehbar),
-// LIMIT/OFFSET und die Kürzung von Name und Beschreibung schon in der Abfrage,
-// damit eine riesige Beschreibung nicht erst geladen wird.
+// The limiting happens in the database, not afterwards: fixed
+// order by ID (otherwise offset pages unpredictably in Postgres),
+// LIMIT/OFFSET and the truncation of name and description already in the query,
+// so that a huge description is not loaded in the first place.
 func TestPublicPagesDirectory_QueryOrdersLimitsAndTruncatesInTheDatabase(t *testing.T) {
 	db, r := directoryEnv(t)
 	seedDirectory(t, db, 3)

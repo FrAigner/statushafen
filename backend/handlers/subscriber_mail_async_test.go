@@ -21,13 +21,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bestätigungsmails werden asynchron versendet: Die Antwortzeit darf weder vom
-// SMTP-Server abhängen (hängender Server) noch verraten, ob eine Adresse neu
-// oder schon eingetragen ist (Mail ja/nein).
+// Confirmation mails are sent asynchronously: the response time must neither depend on the
+// SMTP server (hanging server) nor reveal whether an address is new
+// or already registered (mail yes/no).
 
-// startHangingSMTP nimmt Verbindungen an und sendet nie ein Banner. Alle
-// Die Verbindungen schließt die zurückgegebene Funktion (spätestens beim Testende),
-// damit hängende Versand-Goroutinen enden.
+// startHangingSMTP accepts connections and never sends a banner.
+// The returned function closes all connections (at the latest at test end),
+// so that hanging sender goroutines end.
 func startHangingSMTP(t *testing.T) (release func()) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -68,9 +68,9 @@ type asyncMailEnv struct {
 	page models.StatusPage
 }
 
-// setupAsyncMailEnv baut Router und Handler. Beim Testende werden zuerst die
-// hängenden SMTP-Verbindungen (release, darf nil sein) geschlossen, dann wird
-// auf den Versand gewartet, bevor die SMTP-Umgebung zurückgesetzt wird.
+// setupAsyncMailEnv builds the router and handler. At test end the
+// hanging SMTP connections (release, may be nil) are closed first, then
+// the send is awaited before the SMTP environment is reset.
 func setupAsyncMailEnv(t *testing.T, release func()) *asyncMailEnv {
 	t.Helper()
 	db := testutils.SetupTestDB()
@@ -114,9 +114,9 @@ func TestCreateSubscriberAdmin_AntwortOhneWartenAufHaengendenSMTP(t *testing.T) 
 	assert.Less(t, d, 2*time.Second)
 }
 
-// Robuste Relation statt enger Schwelle: Mit hängendem SMTP-Server dauert eine
-// neue Adresse (Mail wird angestoßen) nicht merklich länger als eine bereits
-// aktive (keine Mail). Wäre der Versand synchron, läge der Unterschied bei Sekunden.
+// A robust relation instead of a tight threshold: with a hanging SMTP server a
+// new address (mail is triggered) does not take noticeably longer than an already
+// active one (no mail). If sending were synchronous, the difference would be seconds.
 func TestSubscribe_AntwortzeitNeuGegenBekanntOhneUnterschied(t *testing.T) {
 	e := setupAsyncMailEnv(t, startHangingSMTP(t))
 	require.NoError(t, e.db.Create(&models.Subscriber{StatusPageID: e.page.ID, Channel: "email", Email: "aktiv@example.com", Status: models.SubscriberStatusActive}).Error)
@@ -136,7 +136,7 @@ func TestSubscribe_AntwortzeitNeuGegenBekanntOhneUnterschied(t *testing.T) {
 		"neu %v gegen bekannt %v: kein Zeitunterschied durch den Mailversand", median(neu), median(bekannt))
 }
 
-// captureSlog leitet slog in einen Puffer um und stellt den Standard beim Testende wieder her.
+// captureSlog redirects slog into a buffer and restores the default at test end.
 func captureSlog(t *testing.T) *lockedBuffer {
 	t.Helper()
 	buf := &lockedBuffer{}
@@ -163,7 +163,7 @@ func (l *lockedBuffer) String() string {
 	return l.b.String()
 }
 
-// Gegenprobe zum hängenden Server: Die Mail wird im Hintergrund tatsächlich zugestellt.
+// Counter-check to the hanging server: the mail is actually delivered in the background.
 func TestSubscribe_BestaetigungsmailWirdImHintergrundZugestellt(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -188,8 +188,8 @@ func TestCreateSubscriberAdmin_BestaetigungsmailWirdZugestellt(t *testing.T) {
 	e.h.WaitMails()
 }
 
-// Ist die Warteschlange voll, wird die Mail verworfen und geloggt; die Anfrage
-// blockiert nicht und das Log nennt weder Adresse noch sonstige Eingaben.
+// If the queue is full, the mail is dropped and logged; the request
+// does not block and the log names neither the address nor any other input.
 func TestSubscribe_VolleWarteschlangeBlockiertNichtUndLoggtOhneEingaben(t *testing.T) {
 	logBuf := captureSlog(t)
 	release := startHangingSMTP(t)

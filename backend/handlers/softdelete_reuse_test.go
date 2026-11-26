@@ -16,11 +16,11 @@ import (
 	"gorm.io/gorm"
 )
 
-// Nach dem Löschen eines Tags oder einer Statusseite ließ sich
-// derselbe Name bzw. Slug nicht wieder anlegen (500), weil die Unique-Indizes
-// auch soft-gelöschte Zeilen erfassten. Die Tests laufen mit den echten
-// Produktions-Indizes (database.CreateSoftDeleteUniqueIndexes), da
-// testutils.SetupTestDB nur AutoMigrate kennt.
+// After deleting a tag or a status page, the same name or slug
+// could not be created again (500) because the unique indexes
+// also covered soft-deleted rows. The tests run with the real
+// production indexes (database.CreateSoftDeleteUniqueIndexes), since
+// testutils.SetupTestDB only knows AutoMigrate.
 func setupSoftDeleteReuseRouter(t *testing.T) (*gorm.DB, *gin.Engine) {
 	t.Helper()
 	db := testutils.SetupTestDB()
@@ -67,7 +67,7 @@ func TestSoftDeleteReuse_TagName(t *testing.T) {
 			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 			id := decodeID(t, w.Body.Bytes())
 
-			// Aktiver Name kollidiert: 409 mit Fehlercode statt 500.
+			// Active name collides: 409 with error code instead of 500.
 			w = doTagRequest(r, http.MethodPost, "/api/tags", payload)
 			require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
 			requireErrorCode(t, w.Body.Bytes(), "tag_name_taken")
@@ -75,7 +75,7 @@ func TestSoftDeleteReuse_TagName(t *testing.T) {
 			w = doTagRequest(r, http.MethodDelete, "/api/tags/"+strconv.FormatUint(uint64(id), 10), nil)
 			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-			// Kern: gleicher Name nach dem Löschen wieder anlegbar.
+			// Core: the same name can be created again after deletion.
 			w = doTagRequest(r, http.MethodPost, "/api/tags", payload)
 			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 			require.NotEqual(t, id, decodeID(t, w.Body.Bytes()))
@@ -116,13 +116,13 @@ func TestSoftDeleteReuse_StatusPageSlug(t *testing.T) {
 	w = doTagRequest(r, http.MethodDelete, "/api/admin/pages/"+strconv.FormatUint(uint64(id), 10), nil)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	// Kern: gleicher Slug nach dem Löschen wieder anlegbar.
+	// Core: the same slug can be created again after deletion.
 	w = doTagRequest(r, http.MethodPost, "/api/admin/pages", payload)
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	neuID := decodeID(t, w.Body.Bytes())
 	require.NotEqual(t, id, neuID)
 
-	// Ändern auf einen aktiven fremden Slug: 409 mit Code.
+	// Changing to an active slug of another page: 409 with code.
 	w = doTagRequest(r, http.MethodPost, "/api/admin/pages", map[string]interface{}{"Name": "Andere", "Slug": "andere"})
 	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	andereID := decodeID(t, w.Body.Bytes())
@@ -131,8 +131,8 @@ func TestSoftDeleteReuse_StatusPageSlug(t *testing.T) {
 	requireErrorCode(t, w.Body.Bytes(), "slug_taken")
 }
 
-// Die Systemseite darf nicht gelöscht werden. Vorher brach ein
-// Löschen den nächsten Backend-Start ab (SeedSystemStatusPage → Fatal).
+// The system page must not be deleted. Previously, deleting it
+// aborted the next backend start (SeedSystemStatusPage → Fatal).
 func TestDeleteStatusPageHandler_SystemPageProtected(t *testing.T) {
 	db, r := setupSoftDeleteReuseRouter(t)
 	database.SeedSystemStatusPage(db)

@@ -12,20 +12,20 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Regressionstests für den Notice-Mail-Versand + die
-// zugehörigen Templates.
+// Regression tests for the notice mail dispatch + the
+// associated templates.
 //
 // Testmatrix:
-//   - Notice ohne NotifySubscribers löst KEINEN Mailversand aus
-//     (Rückwärtskompatibilität: bisheriges Verhalten aller Bestandskunden).
-//   - Notice mit NotifySubscribers schickt eine Mail an Email-Subscriber
-//     der Statusseite - mit Default-Body wenn kein Template hinterlegt.
-//   - Custom-Template für notice_created wird verwendet, wenn hinterlegt.
-//   - {{.Title}} und {{.Level}} sind an Notice-Templates verfügbar.
+//   - A notice without NotifySubscribers triggers NO mail dispatch
+//     (backward compatibility: previous behavior for all existing customers).
+//   - A notice with NotifySubscribers sends a mail to email subscribers
+//     of the status page - with the default body if no template is stored.
+//   - A custom template for notice_created is used if stored.
+//   - {{.Title}} and {{.Level}} are available in notice templates.
 
-// setupNoticeDispatch entspricht setupNotificationDispatch, legt aber
-// zusätzlich einen Email-Subscriber an - Notices richten sich an
-// Subscriber, nicht an interne User.
+// setupNoticeDispatch corresponds to setupNotificationDispatch, but
+// additionally creates an email subscriber - notices are aimed at
+// subscribers, not at internal users.
 func setupNoticeDispatch(t *testing.T, slug string) (*fakeSMTPServer, *handlers.Handler, models.StatusPage, *fakeSMTPServer) {
 	t.Helper()
 	srv := startFakeSMTPWithEnv(t)
@@ -59,13 +59,13 @@ func TestDispatchNoticeNotifications_OptOut_NoMailSent(t *testing.T) {
 	}
 	h.DispatchNoticeNotifications(notice, "created")
 
-	// Nichts sollte im Fake-SMTP-Server ankommen. Kurzes Warten, damit ein
-	// versehentlicher goroutine-Versand auch tatsächlich Zeit hätte.
+	// Nothing should arrive at the fake SMTP server. Short wait so that an
+	// accidental goroutine dispatch would actually have time.
 	select {
 	case msg := <-srv.dataCh:
 		t.Fatalf("expected no mail for opt-out notice, got:\n%s", msg)
 	case <-time.After(300 * time.Millisecond):
-		// erwartet
+		// expected
 	}
 }
 
@@ -96,8 +96,8 @@ func TestDispatchNoticeNotifications_DefaultBody(t *testing.T) {
 func TestDispatchNoticeNotifications_CustomTemplate(t *testing.T) {
 	srv, h, page, _ := setupNoticeDispatch(t, "custom-tpl")
 
-	// Custom-Template speichern (der Test tunnelt direkt in die DB, weil das
-	// Wiring des Handler-Chains hier nicht Gegenstand ist - dafür gibt es
+	// Save the custom template (the test goes directly to the DB because the
+	// wiring of the handler chain is not the subject here - there is
 	// notification_template_admin_test.go).
 	tmpl := models.NotificationTemplate{
 		StatusPageID: page.ID,
@@ -128,16 +128,16 @@ func TestDispatchNoticeNotifications_CustomTemplate(t *testing.T) {
 	if !strings.Contains(msg, "NOTICE-BODY :: Alles neu.") {
 		t.Fatalf("expected custom notice body with Message placeholder, got:\n%s", msg)
 	}
-	// Default-Body-Header darf nicht auftauchen, wenn das Custom-Template
-	// aktiv ist.
+	// The default body header must not appear when the custom template
+	// is active.
 	if strings.Contains(msg, "Ankündigung") && strings.Contains(msg, "Statushafen") {
 		t.Fatalf("expected the default template NOT to be used when a custom template exists, got:\n%s", msg)
 	}
 }
 
-// Review-Befund 3: Der Update-Handler wählt anhand von
-// Alt- und Neuzustand die Mail-Art (created/updated/ended). Eindeutige
-// Betreffs je Vorlage zeigen, welcher Fall gegriffen hat.
+// Review finding 3: the update handler chooses the mail type (created/updated/ended)
+// based on the old and new state. Unique
+// subjects per template show which case applied.
 func TestUpdateNoticeHandler_VersandArt(t *testing.T) {
 	type fall struct {
 		name        string
@@ -145,7 +145,7 @@ func TestUpdateNoticeHandler_VersandArt(t *testing.T) {
 		wasActive   bool
 		notify      bool
 		body        string
-		wantSubject string // leer = keine Mail erwartet
+		wantSubject string // empty = no mail expected
 	}
 	faelle := []fall{
 		{"inaktiv zu aktiv sendet created", "upd-created", false, true, `{"Title":"T","Message":"m","IsActive":true}`, "KIND-CREATED :: T"},
@@ -162,7 +162,7 @@ func TestUpdateNoticeHandler_VersandArt(t *testing.T) {
 			if err := h.DB.Create(&n).Error; err != nil {
 				t.Fatalf("create notice: %v", err)
 			}
-			// Per Update setzen, weil GORM beim Create den Zero-Value nicht von true unterscheidet.
+			// Set via update, because GORM cannot distinguish the zero value from true on create.
 			if err := h.DB.Model(&n).Updates(map[string]any{"is_active": f.wasActive, "notify_subscribers": f.notify}).Error; err != nil {
 				t.Fatalf("set flags: %v", err)
 			}
@@ -188,8 +188,8 @@ func TestUpdateNoticeHandler_VersandArt(t *testing.T) {
 	}
 }
 
-// createKindTemplates legt je Notice-Art eine Subscriber-Vorlage mit
-// eindeutigem Betreff an (KIND-CREATED/UPDATED/ENDED :: Titel).
+// createKindTemplates creates a subscriber template per notice kind with a
+// distinct subject (KIND-CREATED/UPDATED/ENDED :: title).
 func createKindTemplates(t *testing.T, h *handlers.Handler, pageID uint) {
 	t.Helper()
 	for kind, prefix := range map[string]string{
@@ -211,15 +211,15 @@ func createKindTemplates(t *testing.T, h *handlers.Handler, pageID uint) {
 	}
 }
 
-// Review-Befund 4: Der Create-Handler übernimmt Collapsed,
-// StartAt, EndAt und NotifySubscribers und verschickt nur bei aktiver
-// Notice mit NotifySubscribers eine "created"-Mail.
+// Review finding 4: the create handler takes over Collapsed,
+// StartAt, EndAt and NotifySubscribers and sends a "created" mail only for an active
+// notice with NotifySubscribers.
 func TestCreateNoticeHandler_Versand(t *testing.T) {
 	type fall struct {
 		name        string
 		slug        string
 		body        string
-		wantSubject string // leer = keine Mail erwartet
+		wantSubject string // empty = no mail expected
 		wantNotify  bool
 	}
 	faelle := []fall{

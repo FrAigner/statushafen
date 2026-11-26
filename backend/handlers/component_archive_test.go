@@ -16,9 +16,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// Komponenten archivieren und wiederherstellen. Nutzt die
-// Testumgebung der Sichtbarkeit, weil archivierte Komponenten
-// öffentlich wie unsichtbare behandelt werden.
+// Archive and restore components. Uses the
+// visibility test environment because archived components
+// are treated publicly like invisible ones.
 
 func (e *visEnv) compURL(c models.Component, suffix string) string {
 	return e.base + "/" + strconv.Itoa(int(c.ID)) + suffix
@@ -47,7 +47,7 @@ func TestComponentArchive_ArchiviertUndStelltWiederHer(t *testing.T) {
 	require.NotNil(t, e.reload(comp).ArchivedAt)
 	assert.EqualValues(t, 1, e.auditCount("component.archived"))
 
-	// idempotent: zweites Archivieren behält den ersten Zeitpunkt, kein zweiter Audit-Eintrag
+	// idempotent: second archiving keeps the first timestamp, no second audit entry
 	first := *e.reload(comp).ArchivedAt
 	w, _ = e.do("POST", e.compURL(comp, "/archive"), nil)
 	requireStatusCode(t, w, http.StatusOK)
@@ -60,7 +60,7 @@ func TestComponentArchive_ArchiviertUndStelltWiederHer(t *testing.T) {
 	assert.Nil(t, e.reload(comp).ArchivedAt)
 	assert.EqualValues(t, 1, e.auditCount("component.restored"))
 
-	// Wiederherstellen einer aktiven Komponente ist ebenfalls folgenlos.
+	// Restoring an active component is likewise without effect.
 	w, _ = e.do("POST", e.compURL(comp, "/restore"), nil)
 	requireStatusCode(t, w, http.StatusOK)
 	assert.EqualValues(t, 1, e.auditCount("component.restored"))
@@ -97,7 +97,7 @@ func TestComponentArchive_GruppeNimmtMitgliederMit(t *testing.T) {
 	group := e.comp("Gruppe", nil, true, "group")
 	child := e.comp("Kind", &group.ID, true, "operational")
 	grandchild := e.comp("Enkel", &child.ID, true, "operational")
-	// Bereits vorher einzeln archiviert: behält seinen eigenen Zeitpunkt.
+	// Already archived individually beforehand: keeps its own timestamp.
 	early := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	own := e.comp("Schon weg", &group.ID, true, "operational")
 	require.NoError(t, e.db.Model(&own).Update("archived_at", early).Error)
@@ -111,13 +111,13 @@ func TestComponentArchive_GruppeNimmtMitgliederMit(t *testing.T) {
 	assert.True(t, early.Equal(*e.reload(own).ArchivedAt), "früherer Zeitpunkt bleibt")
 	assert.Nil(t, e.reload(other).ArchivedAt)
 
-	// Kind einzeln wiederherstellen geht nicht, solange die Gruppe archiviert ist.
+	// Restoring a child individually does not work while the group is archived.
 	w, m := e.do("POST", e.compURL(child, "/restore"), nil)
 	requireStatusCode(t, w, http.StatusConflict)
 	assert.Equal(t, "parent_archived", m["code"])
 	assert.NotNil(t, e.reload(child).ArchivedAt)
 
-	// Gruppe wiederherstellen holt nur die mit archivierten Mitglieder zurück.
+	// Restoring the group brings back only the members archived with it.
 	w, _ = e.do("POST", e.compURL(group, "/restore"), nil)
 	requireStatusCode(t, w, http.StatusOK)
 	for _, c := range []models.Component{group, child, grandchild} {
@@ -125,7 +125,7 @@ func TestComponentArchive_GruppeNimmtMitgliederMit(t *testing.T) {
 	}
 	assert.NotNil(t, e.reload(own).ArchivedAt, "einzeln archiviertes Mitglied bleibt archiviert")
 
-	// Ein Mitglied lässt sich einzeln archivieren und (bei aktiver Gruppe) zurückholen.
+	// A member can be archived individually and (with an active group) brought back.
 	w, _ = e.do("POST", e.compURL(child, "/archive"), nil)
 	requireStatusCode(t, w, http.StatusOK)
 	assert.Nil(t, e.reload(group).ArchivedAt)
@@ -207,7 +207,7 @@ func TestComponentArchive_OeffentlichAusgeblendetAdminSiehtSie(t *testing.T) {
 	require.NoError(t, e.db.Create(&inc).Error)
 	require.NoError(t, e.db.Create(&models.IncidentComponent{IncidentID: inc.ID, ComponentID: archived.ID}).Error)
 
-	// Öffentliches Dashboard: weder Baum noch Vorfall-Zuordnung zeigen den Namen.
+	// Public dashboard: neither tree nor incident assignment shows the name.
 	w := e.get("/api/public/pages/vis-580/dashboard")
 	requireStatusCode(t, w, http.StatusOK)
 	assert.NotContains(t, w.Body.String(), "Alt\"")
@@ -222,12 +222,12 @@ func TestComponentArchive_OeffentlichAusgeblendetAdminSiehtSie(t *testing.T) {
 	require.Len(t, resp.Incidents, 1, "der Vorfall bleibt")
 	assert.Empty(t, resp.Incidents[0].Components)
 
-	// Verfügbarkeit: archivierte Komponente taucht nicht auf.
+	// Availability: archived component does not appear.
 	w = e.get("/api/public/pages/vis-580/availability?include=components")
 	requireStatusCode(t, w, http.StatusOK)
 	assert.NotContains(t, w.Body.String(), "Alt")
 
-	// Anonym (öffentliche Komponentenliste): gefiltert.
+	// Anonymous (public component list): filtered.
 	w = e.get(e.base)
 	requireStatusCode(t, w, http.StatusOK)
 	var tree []any
@@ -236,7 +236,7 @@ func TestComponentArchive_OeffentlichAusgeblendetAdminSiehtSie(t *testing.T) {
 	collectNames(tree, &names)
 	assert.ElementsMatch(t, []string{"Gruppe", "Kind aktiv", "Offen"}, names)
 
-	// Verwalter sehen alles, archivierte mit ArchivedAt.
+	// Managers see everything, archived ones with ArchivedAt.
 	admin := models.User{Email: "arch-admin@example.com", IsGlobalAdmin: true}
 	require.NoError(t, e.db.Create(&admin).Error)
 	req, _ := http.NewRequest("GET", e.base, nil)

@@ -14,31 +14,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 90-Tage-Verfügbarkeit für die Statusseite (Redesign Paket 4a).
-// nach Schweregrad gewichtet.
+// 90-day availability for the status page (redesign package 4a),
+// weighted by severity.
 //
-// Datenquelle: Vorfälle, Wartungsfenster, gespiegelte externe Meldungen und
-// seit der Umstellung die Statushistorie der Komponenten (component_status_changes:
-// Webhook, manuell, Wartung, Selbstüberwachung). Die Historie beginnt mit dem
-// Nachtrag der Bestandsstände; davor gesetzte Ausfälle ohne vorfall fehlen
-// weiterhin. Eigene Vorfälle tragen seit der Umstellung einen Schweregrad
-// (Incident.Severity, Altdaten degraded_performance, Gewicht 0,3). Externe
-// Meldungen bringen ihr `impact` mit (minor/major/critical -> degraded/partial/
-// major). Ausfälle, die nur per Webhook/manuell ohne Vorfall gesetzt werden,
-// zählen über die Historie mit ihrem Status; überlappende Quellen zählen nach
-// dem schlimmsten Status.
-// Die Gesamtseite ist der Durchschnitt der sichtbaren Komponenten (versteckte
-// Komponenten und ihre Vorfälle zählen nicht).
+// Data source: incidents, maintenance windows, mirrored external reports and,
+// since the changeover, the components' status history (component_status_changes:
+// webhook, manual, maintenance, self-monitoring). The history begins with the
+// backfill of the existing states; outages set before that without an incident are still
+// missing. Own incidents have carried a severity since the changeover
+// (Incident.Severity, legacy data degraded_performance, weight 0.3). External
+// reports bring their `impact` along (minor/major/critical -> degraded/partial/
+// major). Outages set only via webhook/manual without an incident
+// count via the history with their status; overlapping sources count by
+// the worst status.
+// The overall page is the average of the visible components (hidden
+// components and their incidents do not count).
 
 const (
 	availabilityDays     = 90
 	availabilityCacheTTL = 60 * time.Second
-	// maxHistoryRowsPerComponent begrenzt die Zeilen der Statushistorie je
-	// Komponente beim Lesen. Ohne Grenze lädt Dauerflattern
-	// (86.400 Zeilen ≈ 0,6 s) unbegrenzt viel. Normal sind es wenige Dutzend
-	// Zeilen in 90 Tagen; die Schreib-Verdichtung (statushistory.MergeGap)
-	// erlaubt höchstens 2.880 je Tag, 10.000 decken also über 3 Tage
-	// Dauerflattern ab und kosten rund 70 ms je Komponente.
+	// maxHistoryRowsPerComponent limits the rows of the status history per
+	// component when reading. Without a limit, permanent flapping loads
+	// (86,400 rows ≈ 0.6 s) an unbounded amount. Normally there are a few dozen
+	// rows in 90 days; the write compaction (statushistory.MergeGap)
+	// allows at most 2,880 per day, so 10,000 cover over 3 days of
+	// permanent flapping and cost about 70 ms per component.
 	maxHistoryRowsPerComponent = 10000
 )
 
@@ -47,7 +47,7 @@ type availabilityDay struct {
 	Status          string   `json:"status"`
 	Availability    *float64 `json:"availability"`
 	DowntimeSeconds int64    `json:"downtime_seconds"`
-	// Impairments: Dauer je Schweregrad (ungewichtet, schlimmster zuerst).
+	// Impairments: duration per severity (unweighted, worst first).
 	Impairments []availabilityImpairment `json:"impairments"`
 }
 
@@ -70,15 +70,15 @@ type availabilityResponse struct {
 	UptimePercent *float64                `json:"uptime_percent"`
 	Days          []availabilityDay       `json:"days"`
 	Components    []availabilityComponent `json:"components,omitempty"`
-	// HistoryTruncated: Mindestens eine Komponente hat im Fenster
-	// mehr Statuswechsel als maxHistoryRowsPerComponent; ausgewertet wurden
-	// nur die neuesten, ältere Beeinträchtigungen fehlen.
+	// HistoryTruncated: At least one component has more status changes
+	// in the window than maxHistoryRowsPerComponent; only the newest were
+	// evaluated, older impairments are missing.
 	HistoryTruncated bool `json:"history_truncated,omitempty"`
 }
 
-// availabilityCache hält die Antwort je Seite kurz vor (60 s): Die Statusseite
-// wird häufig aufgerufen, die Berechnung läuft über bis zu 90 Tage Vorfälle.
-// Zugriffsprüfung passiert VOR dem Cache, der Eintrag enthält nur Seitendaten.
+// availabilityCache keeps the response per page briefly (60 s): The status page
+// is requested often, and the calculation runs over up to 90 days of incidents.
+// The access check happens BEFORE the cache; the entry contains only page data.
 type availabilityCache struct {
 	mu      sync.Mutex
 	entries map[availabilityCacheKey]availabilityCacheEntry
@@ -143,11 +143,11 @@ func (h *Handler) GetPublicAvailabilityHandler(c *gin.Context) {
 }
 
 func (h *Handler) respondAvailability(c *gin.Context, key availabilityCacheKey, now time.Time, resp availabilityResponse) {
-	// erst kodieren, dann cachen. Eine nicht kodierbare Antwort
-	// (z. B. NaN) bliebe sonst 60 s im Cache. Zudem setzt gin in c.JSON den
-	// Status 200 vor dem Kodieren: schlägt es fehl, bekäme der Client 200 mit
-	// leerem Body (der Fehler läge nur in c.Errors, Access-Log und
-	// Statusüberwachung sähen 200). Darum vorher selbst kodieren und 500 senden.
+	// Encode first, then cache. A response that cannot be encoded
+	// (e.g. NaN) would otherwise stay in the cache for 60 s. Also, gin sets the
+	// status 200 in c.JSON before encoding: if it fails, the client would get 200 with
+	// an empty body (the error would only be in c.Errors, and the access log and
+	// status monitoring would see 200). So encode ourselves first and send 500.
 	body, err := json.Marshal(resp)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute availability", "code": "server_error"})
@@ -157,20 +157,20 @@ func (h *Handler) respondAvailability(c *gin.Context, key availabilityCacheKey, 
 	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
 }
 
-// availabilityIncidentRow: Vorfall plus (optionale) Komponente aus einem
-// einzigen LEFT JOIN, damit es keine Abfrage pro Vorfall gibt.
+// availabilityIncidentRow: incident plus (optional) component from a
+// single LEFT JOIN, so there is no query per incident.
 type availabilityIncidentRow struct {
 	models.Incident
 	ComponentID *uint
-	LinkID      *uint // incident_components.id; nil = Vorfall ohne Zuordnung
+	LinkID      *uint // incident_components.id; nil = incident without assignment
 }
 
 func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withComponents bool) (availabilityResponse, error) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	windowStart := today.AddDate(0, 0, -(availabilityDays - 1))
 
-	// Sichtbare Komponenten: versteckte samt Nachfahren zählen
-	// weder als Zeile noch für die Gesamtseite.
+	// Visible components: hidden ones including descendants count
+	// neither as a row nor for the overall page.
 	var comps []models.Component
 	if err := h.DB.Where(whereStatusPageIDEquals, page.ID).Order("sort_order asc, id asc").Find(&comps).Error; err != nil {
 		return availabilityResponse{}, err
@@ -186,8 +186,8 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		}
 	}
 
-	// Eine Abfrage: Vorfälle im Fenster samt Komponentenzuordnung. Grober
-	// SQL-Filter, die genaue Kappung macht availability.Compute.
+	// One query: incidents in the window including component assignment. Coarse
+	// SQL filter; the exact clamping is done by availability.Compute.
 	var rows []availabilityIncidentRow
 	err := h.DB.Table("incidents").
 		Select("incidents.*, c.id AS component_id, ic.id AS link_id").
@@ -201,9 +201,9 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		return availabilityResponse{}, err
 	}
 
-	// Ein Vorfall ohne eine einzige Komponentenzeile betrifft die ganze Seite
-	// (alle sichtbaren Komponenten); einer, dessen Komponenten alle gelöscht
-	// oder versteckt sind, wird ignoriert.
+	// An incident without a single component row affects the whole page
+	// (all visible components); one whose components are all deleted
+	// or hidden is ignored.
 	var pageWide []availability.Interval
 	perComp := map[uint][]availability.Interval{}
 	dataStart := page.CreatedAt.UTC()
@@ -219,10 +219,10 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 			continue
 		}
 		if r.ComponentID == nil && r.LinkID != nil {
-			continue // alle zugeordneten Komponenten gelöscht bzw. fremd
+			continue // all assigned components deleted or foreign
 		}
 		if r.ComponentID != nil && hidden[*r.ComponentID] {
-			continue // betrifft nur eine unsichtbare Komponente
+			continue // affects only an invisible component
 		}
 		switch {
 		case r.ComponentID != nil:
@@ -237,9 +237,9 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		}
 	}
 
-	// gespiegelte Meldungen externer Quellen zählen wie eigene
-	// Vorfälle, an den eigenen Komponenten, die sie betreffen - mit ihrem
-	// Schweregrad.
+	// Mirrored reports from external sources count like own
+	// incidents, on the own components they affect - with their
+	// severity.
 	extRows, err := h.externalAvailabilityIntervals(page.ID, now)
 	if err != nil {
 		return availabilityResponse{}, err
@@ -256,8 +256,8 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		}
 	}
 
-	// Je Blatt-Komponente (Gruppen haben keinen eigenen Status) einmal rechnen;
-	// die Gesamtseite ist der Durchschnitt, ihr Status der schlimmste aller Tage.
+	// Compute once per leaf component (groups have no status of their own);
+	// the overall page is the average, its status the worst of all days.
 	var leaves []models.Component
 	for _, comp := range comps {
 		if comp.Status != componentStatusGroup {
@@ -265,9 +265,9 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		}
 	}
 
-	// Statushistorie der Blätter (Webhook, manuell, Wartung,
-	// Selbstüberwachung). Überlappungen mit Vorfällen zählt Compute nach dem
-	// schlimmsten Status. Nur Komponenten dieser (sichtbaren) Seite.
+	// Status history of the leaves (webhook, manual, maintenance,
+	// self-monitoring). Compute counts overlaps with incidents by the
+	// worst status. Only components of this (visible) page.
 	hist, truncated, err := h.statusHistoryIntervals(leaves, windowStart, now)
 	if err != nil {
 		return availabilityResponse{}, err
@@ -296,7 +296,7 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 		To:            today.Format("2006-01-02"),
 		UptimePercent: availability.Summary(pageDays),
 		Days:          toAvailabilityDays(pageDays),
-		// Hinweis, dass bei Dauerflattern nur die neuesten Wechsel einflossen.
+		// Note that with permanent flapping only the newest changes were included.
 		HistoryTruncated: len(truncated) > 0,
 	}
 	if withComponents {
@@ -310,7 +310,7 @@ func (h *Handler) buildAvailability(page models.StatusPage, now time.Time, withC
 	return resp, nil
 }
 
-// allHidden: ids ist nicht leer und jede ID gehört einer unsichtbaren
+// allHidden: ids is not empty and every ID belongs to an invisible
 // Komponente.
 func allHidden(ids []uint, hidden map[uint]bool) bool {
 	if len(ids) == 0 {
@@ -324,8 +324,8 @@ func allHidden(ids []uint, hidden map[uint]bool) bool {
 	return true
 }
 
-// expandGroup liefert die Komponente selbst bzw. bei einer Gruppe alle
-// Nachfahren (ein Vorfall an einer Gruppe betrifft deren Kinder).
+// expandGroup returns the component itself or, for a group, all
+// descendants (an incident on a group affects its children).
 func expandGroup(byID map[uint]models.Component, children map[uint][]uint, id uint) []uint {
 	comp, ok := byID[id]
 	if !ok {
@@ -341,10 +341,10 @@ func expandGroup(byID map[uint]models.Component, children map[uint][]uint, id ui
 	return out
 }
 
-// incidentInterval bildet einen Vorfall bzw. ein Wartungsfenster auf ein
-// Intervall ab. Beginn: StartedAt, sonst CreatedAt. Ende: ResolvedAt; offene
-// Vorfälle laufen bis jetzt; behobene ohne ResolvedAt (Altdaten) enden mit der
-// letzten Änderung. ok=false: nicht auswertbar (Wartung ohne Zeiten).
+// incidentInterval maps an incident or maintenance window to an
+// interval. Start: StartedAt, otherwise CreatedAt. End: ResolvedAt; open
+// incidents run until now; resolved ones without ResolvedAt (legacy data) end with the
+// last change. ok=false: not evaluable (maintenance without times).
 func incidentInterval(inc models.Incident, now time.Time) (availability.Interval, bool) {
 	if inc.IsMaintenance {
 		if inc.ScheduledStartAt == nil || inc.ScheduledEndAt == nil {
@@ -384,16 +384,16 @@ func toAvailabilityDays(days []availability.Day) []availabilityDay {
 	return out
 }
 
-// externalInterval ist ein Zeitraum einer gespiegelten externen Meldung samt
-// den eigenen Komponenten, die sie betrifft.
+// externalInterval is a period of a mirrored external report together with
+// the own components it affects.
 type externalInterval struct {
 	interval     availability.Interval
 	componentIDs []uint
 }
 
-// externalViewInterval bildet eine Meldung auf ein Intervall ab. Wartungen
-// laufen von ScheduledFor bis ScheduledUntil, Vorfälle von StartedAt (sonst der
-// letzten Änderung) bis zur Behebung bzw. jetzt.
+// externalViewInterval maps a report to an interval. Maintenance windows
+// run from ScheduledFor to ScheduledUntil, incidents from StartedAt (otherwise the
+// last change) until resolution or now.
 func externalViewInterval(v externalIncidentView, now time.Time) (availability.Interval, bool) {
 	if v.Kind == models.ExternalIncidentKindMaintenance {
 		if v.ScheduledFor == nil || v.ScheduledUntil == nil {
@@ -401,8 +401,8 @@ func externalViewInterval(v externalIncidentView, now time.Time) (availability.I
 		}
 		return availability.Interval{Start: v.ScheduledFor.UTC(), End: v.ScheduledUntil.UTC(), Status: componentstatus.UnderMaintenance}, true
 	}
-	// Schweregrad aus `impact`. "none" meldet die Fremdseite
-	// ausdrücklich als folgenlos.
+	// Severity from `impact`. "none" is explicitly reported by the external
+	// site as without consequences.
 	status, counts := externalImpactStatus(v.Impact)
 	if !counts {
 		return availability.Interval{}, false
@@ -432,10 +432,10 @@ func externalViewInterval(v externalIncidentView, now time.Time) (availability.I
 	return availability.Interval{Start: start.UTC(), End: end.UTC(), Status: status}, true
 }
 
-// externalImpactStatus ordnet das `impact` einer externen Meldung einem
-// Komponentenstatus zu (Vorschlag): minor ->
+// externalImpactStatus maps the `impact` of an external report to a
+// component status (suggestion): minor ->
 // degraded_performance, major -> partial_outage, critical -> major_outage;
-// none zählt nicht. Unbekannte oder leere Werte zählen vorsichtig wie bisher als
+// none does not count. Unknown or empty values count conservatively as before as
 // degraded_performance.
 func externalImpactStatus(impact string) (string, bool) {
 	switch impact {
@@ -469,11 +469,11 @@ func (h *Handler) externalAvailabilityIntervals(pageID uint, now time.Time) ([]e
 	return out, nil
 }
 
-// statusHistoryIntervals liest die Statushistorie der Komponenten im Fenster
-// samt dem jeweils letzten Eintrag davor (Ausgangsstatus) und bildet
-// Intervalle je Komponente. Zwei indexgestützte Abfragen (component_id,
-// changed_at) statt einer je Komponente; die Komponentenliste stammt aus der
-// Seite, fremde Komponenten kommen nie vor (Mandantentrennung).
+// statusHistoryIntervals reads the components' status history in the window
+// together with the latest entry before it (initial status) and builds
+// intervals per component. Two index-backed queries (component_id,
+// changed_at) instead of one per component; the component list comes from the
+// page, foreign components never occur (tenant separation).
 func (h *Handler) statusHistoryIntervals(leaves []models.Component, windowStart, now time.Time) (map[uint][]availability.Interval, []uint, error) {
 	ids := make([]uint, len(leaves))
 	for i, c := range leaves {
@@ -482,16 +482,16 @@ func (h *Handler) statusHistoryIntervals(leaves []models.Component, windowStart,
 	if len(ids) == 0 {
 		return nil, nil, nil
 	}
-	// je Komponente nur die neuesten maxHistoryRowsPerComponent+1
-	// Zeilen (Fensterfunktion); die eine Zeile darüber zeigt nur an, dass
-	// gekürzt wurde, und fällt weg. Der erste behaltene Eintrag bestimmt dann
-	// den Anfangsstatus.
+	// per component only the newest maxHistoryRowsPerComponent+1
+	// rows (window function); the one row beyond only indicates that
+	// truncation occurred, and is dropped. The first retained entry then determines
+	// the initial status.
 	var rows []struct {
 		models.ComponentStatusChange
 		Rn int
 	}
-	// Ausgangsstatus = neuester Eintrag VOR dem Fenster nach (changed_at, id),
-	// nicht nach der höchsten ID.
+	// Initial status = newest entry BEFORE the window by (changed_at, id),
+	// not by highest ID.
 	err := h.DB.Raw(`SELECT id, component_id, old_status, new_status, source, changed_at, created_at, rn FROM (
 SELECT s.*, ROW_NUMBER() OVER (PARTITION BY s.component_id ORDER BY s.changed_at DESC, s.id DESC) AS rn FROM (
 SELECT * FROM component_status_changes WHERE component_id IN ? AND (changed_at >= ? OR (changed_at < ? AND NOT EXISTS (

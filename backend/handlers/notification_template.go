@@ -12,32 +12,32 @@ import (
 	"gorm.io/gorm"
 )
 
-// Template-Engine + Platzhalter-System für Benachrichtigungs-Mails.
+// Template engine + placeholder system for notification mails.
 //
-// Die früheren fmt.Sprintf-basierten Subject/Body-Strings werden durch
-// html/template ersetzt, sobald für die Kombination
-// (StatusPage, Kind, Language) ein NotificationTemplate hinterlegt ist.
-// Fehlt ein Custom-Template, greift der bestehende Default-Renderer
-// (buildNotificationEmailHTML), damit sich das Verhalten für alle Seiten
-// ohne eigene Konfiguration bitgenau nicht ändert.
+// The former fmt.Sprintf-based subject/body strings are replaced by
+// html/template as soon as a NotificationTemplate is stored for the combination
+// (StatusPage, Kind, Language).
+// If no custom template exists, the existing default renderer
+// (buildNotificationEmailHTML) applies, so that behavior does not change bit for bit
+// for all pages without their own configuration.
 //
-// html/template escaped Platzhalterwerte automatisch (Regressionsschutz). Die Absender-Validierung gegen SMTP-Header-Injection erledigt
-// weiterhin sendAlertEmail per hasHeaderInjectionChars auf dem fertig
-// gerenderten Subject/Body - ein manipuliertes Template, das CR/LF
-// einschleust, wird dort also weiterhin verworfen.
+// html/template escapes placeholder values automatically (regression protection). Sender validation against SMTP header injection is still done
+// by sendAlertEmail via hasHeaderInjectionChars on the fully
+// rendered subject/body - a manipulated template that smuggles in CR/LF
+// is therefore still discarded there.
 
-// Notification-Template-Kinds. Bewusst als typisierte Konstanten statt
-// Magic-Strings, damit ein Tippfehler beim Nachschlagen des Templates
-// gleich zur Compile-Zeit auffällt.
-// Incident-Kinds stammen, Maintenance-Kinds sind dazugekommen
-// (analog zu den drei DispatchNotifications-Actions in maintenance_scheduler.go:
+// Notification template kinds. Deliberately typed constants instead of
+// magic strings, so that a typo when looking up the template
+// is caught at compile time.
+// Incident kinds are the original ones, maintenance kinds were added
+// (analogous to the three DispatchNotifications actions in maintenance_scheduler.go:
 // MAINTENANCE_REMINDER / MAINTENANCE_STARTED / MAINTENANCE_COMPLETED).
 //
-// General-Notice-Kinds sind bewusst NICHT enthalten: GeneralNotice-Endpunkte
-// versenden aktuell keine Mails (siehe handlers/general_notice.go), das
-// die Vorgabe formuliert diesen Teil deshalb explizit als konditional ("falls
-// diese per Mail versendet werden"). Wenn Mail-Versand für Notices später
-// nachgezogen wird, kommen die zugehörigen Kinds hier hinzu.
+// General notice kinds are deliberately NOT included: GeneralNotice endpoints
+// currently send no mails (see handlers/general_notice.go), the
+// specification therefore phrases this part explicitly as conditional ("if
+// these are sent by mail"). If mail dispatch for notices is added
+// later, the corresponding kinds will be added here.
 const (
 	NotificationKindIncidentCreated      = "incident_created"
 	NotificationKindIncidentUpdated      = "incident_updated"
@@ -45,17 +45,17 @@ const (
 	NotificationKindMaintenanceReminder  = "maintenance_reminder"
 	NotificationKindMaintenanceStarted   = "maintenance_started"
 	NotificationKindMaintenanceCompleted = "maintenance_completed"
-	// Notice-Kinds: kommen zum Tragen, wenn eine GeneralNotice
-	// mit NotifySubscribers=true angelegt/aktualisiert/beendet wird und
-	// dabei durch DispatchNoticeNotifications geschickt wird.
+	// Notice kinds: come into play when a GeneralNotice
+	// is created/updated/ended with NotifySubscribers=true and
+	// is sent through DispatchNoticeNotifications.
 	NotificationKindNoticeCreated = "notice_created"
 	NotificationKindNoticeUpdated = "notice_updated"
 	NotificationKindNoticeEnded   = "notice_ended"
-	// Bestätigungsmail des Double-Opt-in für E-Mail-Abos
-	// (Audience subscriber, Platzhalter {{.ConfirmURL}}).
+	// Confirmation mail of the double opt-in for email subscriptions
+	// (Audience subscriber, placeholder {{.ConfirmURL}}).
 	NotificationKindSubscriptionConfirm = "subscription_confirm"
-	// Teil B2: Meldungen externer Quellen an Abonnenten
-	// (Audience subscriber, Platzhalter {{.SourceName}}/{{.SourceURL}}).
+	// Part B2: reports from external sources to subscribers
+	// (Audience subscriber, placeholders {{.SourceName}}/{{.SourceURL}}).
 	NotificationKindExternalIncidentCreated     = "external_incident_created"
 	NotificationKindExternalIncidentUpdated     = "external_incident_updated"
 	NotificationKindExternalIncidentResolved    = "external_incident_resolved"
@@ -64,58 +64,58 @@ const (
 	NotificationKindExternalMaintenanceResolved = "external_maintenance_resolved"
 )
 
-// Notification-Audience-Werte (Stage 5 der Mehrsprachigkeit):
-// lösen die vorherige Konvention auf, bei der die Zielgruppe implizit über
-// Language=en ("staff") bzw. Language=de ("subscriber") codiert war (siehe
-// Kommentar an models.NotificationTemplate). NotificationAudienceStaff
-// erreicht interne User (Admin/Editor), NotificationAudienceSubscriber die
-// öffentlichen Abonnenten.
+// Notification audience values (stage 5 of multilingual support):
+// replace the previous convention in which the audience was encoded implicitly via
+// Language=en ("staff") or Language=de ("subscriber") (see
+// the comment on models.NotificationTemplate). NotificationAudienceStaff
+// reaches internal users (Admin/Editor), NotificationAudienceSubscriber the
+// public subscribers.
 const (
 	NotificationAudienceStaff      = "staff"
 	NotificationAudienceSubscriber = "subscriber"
 )
 
-// NotificationTemplateData bündelt die Platzhalter, die einem Template zur
-// Verfügung stehen. Feldnamen sind bewusst sprechend gehalten, damit
-// Templates lesbar bleiben ({{.IncidentTitle}} statt {{.T}}).
+// NotificationTemplateData bundles the placeholders available to a template.
+// Field names are deliberately descriptive so that
+// templates stay readable ({{.IncidentTitle}} instead of {{.T}}).
 //
-// Alle Felder sind Rohwerte - html/template escaped sie beim Rendern
-// automatisch. Kein Feld darf hier vorab escaped werden, sonst würde
-// doppelt escaped und der User sähe &amp;lt; statt <.
+// All fields are raw values - html/template escapes them automatically
+// when rendering. No field may be escaped in advance here, otherwise it would be
+// escaped twice and the user would see &amp;lt; instead of <.
 type NotificationTemplateData struct {
-	// IncidentTitle bleibt für Rückwärts-Kompatibilität mit Templates aus
-	// früheren Versionen erhalten. Neu empfohlen: Title (funktioniert für
-	// Incidents UND Notices gleichermaßen). Beide Felder halten für
-	// Incident-Dispatches denselben Wert.
+	// IncidentTitle is kept for backward compatibility with templates from
+	// earlier versions. Newly recommended: Title (works for
+	// incidents AND notices alike). Both fields hold
+	// the same value in incident dispatches.
 	IncidentTitle  string
 	Title          string
 	Status         string
 	StatusLabel    string
-	Level          string // nur für Notice-Kinds befüllt: info/warning/critical
+	Level          string // only filled for notice kinds: info/warning/critical
 	ComponentNames string
 	Tags           string
-	// Message bleibt der Rohtext (Markdown-Quelltext, für Altvorlagen wie
-	// bisher). MessageHTML ist die formatierte Fassung als
-	// fertiges, bereits bereinigtes Mail-HTML (richtext.ToMailHTML) und
-	// wird von html/template unmaskiert ausgegeben.
+	// Message remains the raw text (Markdown source, as before for legacy templates).
+	// MessageHTML is the formatted version as
+	// finished, already sanitized mail HTML (richtext.ToMailHTML) and
+	// is output unescaped by html/template.
 	Message        string
 	MessageHTML    htmltemplate.HTML
 	Action         string
 	Language       string
 	FrontendURL    string
 	UnsubscribeURL string
-	// ConfirmURL: Bestätigungslink des Double-Opt-in, nur für
-	// Kind subscription_confirm befüllt.
+	// ConfirmURL: confirmation link of the double opt-in, only filled for
+	// kind subscription_confirm.
 	ConfirmURL  string
 	FromAddress string
-	// SourceName/SourceURL: Name der externen Quelle und Link auf
-	// die Original-Meldung, nur für die Kinds external_* befüllt.
+	// SourceName/SourceURL: name of the external source and link to
+	// the original report, only filled for the external_* kinds.
 	SourceName string
 	SourceURL  string
 }
 
-// incidentTemplateDataOpts bündelt die Eingaben für newIncidentTemplateData,
-// damit die Parameterliste die SonarCloud-Obergrenze von 7 nicht überschreitet.
+// incidentTemplateDataOpts bundles the inputs for newIncidentTemplateData,
+// so that the parameter list does not exceed the SonarCloud limit of 7.
 type incidentTemplateDataOpts struct {
 	Title       string
 	StatusRaw   string
@@ -129,12 +129,12 @@ type incidentTemplateDataOpts struct {
 	FromAddress string
 }
 
-// newIncidentTemplateData baut die Platzhalter aus einem Incident +
-// begleitender Metainfo (Sprache, URLs, Absender). Bewusst als Helper
-// statt zweier fast-identischer Struct-Literale in DispatchNotifications -
-// so kann der Datensatz pro Sprache mit einem Aufruf erzeugt werden und
-// per-Empfänger-Felder (UnsubscribeURL/FrontendURL) werden anschließend
-// nur noch am Rückgabewert gesetzt.
+// newIncidentTemplateData builds the placeholders from an incident +
+// accompanying meta information (language, URLs, sender). Deliberately a helper
+// instead of two almost identical struct literals in DispatchNotifications -
+// this way the record can be created per language with one call
+// and per-recipient fields (UnsubscribeURL/FrontendURL) are then
+// only set on the return value.
 func newIncidentTemplateData(opts incidentTemplateDataOpts) NotificationTemplateData {
 	return NotificationTemplateData{
 		IncidentTitle:  opts.Title,
@@ -152,11 +152,11 @@ func newIncidentTemplateData(opts incidentTemplateDataOpts) NotificationTemplate
 	}
 }
 
-// statusLabelFor liefert das lokalisierte Label zum Status ("Investigating"/
-// "Untersuchung"/...) mit Fallback auf den Rohwert für unbekannte Stati.
-// Wird als vorgerechneter Platzhalter {{.StatusLabel}} an Templates
-// gereicht, damit Autoren nicht selbst die Sprach-Umschaltung nachbauen
-// müssen.
+// statusLabelFor returns the localized label for the status ("Investigating"/
+// "Untersuchung"/...) with a fallback to the raw value for unknown statuses.
+// Passed to templates as the precomputed placeholder {{.StatusLabel}}
+// so that authors do not have to rebuild the language switch
+// themselves.
 func statusLabelFor(status, lang string) string {
 	meta, ok := incidentStatusMeta[status]
 	if !ok {
@@ -168,11 +168,11 @@ func statusLabelFor(status, lang string) string {
 	return meta.labelEN
 }
 
-// resolveIncidentKind mappt die DispatchNotifications-Actions
-// ("CREATED"/"UPDATED"/...) auf einen NotificationTemplate-Kind. Ein
-// UPDATED-Event mit finalem Status "resolved" wird zum eigenständigen
-// "incident_resolved"-Kind, damit Admins die Auflösungs-Mail getrennt
-// vom regulären Status-Update anpassen können.
+// resolveIncidentKind maps the DispatchNotifications actions
+// ("CREATED"/"UPDATED"/...) to a NotificationTemplate kind. An
+// UPDATED event with final status "resolved" becomes the standalone
+// "incident_resolved" kind, so that admins can customize the resolution mail separately
+// from the regular status update.
 func resolveIncidentKind(action, status string) string {
 	switch action {
 	case "CREATED":
@@ -189,15 +189,15 @@ func resolveIncidentKind(action, status string) string {
 	case "MAINTENANCE_COMPLETED":
 		return NotificationKindMaintenanceCompleted
 	}
-	// Unbekannte Action: lookupNotificationTemplate überspringt die
-	// DB-Abfrage bei leerem Kind (siehe dort) - der Aufrufer bekommt dann
-	// den hartkodierten Default-Renderer.
+	// Unknown action: lookupNotificationTemplate skips the
+	// DB query for an empty kind (see there) - the caller then gets
+	// the hard-coded default renderer.
 	return ""
 }
 
-// lookupNotificationTemplate lädt das gespeicherte Custom-Template für
-// (statusPageID, kind, audience, language), sofern vorhanden. Nil-Rückgabe =
-// keins, dann fällt der Renderer auf den Default zurück.
+// lookupNotificationTemplate loads the stored custom template for
+// (statusPageID, kind, audience, language), if present. Nil return =
+// none, in which case the renderer falls back to the default.
 func (h *Handler) lookupNotificationTemplate(statusPageID uint, kind, audience, language string) *models.NotificationTemplate {
 	if kind == "" {
 		return nil
@@ -213,12 +213,12 @@ func (h *Handler) lookupNotificationTemplate(statusPageID uint, kind, audience, 
 	return &tmpl
 }
 
-// renderNotificationTemplate parst und rendert Subject und Body eines
-// Custom-Templates. Fehlerfall (Parse-/Execute-Fehler): leere Strings +
-// error - der Aufrufer entscheidet dann per Fallback auf den Default.
+// renderNotificationTemplate parses and renders the subject and body of a
+// custom template. On error (parse/execute error): empty strings +
+// error - the caller then decides to fall back to the default.
 //
-// html/template escaped Platzhalterwerte automatisch, das ist der
-// eigentliche Grund für html/template statt text/template hier.
+// html/template escapes placeholder values automatically, which is the
+// real reason for html/template instead of text/template here.
 func renderNotificationTemplate(tmpl *models.NotificationTemplate, data NotificationTemplateData) (subject, body string, err error) {
 	subject, err = executeStringTemplate("subject", tmpl.Subject, data)
 	if err != nil {
@@ -231,10 +231,10 @@ func renderNotificationTemplate(tmpl *models.NotificationTemplate, data Notifica
 	return subject, body, nil
 }
 
-// executeStringTemplate parst, prüft (Länge und erlaubte Konstrukte) und
-// rendert eine Vorlage mit begrenzter Ausgabegröße und Laufzeit. Die Prüfung
-// läuft bei jeder Ausführung, weil auch bereits gespeicherte Vorlagen aus der
-// Zeit vor den Grenzen nichts Unzulässiges mehr ausführen dürfen.
+// executeStringTemplate parses, checks (length and permitted constructs) and
+// renders a template with bounded output size and runtime. The check
+// runs on every execution, because even already stored templates from the
+// time before the limits must no longer execute anything impermissible.
 func executeStringTemplate(name, raw string, data NotificationTemplateData) (string, error) {
 	maxIn, maxOut := MaxTemplateBodyLen, maxTemplateBodyOutput
 	if name == "subject" {
@@ -256,24 +256,24 @@ func executeStringTemplate(name, raw string, data NotificationTemplateData) (str
 	})
 }
 
-// ValidateNotificationTemplate prüft ein Template vor dem Speichern:
-// Parse-Fehler und CR/LF im Subject (SMTP-Header-Injection-Sink) werden
-// abgelehnt. Der Body darf CR/LF enthalten - sendAlertEmail faltet ihn vor
-// dem Versand zu einer Zeile.
+// ValidateNotificationTemplate checks a template before saving:
+// parse errors and CR/LF in the subject (SMTP header injection sink) are
+// rejected. The body may contain CR/LF - sendAlertEmail folds it into
+// one line before sending.
 //
-// Der explizite CR/LF-Guard hier hat einen Grund: sendAlertEmail lehnt
-// zwar dieselben Zeichen zur Sendezeit ab (Defense-in-Depth bleibt), aber
-// dann würde jede einzelne Mail dieser Statusseite still verworfen. Die
-// Prüfung beim Speichern verhindert das schon im Admin-UI mit klarer
-// Fehlermeldung (Vorbereitung).
+// The explicit CR/LF guard here has a reason: sendAlertEmail does reject
+// the same characters at send time (defense in depth remains), but
+// then every single mail of this status page would be silently discarded. The
+// check at save time prevents that already in the admin UI with a clear
+// error message.
 func ValidateNotificationTemplate(subject, body string) error {
 	return ValidateNotificationTemplateForKind("", subject, body)
 }
 
-// ValidateNotificationTemplateForKind prüft zusätzlich die Pflichtangaben der
-// Art: Die Bestätigungsmail des Double-Opt-in muss den Bestätigungslink
-// ({{.ConfirmURL}}) unbedingt ausgeben, sonst ließe sich die Vorlage für
-// beliebigen Inhalt an Dritte missbrauchen und könnte kein Abo bestätigen.
+// ValidateNotificationTemplateForKind additionally checks the mandatory content of the
+// kind: the confirmation mail of the double opt-in must always contain the confirmation link
+// ({{.ConfirmURL}}), otherwise the template could be abused to send
+// arbitrary content to third parties and could not confirm a subscription.
 func ValidateNotificationTemplateForKind(kind, subject, body string) error {
 	if strings.TrimSpace(subject) == "" {
 		return newCodedError("template_subject_empty", "subject darf nicht leer sein")
@@ -301,12 +301,12 @@ func errConfirmURLMissing() error {
 	return newCodedError("template_confirm_url_missing", "Die Vorlage muss den Platzhalter {{.ConfirmURL}} enthalten")
 }
 
-// applyNotificationTemplate rendert das übergebene Custom-Template ODER gibt
-// die Defaults zurück, wenn kein Template gesetzt ist oder das Rendern
-// fehlschlägt (letzteres wird geloggt - eine defekte Vorlage darf den
-// Mailversand nicht komplett unterbinden). Der Lookup wird bewusst NICHT
-// hier gemacht, damit DispatchNotifications ihn einmal pro Sprache statt
-// pro Empfänger machen kann.
+// applyNotificationTemplate renders the given custom template OR returns
+// the defaults if no template is set or rendering
+// fails (the latter is logged - a broken template must not
+// prevent mail dispatch entirely). The lookup is deliberately NOT done
+// here, so that DispatchNotifications can do it once per language instead of
+// per recipient.
 func applyNotificationTemplate(
 	tmpl *models.NotificationTemplate,
 	data NotificationTemplateData,

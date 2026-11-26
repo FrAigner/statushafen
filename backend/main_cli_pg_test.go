@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// create-admin gegen ein echtes Postgres: Der Befehl migriert wie der
-// Serverstart, legt den Admin an, das Passwort passt, und ein zweiter Aufruf
-// ändert nichts. Nur mit MIGRATION_PG_TEST=1 (startet nicht als root).
+// create-admin against a real Postgres: the command migrates like the
+// server start, creates the admin, the password matches, and a second call
+// changes nothing. Only with MIGRATION_PG_TEST=1 (does not start as root).
 func TestRunCLI_CreateAdminGegenPostgres(t *testing.T) {
 	if os.Getenv("MIGRATION_PG_TEST") != "1" {
 		t.Skip("nur mit MIGRATION_PG_TEST=1 (wie der Postgres-Migrationstest)")

@@ -16,11 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// publicPageKeys sind genau die Felder, die das öffentliche Frontend
-// (LandingPage.vue, StatusPage.vue) aus einer Statusseite liest - API-Befund
-// zu alles darüber hinaus (AutoJoinEmailDomains, DefaultRoleID,
-// NotificationFromAddress, CustomDomain*, IsPrivate, ...) ist interne
-// Mandanten-Konfiguration und gehört nicht in öffentliche Antworten.
+// publicPageKeys are exactly the fields the public frontend
+// (LandingPage.vue, StatusPage.vue) reads from a status page - API finding:
+// everything beyond that (AutoJoinEmailDomains, DefaultRoleID,
+// NotificationFromAddress, CustomDomain*, IsPrivate, ...) is internal
+// tenant configuration and does not belong in public responses.
 var publicPageKeys = []string{
 	"Description", "HeaderStyle", "ID", "LogoURL", "Name",
 	"PageLayout", "PrimaryColor", "SecondaryColor", "Slug",
@@ -87,10 +87,10 @@ func TestPublicPageEndpointsReturnOnlyPublicFields(t *testing.T) {
 		var resp map[string]interface{}
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		check(t, resp["page"].(map[string]interface{}))
-		// Incident/GeneralNotice trugen bisher ein leeres, nie geladenes
-		// "StatusPage"-Objekt mit dem kompletten Konfigurations-Schema der
-		// Seite (AutoJoinEmailDomains, DefaultRoleID, ...) - wie bei Component
-		// fällt es jetzt ganz weg.
+		// Incident/GeneralNotice previously carried an empty, never-loaded
+		// "StatusPage" object with the complete configuration schema of the
+		// page (AutoJoinEmailDomains, DefaultRoleID, ...) - as with Component
+		// it is now dropped entirely.
 		for _, key := range []string{"incidents", "notices"} {
 			items := resp[key].([]interface{})
 			require.Len(t, items, 1, key)
@@ -108,8 +108,8 @@ func TestPublicPageEndpointsReturnOnlyPublicFields(t *testing.T) {
 	})
 }
 
-// TestPublicPagesHandler_DBErrorReturns500 deckt den Fehlerzweig der
-// Listen-Abfrage ab (geschlossene DB-Verbindung).
+// TestPublicPagesHandler_DBErrorReturns500 covers the error branch of the
+// list query (closed DB connection).
 func TestPublicPagesHandler_DBErrorReturns500(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

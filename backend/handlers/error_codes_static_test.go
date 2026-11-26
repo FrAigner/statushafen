@@ -16,14 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Rest: Fehlerantworten tragen einen Fehlercode, das
-// Frontend übersetzt ihn unter api.errors.<code>. Rohe Go-Fehlertexte
-// (err.Error()) gehören nie in eine Antwort.
+// Rest: error responses carry an error code, which the
+// frontend translates under api.errors.<code>. Raw Go error texts
+// (err.Error()) never belong in a response.
 
-// Die Ratsche gilt nun für ALLE Handler- und Middleware-Dateien
-// (vorher nur die bearbeiteten) und steht auf 0: Jede Fehlerantwort
-// (gin.H mit "error") trägt einen "code". Neue Klartext-Fehler ohne Code
-// schlagen den Test fehl.
+// The ratchet now applies to ALL handler and middleware files
+// (previously only the edited ones) and is set to 0: every error response
+// (gin.H with "error") carries a "code". New plain-text errors without a code
+// fail the test.
 func errorSourceFiles(t *testing.T) []string {
 	t.Helper()
 	var files []string
@@ -40,19 +40,19 @@ func errorSourceFiles(t *testing.T) []string {
 	return files
 }
 
-// codeLuecken sind die wenigen Fehlerantworten ohne code, die sich in Tests nicht
-// auslösen lassen (Zufallsquelle/JWT-Signatur versagt, OAuth-Austausch mit dem
-// echten Provider) und deshalb vom Coverage-Gate nicht angefasst werden dürfen.
-// Eine Ratsche: Steigt die Zahl, schlägt der Test fehl; sinkt sie, muss die
-// Grenze im selben PR gesenkt werden (Folgeaufgabe).
+// codeLuecken are the few error responses without code that cannot be triggered in tests
+// (random source/JWT signature fails, OAuth exchange with the
+// real provider) and therefore must not be touched by the coverage gate.
+// A ratchet: if the number rises, the test fails; if it falls, the
+// limit must be lowered in the same PR (follow-up task).
 var codeLuecken = map[string]int{
 	"auth.go":       1,
 	"webhook.go":    1,
 	"page_order.go": 2,
 }
 
-// codeForStatusCodes sind die Codes, die codeForStatus (handlers und middleware)
-// zurückgeben kann; sie stehen nicht als Literal in gin.H.
+// codeForStatusCodes are the codes that codeForStatus (handlers and middleware)
+// can return; they do not appear as a literal in gin.H.
 var codeForStatusCodes = []string{"invalid_request", "invalid_id", "unauthorized", "forbidden", "not_found", "conflict", "server_error"}
 
 func parseHandlerFile(t *testing.T, name string) *ast.File {
@@ -139,7 +139,7 @@ func TestFehlerantworten_KeinRohesErrError(t *testing.T) {
 	}
 }
 
-// collectCodes sammelt die Codes einer Datei: "code": "x" in gin.H sowie
+// collectCodes collects the codes of a file: "code": "x" in gin.H as well as
 // newCodedError("x", ...).
 func collectCodes(f *ast.File, into map[string]bool) {
 	ast.Inspect(f, func(n ast.Node) bool {
@@ -163,14 +163,14 @@ func collectCodes(f *ast.File, into map[string]bool) {
 	})
 }
 
-// Jeder vergebene Code der bearbeiteten Dateien hat eine deutsche und
-// englische Übersetzung unter api.errors.
+// Every assigned code of the edited files has a German and
+// English translation under api.errors.
 func TestFehlercodes_HabenUebersetzung(t *testing.T) {
 	used := map[string]bool{}
 	for _, name := range errorSourceFiles(t) {
 		collectCodes(parseHandlerFile(t, name), used)
 	}
-	for _, c := range incidentValidationCodes { // Status-/Zeitprüfung (incident.go)
+	for _, c := range incidentValidationCodes { // Status/time check (incident.go)
 		used[c] = true
 	}
 	for _, c := range codeForStatusCodes {

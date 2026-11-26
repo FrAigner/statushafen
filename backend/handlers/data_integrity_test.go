@@ -21,8 +21,8 @@ func pageRoleCount(t *testing.T, db *gorm.DB, where string, arg uint) int64 {
 	return n
 }
 
-// Beim Löschen eines Benutzers blieben seine Zeilen in
-// user_status_page_roles stehen (Soft-Delete löst kein FK-OnDelete aus).
+// When deleting a user, their rows remained in
+// user_status_page_roles (soft delete does not trigger FK OnDelete).
 func TestDeleteUserHandler_RemovesPageRoles(t *testing.T) {
 	e := newUserGuardEnv(t)
 	me := e.user(t, "me@example.com", true)
@@ -43,7 +43,7 @@ func TestDeleteUserHandler_RemovesPageRoles(t *testing.T) {
 	assert.EqualValues(t, 1, pageRoleCount(t, e.db, "user_id = ?", keeper.ID), "fremde Zuordnungen bleiben")
 }
 
-// Dasselbe für das Löschen einer Rolle.
+// The same for deleting a role.
 func TestDeleteRoleHandler_RemovesPageRoles(t *testing.T) {
 	e := newUserGuardEnv(t)
 	h := handlers.NewHandler(e.db)
@@ -55,7 +55,7 @@ func TestDeleteRoleHandler_RemovesPageRoles(t *testing.T) {
 	kept := models.Role{Name: "Kept", Permissions: "x"}
 	require.NoError(t, e.db.Create(&gone).Error)
 	require.NoError(t, e.db.Create(&kept).Error)
-	// je (Konto, Seite) nur eine Rolle, die behaltene liegt auf einer zweiten Seite.
+	// only one role per (account, page), the retained one is on a second page.
 	page2 := models.StatusPage{Name: "Beta", Slug: "beta"}
 	require.NoError(t, e.db.Create(&page2).Error)
 	require.NoError(t, e.db.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: page.ID, RoleID: gone.ID}).Error)
@@ -68,8 +68,8 @@ func TestDeleteRoleHandler_RemovesPageRoles(t *testing.T) {
 	assert.EqualValues(t, 1, pageRoleCount(t, e.db, "role_id = ?", kept.ID))
 }
 
-// Name einer gelöschten Rolle und E-Mail eines gelöschten Benutzers
-// sind über die Handler wieder vergebbar (partielle Indizes aus testutils).
+// The name of a deleted role and the email of a deleted user
+// can be assigned again through the handlers (partial indexes from testutils).
 func TestRoleAndUserHandlers_ReuseAfterDelete(t *testing.T) {
 	e := newUserGuardEnv(t)
 	h := handlers.NewHandler(e.db)
@@ -92,8 +92,8 @@ func TestRoleAndUserHandlers_ReuseAfterDelete(t *testing.T) {
 	require.Equal(t, http.StatusCreated, w.Code, "gelöschte E-Mail muss frei sein: %s", w.Body.String())
 }
 
-// Der Slug der Systemseite lässt sich nicht ändern, und das
-// Löschverbot gilt über das Kennzeichen auch bei abweichendem Slug.
+// The slug of the system page cannot be changed, and the
+// deletion ban applies via the flag even with a differing slug.
 func TestSystemPage_SlugLockedAndDeleteProtectedByFlag(t *testing.T) {
 	db, r := setupSoftDeleteReuseRouter(t)
 	database.SeedSystemStatusPage(db)
@@ -105,13 +105,13 @@ func TestSystemPage_SlugLockedAndDeleteProtectedByFlag(t *testing.T) {
 	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
 	requireErrorCode(t, w.Body.Bytes(), "system_page_slug_locked")
 
-	// Gleicher Slug bleibt änderbar (z. B. Name/Beschreibung).
+	// The same slug remains changeable (e.g. name/description).
 	w = doTagRequest(r, http.MethodPut, path, map[string]any{"Name": "Unser Status", "Slug": database.SystemStatusPageSlug})
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	require.NoError(t, db.First(&system, system.ID).Error)
 	assert.True(t, system.IsSystem, "Kennzeichen darf durch ein Update nicht verloren gehen")
 
-	// Löschschutz hängt am Kennzeichen, nicht am Slug.
+	// Deletion protection hangs on the flag, not on the slug.
 	require.NoError(t, db.Model(&system).UpdateColumn("slug", "anders").Error)
 	w = doTagRequest(r, http.MethodDelete, path, nil)
 	require.Equal(t, http.StatusConflict, w.Code, w.Body.String())

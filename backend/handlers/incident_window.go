@@ -9,22 +9,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// Vorfall-Listen sind anonym lesbar (öffentliche Seiten) und wuchsen mit der
-// Zahl der Vorfälle unbegrenzt: Jeder Aufruf lud alle Zeilen samt Komponenten
-// und Tags in den Speicher. Jetzt ist jede Liste begrenzt; wer mehr braucht,
-// blättert mit limit/offset.
+// Incident lists are readable anonymously (public pages) and grew without limit with the
+// number of incidents: every call loaded all rows including components
+// and tags into memory. Now every list is bounded; anyone who needs more
+// uses limit/offset paging.
 const (
-	// defaultIncidentListLimit: Seitengröße ohne Angabe.
+	// defaultIncidentListLimit: page size when none is given.
 	defaultIncidentListLimit = 50
-	// maxIncidentListLimit: Obergrenze der Seitengröße und der gleichzeitig
-	// geladenen offenen Vorfälle im Dashboard.
+	// maxIncidentListLimit: upper bound of the page size and of the simultaneously
+	// loaded open incidents in the dashboard.
 	maxIncidentListLimit = 200
-	// maxIncidentListOffset begrenzt das Blättern, damit kein Aufruf die
-	// Datenbank über Millionen Zeilen springen lässt.
+	// maxIncidentListOffset bounds paging so that no call makes the
+	// database skip over millions of rows.
 	maxIncidentListOffset = 100000
 
-	// incidentNewestFirst ist die Reihenfolge aller Listen; die ID macht sie
-	// bei gleichem Zeitpunkt stabil, sonst gingen beim Blättern Zeilen verloren.
+	// incidentNewestFirst is the order of all lists; the ID makes it
+	// stable for equal timestamps, otherwise rows would be lost while paging.
 	incidentNewestFirst = "COALESCE(started_at, created_at) desc, id desc"
 )
 
@@ -32,7 +32,7 @@ func badIncidentWindow(c *gin.Context) {
 	respondInvalidInput(c)
 }
 
-// parseCount liest einen Ganzzahl-Parameter ab min; fehlt er, gilt def.
+// parseCount reads an integer parameter with minimum min; if it is missing, def applies.
 func parseCount(c *gin.Context, name string, def, minValue int) (int, bool) {
 	raw := c.Query(name)
 	if raw == "" {
@@ -45,9 +45,9 @@ func parseCount(c *gin.Context, name string, def, minValue int) (int, bool) {
 	return n, true
 }
 
-// parseIncidentWindow liest limit (Standard 50, mindestens 1, über 200 wird auf
-// 200 gekappt) und offset (ab 0, höchstens 100000). Bei einem ungültigen Wert
-// ist die 400-Antwort schon geschrieben.
+// parseIncidentWindow reads limit (default 50, at least 1, values above 200 are capped to
+// 200) and offset (from 0, at most 100000). For an invalid value
+// the 400 response has already been written.
 func parseIncidentWindow(c *gin.Context) (limit, offset int, ok bool) {
 	limit, ok = parseCount(c, "limit", defaultIncidentListLimit, 1)
 	if !ok {
@@ -62,7 +62,7 @@ func parseIncidentWindow(c *gin.Context) (limit, offset int, ok bool) {
 	return min(limit, maxIncidentListLimit), offset, true
 }
 
-// incidentStateScope filtert nach offen/behoben ("" = alle).
+// incidentStateScope filters by open/resolved ("" = all).
 func incidentStateScope(state string) (func(*gorm.DB) *gorm.DB, bool) {
 	switch state {
 	case "":

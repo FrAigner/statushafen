@@ -22,8 +22,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Seitenadmins (keine Global Admins) hängen Konten nicht mehr direkt
-// an, sondern laden ein; erst der Kontoinhaber macht daraus eine Mitgliedschaft.
+// Page admins (not global admins) no longer attach accounts directly,
+// but invite; only the account holder turns that into a membership.
 
 var invitationLinkRe = regexp.MustCompile(`/invitation#token=([A-Za-z0-9]+)`)
 
@@ -46,12 +46,12 @@ func newInvFixture(t *testing.T) invFixture {
 	return newInvFixtureOn(t, testutils.SetupTestDB())
 }
 
-// newInvFixtureOn baut die Fixture auf einer vorhandenen Datenbank (SQLite aus
-// SetupTestDB oder, in page_invitation_postgres_test.go, ein echtes Postgres).
+// newInvFixtureOn builds the fixture on an existing database (SQLite from
+// SetupTestDB or, in page_invitation_postgres_test.go, a real Postgres).
 func newInvFixtureOn(t *testing.T, db *gorm.DB) invFixture {
 	t.Helper()
 	h := handlers.NewHandler(db)
-	t.Cleanup(h.WaitMails) // Einladungsmails laufen im Hintergrund
+	t.Cleanup(h.WaitMails) // Invitation mails run in the background
 	r := testutils.SetupRouter()
 	admin := r.Group("/api/admin/pages/:page_id", middleware.AuthMiddleware())
 	admin.GET("/users", middleware.RequirePermission("pages:read"), h.GetStatusPageUsersHandler)
@@ -112,7 +112,7 @@ func (f invFixture) invitationCount() int64 {
 	return n
 }
 
-// invite lädt per E-Mail ein und liefert den Token aus der Mail.
+// invite invites by email and returns the token from the mail.
 func (f invFixture) invite(t *testing.T, srv *fakeSMTPServer, email string, role models.Role) string {
 	t.Helper()
 	w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": email, "role_id": role.ID})
@@ -143,8 +143,8 @@ func TestPageInvitation_OwnerInvitesInsteadOfAttaching(t *testing.T) {
 	}
 	msg := awaitSMTPMessage(t, srv)
 	m := invitationLinkRe.FindStringSubmatch(msg)
-	// Der Token steht im Fragment (geht nie an den Server und nie in
-	// den Referer), nicht in der Query.
+	// The token is in the fragment (never goes to the server and never into
+	// the Referer), not in the query.
 	if m == nil || !strings.Contains(msg, "https://status.example.test/invitation#token="+m[1]) {
 		t.Fatalf("Mail ohne Einladungslink mit Fragment: %s", msg)
 	}
@@ -199,7 +199,7 @@ func TestPageInvitation_SameAnswerForKnownAndUnknownAddress(t *testing.T) {
 			t.Errorf("Antworten unterscheiden sich: %d %s vs. %d %s", known.Code, known.Body.String(), w.code, w.body)
 		}
 	}
-	// Die Liste offener Einladungen ist ebenfalls gleich aufgebaut (drei Einträge).
+	// The list of open invitations is built the same way (three entries).
 	list := idorRequest(t, f.r, "GET", f.invPath(), f.ownerTok, nil)
 	requireStatusCode(t, list, http.StatusOK)
 	var rows []map[string]any
@@ -318,7 +318,7 @@ func TestPageInvitation_ExpiredAndStale(t *testing.T) {
 		}
 	})
 	t.Run("Rolle gelöscht -> 404", func(t *testing.T) {
-		backdateInvitations(f.db, 31*time.Minute) // Grabstein der vorigen Prüfung: Sperre abgelaufen (Review B1)
+		backdateInvitations(f.db, 31*time.Minute) // Tombstone of the previous check: lock expired (review B1)
 		tmp := models.Role{Name: "Tmp", Permissions: "incidents:read"}
 		f.db.Create(&tmp)
 		token := f.invite(t, srv, invitee.Email, tmp)
@@ -327,7 +327,7 @@ func TestPageInvitation_ExpiredAndStale(t *testing.T) {
 		requireStatusCode(t, w, http.StatusNotFound)
 	})
 	t.Run("Seite gelöscht -> 404", func(t *testing.T) {
-		backdateInvitations(f.db, 31*time.Minute) // Grabstein der vorigen Prüfung: Sperre abgelaufen (Review B1)
+		backdateInvitations(f.db, 31*time.Minute) // Tombstone of the previous check: lock expired (review B1)
 		token := f.invite(t, srv, invitee.Email, f.viewer)
 		f.db.Delete(&f.page)
 		defer f.db.Unscoped().Model(&models.StatusPage{}).Where("id = ?", f.page.ID).Update("deleted_at", nil)
@@ -335,9 +335,9 @@ func TestPageInvitation_ExpiredAndStale(t *testing.T) {
 		requireStatusCode(t, w, http.StatusNotFound)
 	})
 	t.Run("erneutes Einladen macht den alten Link ungültig", func(t *testing.T) {
-		backdateInvitations(f.db, 31*time.Minute) // Grabstein der vorigen Prüfung: Sperre abgelaufen (Review B1)
+		backdateInvitations(f.db, 31*time.Minute) // Tombstone of the previous check: lock expired (review B1)
 		old := f.invite(t, srv, invitee.Email, f.viewer)
-		backdateInvitations(f.db, 31*time.Minute) // Ersetzen erst nach 30 Minuten (Security-Review)
+		backdateInvitations(f.db, 31*time.Minute) // Replacing only after 30 minutes (security review)
 		fresh := f.invite(t, srv, invitee.Email, f.viewer)
 		requireStatusCode(t, idorRequest(t, f.r, "POST", "/api/invitations/preview", tok, map[string]any{"token": old}), http.StatusNotFound)
 		requireStatusCode(t, idorRequest(t, f.r, "POST", "/api/invitations/preview", tok, map[string]any{"token": fresh}), http.StatusOK)
@@ -352,7 +352,7 @@ func TestPageInvitation_AccountConflicts(t *testing.T) {
 	t.Run("Rolle auf einer anderen Seite -> 409", func(t *testing.T) {
 		u, tok := f.account(t, "multi@x.example")
 		token := f.invite(t, srv, u.Email, f.viewer)
-		// Erst nach der Einladung woanders Mitglied geworden.
+		// Became a member elsewhere only after the invitation.
 		f.db.Create(&models.UserStatusPageRole{UserID: u.ID, StatusPageID: f.other.ID, RoleID: f.viewer.ID})
 		w := idorRequest(t, f.r, "POST", "/api/invitations/accept", tok, map[string]any{"token": token})
 		requireStatusCode(t, w, http.StatusConflict)
@@ -464,7 +464,7 @@ func TestPageInvitation_AdminPaths(t *testing.T) {
 			requireErrorCode(t, w.Body.Bytes(), "invitation_limit_reached")
 		}
 		expectNoSMTPMessage(t, srv)
-		// Abgelaufene zählen nicht mit und werden beim nächsten Einladen entfernt.
+		// Expired ones do not count and are removed on the next invite.
 		f.db.Model(&models.PageInvitation{}).Where("email LIKE ?", "m%").Update("expires_at", time.Now().Add(-time.Minute))
 		w := idorRequest(t, f.r, "POST", f.usersPath(), f.ownerTok, map[string]any{"email": "niemand@x.example", "role_id": f.viewer.ID})
 		requireStatusCode(t, w, http.StatusOK)
@@ -474,12 +474,12 @@ func TestPageInvitation_AdminPaths(t *testing.T) {
 	})
 }
 
-// Mail und Log: kein Token im Log, CR/LF im Seitennamen verhindert den Versand,
-// englische Mail für englischsprachige Konten.
+// Mail and log: no token in the log, CR/LF in the page name prevents sending,
+// English mail for English-speaking accounts.
 func TestPageInvitation_MailAndLogging(t *testing.T) {
 	t.Run("Versandfehler: Token und Link nicht im Log", func(t *testing.T) {
 		t.Setenv("SMTP_HOST", "127.0.0.1")
-		t.Setenv("SMTP_PORT", "1") // nichts lauscht -> Fehler
+		t.Setenv("SMTP_PORT", "1") // nothing listening -> error
 		buf := captureLog(t)
 		f := newInvFixture(t)
 		f.account(t, "log@x.example")
@@ -540,8 +540,8 @@ func TestPageInvitation_MailAndLogging(t *testing.T) {
 	})
 }
 
-// failOn registriert einen Fehler für Abfragen (kind: query/create/delete) auf
-// der Tabelle, solange cond true liefert, und räumt am Testende auf.
+// failOn registers an error for queries (kind: query/create/delete) on
+// the table as long as cond returns true, and cleans up at the end of the test.
 func failOn(t *testing.T, db *gorm.DB, kind, table string, cond func(*gorm.DB) bool) {
 	t.Helper()
 	name := "fail799:" + kind + ":" + table + ":" + t.Name()
@@ -563,7 +563,7 @@ func failOn(t *testing.T, db *gorm.DB, kind, table string, cond func(*gorm.DB) b
 	}
 }
 
-// DB-Fehler enden fail closed mit 500 und ohne Mitgliedschaft.
+// DB errors end fail closed with 500 and without membership.
 func TestPageInvitation_DBErrors(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -634,7 +634,7 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 		f := newInvFixture(t)
 		u, tok := f.account(t, "twice@x.example")
 		token := f.invite(t, srv, u.Email, f.viewer)
-		// Unmittelbar vor dem Löschen in der Transaktion löscht ein "zweiter Aufruf".
+		// Immediately before deleting in the transaction a "second call" deletes.
 		name := "twice799"
 		_ = f.db.Callback().Delete().Before("gorm:delete").Register(name, func(tx *gorm.DB) {
 			if tx.Statement.Table == "page_invitations" {
@@ -654,7 +654,7 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 		mk := func(by uint) string {
 			raw := "tok-" + strconv.Itoa(int(by)) + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 			inv := models.PageInvitation{StatusPageID: f.page.ID, Email: u.Email, RoleID: f.viewer.ID, TokenHash: hashToken(raw), ExpiresAt: time.Now().Add(time.Hour), InvitedByID: by}
-			// Review F3: je (Seite, Adresse) gibt es nur noch eine Zeile.
+			// Review F3: per (page, address) there is only one row now.
 			f.db.Unscoped().Where("email = ?", u.Email).Delete(&models.PageInvitation{})
 			f.db.Create(&inv)
 			f.db.Model(&inv).Update("invited_user_id", u.ID)
@@ -702,9 +702,9 @@ func TestPageInvitation_DBErrors(t *testing.T) {
 	})
 }
 
-// backdateInvitations setzt alle Einladungen um d in die Vergangenheit.
+// backdateInvitations moves all invitations back into the past by d.
 func backdateInvitations(db *gorm.DB, d time.Duration) {
-	// Unscoped: auch zurückgezogene (soft-gelöschte) Zeilen (Review B1).
+	// Unscoped: also revoked (soft-deleted) rows (review B1).
 	db.Unscoped().Model(&models.PageInvitation{}).Where("1 = 1").Update("created_at", time.Now().Add(-d))
 }
 

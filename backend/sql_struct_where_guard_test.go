@@ -14,15 +14,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter gegen Struktur-Bedingungen: GORM lässt bei Where(&modell)
-// jedes Feld mit Nullwert weg. Eine Suche nach einer Identität mit leerem
-// Subject oder Issuer trifft dann beliebige Zeilen und meldete einen Angreifer
-// als fremdes Konto an. Bedingungen stehen deshalb als Text mit Parametern
-// ("a = ? AND b = ?"), jede Spalte ausdrücklich.
+// Structural guard against struct conditions: with Where(&model) GORM omits
+// every field with a zero value. A lookup of an identity with an empty
+// subject or issuer then matches arbitrary rows and would have logged an attacker in
+// as a foreign account. Conditions are therefore written as text with parameters
+// ("a = ? AND b = ?"), every column explicit.
 //
-// Verboten sind Where, Not und Or mit einer Struktur als erstem Argument: eine
-// Variable oder ein Feld (&key, key) sowie ein Literal (&models.X{...}). Eine
-// Ausnahme steht unten und hat ihren Grund: ein Literal, dessen Feld nie leer ist.
+// Where, Not and Or with a struct as the first argument are forbidden: a
+// variable or a field (&key, key) as well as a literal (&models.X{...}). One
+// exception is listed below and has its reason: a literal whose field is never empty.
 var allowedStructConditions = map[string]string{
 	"handlers/oidc_login.go:Where:&models.StatusPageSSOConfig{OIDCEnabled: true}": "das einzige Feld ist das feste Literal true, kein Nullwert möglich",
 }
@@ -82,19 +82,19 @@ func TestNoStructConditionsInQueries(t *testing.T) {
 	}
 }
 
-// isStructCondition: &x, x.y-Zeiger auf Variablen, Literale und Zeiger darauf.
+// isStructCondition: &x, x.y pointers to variables, literals and pointers to them.
 func isStructCondition(e ast.Expr) bool {
 	switch v := e.(type) {
 	case *ast.UnaryExpr:
 		return v.Op == token.AND
 	case *ast.CompositeLit:
 		_, isMap := v.Type.(*ast.MapType)
-		return !isMap // Map-Bedingungen behalten Nullwerte
+		return !isMap // map conditions keep zero values
 	}
 	return false
 }
 
-// Gegenprobe: Der Prüfer erkennt die verbotenen Formen und lässt Text zu.
+// Control case: the checker detects the forbidden forms and lets text through.
 func TestIsStructCondition(t *testing.T) {
 	parse := func(src string) ast.Expr {
 		e, err := parser.ParseExpr(src)

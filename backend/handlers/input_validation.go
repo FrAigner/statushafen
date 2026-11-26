@@ -13,28 +13,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Das Frontend prüfte Pflichtfelder, Passwort-Mindestlänge,
-// Sprachcode-Format und Slugs, das Backend nahm alles an (direkte API-Aufrufe
-// umgingen die Prüfung). Die Regeln stehen jetzt hier an einer Stelle; jede
-// Verletzung liefert 400 mit einem `code`, den das Frontend per i18n übersetzt
-// (Muster wie group_not_empty / system_page_slug_locked).
+// The frontend checked required fields, minimum password length,
+// language code format and slugs, while the backend accepted everything (direct API calls
+// bypassed the check). The rules now live here in one place; every
+// violation yields 400 with a `code` that the frontend translates via i18n
+// (pattern like group_not_empty / system_page_slug_locked).
 const (
-	// minPasswordLength gilt für jeden Weg, ein Passwort zu setzen (Benutzer
-	// anlegen/ändern, Set-Password der Bestellung).
+	// minPasswordLength applies to every way of setting a password (creating/
+	// changing a user, set-password of the order).
 	minPasswordLength = 8
 
-	// maxEmailLength ist die Obergrenze einer E-Mail-Adresse (RFC 5321).
-	// Längere Eingaben werden vor Suche, Zähler und Audit-Log abgewiesen bzw. gekürzt.
+	// maxEmailLength is the upper bound of an email address (RFC 5321).
+	// Longer inputs are rejected or truncated before lookup, counters and audit log.
 	maxEmailLength = 254
 
-	// Obergrenzen (in Byte) für Texte, die anonyme oder selbst angemeldete
-	// Nutzer senden. Ohne sie wurden Werte bis zum Body-Limit (1 MiB)
-	// gespeichert, und jeder spätere Versand las sie wieder ein.
+	// Upper bounds (in bytes) for texts that anonymous or self-registered
+	// users send. Without them, values up to the body limit (1 MiB) were
+	// stored, and every later send read them in again.
 	maxWebhookURLLength = 2048
 	maxLanguageLength   = 16
 	maxSlugInputLength  = 100
-	// maxComponentIDsLength: Liste "1,2,3" oder "all"; reicht für einige
-	// Tausend Komponenten.
+	// maxComponentIDsLength: list "1,2,3" or "all"; enough for a few
+	// thousand components.
 	maxComponentIDsLength = 8192
 
 	codeInputTooLong           = "input_too_long"
@@ -51,23 +51,23 @@ const (
 	codeInvalidCharacters   = "invalid_characters"
 )
 
-// languageCodeRegex: BCP47 light - 2-3 Buchstaben Hauptsprache, optional
-// Untertags (Region, Schrift) mit 2-8 Zeichen, z. B. de, en-us, zh-hant-tw.
-// Der Code wird vor der Prüfung klein geschrieben (CreateLanguageHandler).
+// languageCodeRegex: BCP47 light - 2-3 letters of the main language, optional
+// subtags (region, script) of 2-8 characters, e.g. de, en-us, zh-hant-tw.
+// The code is lowercased before the check (CreateLanguageHandler).
 var languageCodeRegex = regexp.MustCompile(`^[a-z]{2,3}(-[a-z0-9]{2,8})*$`)
 
-// reservedSlugs sind Namen, die als Subdomain (<slug>.<Basisdomain>) oder
-// Pfad bereits belegt sind oder sein könnten: Plattform-Hosts (www, staging,
-// api, admin, app, mail, edge), Frontend-Routen (login, docs, status, order, auth,
-// subscribe, unsubscribe, profile) und Backend-/Static-Pfade (healthz, static,
-// assets, fonts). "system" ist der feste Slug der Systemstatusseite.
+// reservedSlugs are names that are already taken or could be taken as a subdomain (<slug>.<base domain>) or
+// path: platform hosts (www, staging,
+// api, admin, app, mail, edge), frontend routes (login, docs, status, order, auth,
+// subscribe, unsubscribe, profile) and backend/static paths (healthz, static,
+// assets, fonts). "system" is the fixed slug of the system status page.
 var reservedSlugs = map[string]struct{}{
 	"www": {}, "staging": {}, "api": {}, "admin": {}, "app": {}, "mail": {},
 	"login": {}, "docs": {}, "status": {}, "order": {}, "auth": {},
 	"subscribe": {}, "unsubscribe": {}, "profile": {},
 	"healthz": {}, "static": {}, "assets": {}, "fonts": {}, "system": {},
-	// Typische Mail-Postfächer und Hosts: ein Slug taucht in Absender- und
-	// Subdomain-Namen auf und darf keine Betreiberadresse vortäuschen.
+	// Typical mailboxes and hosts: a slug appears in sender and
+	// subdomain names and must not fake an operator address.
 	"support": {}, "security": {}, "billing": {}, "postmaster": {}, "abuse": {},
 	"noreply": {}, "no-reply": {}, "info": {}, "root": {}, "hostmaster": {},
 	"webmaster": {}, "edge": {},
@@ -78,8 +78,8 @@ func isReservedSlug(slug string) bool {
 	return ok
 }
 
-// containsInvalidText meldet NUL-Bytes und ungültiges UTF-8: PostgreSQL lehnt
-// beides in Textspalten ab, das Speichern scheiterte sonst mit 500.
+// containsInvalidText reports NUL bytes and invalid UTF-8: PostgreSQL rejects
+// both in text columns, so saving otherwise failed with 500.
 func containsInvalidText(values ...string) bool {
 	for _, v := range values {
 		if !utf8.ValidString(v) || strings.ContainsRune(v, 0) {
@@ -93,23 +93,23 @@ func abortInvalidInput(c *gin.Context, code, msg string) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": msg, "code": code})
 }
 
-// passwordTooShort zählt Zeichen (Runen), nicht Bytes, damit Umlaute nicht
-// doppelt zählen.
+// passwordTooShort counts characters (runes), not bytes, so that umlauts do not
+// count double.
 func passwordTooShort(pw string) bool {
 	return len([]rune(pw)) < minPasswordLength
 }
 
-// passwordTooLong zählt Bytes, weil bcrypt bei 72 Byte endet.
+// passwordTooLong counts bytes because bcrypt stops at 72 bytes.
 func passwordTooLong(pw string) bool {
 	return len(pw) > database.MaxPasswordBytes
 }
 
-// hashPassword ist database.HashPassword; als Variable, damit ein Test den
-// Fehlerpfad (Hashen scheitert) auslösen kann.
+// hashPassword is database.HashPassword; a variable so that a test can trigger the
+// error path (hashing fails).
 var hashPassword = database.HashPassword
 
-// rejectInvalidPassword beantwortet ein zu kurzes oder zu langes Passwort mit
-// 400 und Fehlercode und meldet true, wenn die Anfrage damit beendet ist.
+// rejectInvalidPassword answers a password that is too short or too long with
+// 400 and an error code and returns true if the request is thereby finished.
 func rejectInvalidPassword(c *gin.Context, pw string) bool {
 	switch {
 	case passwordTooShort(pw):
@@ -122,17 +122,17 @@ func rejectInvalidPassword(c *gin.Context, pw string) bool {
 	return true
 }
 
-// textField ist ein Eingabewert samt Obergrenze in Byte für checkInputTexts.
+// textField is an input value with its upper bound in bytes for checkInputTexts.
 type textField struct {
 	value string
 	max   int
 }
 
-// checkInputTexts ist die zentrale Prüfung für einzeilige Texte aus
-// öffentlichen und selbst angemeldeten Eingaben: überlang (input_too_long) oder
-// mit Steuerzeichen bzw. ungültigem UTF-8 (input_invalid_characters). Ein
-// NUL-Byte lehnt PostgreSQL erst beim Schreiben ab; ohne diese Prüfung wurde
-// daraus ein 500 statt eines 400. Zuerst die Länge (billig), dann die Zeichen.
+// checkInputTexts is the central check for single-line texts from
+// public and self-registered inputs: too long (input_too_long) or
+// containing control characters or invalid UTF-8 (input_invalid_characters). A
+// NUL byte is only rejected by PostgreSQL on write; without this check it turned
+// into a 500 instead of a 400. Length first (cheap), then characters.
 func checkInputTexts(fields ...textField) error {
 	for _, f := range fields {
 		if len(f.value) > f.max {
@@ -147,9 +147,9 @@ func checkInputTexts(fields ...textField) error {
 	return nil
 }
 
-// checkSubscriberTexts prüft die Texte eines Abos (E-Mail, Webhook-URL,
-// Komponentenliste, Sprache). Die Prüfung gilt für alle Wege, die ein Abo
-// anlegen oder ändern.
+// checkSubscriberTexts checks the texts of a subscription (email, webhook URL,
+// component list, language). The check applies to all paths that create
+// or change a subscription.
 func checkSubscriberTexts(email, webhookURL, componentIDs, language string) error {
 	return checkInputTexts(
 		textField{email, maxEmailLength},
@@ -159,8 +159,8 @@ func checkSubscriberTexts(email, webhookURL, componentIDs, language string) erro
 	)
 }
 
-// limitEmail kürzt eine Nutzereingabe, die als E-Mail-Adresse protokolliert
-// wird, auf maxEmailLength Zeichen.
+// limitEmail truncates a user input that is logged as an email address
+// to maxEmailLength characters.
 func limitEmail(s string) string {
 	if utf8.RuneCountInString(s) <= maxEmailLength {
 		return s

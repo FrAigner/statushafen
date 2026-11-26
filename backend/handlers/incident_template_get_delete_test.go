@@ -14,9 +14,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Get-/DeleteIncidentTemplateHandler hatten nur Normalfall-Tests.
-// Ergänzt: ungültige Parameter, Mandantentrennung, Sortierung, leere Liste
-// und Datenbankfehler.
+// Get-/DeleteIncidentTemplateHandler had only normal-case tests.
+// Added: invalid parameters, tenant isolation, sorting, empty list
+// and database errors.
 func TestGetDeleteIncidentTemplateHandlers(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)

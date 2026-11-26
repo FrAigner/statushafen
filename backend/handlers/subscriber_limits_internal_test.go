@@ -12,9 +12,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// Scheitert eine der beiden Zählabfragen, wird das Anlegen abgelehnt (fail
-// closed): Der Fehler kommt als gewöhnlicher Fehler zurück, nicht als
-// Ratenbegrenzung und nicht als stilles "erlaubt".
+// If one of the two count queries fails, creation is rejected (fail
+// closed): the error is returned as an ordinary error, not as a
+// rate limit and not as a silent "allowed".
 func TestCheckAdminSubscriberLimits_DBErrorsFailClosed(t *testing.T) {
 	for name, skip := range map[string]int{"Zählung je Seite": 0, "Zählung je Empfänger": 1} {
 		t.Run(name, func(t *testing.T) {
@@ -31,8 +31,8 @@ func TestCheckAdminSubscriberLimits_DBErrorsFailClosed(t *testing.T) {
 	}
 }
 
-// Gegenprobe zu den Fehlerpfaden: Ohne Fehler und unter den Grenzen ist das
-// Anlegen erlaubt; je Empfänger zählen nur unbestätigte Abos der letzten 24 Stunden.
+// Counter-check to the error paths: without an error and under the limits,
+// creation is allowed; per recipient only unconfirmed subscriptions of the last 24 hours count.
 func TestCheckAdminSubscriberLimits_PerRecipientLimit(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
@@ -49,13 +49,13 @@ func TestCheckAdminSubscriberLimits_PerRecipientLimit(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, "subscriber_rate_limited", TemplateErrorCode(err))
 
-	// Außerhalb des 24-Stunden-Fensters zählen sie nicht mehr.
+	// Outside the 24-hour window they no longer count.
 	require.NoError(t, h.checkAdminSubscriberLimits(1, "reader@example.org", now.Add(25*time.Hour)))
 }
 
-// Gelöschte Zeilen zählen mit: Sonst ließe sich die Grenze durch Anlegen und
-// sofortiges Löschen von Abos umgehen, und jedes Anlegen hätte eine
-// Bestätigungsmail an eine fremde Adresse ausgelöst.
+// Deleted rows count too: otherwise the limit could be bypassed by creating and
+// immediately deleting subscriptions, and every creation would have triggered a
+// confirmation mail to a third-party address.
 func TestCheckAdminSubscriberLimits_SoftDeletedRowsStillCount(t *testing.T) {
 	now := time.Now()
 

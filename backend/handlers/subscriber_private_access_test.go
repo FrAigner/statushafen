@@ -13,9 +13,9 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// awaitSMTPMessageTo liest Mails vom Fake-SMTP-Server, bis eine an recipient
-// adressierte ankommt (DispatchNotifications schickt parallel auch interne
-// Mails an Seitenmitglieder).
+// awaitSMTPMessageTo reads mails from the fake SMTP server until one addressed
+// to recipient arrives (DispatchNotifications also sends mails to page
+// members internally in parallel).
 func awaitSMTPMessageTo(t *testing.T, srv *fakeSMTPServer, recipient string) string {
 	t.Helper()
 	deadline := time.After(3 * time.Second)
@@ -32,12 +32,12 @@ func awaitSMTPMessageTo(t *testing.T, srv *fakeSMTPServer, recipient string) str
 	}
 }
 
-// Das Subscriber-Token gewährt auf
-// privaten Seiten nur noch Lesezugriff, solange der User, der das Abo angelegt
-// hat, die Seite selbst sehen darf (Global Admin oder Rolle auf der Seite).
-// Sonst behielten über die Lücke angelegte Altabos, Abos von vor einer
-// Umstellung öffentlich -> privat und Abos nach einem Rollenentzug dauerhaft
-// Zugriff.
+// The subscriber token only grants read access on
+// private pages as long as the user who created the subscription
+// may still see the page itself (Global Admin or role on the page).
+// Otherwise legacy subscriptions created via the gap, subscriptions from before a
+// switch from public -> private and subscriptions after a role revocation would retain
+// access permanently.
 func TestPrivatePage_SubscriberTokenRequiresAuthorizedCreator(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := handlers.NewHandler(db)
@@ -126,8 +126,8 @@ func TestPrivatePage_SubscriberTokenRequiresAuthorizedCreator(t *testing.T) {
 	})
 }
 
-// Auch der Versand muss die Berechtigung prüfen,
-// sonst bekäme ein Altabo weiter jeden Vorfall der privaten Seite per Mail.
+// Sending must also check the permission,
+// otherwise a legacy subscription would keep receiving every incident of the private page by mail.
 func TestDispatchNotifications_PrivatePageSkipsUnauthorizedSubscriber(t *testing.T) {
 	srv := startFakeSMTPServerWithEnv(t)
 	defer srv.close()
@@ -145,8 +145,8 @@ func TestDispatchNotifications_PrivatePageSkipsUnauthorizedSubscriber(t *testing
 	}
 }
 
-// Dieselbe Lücke im Notice-Versand. Hinweise privater
-// Seiten gehen nur an Abos mit berechtigtem Ersteller.
+// The same gap in notice sending. Notices of private
+// pages only go to subscriptions with an authorized creator.
 func TestDispatchNoticeNotifications_PrivatePageSkipsUnauthorizedSubscriber(t *testing.T) {
 	srv := startFakeSMTPWithEnv(t)
 	db := testutils.SetupTestDB()

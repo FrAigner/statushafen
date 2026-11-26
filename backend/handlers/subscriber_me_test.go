@@ -94,8 +94,8 @@ func TestSubscriberMeHandlers(t *testing.T) {
 		}
 	})
 
-	// "Abonnement beenden" braucht einen eigenen Endpunkt
-	// mit derselben Besitzprüfung wie GET/PUT (findMySubscriber).
+	// "Unsubscribe" needs its own endpoint
+	// with the same ownership check as GET/PUT (findMySubscriber).
 	t.Run("Delete My Subscription - Valid", func(t *testing.T) {
 		delSub := models.Subscriber{
 			StatusPageID:           page.ID,
@@ -155,13 +155,13 @@ func TestSubscriberMeHandlers(t *testing.T) {
 	})
 }
 
-// TestDeleteMySubscriptionHandler_DBErrorReturns500 deckt den Fehlerpfad von
-// h.DB.Delete ab: die Besitzprüfung (findMySubscriber)
-// muss noch lesen können, aber das anschließende Delete (Schreiben) schlägt
-// fehl - analog zu TestUpdateStatusPageHandler_SaveErrorReturns500 wird dafür
-// die DB-Datei nach dem Seeden read-only gemacht (ein einfaches Schließen der
-// Connection würde auch die vorherigen Lese-Queries scheitern lassen und
-// damit fälschlich ein 404 statt 500 liefern).
+// TestDeleteMySubscriptionHandler_DBErrorReturns500 covers the error path of
+// h.DB.Delete: the ownership check (findMySubscriber)
+// must still be able to read, but the subsequent Delete (write) fails
+// - analogous to TestUpdateStatusPageHandler_SaveErrorReturns500 the
+// DB file is made read-only after seeding (simply closing the
+// connection would also make the earlier read queries fail and
+// thus wrongly yield a 404 instead of 500).
 func TestDeleteMySubscriptionHandler_DBErrorReturns500(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "readonly-delete.db")
 	writeDB, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})

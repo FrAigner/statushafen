@@ -9,10 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TestTrustedProxiesFromEnv: ohne TRUSTED_PROXIES darf gar kein
-// Proxy vertraut werden (sicherer Default, schließt das gin-Default-Verhalten
-// "vertraue 0.0.0.0/0" - siehe Review-Befund B3), mit gesetztem Wert müssen
-// die konfigurierten Adressen 1:1 übernommen werden.
+// TestTrustedProxiesFromEnv: without TRUSTED_PROXIES no
+// proxy may be trusted at all (safe default, rules out the gin default behavior
+// "trust 0.0.0.0/0" - see review finding B3); with a value set, the
+// configured addresses must be adopted 1:1.
 func TestTrustedProxiesFromEnv(t *testing.T) {
 	t.Run("ohne TRUSTED_PROXIES: nil (kein Proxy vertraut)", func(t *testing.T) {
 		_ = os.Unsetenv("TRUSTED_PROXIES")
@@ -73,10 +73,10 @@ func TestClientIP_UntrustedProxyCannotSpoofXForwardedFor(t *testing.T) {
 	}
 }
 
-// TestCORSMiddleware prüft CORSMiddleware() (main.go) inkl. Default-Origins,
-// Wildcard-Subdomain-Matching (Review-Befund S9) und AllowCredentials. Den
-// Fatal-Guard für CORS_ORIGINS="*" prüft TestCORSMiddleware_WildcardIsFatal
-// (logging.Fatal statt log.Fatalf).
+// TestCORSMiddleware tests CORSMiddleware() (main.go) including default origins,
+// wildcard subdomain matching (review finding S9) and AllowCredentials. The
+// fatal guard for CORS_ORIGINS="*" is tested by TestCORSMiddleware_WildcardIsFatal
+// (logging.Fatal instead of log.Fatalf).
 func TestCORSMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

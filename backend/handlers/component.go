@@ -17,14 +17,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// allowedComponentStatuses sind die zulässigen Werte für Component.Status, die
-// gezielt per Status-Update (Admin-UI oder Monitoring-Webhook) gesetzt
-// werden dürfen. "group" ist bewusst ausgeschlossen - das ist ein reiner
-// Ordner-Knoten, dessen Status stets aus den Kindern aggregiert wird (siehe
-// buildTree) und nie direkt gesetzt werden soll.
+// allowedComponentStatuses are the permitted values for Component.Status that
+// may be set deliberately via status update (admin UI or monitoring webhook).
+// "group" is intentionally excluded - it is a pure
+// folder node whose status is always aggregated from its children (see
+// buildTree) and must never be set directly.
 const componentStatusGroup = "group"
 
-// errComponentIsGroup: Statusschreiben auf eine Gruppe.
+// errComponentIsGroup: status write to a group.
 var errComponentIsGroup = errors.New("component is a group; its status is derived from its children")
 
 var allowedComponentStatuses = map[string]bool{
@@ -35,18 +35,18 @@ var allowedComponentStatuses = map[string]bool{
 	"under_maintenance":    true,
 }
 
-// setComponentStatus validiert den übergebenen Status und persistiert ihn auf
-// der Komponente. Zentrale Stelle für die Statuslogik, damit sowohl der
-// Admin-Update-Handler als auch der Monitoring-Webhook-Handler
-// dieselbe Validierung/Speicherung verwenden statt sie zu duplizieren.
+// setComponentStatus validates the given status and persists it on
+// the component. Central place for the status logic, so that both the
+// admin update handler and the monitoring webhook handler
+// use the same validation/storage instead of duplicating it.
 //
-// Speichern und Historieneintrag laufen in EINER Transaktion; der
-// alte Stand wird unter Zeilensperre frisch gelesen (nicht aus dem evtl.
-// veralteten component), damit parallele Schreiber keinen falschen Wechsel
+// Saving and the history entry run in ONE transaction; the
+// old state is read fresh under a row lock (not from the possibly
+// stale component) so that parallel writers do not log a false change
 // protokollieren. source: models.StatusSource* (manual/webhook).
 func setComponentStatus(db *gorm.DB, component *models.Component, status, source string) error {
-	// Der Status einer Gruppe wird aus den Kindern berechnet und
-	// darf von keinem Schreiber (Webhook, Quick-Status, Admin) ersetzt werden.
+	// The status of a group is computed from its children and
+	// must not be replaced by any writer (webhook, quick status, admin).
 	if component.Status == componentStatusGroup {
 		return errComponentIsGroup
 	}
@@ -68,34 +68,34 @@ func setComponentStatus(db *gorm.DB, component *models.Component, status, source
 	})
 }
 
-// statusSeverity/worstStatus delegieren seit der Umstellung an das Paket
-// componentstatus, das auch der Abfrage-Dienst für externe Statusseiten nutzt.
+// statusSeverity/worstStatus have delegated to the componentstatus package since the changeover,
+// which is also used by the polling service for external status pages.
 func statusSeverity(s string) int { return componentstatus.Severity(s) }
 
 func worstStatus(statuses []string) string { return componentstatus.Worst(statuses...) }
 
-// effectiveComponentStatus: Logik seit der Umstellung in componentstatus
-// (FromOpenIncident/Own), siehe dort.
+// effectiveComponentStatus: logic lives in componentstatus since the changeover
+// (FromOpenIncident/Own), see there.
 func effectiveComponentStatus(manualStatus, incidentSeverity string) string {
 	return componentstatus.Own(manualStatus, incidentSeverity)
 }
 
-// slugRetryAttempts: Versuche beim Anlegen mit automatischer Kennung, falls
-// eine parallele Anlage dieselbe Kennung vergibt.
+// slugRetryAttempts: attempts when creating with an automatic identifier, in case
+// a parallel creation assigns the same identifier.
 const slugRetryAttempts = 3
 
-// Feldlängen in Zeichen (Runen, nicht Bytes, wegen Umlauten).
+// Field lengths in characters (runes, not bytes, because of umlauts).
 const (
 	maxComponentNameLen        = 60
 	maxComponentDescriptionLen = 240
 )
 
-// validateComponentTexts prüft Name und Beschreibung gegen die Längengrenzen
-// und liefert bei Verstoß den maschinenlesbaren Fehlercode
-// (name_too_long/description_too_long), den das Frontend am Feld übersetzt.
-// nil heißt "Feld nicht gesendet, nicht prüfen". Bestehende längere Werte
-// werden nie abgeschnitten; sie fallen erst beim nächsten Speichern des
-// betreffenden Feldes auf.
+// validateComponentTexts checks name and description against the length limits
+// and on violation returns the machine-readable error code
+// (name_too_long/description_too_long), which the frontend translates at the field.
+// nil means "field not sent, do not check". Existing longer values
+// are never truncated; they only surface on the next save of the
+// field concerned.
 func validateComponentTexts(name, description *string) (code, msg string) {
 	if name != nil && utf8.RuneCountInString(*name) > maxComponentNameLen {
 		return "name_too_long", fmt.Sprintf("Name must not exceed %d characters", maxComponentNameLen)
@@ -106,19 +106,19 @@ func validateComponentTexts(name, description *string) (code, msg string) {
 	return "", ""
 }
 
-// respondComponentTextTooLong beantwortet die Längenprüfung mit 400 und Code.
+// respondComponentTextTooLong answers the length check with 400 and a code.
 func respondComponentTextTooLong(c *gin.Context, code, msg string) {
 	c.JSON(http.StatusBadRequest, gin.H{"error": msg, "code": code})
 }
 
-// hiddenComponentIDs: die öffentliche Regel steht in models.HiddenComponentIDs
-// (gemeinsam mit der Selbstüberwachung).
+// hiddenComponentIDs: the public rule is in models.HiddenComponentIDs
+// (shared with self-monitoring).
 func hiddenComponentIDs(all []models.Component) map[uint]bool {
 	return models.HiddenComponentIDs(all)
 }
 
-// withoutHiddenComponents entfernt unsichtbare Komponenten samt Nachfahren
-// aus der flachen Liste, für alle öffentlichen Sichten.
+// withoutHiddenComponents removes invisible components including descendants
+// from the flat list, for all public views.
 func withoutHiddenComponents(all []models.Component) []models.Component {
 	hidden := hiddenComponentIDs(all)
 	if len(hidden) == 0 {
@@ -133,9 +133,9 @@ func withoutHiddenComponents(all []models.Component) []models.Component {
 	return out
 }
 
-// callerMaySeeHiddenComponents: Global Admin oder eine Rolle auf der Seite, die
-// Komponenten bzw. Vorfälle liest oder schreibt (die Vorfall- und Wartungs-
-// formulare brauchen auch unsichtbare Komponenten zur Auswahl).
+// callerMaySeeHiddenComponents: Global Admin or a role on the page that
+// reads or writes components or incidents (the incident and maintenance
+// forms also need invisible components for selection).
 func (h *Handler) callerMaySeeHiddenComponents(c *gin.Context, pageID uint) bool {
 	for _, perm := range []string{"components:read", "incidents:read", "maintenance:read", "external_sources:read"} {
 		if h.userHasPermissionOnPrivatePage(c, pageID, perm) {
@@ -145,9 +145,9 @@ func (h *Handler) callerMaySeeHiddenComponents(c *gin.Context, pageID uint) bool
 	return false
 }
 
-// stripHiddenIncidentComponents entfernt unsichtbare Komponenten aus den
-// Zuordnungen der Vorfälle, damit ihr Name öffentlich nicht über
-// einen Vorfall durchsickert. Der Vorfall selbst bleibt sichtbar.
+// stripHiddenIncidentComponents removes invisible components from the
+// incident assignments so that their name does not leak publicly via
+// an incident. The incident itself stays visible.
 func stripHiddenIncidentComponents(incidents []models.Incident, hidden map[uint]bool) {
 	if len(hidden) == 0 {
 		return
@@ -163,24 +163,24 @@ func stripHiddenIncidentComponents(incidents []models.Incident, hidden map[uint]
 	}
 }
 
-// buildTree baut aus einer flachen Liste einen Baum und aggregiert Statuses nach oben
+// buildTree builds a tree from a flat list and aggregates statuses upward
 func buildTree(all []models.Component, parentID *uint) []models.Component {
-	// nicht-nil, damit leere Listen als [] statt null serialisiert werden.
+	// non-nil so that empty lists are serialized as [] instead of null.
 	nodes := []models.Component{}
 	for i := range all {
 		comp := all[i]
 		if (parentID == nil && comp.ParentID == nil) ||
 			(parentID != nil && comp.ParentID != nil && *comp.ParentID == *parentID) {
-			// Kinder rekursiv laden
+			// load children recursively
 			comp.Children = buildTree(all, &comp.ID)
-			// Gruppe kennzeichnen, bevor Status gleich durch den
-			// Kindstatus ersetzt wird. Sonst kann der Admin eine Gruppe nicht
-			// von einer normalen Komponente unterscheiden.
+			// mark group before the status is replaced by the
+			// child status. Otherwise the admin cannot tell a group
+			// from a normal component.
 			comp.IsGroup = comp.Status == componentStatusGroup
-			// Status aggregieren: wenn Gruppe, schlechtesten Kindstatus hochreichen
+			// Aggregate status: if group, pass up the worst child status
 			if comp.IsGroup && len(comp.Children) > 0 {
-				// archivierte Kinder zählen nicht in den Status der
-				// aktiven Ansicht; eine selbst archivierte Gruppe aggregiert alle.
+				// archived children do not count toward the status of the
+				// active view; a group that is itself archived aggregates all.
 				childStatuses := make([]string, 0, len(comp.Children))
 				childEffective := make([]string, 0, len(comp.Children))
 				for _, ch := range comp.Children {
@@ -192,7 +192,7 @@ func buildTree(all []models.Component, parentID *uint) []models.Component {
 				}
 				if len(childStatuses) > 0 {
 					comp.Status = worstStatus(childStatuses)
-					// der effektive Status (falls annotiert) ebenso.
+					// the effective status (if annotated) likewise.
 					if comp.EffectiveStatus != "" {
 						comp.EffectiveStatus = worstStatus(childEffective)
 					}
@@ -201,7 +201,7 @@ func buildTree(all []models.Component, parentID *uint) []models.Component {
 			nodes = append(nodes, comp)
 		}
 	}
-	// Sortierung nach SortOrder
+	// Sort by SortOrder
 	sort.SliceStable(nodes, func(i, j int) bool {
 		return nodes[i].SortOrder < nodes[j].SortOrder
 	})
@@ -231,16 +231,16 @@ func (h *Handler) GetComponentsHandler(c *gin.Context) {
 	}
 
 	all := []models.Component{}
-	// id als zweites Kriterium, damit gleiche SortOrder (z. B. 0 bei
-	// älteren Komponenten) stabil nach Anlage sortiert wird; Postgres garantiert
-	// bei Gleichstand sonst keine Reihenfolge.
+	// id as second criterion so that equal SortOrder (e.g. 0 for
+	// older components) is sorted stably by creation; Postgres otherwise guarantees
+	// no order on ties.
 	if err := h.DB.Where("status_page_id = ?", tenantID).Order("sort_order asc, id asc").Find(&all).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch components", "code": "server_error"})
 		return
 	}
-	// Diese Route ist auch anonym lesbar (main.go). Unsichtbare
-	// Komponenten sieht nur, wer die Seite verwaltet; alle anderen bekommen den
-	// gefilterten Baum wie auf der öffentlichen Statusseite.
+	// This route is also readable anonymously (main.go). Invisible
+	// components are seen only by those who manage the page; everyone else gets the
+	// filtered tree as on the public status page.
 	if !h.callerMaySeeHiddenComponents(c, page.ID) {
 		all = withoutHiddenComponents(all)
 	}
@@ -248,8 +248,8 @@ func (h *Handler) GetComponentsHandler(c *gin.Context) {
 	for i := range all {
 		all[i].Tags = tagsByComponent.of(all[i].ID)
 	}
-	// Status bleibt der gespeicherte Wert (Admin-Formular),
-	// effective_status/external_sources kommen dazu.
+	// Status remains the stored value (admin form),
+	// effective_status/external_sources are added.
 	h.annotateEffectiveStatus(page.ID, all, h.componentIDsWithOpenIncidents(page.ID))
 
 	tree := buildTree(all, nil)
@@ -260,20 +260,20 @@ func (h *Handler) CreateComponentHandler(c *gin.Context) {
 	type CreateReq struct {
 		Name        string `json:"name" binding:"required"`
 		Description string `json:"description"`
-		// TagIDs ersetzt das frühere Country-Freitextfeld. Leer
-		// bedeutet "kein Tag" - anders als beim alten Country-Default fällt
-		// das NICHT automatisch auf "global" zurück (fail-closed).
+		// TagIDs replaces the former free-text Country field. Empty
+		// means "no tag" - unlike the old Country default, this does NOT
+		// fall back automatically to "global" (fail-closed).
 		TagIDs []uint `json:"tag_ids"`
-		// Status beim Anlegen (leer = operational) und Eltern-Komponente.
+		// Status on creation (empty = operational) and parent component.
 		Status   string `json:"status"`
 		ParentID *uint  `json:"parent_id"`
-		// true legt eine Gruppe an. Eine Gruppe hat keinen eigenen
-		// Status (er wird aus den Kindern berechnet, siehe buildTree); ein
-		// mitgeschickter status ist deshalb ein Fehler statt still ignoriert.
+		// true creates a group. A group has no status of its own
+		// (it is computed from the children, see buildTree); a
+		// status sent along is therefore an error instead of silently ignored.
 		IsGroup bool `json:"is_group"`
-		// nil (Feld fehlt) = sichtbar.
+		// nil (field missing) = visible.
 		Visible *bool `json:"visible"`
-		// leer = automatisch aus dem Namen.
+		// empty = automatically from the name.
 		Slug string `json:"slug"`
 	}
 	var req CreateReq
@@ -332,7 +332,7 @@ func (h *Handler) CreateComponentHandler(c *gin.Context) {
 		Visible:      req.Visible == nil || *req.Visible,
 	}
 	err = h.createComponent(&comp, tags, req.Visible)
-	if isUniqueViolation(err) { // Race nach der Vorabprüfung
+	if isUniqueViolation(err) { // Race after the pre-check
 		respondSlugTaken(c)
 		return
 	}
@@ -346,12 +346,12 @@ func (h *Handler) CreateComponentHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, comp)
 }
 
-// createComponent legt die Komponente samt Tags in einer Transaktion an.
-// GORM ersetzt den Nullwert false beim Create durch den Tag-Default true; ein
-// unsichtbar angelegter Eintrag wird deshalb nachgezogen. Hat der Aufrufer
-// keine Kennung vorgegeben, vergibt BeforeCreate eine; kollidiert sie im
-// Wettlauf mit einer parallelen Anlage (Unique-Index), wird mit einer neu
-// berechneten Kennung wiederholt.
+// createComponent creates the component with its tags in one transaction.
+// GORM replaces the zero value false on Create with the tag default true; an
+// entry created as invisible is therefore corrected afterwards. If the caller
+// gave no identifier, BeforeCreate assigns one; if it collides in
+// a race with a parallel creation (unique index), it is retried with a newly
+// computed identifier.
 func (h *Handler) createComponent(comp *models.Component, tags []models.Tag, visible *bool) error {
 	autoSlug := comp.Slug == ""
 	var err error
@@ -363,7 +363,7 @@ func (h *Handler) createComponent(comp *models.Component, tags []models.Tag, vis
 			if err := tx.Create(comp).Error; err != nil {
 				return err
 			}
-			// Anfangsstatus als erster Eintrag der Historie.
+			// Initial status as first entry of the history.
 			if err := statushistory.Record(tx, comp.ID, "", comp.Status, models.StatusSourceCreated, time.Now()); err != nil {
 				return err
 			}
@@ -383,10 +383,10 @@ func (h *Handler) createComponent(comp *models.Component, tags []models.Tag, vis
 	return err
 }
 
-// initialComponentStatus liefert den Anfangsstatus einer neuen Komponente bzw.
-// Gruppe. Gruppen bekommen den Marker-Status "group" und dürfen
-// keinen eigenen Status mitbringen; Komponenten: leer = operational, sonst
-// muss der Wert zulässig sein.
+// initialComponentStatus returns the initial status of a new component or
+// group. Groups get the marker status "group" and must
+// not bring their own status; components: empty = operational, otherwise
+// the value must be permitted.
 func initialComponentStatus(isGroup bool, requested string) (string, error) {
 	if isGroup {
 		if requested != "" {
@@ -403,11 +403,11 @@ func initialComponentStatus(isGroup bool, requested string) (string, error) {
 	return requested, nil
 }
 
-// nextSiblingSortOrder liefert die SortOrder für eine neue Komponente unter
-// parentID (nil = oberste Ebene): eins mehr als die höchste ihrer Geschwister.
-// Vorher bekam jede neue Komponente den Default 0 und landete so
-// vor allen Geschwistern mit gepflegter Reihenfolge (Seed: 1, 2, 3 …), statt
-// wie erwartet am Ende.
+// nextSiblingSortOrder returns the SortOrder for a new component under
+// parentID (nil = top level): one more than the highest of its siblings.
+// Previously every new component got the default 0 and thus ended up
+// before all siblings with a maintained order (seed: 1, 2, 3 …), instead of
+// at the end as expected.
 func (h *Handler) nextSiblingSortOrder(tenantID uint, parentID *uint) int {
 	q := h.DB.Model(&models.Component{}).Where("status_page_id = ?", tenantID)
 	if parentID == nil {
@@ -416,43 +416,43 @@ func (h *Handler) nextSiblingSortOrder(tenantID uint, parentID *uint) int {
 		q = q.Where("parent_id = ?", *parentID)
 	}
 	var maxOrder int
-	// Bei einem Lesefehler bleibt maxOrder 0; die Reihenfolge ist dann nur
-	// kosmetisch falsch, das Anlegen soll daran nicht scheitern.
+	// On a read error maxOrder stays 0; the order is then only
+	// cosmetically wrong, creation should not fail because of it.
 	q.Select("COALESCE(MAX(sort_order), 0)").Scan(&maxOrder)
 	return maxOrder + 1
 }
 
 type componentUpdateReq struct {
 	Name string `json:"name"`
-	// nicht mehr binding:"required", weil Gruppen keinen Status
-	// mitschicken müssen; für normale Komponenten prüft der Handler selbst.
+	// no longer binding:"required", because groups do not have to
+	// send a status; for normal components the handler checks itself.
 	Status string `json:"status"`
-	// nil (Feld fehlt) = unverändert, "" = Beschreibung leeren.
+	// nil (field missing) = unchanged, "" = clear description.
 	Description *string `json:"description"`
-	TagIDs      *[]uint `json:"tag_ids"` // nil = unverändert lassen, [] = Tags entfernen
-	// nil = unverändert, 0 = Wurzel, sonst ID der Eltern-Komponente.
+	TagIDs      *[]uint `json:"tag_ids"` // nil = leave unchanged, [] = remove tags
+	// nil = unchanged, 0 = root, otherwise ID of the parent component.
 	ParentID *uint `json:"parent_id"`
-	// nil = unverändert.
+	// nil = unchanged.
 	Visible *bool `json:"visible"`
-	// die Kennung ist unveränderlich; erlaubt ist nur der
-	// unveränderte Wert (das Formular schickt ihn mit), jeder andere ergibt 400.
+	// the identifier is immutable; only the unchanged
+	// value is allowed (the form sends it along), anything else yields 400.
 	Slug *string `json:"slug"`
 }
 
-// applyParentChange setzt die neue Eltern-Komponente (0 = oberste Ebene) und
-// schreibt bei Fehlern die Antwort (false). Eine archivierte
-// Komponente bleibt in ihrer Gruppe (409), sonst umginge das Umhängen die Regel
-// „Wiederherstellen nur über die Gruppe“; eine unveränderte Zuordnung (das
-// Formular schickt sie mit) ist erlaubt und wird nicht neu geprüft.
+// applyParentChange sets the new parent component (0 = top level) and
+// writes the response on errors (false). An archived
+// component stays in its group (409), otherwise reparenting would bypass the rule
+// "restore only via the group"; an unchanged assignment (the
+// form sends it along) is allowed and not rechecked.
 func (h *Handler) applyParentChange(c *gin.Context, component *models.Component, tenantID, parentID uint) bool {
 	return h.applyParentChangeDB(c, h.DB, component, tenantID, parentID)
 }
 
-// applyParentChangeDB wie applyParentChange, liest aber über db (
-// innerhalb der Transaktion mit Zeilensperre).
+// applyParentChangeDB is like applyParentChange, but reads via db (
+// inside the transaction with row lock).
 func (h *Handler) applyParentChangeDB(c *gin.Context, db *gorm.DB, component *models.Component, tenantID, parentID uint) bool {
-	// frisch lesen; wurde die Komponente seit dem Laden archiviert,
-	// gilt der aktuelle Stand (sonst landete ein archiviertes Element oben).
+	// read fresh; if the component was archived since loading,
+	// the current state applies (otherwise an archived element would end up on top).
 	var fresh models.Component
 	if err := db.Select("id", "archived_at").First(&fresh, component.ID).Error; err == nil {
 		component.ArchivedAt = fresh.ArchivedAt
@@ -476,7 +476,7 @@ func (h *Handler) applyParentChangeDB(c *gin.Context, db *gorm.DB, component *mo
 	return true
 }
 
-// sameParent: ob die angeforderte parent_id (0 = oberste Ebene) der aktuellen entspricht.
+// sameParent: whether the requested parent_id (0 = top level) equals the current one.
 func sameParent(current *uint, requested uint) bool {
 	if current == nil {
 		return requested == 0
@@ -484,10 +484,10 @@ func sameParent(current *uint, requested uint) bool {
 	return *current == requested
 }
 
-// validateParent prüft, ob parentID als Eltern-Komponente von
-// compID (0 = neue Komponente) taugt: sie muss auf derselben Statusseite
-// existieren (Mandantentrennung), darf nicht die Komponente selbst sein und
-// keinen Zyklus erzeugen (Eltern ist Nachfahre von compID).
+// validateParent checks whether parentID is suitable as parent component of
+// compID (0 = new component): it must exist on the same status page
+// (tenant separation), must not be the component itself, and must
+// not create a cycle (parent is a descendant of compID).
 func (h *Handler) validateParent(tenantID, compID, parentID uint) error {
 	return validateParentDB(h.DB, tenantID, compID, parentID)
 }
@@ -500,13 +500,13 @@ func validateParentDB(db *gorm.DB, tenantID, compID, parentID uint) error {
 	if err := db.Where("id = ? AND status_page_id = ?", parentID, tenantID).First(&parent).Error; err != nil {
 		return newCodedError("parent_not_found", "parent component not found")
 	}
-	// in eine archivierte Gruppe lässt sich nichts verschieben.
+	// nothing can be moved into an archived group.
 	if parent.ArchivedAt != nil {
 		return newCodedError("parent_archived", "parent group is archived")
 	}
-	// Von der Eltern-Komponente aufwärts laufen; begegnet dabei compID, wäre es ein Zyklus.
-	// Besuchte IDs verhindern Endlosschleifen bei einem bereits bestehenden Zyklus
-	// (Altlast, direkter DB-Eingriff), der compID nicht enthält.
+	// Walk upward from the parent component; if compID is encountered, it would be a cycle.
+	// Visited IDs prevent infinite loops with an already existing cycle
+	// (legacy issue, direct DB intervention) that does not contain compID.
 	visited := map[uint]bool{parent.ID: true}
 	for cur := parent.ParentID; cur != nil; {
 		if *cur == compID {
@@ -517,18 +517,18 @@ func validateParentDB(db *gorm.DB, tenantID, compID, parentID uint) error {
 		}
 		visited[*cur] = true
 		var anc models.Component
-		// Fehlt ein Vorfahr (gelöscht), bleibt anc.ParentID nil und die Schleife endet.
+		// If an ancestor is missing (deleted), anc.ParentID stays nil and the loop ends.
 		db.Select("id", "parent_id").First(&anc, *cur)
 		cur = anc.ParentID
 	}
 	return nil
 }
 
-// resolveComponentUpdateTags löst req.TagIDs (falls gesetzt) zu Tags auf und
-// prüft die Zugriffsberechtigung darauf. ok=true mit newTags=nil bedeutet
-// "TagIDs war nil, Tags unverändert lassen". Ausgelagert aus
-// UpdateComponentHandler, damit dessen kognitive Komplexität die
-// SonarCloud-Grenze (go:S3776) nicht überschreitet.
+// resolveComponentUpdateTags resolves req.TagIDs (if set) to tags and
+// checks the access permission on them. ok=true with newTags=nil means
+// "TagIDs was nil, leave tags unchanged". Extracted from
+// UpdateComponentHandler so that its cognitive complexity does not
+// exceed the SonarCloud limit (go:S3776).
 func (h *Handler) resolveComponentUpdateTags(c *gin.Context, req componentUpdateReq, tenantID uint, current []models.Tag) (newTags []models.Tag, ok bool) {
 	if req.TagIDs == nil {
 		return nil, true
@@ -548,10 +548,10 @@ func (h *Handler) resolveComponentUpdateTags(c *gin.Context, req componentUpdate
 	return newTags, true
 }
 
-// saveComponentUpdate speichert die geänderte Komponente. Normale Komponenten
-// laufen über setComponentStatus (Validierung + Speichern), Gruppen behalten
-// ihren Status "group". Ausgelagert, damit die kognitive
-// Komplexität von UpdateComponentHandler nicht weiter steigt (go:S3776).
+// saveComponentUpdate saves the changed component. Normal components
+// go through setComponentStatus (validation + saving), groups keep
+// their status "group". Extracted so that the cognitive
+// complexity of UpdateComponentHandler does not rise further (go:S3776).
 func (h *Handler) saveComponentUpdate(db *gorm.DB, component *models.Component, isGroup bool, status string) error {
 	if isGroup {
 		return db.Omit("archived_at").Save(component).Error
@@ -559,11 +559,11 @@ func (h *Handler) saveComponentUpdate(db *gorm.DB, component *models.Component, 
 	return setComponentStatus(db, component, status, models.StatusSourceManual)
 }
 
-// errParentChangeRejected bricht die Transaktion ab, wenn die Antwort schon geschrieben ist.
+// errParentChangeRejected aborts the transaction when the response has already been written.
 var errParentChangeRejected = errors.New("parent change rejected")
 
-// saveWithParentChange: Sperre der Seite, Prüfung der Eltern und Speichern in
-// einer Transaktion. false = Antwort ist geschrieben.
+// saveWithParentChange: page lock, parent check and saving in
+// one transaction. false = response has been written.
 func (h *Handler) saveWithParentChange(c *gin.Context, component *models.Component, tenantID, parentID uint, isGroup bool, status string) bool {
 	var saveErr error
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
@@ -618,14 +618,14 @@ func (h *Handler) UpdateComponentHandler(c *gin.Context) {
 		return
 	}
 
-	// Der Status einer Gruppe ist kein gespeicherter Wert, sondern
-	// wird aus den Kindern berechnet (buildTree). Ein mitgeschickter Status
-	// wird bei Gruppen deshalb ignoriert statt mit 400 abgelehnt: Ältere,
-	// noch im Browser geladene Admin-Stände schicken beim Umbenennen den
-	// aggregierten Kindstatus mit; ein 400 würde dort das Bearbeiten von
-	// Gruppen blockieren, das Ignorieren hält sie korrekt. Eine Umwandlung
-	// Gruppe <-> Komponente ist per Update nicht vorgesehen (das Issue
-	// verlangt sie nicht).
+	// The status of a group is not a stored value but
+	// is computed from the children (buildTree). A status sent along
+	// is therefore ignored for groups instead of rejected with 400: Older
+	// admin states still loaded in the browser send the
+	// aggregated child status along when renaming; a 400 would block editing
+	// groups there, ignoring keeps it working correctly. A conversion
+	// group <-> component is not intended via update (the issue
+	// does not require it).
 	isGroup := component.Status == componentStatusGroup
 	if !isGroup && req.Status == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request fields", "code": "invalid_request"})
@@ -654,8 +654,8 @@ func (h *Handler) UpdateComponentHandler(c *gin.Context) {
 		component.Description = *req.Description
 	}
 	if req.ParentID != nil && !sameParent(component.ParentID, *req.ParentID) {
-		// Ein Wechsel der Eltern prüft und speichert unter der Sperre
-		// der Seite in einer Transaktion (Archivieren läuft sonst dazwischen).
+		// A parent change checks and saves under the lock
+		// of the page in one transaction (otherwise archiving runs in between).
 		if !h.saveWithParentChange(c, &component, tenantID, *req.ParentID, isGroup, req.Status) {
 			return
 		}
@@ -705,9 +705,9 @@ func (h *Handler) DeleteComponentHandler(c *gin.Context) {
 		return
 	}
 
-	// Eine Gruppe mit Kindern nicht löschen. Die Kinder würden
-	// sonst verwaist (parent_id zeigt ins Leere) und aus dem Baum fallen.
-	// Maschinenlesbarer code, damit das Frontend die Meldung übersetzt.
+	// Do not delete a group with children. The children would
+	// otherwise be orphaned (parent_id points nowhere) and fall out of the tree.
+	// Machine-readable code so that the frontend translates the message.
 	if comp.Status == componentStatusGroup {
 		var children int64
 		if err := h.DB.Model(&models.Component{}).Where("parent_id = ? AND status_page_id = ?", comp.ID, tenantID).Count(&children).Error; err != nil {
@@ -720,11 +720,11 @@ func (h *Handler) DeleteComponentHandler(c *gin.Context) {
 		}
 	}
 
-	// ein Incident kann mehrere Komponenten betreffen - beim Löschen
-	// einer Komponente nur die Zuordnung entfernen, nicht mehr den ganzen
-	// Incident (der könnte noch für andere Komponenten gültig sein).
+	// an incident can affect several components - when deleting
+	// a component, only remove the assignment, no longer the whole
+	// incident (it might still be valid for other components).
 	h.DB.Where("component_id = ?", comp.ID).Delete(&models.IncidentComponent{})
-	// Kopplungen an externe Komponenten ebenso entfernen.
+	// Also remove links to external components.
 	h.DB.Where("component_id = ?", comp.ID).Delete(&models.ExternalComponentLink{})
 
 	if err := h.DB.Delete(&comp).Error; err != nil {

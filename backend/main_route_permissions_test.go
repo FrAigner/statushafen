@@ -19,14 +19,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// Jede geschützte Admin-Route hängt an genau einer Ressource und
-// einer Aktion. Der Test prüft den echten Router: keine Route an der Registry
-// (guarded) vorbei, die Aktion passt zur HTTP-Methode (Sonderaktionen stehen
-// ausdrücklich in routeActionExceptions und in der Doku) und die Rechteprüfung
-// verhält sich je Ressource und Aktion wie dokumentiert.
+// Every protected admin route is tied to exactly one resource and
+// one action. The test checks the real router: no route bypasses the registry
+// (guarded), the action matches the HTTP method (special actions are listed
+// explicitly in routeActionExceptions and in the docs), and the permission check
+// behaves per resource and action as documented.
 
-// routeActionExceptions: Routen, deren Aktion bewusst von defaultAction
-// (GET=read, POST=create, PUT/PATCH=update, DELETE=delete) abweicht.
+// routeActionExceptions: routes whose action deliberately differs from defaultAction
+// (GET=read, POST=create, PUT/PATCH=update, DELETE=delete).
 var routeActionExceptions = map[string]string{
 	"POST /api/admin/pages/:page_id/webhook-token":                                      "Token erzeugen ändert die Seite (pages:update)",
 	"DELETE /api/admin/pages/:page_id/webhook-token":                                    "Token widerrufen ändert die Seite (pages:update)",
@@ -125,8 +125,8 @@ func defaultActionFor(method string) string {
 	return ""
 }
 
-// permWorld: zwei Seiten mit Inhalten, Nutzer ohne Global Admin mit frei
-// wählbaren Rechten auf Seite A.
+// permWorld: two pages with content, a non-Global-Admin user with freely
+// selectable permissions on page A.
 type permWorld struct {
 	r    *gin.Engine
 	db   *gorm.DB
@@ -149,8 +149,8 @@ func newPermWorld(t *testing.T) *permWorld {
 	return w
 }
 
-// user legt einen Nutzer mit der Rechteliste auf Seite A an (perms == nil: ohne
-// Rolle) und liefert sein Token.
+// user creates a user with the permission list on page A (perms == nil: without
+// role) and returns their token.
 func (w *permWorld) user(perms *string) string {
 	w.n++
 	u := models.User{Email: "u" + string(rune('a'+w.n)) + "@example.com"}
@@ -178,7 +178,7 @@ func listOf(perms ...string) *string {
 	return &s
 }
 
-// allExcept: Vollzugriff auf alle Ressourcen außer den genannten.
+// allExcept: full access to all resources except the named ones.
 func allExcept(skip ...string) *string {
 	var out []string
 	for _, r := range permissions.Resources {
@@ -213,9 +213,9 @@ func itoa(v uint) string { return strconv.FormatUint(uint64(v), 10) }
 func denied(code int) bool  { return code == http.StatusForbidden || code == http.StatusUnauthorized }
 func allowed(code int) bool { return !denied(code) }
 
-// Je Ressource und Aktion: nur read -> 403 bei schreibenden Aktionen, nur eine
-// andere Aktion -> 403, ohne Recht 403, fremde Seite 403 (Mandantentrennung);
-// create/update/delete lassen das Lesen zu (Implikation).
+// Per resource and action: only read -> 403 for write actions, only one
+// other action -> 403, no permission 403, foreign page 403 (tenant isolation);
+// create/update/delete allow reading (implication).
 func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 	for key, info := range guardedRoutes() {
 		parts := strings.SplitN(key, " ", 2)
@@ -226,7 +226,7 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 			pathB := ssoScopePath(route, w.b)
 
 			if info.Mode == modeGlobal {
-				// Auch Vollzugriff auf Seite A macht niemanden zum Plattform-Admin.
+				// Even full access to page A does not make anyone a platform admin.
 				assert.True(t, denied(w.code(method, pathA, w.user(allExcept()))), "Vollzugriff einer Seitenrolle auf globaler Route")
 				return
 			}
@@ -234,26 +234,26 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 			res := info.Resources
 			grant := func(actions ...string) *string {
 				if info.Mode == modeAny || info.Mode == modeKind {
-					// ein Recht an der ersten Ressource genügt (bei Kind: die erste = incidents)
+					// a permission on the first resource suffices (for kind: the first = incidents)
 					return listOf(permsFor(res[:1], actions...)...)
 				}
 				return listOf(permsFor(res, actions...)...)
 			}
 
-			// Ohne Rolle auf der Seite.
+			// Without a role on the page.
 			assert.True(t, denied(w.code(method, pathA, w.user(nil))), "ohne Rolle")
-			// Rolle, aber ohne Recht an dieser Ressource.
+			// Role, but without permission on this resource.
 			noRight := w.user(allExcept(res...))
 			if info.Mode == modePageRole {
 				assert.True(t, allowed(w.code(method, pathA, noRight)), "jede Seitenrolle darf lesen")
 			} else {
 				assert.True(t, denied(w.code(method, pathA, noRight)), "Rolle ohne Recht an der Ressource")
 			}
-			// Bei „alle“ genügt eine der beiden Ressourcen nicht.
+			// With "all", one of the two resources is not enough.
 			if info.Mode == modeAll {
 				assert.True(t, denied(w.code(method, pathA, w.user(listOf(permsFor(res[:1], info.Action)...)))), "nur eine der nötigen Ressourcen")
 			}
-			// Eine andere Aktion derselben Ressource reicht nicht.
+			// A different action on the same resource is not enough.
 			if info.Mode != modePageRole {
 				for _, other := range []string{permissions.Create, permissions.Update, permissions.Delete} {
 					if other == info.Action || (info.Action == permissions.Read) || contains(info.Actions, other) {
@@ -265,17 +265,17 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 					assert.True(t, denied(w.code(method, pathA, w.user(grant(permissions.Read)))), "nur read bei %s", info.Action)
 				}
 			}
-			// Fremde Seite: Recht gilt nur auf Seite A.
+			// Foreign page: the permission only applies on page A.
 			full := grant(info.Action)
 			if info.Mode == modeAll {
 				full = listOf(permsFor(res, info.Action)...)
 			}
 			assert.True(t, denied(w.code(method, pathB, w.user(full))), "Mandantentrennung: Recht von Seite A auf Seite B")
-			// Erlaubt mit genau dem Recht; Lesen auch durch create/update/delete.
+			// Allowed with exactly that permission; reading also via create/update/delete.
 			if info.Mode != modePageRole {
 				assert.True(t, allowed(w.code(method, pathA, w.user(full))), "mit %s", info.Action)
 			}
-			// Bei mehreren Aktionen genügt jede einzelne.
+			// With several actions, each single one suffices.
 			for _, alt := range info.Actions {
 				assert.True(t, allowed(w.code(method, pathA, w.user(grant(alt)))), "mit %s", alt)
 			}
@@ -288,8 +288,8 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 	}
 }
 
-// Wartungen teilen sich die Routen mit Vorfällen: die Ressource folgt der Art
-// des Datensatzes.
+// Maintenance shares routes with incidents: the resource follows the kind
+// of the record.
 func TestRoutePermissions_WartungFolgtDerArtDesDatensatzes(t *testing.T) {
 	post := func(w *permWorld, token, body string) int {
 		req := httptest.NewRequest(http.MethodPost, "/api/pages/"+itoa(w.a.page.ID)+"/incidents", strings.NewReader(body))
@@ -307,7 +307,7 @@ func TestRoutePermissions_WartungFolgtDerArtDesDatensatzes(t *testing.T) {
 	assert.True(t, allowed(post(w, onlyMaintenance, `{"IsMaintenance":true}`)), "Wartung mit maintenance:create")
 	assert.Equal(t, http.StatusForbidden, post(w, onlyMaintenance, `{}`), "Vorfall ohne incidents:create")
 
-	// Bestehende Wartung: Ändern/Löschen verlangt maintenance, nicht incidents.
+	// Existing maintenance: changing/deleting requires maintenance, not incidents.
 	maint := models.Incident{StatusPageID: w.a.page.ID, Title: "W", Message: "m", Status: "scheduled", IsMaintenance: true}
 	require.NoError(t, w.db.Create(&maint).Error)
 	path := "/api/pages/" + itoa(w.a.page.ID) + "/incidents/" + itoa(maint.ID)
@@ -318,7 +318,7 @@ func TestRoutePermissions_WartungFolgtDerArtDesDatensatzes(t *testing.T) {
 	assert.True(t, allowed(w.code(http.MethodPost, path+"/updates", w.user(listOf("maintenance:create")))))
 }
 
-// Der Import legt eigene Komponenten an und verlangt beide Rechte.
+// The import creates its own components and requires both permissions.
 func TestRoutePermissions_ImportBrauchtQuellenUndKomponentenRecht(t *testing.T) {
 	w := newPermWorld(t)
 	path := "/api/pages/" + itoa(w.a.page.ID) + "/external-sources/999/import"
@@ -327,9 +327,9 @@ func TestRoutePermissions_ImportBrauchtQuellenUndKomponentenRecht(t *testing.T) 
 	assert.True(t, allowed(w.code(http.MethodPost, path, w.user(listOf("external_sources:create", "components:create")))))
 }
 
-// Kompatibilität: Eine Rolle mit dem Altwert write (Alt-Rolle,
-// Alt-Token) zählt weiter als create+update+delete+read - ausschließlich beim
-// Prüfen; gespeichert wird er nie mehr (siehe handlers/role_test.go).
+// Compatibility: a role with the legacy value write (legacy role,
+// legacy token) still counts as create+update+delete+read - only when
+// checking; it is never stored again (see handlers/role_test.go).
 func TestRoutePermissions_AltwertWriteGiltWeiterBeimPruefen(t *testing.T) {
 	w := newPermWorld(t)
 	tok := w.user(listOf("components:write"))

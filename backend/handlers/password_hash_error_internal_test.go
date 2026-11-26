@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Scheitert das Hashen, brechen alle Handler mit server_error ab: kein Konto
-// ohne Passwort, keine geänderte Zeile und kein verbrauchter Bestelllink.
+// If hashing fails, all handlers abort with server_error: no account
+// without a password, no changed row and no consumed order link.
 func TestPasswordHashFailure_HandlersAbortWithServerError(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)

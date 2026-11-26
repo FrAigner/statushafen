@@ -1,12 +1,12 @@
 package handlers_test
 
-// Rollenwechsel (POST /api/admin/pages/:page_id/users auf ein
-// bestehendes Mitglied) gleichzeitig mit dem Entfernen des Mitglieds
-// (DELETE .../users/:uid) auf einem ECHTEN Postgres (READ COMMITTED). Früher
-// wartete das UPDATE von Save() auf die Sperre des Entfernens, traf danach 0
-// Zeilen, und der Upsert setzte deleted_at zurück: die entfernte Mitgliedschaft
-// kam mit Antwort 200 wieder. Wie die anderen Postgres-Tests nur mit
-// MIGRATION_PG_TEST=1 und nicht als root.
+// Role change (POST /api/admin/pages/:page_id/users on an
+// existing member) concurrent with removing the member
+// (DELETE .../users/:uid) on a REAL Postgres (READ COMMITTED). Previously
+// the UPDATE of Save() waited for the removal's lock, then hit 0
+// rows, and the upsert reset deleted_at: the removed membership
+// came back with a 200 response. Like the other Postgres tests only with
+// MIGRATION_PG_TEST=1 and not as root.
 
 import (
 	"fmt"
@@ -38,9 +38,9 @@ func activeMemberships(db *gorm.DB, uid uint) int64 {
 	return n
 }
 
-// Deterministisch verschränkt: Die "Entfernung" hält das Soft-Delete der
-// Rollenzeile uncommitted, der Rollenwechsel läuft in die Zeilensperre hinein
-// und wird erst nach dem Commit frei. Erwartung: 404, keine aktive Mitgliedschaft.
+// Deterministically interleaved: the "removal" holds the soft delete of the
+// role row uncommitted, the role change runs into the row lock
+// and is released only after the commit. Expectation: 404, no active membership.
 func TestPageRoleChangePostgres_VsRemoveHeldLock(t *testing.T) {
 	f, db := roleRemoveSetup(t)
 	u, _ := f.account(t, "held856@x.example")
@@ -65,8 +65,8 @@ func TestPageRoleChangePostgres_VsRemoveHeldLock(t *testing.T) {
 	}
 }
 
-// Echte Handler gegeneinander, viele Läufe mit versetztem Start: danach nie eine
-// aktive Mitgliedschaft (außer nach 201 = Neuanlage durch den Global Admin), nie 5xx (Deadlock 40P01), kein Hänger.
+// Real handlers against each other, many runs with staggered start: afterwards never an
+// active membership (except after 201 = re-creation by the Global Admin), never 5xx (deadlock 40P01), no hang.
 func TestPageRoleChangePostgres_VsRemoveRounds(t *testing.T) {
 	f, db := roleRemoveSetup(t)
 	const rounds = 60
@@ -104,8 +104,8 @@ func TestPageRoleChangePostgres_VsRemoveRounds(t *testing.T) {
 		if cCode >= 500 {
 			t.Fatalf("Runde %d: Rollenwechsel antwortet %d (Deadlock/Abbruch)", i, cCode)
 		}
-		// 201: Der Global Admin hat nach dem Entfernen neu hinzugefügt (legitim,
-		// kein Mitglied mehr gefunden). Bei 200/404 muss das Mitglied weg sein.
+		// 201: The Global Admin re-added after the removal (legitimate,
+		// no member found anymore). With 200/404 the member must be gone.
 		if n := activeMemberships(db, u.ID); n != 0 && cCode != http.StatusCreated {
 			t.Fatalf("Runde %d: %d aktive Mitgliedschaft(en) nach dem Entfernen (Rollenwechsel: %d)", i, n, cCode)
 		}

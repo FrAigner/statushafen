@@ -24,8 +24,8 @@ func TestLoginHandler_RejectsMalformedBody(t *testing.T) {
 	}
 }
 
-// /me gibt Rolle und Berechtigungen aus dem Token-Kontext zurück; fehlen sie
-// oder haben einen falschen Typ, bleiben die Felder leer statt zu paniken.
+// /me returns role and permissions from the token context; if they are missing
+// or have the wrong type, the fields stay empty instead of panicking.
 func TestMeHandler_ReadsRoleAndPermissionsFromContext(t *testing.T) {
 	db := testutils.SetupTestDB()
 	h := NewHandler(db)
