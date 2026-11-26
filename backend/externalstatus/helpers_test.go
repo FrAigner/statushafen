@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// fakeResolver liefert vorgegebene DNS-Antworten. answers[host] wird der
-// Reihe nach verbraucht (letzte Antwort bleibt), damit Tests DNS-Rebinding
-// nachstellen können.
+// fakeResolver returns predefined DNS answers. answers[host] is consumed
+// in order (the last answer stays), so tests can simulate
+// DNS rebinding.
 type fakeResolver struct {
 	mu      sync.Mutex
 	answers map[string][][]string
@@ -42,9 +42,9 @@ func (r *fakeResolver) LookupIPAddr(_ context.Context, host string) ([]net.IPAdd
 	return out, nil
 }
 
-// testTarget ist ein lokaler TLS-Server, auf den der Dialer jede bereits
-// geprüfte Adresse umleitet. Das httptest-Zertifikat gilt für example.com,
-// deshalb verwenden die Tests diesen Hostnamen.
+// testTarget is a local TLS server to which the dialer redirects every already
+// checked address. The httptest certificate is valid for example.com,
+// so the tests use this host name.
 type testTarget struct {
 	srv      *httptest.Server
 	resolver *fakeResolver

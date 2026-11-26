@@ -9,17 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// jeder Sperrfall für IPv4 und IPv6, dazu Gegenproben mit
-// öffentlichen Adressen.
+// every block case for IPv4 and IPv6, plus control checks with
+// public addresses.
 func TestIsBlockedIP(t *testing.T) {
 	blocked := []string{
-		"127.0.0.1", "127.8.9.10", "::1", // Loopback
-		"10.1.2.3", "172.16.0.1", "192.168.1.1", // privat
-		"fc00::1", "fd12:3456::1", // Unique-Local
-		"169.254.169.254", "fe80::1", // Link-Local (inkl. Cloud-Metadaten)
+		"127.0.0.1", "127.8.9.10", "::1", // loopback
+		"10.1.2.3", "172.16.0.1", "192.168.1.1", // private
+		"fc00::1", "fd12:3456::1", // unique-local
+		"169.254.169.254", "fe80::1", // link-local (incl. cloud metadata)
 		"224.0.0.1", "239.255.255.250", "ff02::1", // Multicast
 		"100.64.0.1", "100.127.255.254", // CGNAT
-		"0.0.0.0", "0.1.2.3", "::", // unspezifiziert / dieses Netz
+		"0.0.0.0", "0.1.2.3", "::", // unspecified / this network
 		"::ffff:10.0.0.1", "::ffff:127.0.0.1", // IPv4-mapped
 		"192.0.2.1", "198.18.0.1", "198.51.100.1", "203.0.113.1", "240.0.0.1", "255.255.255.255",
 		"fec0::1", "64:ff9b::a00:1", "2002:a00:1::1", "2001:db8::1", "192.0.0.8",
@@ -34,20 +34,20 @@ func TestIsBlockedIP(t *testing.T) {
 	assert.True(t, IsBlockedIP(net.IP{1, 2, 3}), "ungültige Länge gilt als gesperrt")
 }
 
-// IPv6-Übergangsformate tragen eine IPv4-Adresse im Inneren. Ein Ziel wie
-// ::127.0.0.1 darf nicht an der IPv4-Sperrliste vorbeikommen, auch wenn ein
-// Resolver oder Netzstack es auf IPv4 abbildet.
+// IPv6 transition formats carry an IPv4 address inside. A target like
+// ::127.0.0.1 must not slip past the IPv4 block list, even if a
+// resolver or network stack maps it to IPv4.
 func TestIsBlockedIP_EingebetteteIPv4(t *testing.T) {
 	blocked := []string{
-		// IPv4-kompatibel ::/96 (veraltet)
+		// IPv4-compatible ::/96 (deprecated)
 		"::127.0.0.1", "::a00:1", "::808:808",
 		// SIIT ::ffff:0:0:0/96
 		"::ffff:0:127.0.0.1", "::ffff:0:10.0.0.1", "::ffff:0:8.8.8.8",
-		// lokales NAT64 64:ff9b:1::/48
+		// local NAT64 64:ff9b:1::/48
 		"64:ff9b:1::7f00:1", "64:ff9b:1:ffff::a00:1",
 		// Teredo 2001::/32
 		"2001::7f00:1", "2001:0:4136:e378:8000:63bf:3fff:fdd2",
-		// 6to4 2002::/16 mit Loopback und mit öffentlicher IPv4
+		// 6to4 2002::/16 with loopback and with public IPv4
 		"2002:7f00:1::", "2002:808:808::1",
 		// NAT64 64:ff9b::/96
 		"64:ff9b::7f00:1", "64:ff9b::808:808",
@@ -55,8 +55,8 @@ func TestIsBlockedIP_EingebetteteIPv4(t *testing.T) {
 	for _, s := range blocked {
 		assert.True(t, IsBlockedIP(net.ParseIP(s)), s)
 	}
-	// Gegenprobe: öffentliche Adressen bleiben erreichbar, auch solche, deren
-	// Präfix den gesperrten nur ähnelt.
+	// Control check: public addresses remain reachable, even those whose
+	// prefix only resembles the blocked ones.
 	allowed := []string{
 		"93.184.216.34", "::ffff:8.8.8.8", "2606:4700::1111",
 		"2001:4860:4860::8888", "2001:1::1", "2a00:1450:4001:80b::200e",
@@ -67,10 +67,10 @@ func TestIsBlockedIP_EingebetteteIPv4(t *testing.T) {
 	}
 }
 
-// Eine IPv6-Zone (%eth0) lässt netip.Prefix.Contains immer false liefern.
-// Ohne Gegenmaßnahme käme so z. B. eine 6to4- oder NAT64-Adresse mit Zone an
-// der Sperrliste vorbei. Adressen mit Zone gelten daher als gesperrt, egal
-// welcher Bereich dahinter steht.
+// An IPv6 zone (%eth0) makes netip.Prefix.Contains always return false.
+// Without a countermeasure, e.g. a 6to4 or NAT64 address with a zone would slip past
+// the block list. Addresses with a zone are therefore treated as blocked, no matter
+// which range is behind them.
 func TestIsBlockedAddr_ZoneUmgehtSperrlisteNicht(t *testing.T) {
 	cases := []string{
 		"::%lo", "fec0::1%eth0", "64:ff9b::a9fe:a9fe%1", "64:ff9b::a00:1%eth0",
@@ -84,7 +84,7 @@ func TestIsBlockedAddr_ZoneUmgehtSperrlisteNicht(t *testing.T) {
 		require.NotEmpty(t, addr.Zone(), s)
 		assert.True(t, IsBlockedAddr(addr), s)
 	}
-	// Gegenprobe: dieselben öffentlichen Adressen ohne Zone bleiben erlaubt.
+	// Control check: the same public addresses without a zone remain allowed.
 	for _, s := range []string{"2606:4700::1111", "2a00:1450:4001:80b::200e"} {
 		assert.False(t, IsBlockedAddr(netip.MustParseAddr(s)), s)
 	}
@@ -99,7 +99,7 @@ func FuzzIsBlockedAddr_Zone(f *testing.F) {
 		if err != nil || !base.Is6() || base.Zone() != "" || zone == "" {
 			t.Skip()
 		}
-		// Die Zone darf das Ergebnis nie von gesperrt auf erlaubt kippen.
+		// The zone must never flip the result from blocked to allowed.
 		if IsBlockedAddr(base) {
 			assert.True(t, IsBlockedAddr(base.WithZone(zone)))
 		}

@@ -93,7 +93,7 @@ func TestRoutePermissions_JedeGeschuetzteRouteHatGenauEineRessourceUndAktion(t *
 			switch info.Mode {
 			case modeGlobal:
 				assert.Equal(t, kind, ssoGlobalRoute)
-			case modePage, modePageRole, modeAny, modeAll, modeKind:
+			case modePage, modePageRole, modeAny, modeAnyAction, modeAll, modeKind:
 				assert.Equal(t, kind, ssoPageRoute)
 			default:
 				t.Errorf("unbekannter Modus %q", info.Mode)
@@ -256,7 +256,7 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 			// Eine andere Aktion derselben Ressource reicht nicht.
 			if info.Mode != modePageRole {
 				for _, other := range []string{permissions.Create, permissions.Update, permissions.Delete} {
-					if other == info.Action || (info.Action == permissions.Read) {
+					if other == info.Action || (info.Action == permissions.Read) || contains(info.Actions, other) {
 						continue
 					}
 					assert.True(t, denied(w.code(method, pathA, w.user(grant(other)))), "nur %s statt %s", other, info.Action)
@@ -274,6 +274,10 @@ func TestRoutePermissions_RechtepruefungJeRessourceUndAktion(t *testing.T) {
 			// Erlaubt mit genau dem Recht; Lesen auch durch create/update/delete.
 			if info.Mode != modePageRole {
 				assert.True(t, allowed(w.code(method, pathA, w.user(full))), "mit %s", info.Action)
+			}
+			// Bei mehreren Aktionen genügt jede einzelne.
+			for _, alt := range info.Actions {
+				assert.True(t, allowed(w.code(method, pathA, w.user(grant(alt)))), "mit %s", alt)
 			}
 			if info.Action == permissions.Read && info.Mode != modePageRole {
 				for _, impl := range []string{permissions.Create, permissions.Update, permissions.Delete} {

@@ -26,6 +26,7 @@ import FormLanguageDone from '../../components/FormLanguageDone.vue'
 import { useListQuery } from '../../composables/useListQuery'
 import { usePageCrumbs } from '../../composables/usePageCrumbs'
 import { flattenComponentTree, componentOptions } from '../../utils/componentTree'
+import { vHelp } from '../../directives/vHelp'
 
 // Vorlagen für Vorfälle/Wartungsfenster: CRUD analog zu
 // AdminComponents.vue. Werden im "Vorlage verwenden"-Dropdown von
@@ -220,13 +221,14 @@ const componentNames = (ids) => {
     <!-- Alert -->
     <div v-if="alertMsg" :class="`alert alert-${alertType} fade-in mb-16`">
       <span>{{ alertMsg }}</span>
-      <button class="alert-close" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
+      <button class="alert-close" data-help-exempt="Meldung schließen, selbsterklärend" @click="alertMsg = ''" :aria-label="t('common.dismissMessage')"><AppIcon name="x" :size="14" /></button>
     </div>
 
     <PageHeader :level="2" :title="t('incidentTemplates.title')" :subtitle="subtitle" :breadcrumbs="breadcrumbs">
       <template #actions>
         <OnyxButton
           v-if="canCreate"
+          v-help="'incidentTemplates.newTemplate'"
           :label="t('incidentTemplates.newButton')"
           @click="openNew"
         />
@@ -238,7 +240,7 @@ const componentNames = (ids) => {
       <ListCard :title="t('incidentTemplates.cardTitle')" class="split__main">
         <template #tools>
           <SegmentControl v-model="filter" :options="filterOptions" :label="t('incidentTemplates.filterLabel')" />
-          <SearchBox v-model="query" :label="t('incidentTemplates.searchLabel')" :placeholder="t('incidentTemplates.searchPlaceholder')" />
+          <SearchBox v-model="query" v-help="'incidentTemplates.search'" :label="t('incidentTemplates.searchLabel')" :placeholder="t('incidentTemplates.searchPlaceholder')" />
         </template>
         <p v-if="searching" class="sr-only" role="status">{{ t('patterns.searchResult', { n: rows.length }, rows.length) }}</p>
 
@@ -247,7 +249,7 @@ const componentNames = (ids) => {
           <template #cell-Kind="{ item }"><span class="tag-pill">{{ kindLabel(item.Kind) }}</span></template>
           <template #cell-ComponentIDs="{ item }">{{ componentNames(item.ComponentIDs) }}</template>
           <template #actions="{ item }">
-            <RowMenu :label="t('patterns.menuLabel', { name: item.Name })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
+            <RowMenu v-help="'incidentTemplates.rowActions'" :label="t('patterns.menuLabel', { name: item.Name })" :items="menuItems(item)" @select="key => onMenuSelect(item, key)" />
           </template>
         </ResponsiveTable>
         <EmptyState v-else-if="items.length" :title="t('incidentTemplates.noResults')" :text="t('incidentTemplates.noResultsText')" />
@@ -260,27 +262,27 @@ const componentNames = (ids) => {
           <FormLanguageSwitch :trans="trans" />
           <fieldset class="form-lock" :disabled="formReadOnly">
 
-          <FormField v-slot="f" :label="t('incidentTemplates.fieldName')" required :error="errors.Name || null">
+          <FormField v-slot="f" :label="t('incidentTemplates.fieldName')" required help="incidentTemplates.name" :error="errors.Name || null">
             <input :id="f.id" v-model="formData.Name" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('incidentTemplates.namePlaceholder')" @input="clearError('Name')">
           </FormField>
 
-          <FormField v-slot="f" :label="t('incidentTemplates.fieldKind')" required>
+          <FormField v-slot="f" :label="t('incidentTemplates.fieldKind')" required help="incidentTemplates.kind">
             <select :id="f.id" v-model="formData.Kind" :required="f.required">
               <option v-for="o in kindOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </FormField>
 
-          <FormField v-slot="f" :label="t('incidentTemplates.fieldTitle')" required :error="onDefaultLang ? errors.Title || null : null">
+          <FormField v-slot="f" :label="t('incidentTemplates.fieldTitle')" required help="incidentTemplates.title" :error="onDefaultLang ? errors.Title || null : null">
             <input :id="f.id" v-model="titleModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('incidentTemplates.titlePlaceholder')" @input="clearError('Title')">
           </FormField>
 
-          <FormField v-slot="f" :label="t('incidentTemplates.fieldMessage')" required :error="onDefaultLang ? errors.Message || null : null">
+          <FormField v-slot="f" :label="t('incidentTemplates.fieldMessage')" required help="incidentTemplates.message" :error="onDefaultLang ? errors.Message || null : null">
             <RichTextEditor :id="f.id" v-model="messageModel" :required="f.required" :aria-invalid="f.invalid" :aria-describedby="f.describedby" :placeholder="t('incidentTemplates.messagePlaceholder')" @input="clearError('Message')" />
           </FormField>
 
           <FormLanguageDone :trans="trans" />
 
-          <FormField v-if="formData.Kind !== 'maintenance'" v-slot="f" :label="t('incidentTemplates.fieldDefaultStatus')">
+          <FormField v-if="formData.Kind !== 'maintenance'" v-slot="f" :label="t('incidentTemplates.fieldDefaultStatus')" help="incidentTemplates.defaultStatus">
             <select :id="f.id" v-model="formData.DefaultStatus">
               <option v-for="o in statusOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
@@ -291,13 +293,14 @@ const componentNames = (ids) => {
           <FormMultiSelect
             v-model="formData.ComponentIDs"
             :label="t('incidentTemplates.fieldComponents')"
+            help="incidentTemplates.components"
             :options="componentOptions(components, formData.ComponentIDs)"
           />
 
           </fieldset>
           <div class="form-actions">
-            <OnyxButton :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
-            <OnyxButton v-if="!formReadOnly" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
+            <OnyxButton v-help="'incidentTemplates.cancel'" :label="t('common.cancel')" mode="outline" type="button" @click="cancelEdit" :disabled="isSaving" />
+            <OnyxButton v-if="!formReadOnly" v-help="'incidentTemplates.save'" :label="isSaving ? t('common.saving') : t('common.save')" type="submit" :disabled="isSaving" />
           </div>
         </form>
       </FormPanel>

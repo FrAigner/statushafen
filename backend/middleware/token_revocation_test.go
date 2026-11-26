@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// revocationRouter hängt AuthMiddleware und OptionalAuthMiddleware an je eine
-// Route, die nur die erkannte Nutzer-ID zurückgibt.
+// revocationRouter attaches AuthMiddleware and OptionalAuthMiddleware to one
+// route each, which only returns the detected user ID.
 func revocationRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -46,7 +46,7 @@ func TestAuthMiddleware_RejectsTokenAfterTokenVersionBump(t *testing.T) {
 
 	old, err := middleware.GenerateToken(u.ID, u.Email, "", "", false)
 	require.NoError(t, err)
-	// Gegenprobe: vor der Änderung gilt das Token.
+	// Control check: before the change the token is valid.
 	assert.Equal(t, http.StatusOK, callWithToken(r, "/strict", old).Code)
 
 	require.NoError(t, db.Model(&u).Update("token_version", 1).Error)
@@ -54,7 +54,7 @@ func TestAuthMiddleware_RejectsTokenAfterTokenVersionBump(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":"unauthorized"`)
 
-	// Ein neu ausgestelltes Token mit der aktuellen Version gilt wieder.
+	// A newly issued token with the current version is valid again.
 	require.NoError(t, db.First(&u, u.ID).Error)
 	fresh, err := middleware.GenerateToken(u.ID, u.Email, "", "", false, middleware.WithTokenVersion(u.TokenVersion))
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestAuthMiddleware_RejectsTokenOfDeletedOrUnknownUser(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, callWithToken(r, "/strict", tok).Code)
 
-	require.NoError(t, db.Delete(&u).Error) // Soft Delete
+	require.NoError(t, db.Delete(&u).Error) // soft delete
 	assert.Equal(t, http.StatusUnauthorized, callWithToken(r, "/strict", tok).Code)
 
 	unknown, err := middleware.GenerateToken(999999, "nie@example.com", "", "", false)
@@ -90,7 +90,7 @@ func TestAuthMiddleware_FailsClosedOnDatabaseError(t *testing.T) {
 	w := callWithToken(r, "/strict", tok)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":"server_error"`)
-	// Optional: bei DB-Fehler anonym statt mit unbestätigter Identität.
+	// Optional: on a DB error anonymous instead of with an unconfirmed identity.
 	assert.Equal(t, "anonymous", callWithToken(r, "/optional", tok).Body.String())
 }
 

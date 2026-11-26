@@ -15,13 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// TestGenerateTokenFull_IncludesPreferredLanguage deckt einen Bug ab, bei dem
-// SSO-Logins die serverseitig gespeicherte Sprachpräferenz (User.PreferredLanguage)
-// nie an das Frontend weitergeben konnten: /api/auth/sso-exchange liefert nur
-// {"token": ...} zurück, das Frontend liest preferred_language ausschließlich
-// per Client-seitigem JWT-Decode aus dem Token selbst (anders als beim
-// Passwort-Login, wo der Login-Response-Body das Feld separat enthält).
-// GenerateTokenFull muss die Präferenz daher als eigenen Claim einbetten.
+// TestGenerateTokenFull_IncludesPreferredLanguage covers a bug where
+// SSO logins could never pass the server-side stored language preference (User.PreferredLanguage)
+// on to the frontend: /api/auth/sso-exchange returns only
+// {"token": ...}, the frontend reads preferred_language exclusively
+// via client-side JWT decoding from the token itself (unlike
+// password login, where the login response body contains the field separately).
+// GenerateTokenFull must therefore embed the preference as its own claim.
 func TestGenerateTokenFull_IncludesPreferredLanguage(t *testing.T) {
 	testutils.SetupTestDB()
 
@@ -91,10 +91,10 @@ func TestRequirePermission(t *testing.T) {
 		c.Next()
 	})
 
-	// Zwei Routen wie im echten Router: global (kein page_id im Pfad) und
-	// seitenbezogen (:page_id im Pfad) – RequirePermission liest die Seiten-ID
-	// ausschließlich aus c.Param("page_id"), seit die App von einem
-	// X-Status-Page-ID-Header auf RESTful :page_id-URL-Parameter umgestellt wurde.
+	// Two routes as in the real router: global (no page_id in the path) and
+	// page-scoped (:page_id in the path) – RequirePermission reads the page ID
+	// exclusively from c.Param("page_id"), since the app was switched from an
+	// X-Status-Page-ID header to a RESTful :page_id URL parameter.
 	protectedHandler := func(c *gin.Context) {
 		c.String(http.StatusOK, "success")
 	}
@@ -120,10 +120,10 @@ func TestRequirePermission(t *testing.T) {
 			expectedStatus: http.StatusOK,
 		},
 		{
-			// Kein page_id im Pfad ist eine fehlerhafte Anfrage (400), nicht eine
-			// fehlende Berechtigung (403) – die Middleware kann für einen
-			// Nicht-Global-Admin ohne page_id gar nicht erst prüfen, ob eine
-			// Berechtigung vorliegt.
+			// No page_id in the path is a malformed request (400), not a
+			// missing permission (403) – for a non-global admin without page_id the middleware
+			// cannot even check whether a
+			// permission exists.
 			name:           "Normal user ohne page_id im Pfad",
 			mockUserID:     strconv.Itoa(int(normalUser.ID)),
 			statusPageID:   "",
@@ -176,8 +176,8 @@ func TestRequirePermission(t *testing.T) {
 	}
 }
 
-// TestUserHasAccessToAnyTag deckt die geforderten Edge-Cases für
-// den Mehrfach-Tag-Nachfolger von UserHasAccessToCountry ab.
+// TestUserHasAccessToAnyTag covers the required edge cases for
+// the multi-tag successor of UserHasAccessToCountry.
 func TestUserHasAccessToAnyTag(t *testing.T) {
 	pageID := uint(1)
 	otherPageID := uint(2)
@@ -186,8 +186,8 @@ func TestUserHasAccessToAnyTag(t *testing.T) {
 		return models.Tag{Model: gorm.Model{ID: id}, Name: name, StatusPageID: statusPageID}
 	}
 
-	// Der reservierte globale Tag: Name "global" (hier bewusst gemischte
-	// Groß-/Kleinschreibung, um Case-Insensitivität mitzutesten) UND
+	// The reserved global tag: name "global" (deliberately mixed
+	// upper/lower case here, to also test case insensitivity) AND
 	// StatusPageID == nil.
 	globalTag := newTag(1, "Global", nil)
 
@@ -195,9 +195,9 @@ func TestUserHasAccessToAnyTag(t *testing.T) {
 	usTag := newTag(11, "us", &pageID)
 	deTag := newTag(12, "de", &otherPageID)
 
-	// Seitenbezogener Tag, der zufällig ebenfalls "global" heißt, aber NICHT
-	// der reservierte globale Tag ist (StatusPageID != nil). Muss NICHT als
-	// Wildcard wirken.
+	// A page-scoped tag that also happens to be called "global" but is NOT
+	// the reserved global tag (StatusPageID != nil). Must NOT act as a
+	// wildcard.
 	scopedTagNamedGlobal := newTag(13, "global", &pageID)
 
 	tests := []struct {
@@ -243,31 +243,31 @@ func TestUserHasAccessToAnyTag(t *testing.T) {
 			want:         false,
 		},
 		{
-			// Entspricht der alten Schleife: ein "global"-Eintrag beim User
-			// (cTrimmed == "global") gewährt Zugriff unabhängig vom
-			// Ressourcen-Tag.
+			// Corresponds to the old loop: a "global" entry on the user
+			// (cTrimmed == "global") grants access regardless of the
+			// resource tag.
 			name:         "User mit globalem Tag gegen Ressource mit spezifischem Tag -> muss durchgehen",
 			userTags:     []models.Tag{globalTag},
 			resourceTags: []models.Tag{deTag},
 			want:         true,
 		},
 		{
-			// Entspricht dem alten frühen Return `if targetCountry == "global": return true`:
-			// die Ressourcen-Seite ist "global" und die Funktion gewährt Zugriff
-			// sofort, unabhängig vom Inhalt der User-Seite. Im alten Code führen
-			// beide Wildcard-Fälle (targetCountry == "global" UND cTrimmed ==
-			// "global") zum selben Ergebnis (true) - die Wildcard ist im Effekt
-			// symmetrisch, auch wenn sie im alten Code über zwei verschiedene
-			// Codepfade (früher Return vs. Schleifentreffer) läuft.
+			// Corresponds to the old early return `if targetCountry == "global": return true`:
+			// the resource side is "global" and the function grants access
+			// immediately, regardless of the user side's content. In the old code both
+			// wildcard cases (targetCountry == "global" AND cTrimmed ==
+			// "global") lead to the same result (true) - the wildcard is effectively
+			// symmetric, even though in the old code it runs through two different
+			// code paths (early return vs. loop hit).
 			name:         "Ressource mit globalem Tag gegen User mit nur spezifischem Tag -> muss durchgehen",
 			userTags:     []models.Tag{deTag},
 			resourceTags: []models.Tag{globalTag},
 			want:         true,
 		},
 		{
-			// Seitenbezogener Tag, der nur zufällig "global" heißt, ist NICHT der
-			// reservierte globale Tag (StatusPageID != nil) und darf daher keine
-			// Wildcard-Wirkung entfalten.
+			// A page-scoped tag that merely happens to be called "global" is NOT the
+			// reserved global tag (StatusPageID != nil) and therefore must not have any
+			// wildcard effect.
 			name:         "seitenbezogener Tag namens 'global' wirkt nicht als Wildcard",
 			userTags:     []models.Tag{scopedTagNamedGlobal},
 			resourceTags: []models.Tag{deTag},

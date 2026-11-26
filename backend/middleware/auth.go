@@ -38,34 +38,34 @@ type Claims struct {
 	Name              string `json:"name,omitempty"`
 	SSOProvider       string `json:"sso,omitempty"`
 	PreferredLanguage string `json:"preferred_language,omitempty"`
-	// HideHelpTooltips: SSO-Logins setzen den User direkt aus
-	// dem Token, ohne /api/me zu laden. Ohne den Claim wären die Tooltips
-	// dort nach jedem SSO-Login wieder an.
+	// HideHelpTooltips: SSO logins set the user directly from
+	// the token, without loading /api/me. Without the claim the tooltips would be
+	// on again there after every SSO login.
 	HideHelpTooltips bool `json:"hide_help_tooltips,omitempty"`
-	// SSOPageID: Seite, deren IdP die Sitzung ausgestellt hat
-	// (Seiten-SSO per OIDC). Die Sitzung gilt nur für diese Seite
-	// und nie mit Global-Admin-Rechten. Fehlt bei Passwort- und
-	// globalen SSO-Logins.
+	// SSOPageID: page whose IdP issued the session
+	// (page SSO via OIDC). The session applies only to this page
+	// and never with global admin rights. Absent for password and
+	// global SSO logins.
 	SSOPageID uint `json:"sso_page_id,omitempty"`
 	// CustomDomain: the verified custom domain the session was handed to
 	// (always with SSOPageID of that domain's page). Whoever controls the
 	// domain's DNS can read the session there, so it never reaches the
 	// account itself (RejectCustomDomainSession).
 	CustomDomain string `json:"custom_domain,omitempty"`
-	// TokenVersion: Stand von users.token_version bei der Ausstellung. Weicht
-	// er vom Konto ab, wurde das Token widerrufen (siehe sessionStillValid).
+	// TokenVersion: state of users.token_version at issuance. If it
+	// differs from the account, the token was revoked (see sessionStillValid).
 	TokenVersion uint `json:"tv"`
 	jwt.RegisteredClaims
 }
 
-// tokenTTL ist die Access-Token-Laufzeit für alle Login-Wege (Passwort + SSO).
+// tokenTTL is the access token lifetime for all login paths (password + SSO).
 const tokenTTL = 2 * time.Hour
 
-// AllowedCountries wurde aus dem Claim entfernt (Country → Tags
-// Schritt 4/4). Tag-basierte Zugriffsprüfungen lesen die Tags eines Users
-// jetzt frisch aus der DB (siehe handlers/tag_access.go, userTagsAndAdmin) statt
-// aus einem JWT-Claim - so wirkt eine Tag-Änderung sofort, ohne dass der User
-// sich neu einloggen muss.
+// AllowedCountries was removed from the claim (Country → Tags
+// step 4/4). Tag-based access checks now read a user's tags
+// fresh from the DB (see handlers/tag_access.go, userTagsAndAdmin) instead of
+// from a JWT claim - so a tag change takes effect immediately, without the user
+// having to log in again.
 func GenerateToken(userID uint, email string, role string, permissions string, isGlobalAdmin bool, opts ...TokenOption) (string, error) {
 	claims := &Claims{
 		UserID:        userID,
@@ -86,11 +86,11 @@ func GenerateToken(userID uint, email string, role string, permissions string, i
 	return token.SignedString(getJWTSecret())
 }
 
-// TokenOption passt die Claims eines Login-Tokens bei der Ausstellung an.
+// TokenOption adjusts the claims of a login token at issuance.
 type TokenOption func(*Claims)
 
-// WithTokenVersion trägt die aktuelle users.token_version des Kontos ein.
-// Ohne die Option gilt Version 0 (Konto, dessen Version nie erhöht wurde).
+// WithTokenVersion records the account's current users.token_version.
+// Without the option, version 0 applies (account whose version was never raised).
 func WithTokenVersion(v uint) TokenOption {
 	return func(c *Claims) { c.TokenVersion = v }
 }
@@ -108,18 +108,18 @@ func WithCustomDomain(host string) TokenOption {
 	return func(c *Claims) { c.CustomDomain = host }
 }
 
-// GenerateTokenFull ist die zentrale Token-Factory für SSO-Logins, inkl. Name und
-// SSO-Provider als Zusatz-Claims (ersetzt die frühere Inline-Signierung in auth_sso.go).
+// GenerateTokenFull is the central token factory for SSO logins, incl. name and
+// SSO provider as additional claims (replaces the former inline signing in auth_sso.go).
 func GenerateTokenFull(u models.User, permissions, name, sso string) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, fullClaims(u, permissions, name, sso)).SignedString(getJWTSecret())
 }
 
-// GeneratePageSSOToken stellt das Token nach einem Seiten-SSO-
-// Login aus: wie GenerateTokenFull, zusätzlich mit sso_page_id. Ein Seiten-
-// Admin kontrolliert den IdP seiner Seite und kann damit Assertions bzw.
-// ID-Tokens für jeden dort verknüpften Nutzer fälschen. Die Rechte werden je
-// Request frisch aus der DB gelesen; ohne Seitenbezug bekäme das Token sofort
-// jede Rolle, die der Nutzer später anderswo erhält (auch Global Admin).
+// GeneratePageSSOToken issues the token after a page SSO
+// login: like GenerateTokenFull, additionally with sso_page_id. A page
+// admin controls their page's IdP and can thereby forge assertions or
+// ID tokens for any user linked there. Permissions are read fresh from the DB on each
+// request; without page scope the token would immediately get
+// any role the user later receives elsewhere (including Global Admin).
 func GeneratePageSSOToken(u models.User, name, protocol string, pageID uint, opts ...TokenOption) (string, error) {
 	claims := fullClaims(u, u.Role.Permissions, name, protocol)
 	for _, opt := range opts {
@@ -148,31 +148,31 @@ func fullClaims(u models.User, permissions, name, sso string) *Claims {
 	}
 }
 
-// ssoPageIDKey: Kontext-Schlüssel für Claims.SSOPageID.
+// ssoPageIDKey: context key for Claims.SSOPageID.
 const ssoPageIDKey = "ssoPageID"
 
-// SSOPageID liefert die Seite, auf die eine Seiten-SSO-Sitzung beschränkt
-// ist, sonst 0.
+// SSOPageID returns the page to which a page SSO session is restricted,
+// otherwise 0.
 func SSOPageID(c *gin.Context) uint {
 	return c.GetUint(ssoPageIDKey)
 }
 
-// EffectiveGlobalAdmin: Global-Admin-Rechte der Anfrage. Eine Seiten-SSO-
-// Sitzung hat sie nie, auch wenn der Nutzer inzwischen Global Admin ist
+// EffectiveGlobalAdmin: global admin rights of the request. A page SSO
+// session never has them, even if the user has since become Global Admin
 // .
 func EffectiveGlobalAdmin(c *gin.Context, u models.User) bool {
 	return u.IsGlobalAdmin && SSOPageID(c) == 0
 }
 
-// SSOAllowsPage: false, wenn die Anfrage aus einer Seiten-SSO-Sitzung einer
-// anderen Seite stammt.
+// SSOAllowsPage: false if the request comes from a page SSO session of
+// another page.
 func SSOAllowsPage(c *gin.Context, pageID uint) bool {
 	scope := SSOPageID(c)
 	return scope == 0 || scope == pageID
 }
 
-// setUserContext legt die Claims eines gültigen Login-Tokens im Kontext ab
-// (gemeinsam für AuthMiddleware und OptionalAuthMiddleware).
+// setUserContext stores the claims of a valid login token in the context
+// (shared by AuthMiddleware and OptionalAuthMiddleware).
 func setUserContext(c *gin.Context, claims *Claims) {
 	c.Set("userID", claims.UserID)
 	c.Set("email", claims.Email)
@@ -209,47 +209,47 @@ func RejectCustomDomainSession() gin.HandlerFunc {
 	}
 }
 
-// subscriberAudience trennt Subscriber-Tokens von Login-Tokens:
-// beide teilen sich das JWT_SECRET, ein Subscriber-Token darf aber nie als
-// Sitzung durchgehen (zusätzlich zur Prüfung der Audience verlangt der
-// Login-Pfad ein exp von höchstens zwei Stunden).
+// subscriberAudience separates subscriber tokens from login tokens:
+// both share JWT_SECRET, but a subscriber token must never pass as a
+// session (in addition to the audience check, the login path
+// requires an exp of at most two hours).
 const subscriberAudience = "subscriber"
 
-// subscriberTokenTTL: Gültigkeit eines Subscriber-Tokens. 400 Tage sind gut
-// ein Jahr plus Puffer: Jede Benachrichtigung bringt einen frischen Link, und
-// der Abmelde-Link einer selten genutzten Seite hält sich länger als ein
-// Jahreszyklus. Ein weitergegebenes oder geleaktes Exemplar bleibt nicht ewig
-// brauchbar.
+// subscriberTokenTTL: validity of a subscriber token. 400 days is a good
+// year plus buffer: every notification brings a fresh link, and
+// the unsubscribe link of a rarely used page lasts longer than a
+// yearly cycle. A forwarded or leaked copy does not remain
+// usable forever.
 const subscriberTokenTTL = 400 * 24 * time.Hour
 
-// subscriberTokenNow ist die Uhr der Subscriber-Token-Prüfung (Tests setzen sie).
+// subscriberTokenNow is the clock of the subscriber token check (tests set it).
 var subscriberTokenNow = time.Now
 
-// SetSubscriberTokenClockForTests ersetzt die Uhr und gibt über cleanup die
-// Rücksetzung weiter (analog zu den übrigen *ForTests-Helfern).
+// SetSubscriberTokenClockForTests replaces the clock and passes the
+// reset on via cleanup (analogous to the other *ForTests helpers).
 func SetSubscriberTokenClockForTests(cleanup func(func()), now func() time.Time) {
 	prev := subscriberTokenNow
 	subscriberTokenNow = now
 	cleanup(func() { subscriberTokenNow = prev })
 }
 
-// SubscriberClaims: langlebiger, nicht-einmaliger Token für zwei
-// Self-Service-Aktionen ohne Login - Abo abbestellen und (nur bei privaten
-// Seiten) die Statusseite ansehen. Bewusst ein eigener Claims-Typ statt
-// Claims: ein Subscriber hat kein User-Konto (keine Role/Permissions/
-// IsGlobalAdmin), und der Token muss anders als der Login-Token über viele
-// Wochen aus einer Benachrichtigungsmail nutzbar bleiben (subscriberTokenTTL),
-// nicht nur für eine einzelne Session gelten.
+// SubscriberClaims: long-lived, non-single-use token for two
+// self-service actions without login - unsubscribing and (only for private
+// pages) viewing the status page. Deliberately its own claims type instead of
+// Claims: a subscriber has no user account (no role/permissions/
+// IsGlobalAdmin), and unlike the login token the token must remain usable for many
+// weeks from a notification email (subscriberTokenTTL),
+// not just for a single session.
 type SubscriberClaims struct {
 	SubscriberID uint `json:"subscriber_id"`
 	StatusPageID uint `json:"status_page_id"`
 	jwt.RegisteredClaims
 }
 
-// GenerateSubscriberToken signiert einen SubscriberClaims-Token mit demselben
-// Secret wie die User-Login-Tokens. Er läuft nach subscriberTokenTTL ab (exp);
-// iat hält den Ausstellungszeitpunkt fest. Widerruf erfolgt weiterhin
-// implizit durch Löschen des Subscriber-Datensatzes (siehe
+// GenerateSubscriberToken signs a SubscriberClaims token with the same
+// secret as the user login tokens. It expires after subscriberTokenTTL (exp);
+// iat records the issuance time. Revocation still happens
+// implicitly by deleting the subscriber record (see
 // UnsubscribeHandler/subscriberFromToken in handlers/subscriber_token.go).
 func GenerateSubscriberToken(subscriberID, statusPageID uint) (string, error) {
 	now := subscriberTokenNow()
@@ -265,10 +265,10 @@ func GenerateSubscriberToken(subscriberID, statusPageID uint) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(getJWTSecret())
 }
 
-// ParseSubscriberToken validiert Signatur und Algorithmus (jwt.WithValidMethods pinnt
-// HS256, statt jeden vom Token selbst behaupteten
-// Algorithmus zu akzeptieren) und Ablauf eines SubscriberClaims-Tokens. exp und
-// die Subscriber-Audience sind Pflicht; ein Token ohne eines von beiden gilt nie.
+// ParseSubscriberToken validates signature and algorithm (jwt.WithValidMethods pins
+// HS256, instead of accepting whatever algorithm the
+// token itself claims) and expiry of a SubscriberClaims token. exp and
+// the subscriber audience are required; a token missing either is never valid.
 func ParseSubscriberToken(tokenStr string) (*SubscriberClaims, error) {
 	claims := &SubscriberClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
@@ -277,9 +277,9 @@ func ParseSubscriberToken(tokenStr string) (*SubscriberClaims, error) {
 	if err != nil || !token.Valid {
 		return nil, fmt.Errorf("invalid or expired subscriber token")
 	}
-	// Die Audience ist Pflicht. Die ID-Prüfung weist zusätzlich Login-Tokens ab,
-	// die kein subscriber_id/status_page_id tragen und sonst mit Nullwerten
-	// durchgingen.
+	// The audience is required. The ID check additionally rejects login tokens
+	// that carry no subscriber_id/status_page_id and would otherwise
+	// pass with zero values.
 	if !slices.Contains(claims.Audience, subscriberAudience) {
 		return nil, fmt.Errorf("invalid subscriber token audience")
 	}
@@ -289,9 +289,9 @@ func ParseSubscriberToken(tokenStr string) (*SubscriberClaims, error) {
 	return claims, nil
 }
 
-// parseLoginToken validiert ein Login-Token für AuthMiddleware und
-// OptionalAuthMiddleware. exp ist Pflicht, und Tokens mit Subscriber-Audience
-// werden ausdrücklich abgewiesen (auch sie tragen ein exp, aber ein langes).
+// parseLoginToken validates a login token for AuthMiddleware and
+// OptionalAuthMiddleware. exp is required, and tokens with the subscriber audience
+// are explicitly rejected (they also carry an exp, but a long one).
 func parseLoginToken(tokenStr string) (*Claims, bool) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
@@ -303,21 +303,21 @@ func parseLoginToken(tokenStr string) (*Claims, bool) {
 	return claims, true
 }
 
-// AuthTokenHeader ist der Header, in dem das Frontend sein Login-Token
-// schickt. Caddy legt HTTP Basic Auth vor alle Seiten; Basic Auth
-// belegt den Authorization-Header. Setzte die App dort ihr eigenes
-// "Bearer <JWT>", schickte der Browser die Basic-Zugangsdaten nicht mehr mit
-// und Caddy antwortete 401. Deshalb ein eigener Header, ohne "Bearer"-Präfix.
+// AuthTokenHeader is the header in which the frontend sends its login token.
+// Caddy puts HTTP Basic Auth in front of all pages; Basic Auth
+// occupies the Authorization header. If the app put its own
+// "Bearer <JWT>" there, the browser would no longer send the Basic credentials
+// and Caddy would answer 401. Hence a dedicated header, without a "Bearer" prefix.
 const AuthTokenHeader = "X-Auth-Token"
 
-// loginTokenFromRequest liest das Login-Token einer Anfrage:
-// zuerst aus X-Auth-Token, sonst – für API-Clients und Bestandsnutzer – aus
-// "Authorization: Bearer <token>". Ein gesetzter X-Auth-Token hat Vorrang,
-// auch wenn er ungültig ist: Ein Fallback auf Authorization würde sonst je
-// nach Header-Kombination unterschiedliche Identitäten zulassen.
-// Ist kein Token vorhanden (auch bei "Authorization: Basic …", das Caddy
-// durchreicht), ist errMsg gesetzt; AuthMiddleware gibt ihn als 401 zurück,
-// OptionalAuthMiddleware ignoriert ihn und lässt die Anfrage anonym durch.
+// loginTokenFromRequest reads the login token of a request:
+// first from X-Auth-Token, otherwise – for API clients and existing users – from
+// "Authorization: Bearer <token>". A set X-Auth-Token takes precedence,
+// even if invalid: a fallback to Authorization would otherwise allow
+// different identities depending on the header combination.
+// If no token is present (also for "Authorization: Basic …", which Caddy
+// passes through), errMsg is set; AuthMiddleware returns it as 401,
+// OptionalAuthMiddleware ignores it and lets the request through anonymously.
 func loginTokenFromRequest(c *gin.Context) (token string, errMsg string) {
 	if t := strings.TrimSpace(c.GetHeader(AuthTokenHeader)); t != "" {
 		return t, ""
@@ -333,20 +333,20 @@ func loginTokenFromRequest(c *gin.Context) (token string, errMsg string) {
 	return parts[1], ""
 }
 
-// sessionState ist das Ergebnis des Abgleichs eines Login-Tokens mit dem Konto.
+// sessionState is the result of comparing a login token with the account.
 type sessionState int
 
 const (
 	sessionValid   sessionState = iota
-	sessionRevoked              // Konto fehlt/gelöscht oder Token-Version veraltet
-	sessionError                // Datenbankfehler: nichts bestätigen (fail closed)
+	sessionRevoked              // account missing/deleted or token version outdated
+	sessionError                // database error: confirm nothing (fail closed)
 )
 
-// checkSession gleicht ein formal gültiges Login-Token mit dem Konto ab:
-// Das Konto muss existieren (Soft Delete zählt als gelöscht) und die im Token
-// eingetragene Version muss dem Stand in users.token_version entsprechen.
-// Ohne diesen Abgleich lebte ein Token nach Passwortwechsel oder Löschung
-// bis zum Ablauf weiter, auch auf Routen ohne eigene Datenbankprüfung.
+// checkSession compares a formally valid login token with the account:
+// the account must exist (soft delete counts as deleted) and the version
+// recorded in the token must match the state in users.token_version.
+// Without this check a token would live on after a password change or deletion
+// until expiry, even on routes without their own database check.
 func checkSession(claims *Claims) sessionState {
 	var user models.User
 	err := database.DB.Select("id", "token_version").First(&user, claims.UserID).Error
@@ -371,10 +371,10 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// jwt.WithValidMethods (in parseLoginToken) pinnt den erwarteten
-		// Signaturalgorithmus: ohne diese Option akzeptiert die
-		// Bibliothek jeden Algorithmus, den der Token selbst im Header angibt
-		// (inkl. z.B. "none").
+		// jwt.WithValidMethods (in parseLoginToken) pins the expected
+		// signing algorithm: without this option the
+		// library accepts any algorithm the token itself states in its header
+		// (incl. e.g. "none").
 		claims, ok := parseLoginToken(tokenStr)
 		if !ok {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token", "code": "unauthorized"})
@@ -411,41 +411,41 @@ func OptionalAuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// IsGlobalTag identifiziert den reservierten globalen Tag aus der additiven
-// Migration: Name "global" case-insensitive UND StatusPageID ==
-// nil. Beide Bedingungen zusammen sind nötig, damit ein seitenbezogener Tag,
-// der zufällig ebenfalls "global" heißt (von den partiellen Unique-Indizes
-// ausdrücklich erlaubt), nicht fälschlich als Wildcard behandelt wird.
-// Exportiert, da handlers/tag_access.go dieselbe Prüfung für die
-// Listen-Filter-Scope-Logik braucht.
+// IsGlobalTag identifies the reserved global tag from the additive
+// migration: name "global" case-insensitive AND StatusPageID ==
+// nil. Both conditions together are required so that a page-scoped tag
+// that also happens to be called "global" (explicitly allowed by the partial
+// unique indexes) is not wrongly treated as a wildcard.
+// Exported because handlers/tag_access.go needs the same check for the
+// list-filter scope logic.
 func IsGlobalTag(t models.Tag) bool {
 	return t.StatusPageID == nil && strings.EqualFold(t.Name, "global")
 }
 
-// UserHasAccessToAnyTag prüft, ob ein User mit den gegebenen Tags Zugriff auf
-// eine Ressource mit den gegebenen Tags hat (Mehrfach-Tag-Nachfolger von
-// UserHasAccessToCountry, additiv -). Zugriff besteht, sobald
-// mindestens eine TagID aus userTags mit einer TagID aus resourceTags
-// übereinstimmt (direkte Entsprechung der alten "ein gemeinsames Land
-// reicht"-Logik, nicht "alle Tags müssen übereinstimmen").
+// UserHasAccessToAnyTag checks whether a user with the given tags has access to
+// a resource with the given tags (multi-tag successor of
+// UserHasAccessToCountry, additive -). Access exists as soon as
+// at least one TagID from userTags matches a TagID from resourceTags
+// (direct equivalent of the old "one shared country
+// is enough" logic, not "all tags must match").
 //
-// Wildcard-Semantik: Der reservierte globale Tag wirkt auf BEIDEN Seiten als
-// Wildcard, exakt entsprechend dem alten Code. Dort lieferte sowohl
-// `targetCountry == "global"` (Ressourcen-Seite) als auch ein
-// `cTrimmed == "global"`-Eintrag in der Schleife über die User-Seite
-// unabhängig voneinander true. Die beiden Pfade sehen im Code unterschiedlich
-// aus (früher Return vs. Schleifentreffer), aber das Ergebnis ist in beiden
-// Fällen identisch: Zugriff gewährt. Die Wildcard ist also im Effekt
-// symmetrisch, nicht asymmetrisch - global auf der Ressource gewährt jedem
-// User Zugriff, und global beim User gewährt Zugriff auf jede Ressource.
+// Wildcard semantics: the reserved global tag acts as a wildcard on BOTH sides,
+// exactly matching the old code. There, both
+// `targetCountry == "global"` (resource side) and a
+// `cTrimmed == "global"` entry in the loop over the user side
+// yielded true independently of each other. The two paths look different
+// in code (early return vs. loop hit), but the result is identical in both
+// cases: access granted. The wildcard is thus effectively
+// symmetric, not asymmetric - global on the resource grants any
+// user access, and global on the user grants access to any resource.
 //
-// Fail-closed bei leeren Listen: Eine leere userTags- oder resourceTags-Liste
-// liefert false statt implizit als Wildcard behandelt zu werden. Nach der
-// additiven Migration aus Schritt 1/4 sollte jede Ressource und jeder
-// User mindestens einen Tag tragen (im Zweifel den globalen) - eine leere
-// Liste deutet daher eher auf einen Daten-/Ladefehler hin als auf bewusst
-// "keine Einschränkung", und bei sicherheitskritischem Zugriffscode ist die
-// sichere Grundeinstellung, im Zweifel den Zugriff zu verweigern.
+// Fail-closed on empty lists: an empty userTags or resourceTags list
+// returns false instead of being implicitly treated as a wildcard. After the
+// additive migration from step 1/4 every resource and every
+// user should carry at least one tag (the global one if in doubt) - an empty
+// list therefore more likely indicates a data/loading error than a deliberate
+// "no restriction", and for security-critical access code the
+// safe default is to deny access when in doubt.
 func UserHasAccessToAnyTag(userTags, resourceTags []models.Tag) bool {
 	if len(userTags) == 0 || len(resourceTags) == 0 {
 		return false
@@ -472,18 +472,18 @@ func UserHasAccessToAnyTag(userTags, resourceTags []models.Tag) bool {
 	return false
 }
 
-// roleHasAnyPermission ist wahr, wenn die Rolle mindestens eine der Permissions
-// hat. create, update und delete schließen read
-// derselben Ressource ein, der Altwert "<ressource>:write" zählt als
-// create+update+delete+read (permissions.Has); das Frontend (useAuth.hasPerm)
-// spiegelt dieselben Regeln.
+// roleHasAnyPermission is true if the role has at least one of the permissions.
+// create, update and delete include read
+// of the same resource, the legacy value "<resource>:write" counts as
+// create+update+delete+read (permissions.Has); the frontend (useAuth.hasPerm)
+// mirrors the same rules.
 func roleHasAnyPermission(list string, required []string) bool {
 	return permissions.HasAny(list, required)
 }
 
-// requirePermissionCheck führt die eigentliche Berechtigungsprüfung durch
-// und gibt (httpStatus, errorMessage, ok) zurück. Ein leeres requiredPerm
-// verlangt nur irgendeine Rolle auf der Seite (siehe RequirePageRole).
+// requirePermissionCheck performs the actual permission check
+// and returns (httpStatus, errorMessage, ok). An empty requiredPerm
+// only requires any role on the page (see RequirePageRole).
 func requirePermissionCheck(c *gin.Context, requiredPerms ...string) (int, string, bool) {
 	userIDVal, exists := c.Get("userID")
 	if !exists {
@@ -510,8 +510,8 @@ func requirePermissionCheck(c *gin.Context, requiredPerms ...string) (int, strin
 	if err != nil {
 		return http.StatusBadRequest, "Invalid page_id format", false
 	}
-	// Eine Seiten-SSO-Sitzung gilt nur für die Seite ihres IdP,
-	// auch wenn der Nutzer inzwischen auf anderen Seiten Rollen hat.
+	// A page SSO session applies only to the page of its IdP,
+	// even if the user now has roles on other pages.
 	if !SSOAllowsPage(c, uint(pageID)) {
 		return http.StatusForbidden, "Access denied: SSO session is limited to its own Status Page", false
 	}
@@ -520,17 +520,24 @@ func requirePermissionCheck(c *gin.Context, requiredPerms ...string) (int, strin
 	if err := database.DB.Preload("Role").Where("user_id = ? AND status_page_id = ?", userID, pageID).First(&userRole).Error; err != nil {
 		return http.StatusForbidden, "Access denied: No role assigned for this Status Page", false
 	}
+	// A status-page-only role (no admin right) never passes an admin route,
+	// not even one that accepts any role on the page.
+	if !permissions.GrantsAdminArea(userRole.Role.Permissions) {
+		return http.StatusForbidden, "Access denied: Role grants no admin access for this Status Page", false
+	}
 	if len(requiredPerms) > 0 && requiredPerms[0] != "" && !roleHasAnyPermission(userRole.Role.Permissions, requiredPerms) {
 		return http.StatusForbidden, "Access denied: Missing required permission: " + strings.Join(requiredPerms, " or "), false
 	}
 	return 0, "", true
 }
 
-// RequirePageRole verlangt eine beliebige Rolle auf der Statusseite aus
-// :page_id (oder Global Admin), ohne bestimmte Permission.
-// Für Lesezugriffe auf seiten-interne Konfiguration, die jeder
-// Admin-Bereich der Seite braucht (Sprachen, UI-Overrides) - vorher waren sie
-// für jeden eingeloggten Nutzer auf jeder Seite lesbar.
+// RequirePageRole requires any role on the status page from
+// :page_id (or Global Admin), without a specific permission.
+// The role must grant admin access (permissions.GrantsAdminArea): a
+// status-page-only role reads no admin configuration.
+// For read access to page-internal configuration that every
+// admin area of the page needs (languages, UI overrides) - previously they were
+// readable by every logged-in user on every page.
 func RequirePageRole() gin.HandlerFunc {
 	return RequirePermission("")
 }
@@ -548,9 +555,9 @@ func RequirePermission(requiredPerm string) gin.HandlerFunc {
 	}
 }
 
-// RequireAnyPermission verlangt mindestens eine der Permissions:
-// z. B. die Tag-Liste einer Seite für Komponenten- UND Vorfallformulare, die ein
-// Nutzer mit nur incidents:write sonst nicht laden dürfte.
+// RequireAnyPermission requires at least one of the permissions:
+// e.g. a page's tag list for component AND incident forms, which a
+// user with only incidents:write would otherwise not be allowed to load.
 func RequireAnyPermission(requiredPerms ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		status, msg, ok := requirePermissionCheck(c, requiredPerms...)
@@ -563,9 +570,9 @@ func RequireAnyPermission(requiredPerms ...string) gin.HandlerFunc {
 	}
 }
 
-// codeForStatus liefert einen groben Fehlercode nach HTTP-Status für Antworten,
-// deren Text in requirePermissionCheck entsteht; das Frontend
-// übersetzt ihn unter api.errors.<code>.
+// codeForStatus returns a coarse error code by HTTP status for responses
+// whose text is produced in requirePermissionCheck; the frontend
+// translates it under api.errors.<code>.
 func codeForStatus(status int) string {
 	switch status {
 	case http.StatusBadRequest:

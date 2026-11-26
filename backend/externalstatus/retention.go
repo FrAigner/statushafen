@@ -10,24 +10,24 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// Aufbewahrung gespiegelter Meldungen. Beendete Vorfälle und
-// Wartungen (Closed) wachsen sonst unbegrenzt, obwohl die API sie nur im
-// Fenster days (Standard 30, öffentlich 14) zeigt. Offene Meldungen werden
-// nie entfernt.
+// Retention of mirrored reports. Finished incidents and
+// maintenances (Closed) would otherwise grow without bound, although the API
+// only shows them in the window days (default 30, public 14). Open reports are
+// never removed.
 const (
-	// RetentionDaysEnv überschreibt die Aufbewahrungsdauer (Tage seit
-	// Beendigung); ungültige oder nicht positive Werte ergeben den Default.
+	// RetentionDaysEnv overrides the retention period (days since
+	// completion); invalid or non-positive values yield the default.
 	RetentionDaysEnv = "EXTERNAL_INCIDENT_RETENTION_DAYS"
-	// DefaultRetentionDays: Betreiberentscheidung.
+	// DefaultRetentionDays: operator decision.
 	DefaultRetentionDays = 90
 
-	// pruneBatchSize begrenzt die Zeilen je DELETE (kurze Transaktionen).
+	// pruneBatchSize limits the rows per DELETE (short transactions).
 	pruneBatchSize = 200
-	// pruneEvery: Der Aufräumlauf braucht nicht jeden 15-s-Takt.
+	// pruneEvery: the cleanup run does not need every 15 s tick.
 	pruneEvery = time.Hour
 )
 
-// RetentionFromEnv liest RetentionDaysEnv.
+// RetentionFromEnv reads RetentionDaysEnv.
 func RetentionFromEnv(getenv func(string) string) time.Duration {
 	days, err := strconv.Atoi(strings.TrimSpace(getenv(RetentionDaysEnv)))
 	if err != nil || days <= 0 {
@@ -36,18 +36,18 @@ func RetentionFromEnv(getenv func(string) string) time.Duration {
 	return time.Duration(days) * 24 * time.Hour
 }
 
-// RetentionReporter ist optional auf dem IncidentNotifier: Er bekommt die
-// Anzahl entfernter Meldungen (Audit-Eintrag).
+// RetentionReporter is optional on the IncidentNotifier: it receives the
+// number of removed reports (audit entry).
 type RetentionReporter interface {
 	MirroredIncidentsPruned(ctx context.Context, count int, retention time.Duration)
 }
 
-// endedExpr: Zeitpunkt der Beendigung. Fremdseiten liefern nicht immer
-// resolved_at; dann zählt das letzte Update der Fremdseite, zuletzt der
-// letzte Abruf, der eine Änderung sah.
+// endedExpr: time of completion. Third-party sites do not always supply
+// resolved_at; then the third-party site's last update counts, finally the
+// last fetch that saw a change.
 const endedExpr = "COALESCE(resolved_at, external_updated_at, last_seen_at)"
 
-// endedAt entspricht endedExpr für eine Feed-Meldung.
+// endedAt corresponds to endedExpr for a feed report.
 func endedAt(it Incident, now time.Time) time.Time {
 	if it.ResolvedAt != nil {
 		return *it.ResolvedAt
@@ -58,16 +58,16 @@ func endedAt(it Incident, now time.Time) time.Time {
 	return now
 }
 
-// pastRetention: beendete Meldung, die älter als die Aufbewahrung ist. Der
-// Feed liefert sie weiter (letzte 50 Einträge); ohne diesen Filter würde sie
-// nach dem Aufräumen bei jedem Abruf neu angelegt.
+// pastRetention: finished report that is older than the retention. The
+// feed keeps delivering it (last 50 entries); without this filter it would be
+// re-created on every fetch after cleanup.
 func (s *Service) pastRetention(it Incident, now time.Time) bool {
 	return it.Closed && endedAt(it, now).Before(now.Add(-s.retention))
 }
 
-// PruneMirrored entfernt beendete gespiegelte Meldungen, die länger als die
-// Aufbewahrung beendet sind, samt Updates und Komponenten (endgültig, in
-// Batches). Liefert die Anzahl entfernter Meldungen.
+// PruneMirrored removes finished mirrored reports that have been finished
+// longer than the retention, together with updates and components (permanently,
+// in batches). Returns the number of removed reports.
 func (s *Service) PruneMirrored(ctx context.Context) (int, error) {
 	cutoff := s.now().Add(-s.retention)
 	total := 0
@@ -95,8 +95,8 @@ func (s *Service) PruneMirrored(ctx context.Context) (int, error) {
 	return total, nil
 }
 
-// maybePrune läuft im Leader-Takt (Advisory-Sperre gehalten), höchstens
-// einmal je pruneEvery.
+// maybePrune runs on the leader tick (advisory lock held), at most
+// once per pruneEvery.
 func (s *Service) maybePrune(ctx context.Context) {
 	now := s.now()
 	s.mu.Lock()

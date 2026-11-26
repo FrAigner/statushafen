@@ -52,6 +52,22 @@ describe('FormMultiSelect', () => {
     expect(input().attributes('aria-required')).toBeUndefined()
   })
 
+  // The help tooltip (v-help via `help`) must stay linked to the combobox input:
+  // syncAria runs after the directive and used to drop its aria-describedby.
+  it('keeps the help tooltip in aria-describedby next to hint and error', async () => {
+    mountField({ help: 'incidents.components' })
+    await flushPromises()
+    const helpIds = () => (input().attributes('aria-describedby') || '').split(' ').filter(id => id.startsWith('help-'))
+    expect(helpIds()).toHaveLength(1)
+    await wrapper.setProps({ error: 'Fehler' })
+    await flushPromises()
+    expect(helpIds()).toHaveLength(1)
+    expect(input().attributes('aria-describedby')).toContain('-error')
+    await wrapper.setProps({ error: null })
+    await flushPromises()
+    expect(input().attributes('aria-describedby')).toBe(helpIds()[0])
+  })
+
   it('setzt ohne Fehler weder aria-invalid noch aria-describedby', () => {
     mountField()
     expect(input().attributes('aria-invalid')).toBeUndefined()

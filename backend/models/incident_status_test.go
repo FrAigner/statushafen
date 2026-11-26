@@ -2,8 +2,8 @@ package models
 
 import "testing"
 
-// Die Statusregeln (behoben, erlaubte Mengen) stehen an einer
-// Stelle; das Frontend spiegelt sie (incidentStatus.js).
+// The status rules (resolved, allowed sets) live in one
+// place; the frontend mirrors them (incidentStatus.js).
 func TestIncidentStatusRules(t *testing.T) {
 	for status, want := range map[string]bool{"resolved": true, "completed": false, "investigating": false, "identified": false, "monitoring": false, "scheduled": false, "in_progress": false, "": false, "bogus": false} {
 		if got := IsResolvedIncidentStatus(status); got != want {
@@ -28,7 +28,7 @@ func TestIsValidIncidentSeverity(t *testing.T) {
 			t.Errorf("%q muss ein gültiger Schweregrad sein", ok)
 		}
 	}
-	// Ein Komponentenstatus ohne Beeinträchtigung ist kein Schweregrad.
+	// A component status without impairment is not a severity.
 	for _, bad := range []string{"", "operational", "MAJOR_OUTAGE", "major_outage "} {
 		if IsValidIncidentSeverity(bad) {
 			t.Errorf("%q darf kein gültiger Schweregrad sein", bad)

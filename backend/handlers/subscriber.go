@@ -725,19 +725,5 @@ func (h *Handler) TestWebhookHandler(c *gin.Context) {
 		"text": "👋 **Test-Benachrichtigung**\nDie Verbindung zu deinem Status-Dashboard funktioniert einwandfrei!",
 	}
 	// ein Versuch, nie warten; die Fehlerklasse bestimmt die Antwort.
-	res := postWebhook(c.Request.Context(), req.WebhookURL, payload, webhookModeProbe)
-	switch res.Kind {
-	case webhookOK:
-	case webhookRateLimited:
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Webhook-Ziel drosselt gerade", "code": "webhook_rate_limited", "retry_after": res.RetryAfterSeconds()})
-		return
-	case webhookPermanent:
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Webhook-Ziel hat die Anfrage abgelehnt", "code": "webhook_rejected"})
-		return
-	default:
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Webhook-Ziel nicht erreichbar", "code": "webhook_unreachable"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Test erfolgreich gesendet!"})
+	respondWebhookProbe(c, postWebhook(c.Request.Context(), req.WebhookURL, payload, webhookModeProbe))
 }

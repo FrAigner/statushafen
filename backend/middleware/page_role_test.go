@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// TestRequirePageRole: Lesezugriff auf
-// seiten-interne Konfiguration verlangt irgendeine Rolle auf genau dieser
-// Seite (oder Global Admin) - die konkrete Permission ist egal, weil jede
-// Rolle den Admin-Bereich der Seite öffnet, der diese Daten anzeigt.
+// TestRequirePageRole: read access to
+// page-internal configuration requires any role on exactly this
+// page (or Global Admin) - the concrete permission does not matter, because every
+// role opens the page's admin area that displays this data.
 func TestRequirePageRole(t *testing.T) {
 	db := testutils.SetupTestDB()
 	role := models.Role{Name: "Any", Permissions: "incidents:read"}
@@ -30,6 +30,18 @@ func TestRequirePageRole(t *testing.T) {
 	db.Create(&own)
 	db.Create(&foreign)
 	db.Create(&models.UserStatusPageRole{UserID: member.ID, StatusPageID: own.ID, RoleID: role.ID})
+	// Status page only: a role without any admin right (empty or only
+	// admin_dashboard) may view and subscribe, but reads no admin config.
+	viewerRole := models.Role{Name: "Viewer", Permissions: ""}
+	dashboardOnly := models.Role{Name: "DashboardOnly", Permissions: "admin_dashboard"}
+	db.Create(&viewerRole)
+	db.Create(&dashboardOnly)
+	viewer := models.User{Email: "viewer@test.com"}
+	dashboardUser := models.User{Email: "dash@test.com"}
+	db.Create(&viewer)
+	db.Create(&dashboardUser)
+	db.Create(&models.UserStatusPageRole{UserID: viewer.ID, StatusPageID: own.ID, RoleID: viewerRole.ID})
+	db.Create(&models.UserStatusPageRole{UserID: dashboardUser.ID, StatusPageID: own.ID, RoleID: dashboardOnly.ID})
 
 	r := testutils.SetupRouter()
 	r.Use(func(c *gin.Context) {
@@ -49,6 +61,8 @@ func TestRequirePageRole(t *testing.T) {
 		want             int
 	}{
 		{"Rolle auf der Seite", id(member.ID), "/p/" + id(own.ID), http.StatusOK},
+		{"nur Statusseite (Rolle ohne Rechte)", id(viewer.ID), "/p/" + id(own.ID), http.StatusForbidden},
+		{"nur Statusseite (nur admin_dashboard)", id(dashboardUser.ID), "/p/" + id(own.ID), http.StatusForbidden},
 		{"fremde Seite", id(member.ID), "/p/" + id(foreign.ID), http.StatusForbidden},
 		{"Global Admin", id(admin.ID), "/p/" + id(foreign.ID), http.StatusOK},
 		{"nicht angemeldet", "", "/p/" + id(own.ID), http.StatusUnauthorized},

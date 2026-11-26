@@ -10,15 +10,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Härtungsregeln für das GITHUB_TOKEN und die Zugangsdaten im Arbeitsverzeichnis:
+// Hardening rules for the GITHUB_TOKEN and the credentials in the working directory:
 //
-//  3. Jeder Job hat ausdrücklich gesetzte permissions, im Workflow oder im Job.
-//     Ohne Angabe gelten die Standardrechte des Repositorys, oft mit
-//     Schreibzugriff. "write-all" ist nie erlaubt.
-//  4. Jeder actions/checkout-Schritt setzt persist-credentials: false. Sonst
-//     bleibt das Token in .git/config, wo jeder spätere Schritt und jeder Code
-//     des Repositorys es lesen kann. Wer später pushen muss, übergibt das Token
-//     in genau diesem Schritt.
+//  3. Every job has explicitly set permissions, in the workflow or in the job.
+//     Without them the repository's default permissions apply, often with
+//     write access. "write-all" is never allowed.
+//  4. Every actions/checkout step sets persist-credentials: false. Otherwise
+//     the token stays in .git/config, where every later step and any code
+//     of the repository can read it. Whoever must push later passes the token
+//     in exactly that step.
 
 type haertungWorkflow struct {
 	Permissions any                    `yaml:"permissions"`
@@ -33,8 +33,8 @@ type haertungJob struct {
 	} `yaml:"steps"`
 }
 
-// CheckHardening prüft eine Workflow-Datei auf die Härtungsregeln; name erscheint
-// in den Befunden.
+// CheckHardening checks a workflow file against the hardening rules; name appears
+// in the findings.
 func CheckHardening(name string, data []byte) ([]Finding, error) {
 	var wf haertungWorkflow
 	if err := yaml.Unmarshal(data, &wf); err != nil {
@@ -78,7 +78,7 @@ func istWriteAll(v any) bool {
 	return ok && strings.TrimSpace(s) == "write-all"
 }
 
-// CheckHardeningDir prüft alle *.yml/*.yaml in dir auf die Härtungsregeln.
+// CheckHardeningDir checks all *.yml/*.yaml in dir against the hardening rules.
 func CheckHardeningDir(dir string) ([]Finding, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

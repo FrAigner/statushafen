@@ -62,7 +62,7 @@ func TestSet_UnveraenderterStatusSchreibtNichts(t *testing.T) {
 
 func TestSet_BedingtNurWennStatusPasst(t *testing.T) {
 	db := testutils.SetupTestDB()
-	c := newComp(t, db, "under_maintenance") // Admin hat Wartung gesetzt
+	c := newComp(t, db, "under_maintenance") // admin set maintenance
 
 	changed, err := statushistory.Set(db, c.ID, "operational", "major_outage", models.StatusSourceSelfMonitor, t0)
 	require.NoError(t, err)
@@ -96,8 +96,8 @@ func countAll(t *testing.T, db *gorm.DB) int64 {
 	return n
 }
 
-// Transaktionssicherheit: scheitert der Historieneintrag, bleibt auch der
-// Status unverändert (und umgekehrt gibt es keinen Eintrag ohne Änderung).
+// Transaction safety: if the history entry fails, the
+// status also stays unchanged (and conversely there is no entry without a change).
 func TestSet_HistorieFehlerRolltStatusZurueck(t *testing.T) {
 	db := testutils.SetupTestDB()
 	c := newComp(t, db, "operational")
@@ -121,7 +121,7 @@ func TestSet_LeseFehlerWirdGemeldet(t *testing.T) {
 func TestSet_UpdateFehlerWirdGemeldet(t *testing.T) {
 	db := testutils.SetupTestDB()
 	c := newComp(t, db, "operational")
-	// Update scheitert, Lesen nicht: Trigger blockiert Schreiben auf components.
+	// Update fails, reading does not: trigger blocks writing to components.
 	require.NoError(t, db.Exec(`CREATE TRIGGER block_upd BEFORE UPDATE ON components BEGIN SELECT RAISE(ABORT, 'blockiert'); END`).Error)
 	changed, err := statushistory.Set(db, c.ID, "", "major_outage", models.StatusSourceManual, t0)
 	require.Error(t, err)
@@ -183,10 +183,10 @@ func TestPrune_BehaeltJeKomponenteDenNeuestenAltenEintrag(t *testing.T) {
 		require.NoError(t, db.Create(&models.ComponentStatusChange{ComponentID: id, NewStatus: to, ChangedAt: t0.Add(-d)}).Error)
 	}
 	rec := statushistory.Retention
-	old(a.ID, rec+3*24*time.Hour, "major_outage")          // wird gelöscht
-	old(a.ID, rec+2*24*time.Hour, "operational")           // Ausgangsstatus: bleibt
-	old(a.ID, 24*time.Hour, "partial_outage")              // jung: bleibt
-	old(b.ID, rec+10*24*time.Hour, "degraded_performance") // einziger, alt: bleibt
+	old(a.ID, rec+3*24*time.Hour, "major_outage")          // is deleted
+	old(a.ID, rec+2*24*time.Hour, "operational")           // initial status: stays
+	old(a.ID, 24*time.Hour, "partial_outage")              // young: stays
+	old(b.ID, rec+10*24*time.Hour, "degraded_performance") // only one, old: stays
 
 	n, err := statushistory.Prune(db, t0)
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestPrune_FehlerWirdGemeldet(t *testing.T) {
 	require.Error(t, err)
 }
 
-// Prune behält den neuesten Eintrag nach Zeit, nicht nach ID.
+// Prune keeps the newest entry by time, not by ID.
 func TestPrune_BehaeltNeuestenNachZeitNichtNachID(t *testing.T) {
 	db := testutils.SetupTestDB()
 	a := newComp(t, db, "operational")
@@ -226,8 +226,8 @@ func TestPrune_BehaeltNeuestenNachZeitNichtNachID(t *testing.T) {
 	assert.Equal(t, "partial_outage", r[0].NewStatus)
 }
 
-// Webhook-Flattern darf die Tabelle nicht wachsen lassen. Der
-// Status gilt sofort, nur die Historie wird verdichtet.
+// Webhook flapping must not make the table grow. The
+// status applies immediately, only the history is compacted.
 func TestSet_WebhookFlatternWirdVerdichtet(t *testing.T) {
 	db := testutils.SetupTestDB()
 	c := newComp(t, db, "operational")
@@ -242,9 +242,9 @@ func TestSet_WebhookFlatternWirdVerdichtet(t *testing.T) {
 		require.NoError(t, db.First(&cur, c.ID).Error)
 		require.Equal(t, to, cur.Status)
 	}
-	// 3000 Wechsel in 30 s: ohne Verdichtung 3000 Zeilen.
+	// 3000 changes in 30 s: without compaction 3000 rows.
 	assert.LessOrEqual(t, len(rows(t, db, c.ID)), 2)
-	// Endstand: letzter Wechsel (Index 2999) ist "operational".
+	// Final state: last change (index 2999) is "operational".
 	var cur models.Component
 	require.NoError(t, db.First(&cur, c.ID).Error)
 	assert.Equal(t, "operational", cur.Status)
@@ -260,7 +260,7 @@ func TestRecord_ZusammenfassenGrenzen(t *testing.T) {
 		require.NoError(t, statushistory.Record(db, c.ID, "operational", "major_outage", models.StatusSourceWebhook, t0))
 		require.NoError(t, statushistory.Record(db, c.ID, "major_outage", "partial_outage", models.StatusSourceWebhook, t0.Add(statushistory.MergeGap-time.Second)))
 		r := rows(t, db, c.ID)
-		// Anker trägt den schlimmsten Status des Fensters, der Nachlauf den Endstand.
+		// Anchor carries the worst status of the window, the trailer the final state.
 		require.Len(t, r, 2)
 		assert.Equal(t, "operational", r[0].OldStatus)
 		assert.Equal(t, "major_outage", r[0].NewStatus)
@@ -272,7 +272,7 @@ func TestRecord_ZusammenfassenGrenzen(t *testing.T) {
 		require.NoError(t, statushistory.Record(db, c.ID, "operational", "major_outage", models.StatusSourceWebhook, t0))
 		require.NoError(t, statushistory.Record(db, c.ID, "major_outage", "operational", models.StatusSourceWebhook, t0.Add(time.Second)))
 		r := rows(t, db, c.ID)
-		// Nie löschen: Anker (schlimmster Status des Fensters) + Nachlauf (Endstand).
+		// Never delete: anchor (worst status of the window) + trailer (final state).
 		require.Len(t, r, 2)
 		assert.Equal(t, "operational", r[0].OldStatus)
 		assert.Equal(t, "major_outage", r[0].NewStatus)
@@ -338,7 +338,7 @@ func TestRecord_WebhookLesefehlerWirdGemeldet(t *testing.T) {
 	assert.Error(t, statushistory.Record(db, c.ID, "operational", "major_outage", models.StatusSourceWebhook, t0))
 }
 
-// Ausfallsekunden aus der Historie (Status je Zeile bis zur nächsten, letzte bis ende).
+// Outage seconds from the history (status per row until the next, last until end).
 func ausfallSekunden(r []models.ComponentStatusChange, ende time.Time) float64 {
 	sum := 0.0
 	for i, x := range r {
@@ -353,11 +353,11 @@ func ausfallSekunden(r []models.ComponentStatusChange, ende time.Time) float64 {
 	return sum
 }
 
-// Review B1: Wiederholtes Hin- und Zurückwechseln innerhalb von MergeGap darf
-// einen echten Ausfall NIE aus der Historie löschen. Früher löschte der Rückwechsel die
-// Zeile, der nächste Wechsel legte eine neue an: 0 Zeilen und 0 s Ausfall für 50 min echten
-// Ausfall. Jetzt: höchstens zwei Zeilen je Fenster, der Ausfall wird mindestens so lang
-// gezählt wie er war (pessimistisch), und die Zeilenzahl bleibt begrenzt.
+// Review B1: repeated switching back and forth within MergeGap must
+// NEVER delete a real outage from the history. Previously the switch back deleted the
+// row, the next change created a new one: 0 rows and 0 s outage for 50 min of real
+// outage. Now: at most two rows per window, the outage is counted at least as long
+// as it was (pessimistic), and the row count stays bounded.
 func TestSet_DauerflatternVerliertKeinenAusfall(t *testing.T) {
 	for _, tc := range []struct {
 		name         string
@@ -387,7 +387,7 @@ func TestSet_DauerflatternVerliertKeinenAusfall(t *testing.T) {
 			r := rows(t, db, c.ID)
 			assert.NotEmpty(t, r, "der Ausfall darf nicht komplett verschwinden")
 			assert.GreaterOrEqual(t, ausfallSekunden(r, now), echt, "Ausfallzeit darf nie unter dem echten Ausfall liegen")
-			// höchstens zwei Zeilen je MergeGap-Fenster (+ Anfang)
+			// at most two rows per MergeGap window (+ start)
 			maxZeilen := int(2*now.Sub(t0)/statushistory.MergeGap) + 2
 			assert.LessOrEqual(t, len(r), maxZeilen, "Zeilenzahl bleibt begrenzt")
 		})

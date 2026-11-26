@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Aufbewahrung der Admin-Nachrichten (90 Tage seit dem letzten Auftreten).
+// Retention of admin messages (90 days since the last occurrence).
 
 func (f *incFixture) notif(t *testing.T, daysOld int) models.AdminNotification {
 	t.Helper()
@@ -65,14 +65,14 @@ func TestPruneAdminNotifications_FehlerBeimLoeschenUndAbbruch(t *testing.T) {
 	f := newIncFixture(t)
 	f.notif(t, 100)
 
-	// Abgebrochener Kontext: kein Durchlauf.
+	// Cancelled context: no run.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	n, err := f.svc.PruneAdminNotifications(ctx)
 	require.NoError(t, err)
 	assert.Zero(t, n)
 
-	// Löschen der Nachricht scheitert: Fehler wird gemeldet, nichts gezählt.
+	// Deleting the message fails: error is reported, nothing counted.
 	require.NoError(t, f.db.Callback().Delete().Before("gorm:delete").Register("an_fail", func(tx *gorm.DB) {
 		if tx.Statement.Table == "admin_notifications" {
 			_ = tx.AddError(errors.New("boom"))
@@ -82,7 +82,7 @@ func TestPruneAdminNotifications_FehlerBeimLoeschenUndAbbruch(t *testing.T) {
 	assert.Error(t, err)
 	assert.Zero(t, n)
 
-	// Löschen der Lesemarken scheitert.
+	// Deleting the read marks fails.
 	require.NoError(t, f.db.Migrator().DropTable(&models.NotificationRead{}))
 	_, err = f.svc.PruneAdminNotifications(context.Background())
 	assert.Error(t, err)

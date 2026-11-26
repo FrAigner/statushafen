@@ -1,20 +1,20 @@
-// Package permissions beschreibt das Rechtemodell: je Tab der
-// Admin-Navigation eine Ressource mit den vier Aktionen create, read, update
-// und delete. Ein Recht ist der String "<ressource>:<aktion>"; Rollen speichern
-// sie kommagetrennt (models.Role.Permissions).
+// Package permissions describes the permission model: for each tab of the
+// admin navigation a resource with the four actions create, read, update
+// and delete. A permission is the string "<resource>:<action>"; roles store
+// them comma-separated (models.Role.Permissions).
 //
-// Regeln:
-// - create, update und delete schließen read ein.
-//   - Der frühere Sammelwert "<ressource>:write" wird nicht mehr vergeben.
-//     Die Prüfung (Has) akzeptiert ihn aber weiter als create+update+delete+read
-//     der Ressource und der früher daran gekoppelten Tabs (writeCoupling),
-//     damit Alt-Token, ein noch gecachtes Alt-Frontend und nicht migrierte
-//     Rollen bis zur Bereinigung nichts verlieren (reine Kompatibilität beim
-//     Lesen, geschrieben wird er nie).
-//   - "admin_dashboard" ist ein Sonderrecht ohne Aktionen.
+// Rules:
+// - create, update and delete imply read.
+//   - The former catch-all value "<resource>:write" is no longer granted.
+//     The check (Has) still accepts it as create+update+delete+read
+//     of the resource and of the tabs formerly coupled to it (writeCoupling),
+//     so that legacy tokens, a still-cached legacy frontend and unmigrated
+//     roles lose nothing until cleanup (pure compatibility when
+//     reading; it is never written).
+//   - "admin_dashboard" is a special permission without actions.
 //
-// Das Paket hat bewusst keine Abhängigkeiten, damit Datenbank, Middleware und
-// Handler es gemeinsam nutzen können.
+// The package deliberately has no dependencies so that the database, middleware and
+// handlers can share it.
 package permissions
 
 import (
@@ -22,35 +22,35 @@ import (
 	"strings"
 )
 
-// Aktionen in der Reihenfolge der Matrix (C R U D).
+// Actions in the order of the matrix (C R U D).
 const (
 	Create = "create"
 	Read   = "read"
 	Update = "update"
 	Delete = "delete"
-	// legacyWrite ist der Altwert aus der Zeit vor der Umstellung.
+	// legacyWrite is the legacy value from before the switch.
 	legacyWrite = "write"
 )
 
-// AdminDashboard ist das Sonderrecht fürs Dashboard-Menü der Statusseite.
+// AdminDashboard is the special permission for the status page's dashboard menu.
 const AdminDashboard = "admin_dashboard"
 
-// Actions sind alle Aktionen in Matrix-Reihenfolge.
+// Actions are all actions in matrix order.
 var Actions = []string{Create, Read, Update, Delete}
 
-// Scope sagt, worauf sich eine Ressource bezieht.
+// Scope says what a resource relates to.
 type Scope string
 
 const (
-	// ScopePage: gilt je Statusseite über die Rolle des Nutzers auf dieser Seite.
+	// ScopePage: applies per status page via the user's role on that page.
 	ScopePage Scope = "page"
-	// ScopeGlobal: hat keinen page_id-Bezug (mandantenübergreifend) und bleibt
-	// Global Admins vorbehalten. Eine Seitenrolle kann sie nicht wirksam
-	// vergeben, sonst läse sie z. B. alle Benutzer aller Mandanten.
+	// ScopeGlobal: has no page_id reference (cross-tenant) and remains
+	// reserved for Global Admins. A page role cannot effectively
+	// grant it, otherwise it would read e.g. all users of all tenants.
 	ScopeGlobal Scope = "global"
 )
 
-// Bereiche der Navigation.
+// Areas of the navigation.
 const (
 	GroupOperations = "operations"
 	GroupContent    = "content"
@@ -58,16 +58,16 @@ const (
 	GroupSystem     = "system"
 )
 
-// Resource ist ein Tab der Admin-Navigation.
+// Resource is a tab of the admin navigation.
 type Resource struct {
 	Key   string
 	Group string
 	Scope Scope
 }
 
-// Resources sind alle Tabs in Navigationsreihenfolge. Die Schlüssel stehen
-// auch im Frontend (frontend/src/utils/permissionResources.js); ein Test
-// hält beide Seiten gleich.
+// Resources are all tabs in navigation order. The keys are also
+// in the frontend (frontend/src/utils/permissionResources.js); a test
+// keeps both sides equal.
 var Resources = []Resource{
 	{"overview", GroupOperations, ScopeGlobal},
 	{"components", GroupOperations, ScopePage},
@@ -90,10 +90,10 @@ var Resources = []Resource{
 	{"system_settings", GroupSystem, ScopeGlobal},
 }
 
-// Perm baut den Rechte-String "<ressource>:<aktion>".
+// Perm builds the permission string "<resource>:<action>".
 func Perm(resource, action string) string { return resource + ":" + action }
 
-// IsResource: ist key ein bekannter Tab?
+// IsResource: is key a known tab?
 func IsResource(key string) bool {
 	for _, r := range Resources {
 		if r.Key == key {
@@ -103,12 +103,12 @@ func IsResource(key string) bool {
 	return false
 }
 
-// split zerlegt einen Rechte-String in Ressource und Aktion.
+// split splits a permission string into resource and action.
 func split(perm string) (resource, action string, ok bool) {
 	return strings.Cut(perm, ":")
 }
 
-// entries zerlegt eine kommagetrennte Liste (ohne leere Einträge).
+// entries splits a comma-separated list (without empty entries).
 func entries(list string) []string {
 	out := []string{}
 	for _, p := range strings.Split(list, ",") {
@@ -119,13 +119,13 @@ func entries(list string) []string {
 	return out
 }
 
-// Has prüft, ob die Rechte-Liste das verlangte Recht ("res:act") gewährt:
-// das Recht selbst, bei read zusätzlich create/update/delete derselben
-// Ressource, und der Altwert "res:write" für jede Aktion. Der Altwert gilt
-// außerdem für die Tabs, die vor der Umstellung an "res:write" hingen
-// (writeCoupling), genau wie ihn MigrateLegacy übersetzt. Die
-// Leseerbschaft (readCoupling) gilt hier bewusst nicht: "components:read" ist
-// auch ein gültiges Neu-Recht, dessen Kopplung ein Admin entzogen haben kann.
+// Has checks whether the permission list grants the requested permission ("res:act"):
+// the permission itself, for read additionally create/update/delete of the same
+// resource, and the legacy value "res:write" for every action. The legacy value also applies
+// to the tabs that were tied to "res:write" before the switch
+// (writeCoupling), exactly as MigrateLegacy translates it. The
+// read inheritance (readCoupling) deliberately does not apply here: "components:read" is
+// also a valid new permission whose coupling an admin may have revoked.
 func Has(list, required string) bool {
 	res, act, ok := split(required)
 	if !ok {
@@ -142,14 +142,14 @@ func Has(list, required string) bool {
 	return false
 }
 
-// Covers: gewährt die Liste have jedes Recht der Liste want?
-// Der Altwert "res:write" in want zählt als create+read+update+delete. Eine
-// Rolle darf nur vergeben werden, wenn der Vergebende sie selbst abdeckt.
+// Covers: does the list have grant every permission of the list want?
+// The legacy value "res:write" in want counts as create+read+update+delete. A
+// role may only be granted if the grantor covers it themselves.
 func Covers(have, want string) bool {
 	haveEntries := entries(have)
 	for _, p := range entries(Normalize(want)) {
 		if !strings.Contains(p, ":") {
-			// Sonderrecht ohne Aktion (admin_dashboard): nur exakter Treffer.
+			// Special permission without action (admin_dashboard): exact match only.
 			if !slices.Contains(haveEntries, p) {
 				return false
 			}
@@ -162,14 +162,14 @@ func Covers(have, want string) bool {
 	return true
 }
 
-// coupledWrite: ist p ein Alt-"key:write", an dem der Tab res früher hing?
+// coupledWrite: is p a legacy "key:write" to which the tab res used to be tied?
 func coupledWrite(p, res string) bool {
 	key, act, ok := split(p)
 	return ok && act == legacyWrite && slices.Contains(writeCoupling[key], res)
 }
 
-// expandWrite löst "res:write" in create+read+update+delete der Ressource und
-// aller früher daran gekoppelten Tabs auf.
+// expandWrite resolves "res:write" into create+read+update+delete of the resource and
+// of all tabs formerly coupled to it.
 func expandWrite(res string) []string {
 	out := CRUD(res)
 	for _, c := range writeCoupling[res] {
@@ -178,7 +178,7 @@ func expandWrite(res string) []string {
 	return out
 }
 
-// HasAny: mindestens eines der Rechte.
+// HasAny: at least one of the permissions.
 func HasAny(list string, required []string) bool {
 	for _, r := range required {
 		if Has(list, r) {
@@ -188,9 +188,9 @@ func HasAny(list string, required []string) bool {
 	return false
 }
 
-// CanChange: gewährt die Liste irgendeine verändernde Aktion (create, update,
-// delete oder den Altwert write) auf irgendeiner Ressource? Auto-Join-Standard-
-// rollen dürfen das nicht.
+// CanChange: does the list grant any modifying action (create, update,
+// delete or the legacy value write) on any resource? Auto-join default
+// roles must not.
 func CanChange(list string) bool {
 	for _, p := range entries(list) {
 		_, act, ok := split(p)
@@ -201,7 +201,22 @@ func CanChange(list string) bool {
 	return false
 }
 
-// dedupe entfernt doppelte Einträge und behält die erste Position.
+// GrantsAdminArea: does the list grant any right on a known resource (any
+// action, including the legacy write)? Without one a role is "status page
+// only": its members may view and subscribe to the (private) page, but get no
+// admin area and no admin API. admin_dashboard alone does not count, it only
+// shows the Dashboard link.
+func GrantsAdminArea(list string) bool {
+	for _, p := range entries(list) {
+		res, act, ok := split(p)
+		if ok && IsResource(res) && (slices.Contains(Actions, act) || act == legacyWrite) {
+			return true
+		}
+	}
+	return false
+}
+
+// dedupe removes duplicate entries and keeps the first position.
 func dedupe(in []string) []string {
 	seen := map[string]bool{}
 	out := make([]string, 0, len(in))
@@ -214,13 +229,13 @@ func dedupe(in []string) []string {
 	return out
 }
 
-// CRUD gibt die vier Rechte-Strings einer Ressource zurück.
+// CRUD returns the four permission strings of a resource.
 func CRUD(resource string) []string {
 	return []string{Perm(resource, Create), Perm(resource, Read), Perm(resource, Update), Perm(resource, Delete)}
 }
 
-// withRead ergänzt zu jeder Ressource mit create/update/delete das Recht read
-// (ans Ende), damit die Rolle im Editor und in der Matrix vollständig aussieht.
+// withRead adds the read permission to every resource with create/update/delete
+// (at the end), so the role looks complete in the editor and in the matrix.
 func withRead(list []string) []string {
 	have := map[string]bool{}
 	for _, p := range list {
@@ -237,10 +252,10 @@ func withRead(list []string) []string {
 	return out
 }
 
-// Normalize ersetzt "res:write" durch create+read+update+delete (samt der
-// früher gekoppelten Tabs) und stellt read sicher. Reihenfolge und sonstige Einträge bleiben erhalten. Beim
-// Speichern einer Rolle angewandt, damit ein Alt-Frontend den Altwert nicht
-// wieder einschleppt.
+// Normalize replaces "res:write" with create+read+update+delete (including the
+// formerly coupled tabs) and ensures read. Order and other entries are preserved. Applied when
+// saving a role, so a legacy frontend does not
+// reintroduce the legacy value.
 func Normalize(list string) string {
 	out := []string{}
 	for _, p := range entries(list) {
@@ -253,38 +268,38 @@ func Normalize(list string) string {
 	return strings.Join(withRead(dedupe(out)), ",")
 }
 
-// Vor der Umstellung hingen einige Tabs an den Rechten einer anderen Ressource.
-// Die Migration gibt ihnen dieselben Aktionen, die die Schlüsselressource hatte:
+// Before the switch, some tabs were tied to the permissions of another resource.
+// The migration gives them the same actions the key resource had:
 //
-//	external_sources    <- components   (Lesen und Schreiben)
-//	maintenance         <- incidents    (Lesen und Schreiben, teilt die Vorfall-API)
-//	incident_templates  <- incidents    (nur Schreiben, verlangte auch zum Lesen write)
-//	notification_templates, languages, ui_translations, sso <- pages (nur Schreiben)
+// external_sources    <- components   (read and write)
+// maintenance         <- incidents    (read and write, shares the incident API)
+// incident_templates  <- incidents    (write only, also required write to read)
+// notification_templates, languages, ui_translations, sso <- pages (write only)
 var (
-	// writeCoupling: Tabs, die mit "key:write" alle Aktionen bekamen.
+	// writeCoupling: tabs that received all actions with "key:write".
 	writeCoupling = map[string][]string{
 		"components": {"external_sources"},
 		"incidents":  {"maintenance", "incident_templates"},
 		"pages":      {"notification_templates", "languages", "ui_translations", "sso"},
 	}
-	// readCoupling: Tabs, die schon das Leserecht der Schlüsselressource erbten.
-	// Vorfallvorlagen und alles an pages fehlen bewusst: Sie verlangten schon
-	// fürs Lesen das Schreibrecht.
+	// readCoupling: tabs that already inherited the read permission of the key resource.
+	// Incident templates and everything on pages are deliberately missing: they already required
+	// the write permission for reading.
 	readCoupling = map[string][]string{
 		"components": {"external_sources"},
 		"incidents":  {"maintenance"},
 	}
 )
 
-// MigrateLegacy übersetzt eine Rechte-Liste aus der Zeit vor der Umstellung so,
-// dass jeder Nutzer dieselben Zugriffe behält und keine neuen gewinnt:
-//   - "res:write" wird zu create+read+update+delete (res) und für alle
-//     gekoppelten Tabs ebenfalls;
-//   - "res:read" gilt zusätzlich für die gekoppelten Tabs, die das Leserecht
-//     erbten (external_sources, maintenance);
-//   - alle übrigen Einträge (auch unbekannte) bleiben unverändert.
+// MigrateLegacy translates a permission list from before the switch so
+// that every user keeps the same access and gains no new access:
+//   - "res:write" becomes create+read+update+delete (res) and likewise for all
+//     coupled tabs;
+//   - "res:read" additionally applies to the coupled tabs that inherited
+//     the read permission (external_sources, maintenance);
+//   - all other entries (including unknown ones) remain unchanged.
 //
-// Das Ergebnis enthält kein "write" mehr; ein zweiter Aufruf ändert nichts.
+// The result no longer contains "write"; a second call changes nothing.
 func MigrateLegacy(list string) string {
 	out := []string{}
 	for _, p := range entries(list) {
@@ -304,7 +319,7 @@ func MigrateLegacy(list string) string {
 	return strings.Join(withRead(dedupe(out)), ",")
 }
 
-// HasLegacyWrite: enthält die Liste noch einen "res:write"-Eintrag?
+// HasLegacyWrite: does the list still contain a "res:write" entry?
 func HasLegacyWrite(list string) bool {
 	for _, p := range entries(list) {
 		if _, act, ok := split(p); ok && act == legacyWrite {
@@ -314,7 +329,7 @@ func HasLegacyWrite(list string) bool {
 	return false
 }
 
-// FullAccess liefert alle Rechte aller Ressourcen (Rolle "Global Admin").
+// FullAccess returns all permissions of all resources (role "Global Admin").
 func FullAccess() string {
 	out := []string{}
 	for _, r := range Resources {
@@ -323,12 +338,12 @@ func FullAccess() string {
 	return strings.Join(out, ",")
 }
 
-// Union vereinigt zwei Listen (erst a, dann die neuen Einträge aus b).
+// Union merges two lists (first a, then the new entries from b).
 func Union(a, b string) string {
 	return strings.Join(dedupe(append(entries(a), entries(b)...)), ",")
 }
 
-// List fasst Rechte-Strings zu einer Rollenliste zusammen und ergänzt read.
+// List combines permission strings into a role list and adds read.
 func List(perms ...string) string {
 	return strings.Join(withRead(dedupe(perms)), ",")
 }

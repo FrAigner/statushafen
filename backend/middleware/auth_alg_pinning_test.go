@@ -87,7 +87,7 @@ func TestOptionalAuthMiddleware_IgnoresNonHS256Algorithm(t *testing.T) {
 // pinning change did not break the normal, legitimate login path.
 func TestAuthMiddleware_AcceptsHS256Token(t *testing.T) {
 	db := testutils.SetupTestDB()
-	// Das Konto muss existieren: AuthMiddleware gleicht das Token mit der DB ab.
+	// The account must exist: AuthMiddleware checks the token against the DB.
 	if err := db.Create(&models.User{Email: "hs256@example.com"}).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -1,8 +1,8 @@
 package coveragegate
 
-// Gesamtquoten-Check ohne Diff. Seit der Umstellung läuft das Diff-Gate (check) nur noch lokal;
-// beim Push auf develop/main prüft die CI mit baseline-check zusätzlich, dass die Gesamtquoten nicht
-// unter coverage-baseline.json fallen (die Go-Quote lag unbemerkt unter der Baseline).
+// Overall-rate check without diff. Since the switch the diff gate (check) only runs locally;
+// on push to develop/main CI additionally checks with baseline-check that the overall rates do not
+// fall below coverage-baseline.json (the Go rate was unnoticed below the baseline).
 
 import (
 	"errors"
@@ -11,9 +11,9 @@ import (
 	"io"
 )
 
-// runBaselineCheck vergleicht die gemessenen Gesamtquoten mit der Baseline. Anders als check verlangt der
-// Modus ALLE drei Eingaben: in der CI darf ein fehlender Report nie stillschweigend als "nicht gemessen"
-// durchgehen, sonst wäre der Schritt wirkungslos.
+// runBaselineCheck compares the measured overall rates with the baseline. Unlike check, the
+// mode requires ALL three inputs: in CI a missing report must never silently pass as "not measured",
+// otherwise the step would be ineffective.
 func runBaselineCheck(args []string, stdout, stderr io.Writer) (int, error) {
 	fs := flag.NewFlagSet("baseline-check", flag.ContinueOnError)
 	fs.SetOutput(stderr)

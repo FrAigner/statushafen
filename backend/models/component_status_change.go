@@ -2,30 +2,30 @@ package models
 
 import "time"
 
-// Quellen einer Statusänderung.
+// Sources of a status change.
 const (
-	StatusSourceManual  = "manual"  // Admin-Oberfläche / API
-	StatusSourceWebhook = "webhook" // Monitoring-Webhook
-	// StatusSourceWebhookNachlauf markiert die Endstand-Zeile eines verdichteten Webhook-Fensters
-	// Anker (webhook) trägt den schlimmsten Status, der Nachlauf den Endstand.
+	StatusSourceManual  = "manual"  // admin UI / API
+	StatusSourceWebhook = "webhook" // monitoring webhook
+	// StatusSourceWebhookNachlauf marks the final-state row of a condensed webhook window
+	// The anchor (webhook) carries the worst status, the trailing row (Nachlauf) the final state.
 	StatusSourceWebhookNachlauf = "webhook_nachlauf"
-	StatusSourceMaintenance     = "maintenance" // Wartungsfenster (Start/Ende)
-	StatusSourceSelfMonitor     = "selfmonitor" // Selbstüberwachung
-	StatusSourceCreated         = "created"     // Anfangsstatus beim Anlegen
-	StatusSourceBackfill        = "backfill"    // einmalig nachgetragener Bestand
+	StatusSourceMaintenance     = "maintenance" // maintenance window (start/end)
+	StatusSourceSelfMonitor     = "selfmonitor" // self-monitoring
+	StatusSourceCreated         = "created"     // initial status on creation
+	StatusSourceBackfill        = "backfill"    // one-off backfilled data
 )
 
-// ComponentStatusChange: ein Eintrag der Statushistorie einer
-// Komponente. Component.Status ist nur der aktuelle Wert; erst diese Tabelle
-// macht den Verlauf für die 90-Tage-Verfügbarkeit auswertbar. Reine
-// Anhängetabelle (kein Soft-Delete, keine Änderung): Bereinigung nur über die
-// Aufbewahrungsfrist (statushistory.Prune). Bewusst ohne Fremdschlüssel und
-// ohne StatusPageID: Komponenten werden nur weich gelöscht, und die Seite wird
-// immer über die Komponente aufgelöst (Mandantentrennung in der Abfrage).
+// ComponentStatusChange: an entry in the status history of a
+// component. Component.Status is only the current value; only this table
+// makes the history evaluable for the 90-day availability. Pure
+// append-only table (no soft delete, no changes): cleanup only via the
+// retention period (statushistory.Prune). Deliberately without a foreign key and
+// without StatusPageID: components are only soft-deleted, and the page is
+// always resolved via the component (tenant separation in the query).
 type ComponentStatusChange struct {
 	ID          uint `gorm:"primaryKey"`
 	ComponentID uint `gorm:"not null;index:idx_csc_component_time,priority:1"`
-	// OldStatus ist leer beim ersten Eintrag einer Komponente.
+	// OldStatus is empty for the first entry of a component.
 	OldStatus string    `gorm:"not null;default:''"`
 	NewStatus string    `gorm:"not null"`
 	Source    string    `gorm:"not null;default:''"`

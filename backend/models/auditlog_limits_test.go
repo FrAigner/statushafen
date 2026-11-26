@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Audit-Felder stammen teils aus Nutzereingaben (E-Mail beim Login, Honeypot).
-// Der Hook kürzt sie zentral beim Speichern, egal welcher Pfad den Eintrag anlegt.
+// Audit fields partly come from user input (email at login, honeypot).
+// The hook truncates them centrally on save, whichever path creates the entry.
 func TestAuditLog_BeforeCreateTruncatesFields(t *testing.T) {
 	db := testutils.SetupTestDB()
 	huge := strings.Repeat("x", 2<<20)
@@ -28,8 +28,8 @@ func TestAuditLog_BeforeCreateTruncatesFields(t *testing.T) {
 	assert.Equal(t, 255, utf8.RuneCountInString(stored.TargetName))
 	assert.Equal(t, 255, utf8.RuneCountInString(stored.TargetID))
 	assert.Equal(t, 254, utf8.RuneCountInString(stored.ActorEmail))
-	// Jedes Feld ist auf genau seine Grenze gekürzt (nicht nur "irgendwie kleiner"),
-	// damit der Wegfall einer einzelnen Kürzung auffällt.
+	// Each field is truncated to exactly its limit (not just "somehow smaller"),
+	// so that the removal of a single truncation is noticed.
 	assert.Equal(t, 255, utf8.RuneCountInString(stored.ActorRole))
 	assert.Equal(t, 128, utf8.RuneCountInString(stored.Action))
 	assert.Equal(t, 64, utf8.RuneCountInString(stored.Category))
@@ -40,7 +40,7 @@ func TestAuditLog_BeforeCreateTruncatesFields(t *testing.T) {
 
 func TestAuditLog_TruncationIsUTF8Safe(t *testing.T) {
 	db := testutils.SetupTestDB()
-	// 300 Umlaute = 600 Byte: ein Schnitt nach Bytes würde ein Zeichen teilen.
+	// 300 umlauts = 600 bytes: a cut by bytes would split a character.
 	entry := models.AuditLog{Action: "a", Category: "auth", TargetName: strings.Repeat("ä", 300)}
 	require.NoError(t, db.Create(&entry).Error)
 	var stored models.AuditLog
@@ -48,13 +48,13 @@ func TestAuditLog_TruncationIsUTF8Safe(t *testing.T) {
 	assert.True(t, utf8.ValidString(stored.TargetName))
 	assert.Equal(t, strings.Repeat("ä", 255), stored.TargetName)
 
-	// Ungültige UTF-8-Folgen (Postgres lehnt sie in text ab) werden ersetzt.
+	// Invalid UTF-8 sequences (Postgres rejects them in text) are replaced.
 	bad := models.AuditLog{Action: "a", Category: "auth", TargetName: "ab\xff\xfecd"}
 	require.NoError(t, db.Create(&bad).Error)
 	var storedBad models.AuditLog
 	require.NoError(t, db.First(&storedBad, bad.ID).Error)
 	assert.True(t, utf8.ValidString(storedBad.TargetName))
-	// Eine zusammenhängende ungültige Folge wird zu einem Ersatzzeichen.
+	// A contiguous invalid sequence becomes a single replacement character.
 	assert.Equal(t, "ab\uFFFDcd", storedBad.TargetName)
 }
 

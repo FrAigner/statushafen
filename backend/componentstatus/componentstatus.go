@@ -1,16 +1,16 @@
-// Package componentstatus enthält die Rangfolge der Komponentenstatus.
+// Package componentstatus contains the ranking of component statuses.
 //
-// Vorher lag sie als statusSeverity/worstStatus nur in
-// handlers/component.go. Der Abfrage-Dienst für externe Statusseiten
-// (Paket externalstatus) braucht dieselbe Rangfolge, um Statuswechsel zu
-// erkennen, darf aber handlers nicht importieren (handlers importiert
-// externalstatus). Deshalb ein eigenes Paket (nur models/gorm als
-// Abhängigkeit); handlers delegiert dorthin, damit es nur eine Rangfolge und
-// nur eine Vorfall-Überlagerung gibt.
+// Previously it lived as statusSeverity/worstStatus only in
+// handlers/component.go. The polling service for external status pages
+// (package externalstatus) needs the same ranking to detect status
+// changes, but must not import handlers (handlers imports
+// externalstatus). Hence a separate package (only models/gorm as a
+// dependency); handlers delegates there, so there is only one ranking and
+// only one incident overlay.
 package componentstatus
 
-// Statuswerte einer Komponente (Component.Status) plus "unknown" für
-// externe Komponenten mit einem Status, den wir nicht kennen.
+// Status values of a component (Component.Status) plus "unknown" for
+// external components with a status we do not know.
 const (
 	Operational         = "operational"
 	DegradedPerformance = "degraded_performance"
@@ -21,14 +21,14 @@ const (
 	Unknown             = "unknown"
 )
 
-// Severity gibt jedem Status einen numerischen Schweregrad (höher = schlimmer).
+// Severity gives each status a numeric severity (higher = worse).
 //
-// Wartung liegt zwischen "operational" und den echten Störungen:
-// geplant, aber für Nutzer spürbar. Das gilt auch für gekoppelte externe
-// Komponenten: eine Wartung beim Anbieter färbt die eigene
-// Komponente auf "under_maintenance", jede echte Störung (eigene oder
-// externe) hat Vorrang. "group" und "unknown" haben Rang 0 und verschlechtern
-// nie etwas: Ein unbekannter externer Status soll keinen Fehlalarm auslösen.
+// Maintenance sits between "operational" and the real outages:
+// planned, but noticeable to users. This also applies to coupled external
+// components: a maintenance at the provider turns the own
+// component to "under_maintenance", any real outage (own or
+// external) takes precedence. "group" and "unknown" have rank 0 and never
+// make anything worse: an unknown external status must not trigger a false alarm.
 func Severity(s string) int {
 	switch s {
 	case MajorOutage:
@@ -46,7 +46,7 @@ func Severity(s string) int {
 	}
 }
 
-// Worst gibt den schlimmsten Status aus statuses zurück, mindestens "operational".
+// Worst returns the worst status from statuses, at least "operational".
 func Worst(statuses ...string) string {
 	worst := Operational
 	for _, s := range statuses {

@@ -6,19 +6,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// legacyIncidentStatusCompleted: Altwert aus der Zeit vor der Umstellung.
-// Wartungs-Updates konnten ihn ungeprüft setzen. Die Konstante lebt bewusst
-// nur noch hier: models und Regeln kennen ihn nicht mehr.
+// legacyIncidentStatusCompleted: legacy value from the time before the changeover.
+// Maintenance updates could set it unchecked. The constant deliberately lives
+// only here: models and rules no longer know it.
 const legacyIncidentStatusCompleted = "completed"
 
-// migrateCompletedIncidentStatus stellt den Altwert "completed" auf
-// "resolved" um (Vorfälle, Wartungen und deren Timeline-Updates) und füllt
-// ResolvedAt, falls leer, mit der letzten Änderung des Vorfalls (der
-// Zeitpunkt, an dem der Altwert gesetzt wurde). Idempotent: Nach dem ersten
-// Lauf gibt es keine Zeile mit dem Altwert mehr, ein weiterer Lauf ändert
-// nichts. UpdateColumn(s) lässt updated_at unberührt; gelöschte Zeilen
-// (Unscoped) werden mit umgestellt, damit der Altwert nirgends überlebt.
-// Ein Fehler wird nur geloggt, der Start soll nicht daran scheitern.
+// migrateCompletedIncidentStatus switches the legacy value "completed" to
+// "resolved" (incidents, maintenances and their timeline updates) and fills
+// ResolvedAt, if empty, with the last change of the incident (the
+// time at which the legacy value was set). Idempotent: after the first
+// run there is no row with the legacy value anymore, another run changes
+// nothing. UpdateColumn(s) leaves updated_at untouched; deleted rows
+// (Unscoped) are switched too, so the legacy value survives nowhere.
+// An error is only logged, startup is not supposed to fail because of it.
 func migrateCompletedIncidentStatus(db *gorm.DB) {
 	res := db.Unscoped().Table("incidents").Where("status = ?", legacyIncidentStatusCompleted).
 		UpdateColumns(map[string]any{

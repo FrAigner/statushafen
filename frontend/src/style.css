@@ -1289,6 +1289,9 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 /* Zeilenhinweise in Tabellenzellen. */
 .tag-pill--accent { border-color: transparent; background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
 .cell-contact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+/* Test message in the subscriber form: button, hint and inline result. */
+.test-message { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+.test-message .alert { margin: 0; }
 /* Segment-Umschalter (SegmentControl). */
 .segment { display: inline-flex; max-inline-size: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
 .segment__item {
@@ -1330,3 +1333,18 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 /* Bezugspunkt für das Nachrichten-Panel auf schmalen Bildschirmen
    (AdminNotificationBell.vue hängt es dort an die Kopfzeile). */
 .admin-topbar .topbar-main { position: relative; }
+
+/* Quick search: the setting it jumped to is outlined for a moment (utils/revealSetting.js). */
+.quick-search-highlight {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: var(--r-md);
+  animation: quick-search-highlight 2.5s ease-out;
+}
+@keyframes quick-search-highlight {
+  0%, 60% { background: var(--primary-soft); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-search-highlight { animation: none; }
+}

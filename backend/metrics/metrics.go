@@ -1,14 +1,14 @@
 // Package metrics implements the shared in-memory "Golden Signals"
 // (Latency, Traffic, Errors, Saturation) aggregation for the backend.
 //
-// This started as Schritt 1/4 of the Golden-Signals initiative,
-// which only collected and aggregated data in memory. Schritt 2/4 adds
+// This started as Step 1/4 of the Golden-Signals initiative,
+// which only collected and aggregated data in memory. Step 2/4 adds
 // a Prometheus-compatible export of that same data (see prometheus.go and
 // Registry.PrometheusRegistry) for an external Grafana Cloud scraper — the
 // atomic in-memory aggregation below is untouched and still the source of
 // truth for the still-open follow-ups:
-// - Schritt 3/4: in-app dashboard
-// - Schritt 4/4: saturation signals
+// - Step 3/4: in-app dashboard
+// - Step 4/4: saturation signals
 //
 // Both follow-ups are expected to read from the shared Registry exposed
 // here (metrics.Default / Registry.Snapshot) independently of each other.
@@ -38,7 +38,7 @@ import (
 // latency histogram buckets used to aggregate request durations. There is
 // one implicit final "+Inf" bucket for anything slower than the largest
 // boundary. The values mirror commonly used Prometheus defaults so a later
-// Prometheus exporter (Schritt 2/4) can reuse them as-is.
+// Prometheus exporter (Step 2/4) can reuse them as-is.
 var LatencyBucketsMs = []float64{5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000}
 
 // RouteMetrics aggregates Golden-Signals counters for exactly one
@@ -188,7 +188,7 @@ type Registry struct {
 	prom   *prometheusExporter
 
 	// dbStatsProvider backs SaturationSnapshot's DB connection-pool numbers;
-	// see saturation.go (Schritt 4/4). Kept as its own field
+	// see saturation.go (Step 4/4). Kept as its own field
 	// (rather than folded into the request-tracking fields/paths above) so
 	// it applies/merges cleanly independent of the other in-flight
 	// Golden-Signals follow-ups.
@@ -219,7 +219,7 @@ func (r *Registry) PrometheusRegistry() *prometheus.Registry {
 
 // Default is the process-wide registry that the global Gin instrumentation
 // middleware (middleware.GoldenSignals) records into. The Prometheus
-// exporter (Schritt 2/4) and in-app dashboard (Schritt 3/4) are expected to
+// exporter (Step 2/4) and in-app dashboard (Step 3/4) are expected to
 // read from this same instance independently of each other.
 var Default = NewRegistry()
 
@@ -243,14 +243,14 @@ func (r *Registry) Observe(method, route string, statusCode int, latency time.Du
 	r.prom.observe(method, route, statusCode, latency)
 }
 
-// RegisterRoute legt (method, route) mit 0 Requests an, falls noch kein Eintrag
-// existiert: Die Monitoring-Tabelle soll auch Routen zeigen, die
-// seit dem Start nie aufgerufen wurden. Idempotent; ein bereits gezählter
-// Eintrag bleibt unverändert. Bewusst NUR die In-Memory-Aggregation, nicht die
-// Prometheus-Collectors: Dort würde jede Route Zeitreihen (Counter je Status,
-// Histogramm-Buckets) erzeugen, also ein Kardinalitätssprung. Prometheus legt
-// sie wie bisher erst beim ersten Request an. route muss ein Gin-Template
-// sein (nie ein konkreter Pfad mit IDs).
+// RegisterRoute creates (method, route) with 0 requests if no entry
+// exists yet: the monitoring table should also show routes that
+// have never been called since startup. Idempotent; an already counted
+// entry stays unchanged. Deliberately ONLY the in-memory aggregation, not the
+// Prometheus collectors: there every route would create time series (counter
+// per status, histogram buckets), i.e. a cardinality jump. Prometheus creates
+// them as before only on the first request. route must be a Gin template
+// (never a concrete path with IDs).
 func (r *Registry) RegisterRoute(method, route string) {
 	key := routeKey{Method: method, Route: route}
 	if _, ok := r.routes.Load(key); ok {

@@ -8,15 +8,15 @@ import (
 	"github.com/fraigner/statushafen/models"
 )
 
-// AdminNotificationRetention: Nachrichten des Admin-Nachrichten-
-// centers werden nach dieser Zeit (seit dem letzten Auftreten) gelöscht. Der
-// Aufräumlauf hängt am vorhandenen Leader-Takt (maybePrune), wie die
-// Aufbewahrung gespiegelter Meldungen.
+// AdminNotificationRetention: messages of the admin message
+// center are deleted after this time (since the last occurrence). The
+// cleanup run hangs off the existing leader tick (maybePrune), like the
+// retention of mirrored reports.
 const AdminNotificationRetention = 90 * 24 * time.Hour
 
-// PruneAdminNotifications löscht Nachrichten, deren letztes Auftreten länger
-// als AdminNotificationRetention zurückliegt, samt Lesemarken (auch ohne
-// FK-Cascade, z. B. SQLite). Liefert die Anzahl entfernter Nachrichten.
+// PruneAdminNotifications deletes messages whose last occurrence is longer
+// ago than AdminNotificationRetention, together with read marks (even without
+// FK cascade, e.g. SQLite). Returns the number of removed messages.
 func (s *Service) PruneAdminNotifications(ctx context.Context) (int, error) {
 	cutoff := s.now().Add(-AdminNotificationRetention)
 	total := 0

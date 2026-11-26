@@ -16,14 +16,14 @@ func (f *fixture) history(t *testing.T) []models.ComponentStatusChange {
 	return h
 }
 
-// Die Selbstüberwachung setzt den Status über die Historie: genau
-// ein Eintrag beim Kippen und einer bei der Erholung, Quelle selfmonitor.
+// Self-monitoring sets the status via the history: exactly
+// one entry on flipping and one on recovery, source selfmonitor.
 func TestMonitor_SchreibtStatushistorieBeiStoerungUndErholung(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
 	f.run(3)
 	require.Equal(t, "major_outage", f.status(t))
-	f.run(2) // weitere Fehlschläge ändern nichts
+	f.run(2) // further failures change nothing
 	h := f.history(t)
 	require.Len(t, h, 1)
 	assert.Equal(t, "operational", h[0].OldStatus)
@@ -40,8 +40,8 @@ func TestMonitor_SchreibtStatushistorieBeiStoerungUndErholung(t *testing.T) {
 	assert.Equal(t, "operational", h[1].NewStatus)
 }
 
-// Setzt der Admin zwischenzeitlich einen anderen Status, schreibt der Monitor
-// weder Status noch Historie (bedingtes Update).
+// If the admin sets a different status in the meantime, the monitor writes
+// neither status nor history (conditional update).
 func TestMonitor_FremderStatusSchreibtKeineHistorie(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Model(&f.comp).Update("status", "under_maintenance").Error)
@@ -51,7 +51,7 @@ func TestMonitor_FremderStatusSchreibtKeineHistorie(t *testing.T) {
 	assert.Empty(t, f.history(t))
 }
 
-// Verschobene Komponente: das Zurücksetzen durch den Monitor ist protokolliert.
+// Moved component: the reset by the monitor is logged.
 func TestMonitor_VerschobeneKomponenteSchreibtHistorieBeimZuruecksetzen(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)

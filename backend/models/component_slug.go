@@ -8,16 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// Kennung (Slug) einer Komponente bzw. Gruppe. Sie ist je
-// Statusseite unter den aktiven Zeilen eindeutig (partieller Unique-Index in
-// database/db.go) und nach dem Anlegen unveränderlich, weil Integrationen sie
-// als stabilen Schlüssel verwenden sollen.
+// Identifier (slug) of a component or group. It is unique per
+// status page among active rows (partial unique index in
+// database/db.go) and immutable after creation, because integrations are meant to use it
+// as a stable key.
 
-// MaxComponentSlugLen ist die längste zulässige Kennung (Zeichen, nur ASCII).
+// MaxComponentSlugLen is the longest permitted identifier (characters, ASCII only).
 const MaxComponentSlugLen = 60
 
-// componentSlugFallback ist die Kennungsbasis, wenn der Name keine
-// verwertbaren Zeichen enthält (z. B. nur Sonderzeichen).
+// componentSlugFallback is the identifier base when the name contains no
+// usable characters (e.g. only special characters).
 const componentSlugFallback = "komponente"
 
 var (
@@ -26,15 +26,15 @@ var (
 	componentSlugUmlauts  = strings.NewReplacer("ä", "ae", "ö", "oe", "ü", "ue", "ß", "ss")
 )
 
-// ValidComponentSlug prüft Format und Länge einer Kennung.
+// ValidComponentSlug checks the format and length of an identifier.
 func ValidComponentSlug(s string) bool {
 	return len(s) <= MaxComponentSlugLen && componentSlugRegex.MatchString(s)
 }
 
-// ComponentSlugBase leitet aus einem Namen die Kennungsbasis ab: Kleinbuchstaben,
-// Umlaute transliteriert (ä→ae, ö→oe, ü→ue, ß→ss), jede Folge anderer Zeichen
-// wird zu einem Bindestrich. Das Ergebnis ist nie leer und höchstens
-// MaxComponentSlugLen lang.
+// ComponentSlugBase derives the identifier base from a name: lowercase,
+// umlauts transliterated (ä→ae, ö→oe, ü→ue, ß→ss), every run of other characters
+// becomes a hyphen. The result is never empty and at most
+// MaxComponentSlugLen long.
 func ComponentSlugBase(name string) string {
 	s := componentSlugUmlauts.Replace(strings.ToLower(name))
 	s = strings.Trim(componentSlugSanitize.ReplaceAllString(s, "-"), "-")
@@ -44,8 +44,8 @@ func ComponentSlugBase(name string) string {
 	return trimSlug(s, MaxComponentSlugLen)
 }
 
-// trimSlug kürzt s auf höchstens n Zeichen, ohne einen Bindestrich am Ende zu
-// hinterlassen (s ist reines ASCII).
+// trimSlug shortens s to at most n characters without leaving a hyphen at the end
+// (s is pure ASCII).
 func trimSlug(s string, n int) string {
 	if len(s) > n {
 		s = s[:n]
@@ -53,9 +53,9 @@ func trimSlug(s string, n int) string {
 	return strings.TrimRight(s, "-")
 }
 
-// ComponentSlugWithSuffix liefert die n-te Kollisionsvariante von base: n = 1 ist
-// base selbst, ab 2 wird "-n" angehängt (base wird dafür gekürzt, damit die
-// Länge eingehalten bleibt).
+// ComponentSlugWithSuffix returns the n-th collision variant of base: n = 1 is
+// base itself, from 2 on "-n" is appended (base is shortened for that so that the
+// length is kept).
 func ComponentSlugWithSuffix(base string, n int) string {
 	if n <= 1 {
 		return base
@@ -64,9 +64,9 @@ func ComponentSlugWithSuffix(base string, n int) string {
 	return trimSlug(base, MaxComponentSlugLen-len(suffix)) + suffix
 }
 
-// FreeComponentSlug sucht für die Statusseite pageID die erste freie Kennung
-// zu name (base, base-2, base-3 …). Nur aktive Zeilen zählen, so wie der
-// partielle Unique-Index.
+// FreeComponentSlug finds, for the status page pageID, the first free identifier
+// for name (base, base-2, base-3 …). Only active rows count, just like the
+// partial unique index.
 func FreeComponentSlug(db *gorm.DB, pageID uint, name string) (string, error) {
 	base := ComponentSlugBase(name)
 	for n := 1; ; n++ {
@@ -83,11 +83,11 @@ func FreeComponentSlug(db *gorm.DB, pageID uint, name string) (string, error) {
 	}
 }
 
-// BeforeCreate vergibt jeder neuen Komponente ohne Kennung automatisch eine.
-// Damit bekommen alle Anlegewege (Handler, Seed, Übernahme externer
-// Komponenten, Tests) eine eindeutige Kennung, ohne dass jeder Aufrufer daran
-// denken muss. Eine gesetzte Kennung bleibt unangetastet; ihre Prüfung (Format,
-// Eindeutigkeit) liegt beim Handler.
+// BeforeCreate automatically assigns an identifier to every new component without one.
+// This way all creation paths (handler, seed, adoption of external
+// components, tests) get a unique identifier without every caller having to
+// think of it. A set identifier is left untouched; its validation (format,
+// uniqueness) is up to the handler.
 func (c *Component) BeforeCreate(tx *gorm.DB) error {
 	if c.Slug != "" {
 		return nil

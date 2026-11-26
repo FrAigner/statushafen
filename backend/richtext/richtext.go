@@ -1,18 +1,18 @@
-// Package richtext wandelt die eingeschränkte Markdown-Teilmenge für Nachrichten
-// und Beschreibungen in Mail-HTML und in Klartext.
+// Package richtext converts the restricted Markdown subset for messages
+// and descriptions into mail HTML and plain text.
 //
-// Warum ein eigener kleiner Renderer statt goldmark + bluemonday: Die Teilmenge
-// ist winzig (Absätze, fett, kursiv, Listen, Zitate, Code, https-Links). Der
-// Renderer baut das HTML ausschließlich aus festen Tags und HTML-maskiertem
-// Text auf ("sicher durch Konstruktion"). Es gibt keinen Roh-HTML-Durchlass,
-// den ein Sanitizer erst wieder einfangen müsste, keine neue Abhängigkeit
-// und keine Sanitizer-Konfiguration, die sich unbemerkt aufweichen ließe. Aus
-// demselben Syntaxbaum entsteht auch der Klartext für Chat und Webhook.
+// Why a small custom renderer instead of goldmark + bluemonday: the subset
+// is tiny (paragraphs, bold, italic, lists, quotes, code, https links). The
+// renderer builds the HTML exclusively from fixed tags and HTML-escaped
+// text ("safe by construction"). There is no raw-HTML passthrough
+// that a sanitizer would have to catch again, no new dependency
+// and no sanitizer configuration that could be silently weakened. The plain
+// text for chat and webhook is produced from the same syntax tree.
 //
-// Alles, was nicht zur Teilmenge gehört (Überschriften, Bilder, Tabellen,
-// Roh-HTML, Skripte), bleibt als sichtbarer Text stehen. Altdaten (reiner Text
-// mit *, _, # oder - am Zeilenanfang) bleiben dadurch lesbar; einfache
-// Zeilenumbrüche bleiben als Umbruch erhalten.
+// Everything that is not part of the subset (headings, images, tables,
+// raw HTML, scripts) stays as visible text. Legacy data (plain text
+// with *, _, # or - at the start of a line) therefore stays readable; simple
+// line breaks are preserved as breaks.
 package richtext
 
 import (
@@ -23,25 +23,25 @@ import (
 	"unicode/utf8"
 )
 
-// MaxLen ist die größte erlaubte Länge einer formatierten Nachricht (Zeichen).
+// MaxLen is the largest allowed length of a formatted message (characters).
 const MaxLen = 5000
 
-// MaxRenderLen und MaxBlockLen begrenzen den Aufwand beim Rendern von Altdaten,
-// die nie gegen MaxLen geprüft wurden: Ist der ganze Text länger als
-// MaxRenderLen oder ein Block (Zeilen ohne Leerzeile) länger als MaxBlockLen,
-// wird der Text ohne Formatierung ausgegeben. Dieselben Werte gelten im
-// Frontend (frontend/src/utils/richText.js), damit Seite und Mail denselben
-// Text gleich formatieren; beide liegen über MaxLen, erlaubte
-// Texte werden also immer formatiert. Ein Test hält beide Seiten gleich.
+// MaxRenderLen and MaxBlockLen limit the effort when rendering legacy data
+// that was never checked against MaxLen: if the whole text is longer than
+// MaxRenderLen or a block (lines without a blank line) longer than MaxBlockLen,
+// the text is output without formatting. The same values apply in the
+// frontend (frontend/src/utils/richText.js), so that page and mail format the same
+// text identically; both are above MaxLen, so allowed
+// texts are always formatted. A test keeps both sides equal.
 const (
 	MaxRenderLen = 8000
 	MaxBlockLen  = MaxLen
 )
 
-// maxInlineDepth begrenzt die Verschachtelung von fett/kursiv/Link.
+// maxInlineDepth limits the nesting of bold/italic/link.
 const maxInlineDepth = 4
 
-// TooLong meldet, ob s länger als MaxLen Zeichen (Runen) ist.
+// TooLong reports whether s is longer than MaxLen characters (runes).
 func TooLong(s string) bool { return utf8.RuneCountInString(s) > MaxLen }
 
 type nodeKind int
@@ -55,8 +55,8 @@ const (
 	kLink
 )
 
-// node ist ein Inline-Knoten. Text und Code tragen text; Link trägt href und
-// children; strong/em tragen children.
+// node is an inline node. Text and code carry text; link carries href and
+// children; strong/em carry children.
 type node struct {
 	kind     nodeKind
 	text     string
@@ -73,20 +73,20 @@ const (
 	bQuote
 )
 
-// block ist ein Absatz (items[0]), eine Liste (ein Eintrag je Item) oder ein
-// Zitat (items[0]).
+// block is a paragraph (items[0]), a list (one entry per item) or a
+// quote (items[0]).
 type block struct {
 	kind  blockKind
 	items [][]node
-	start int // erste Nummer einer geordneten Liste, 0 = unbekannt
+	start int // first number of an ordered list, 0 = unknown
 }
 
-// ---------------------------------------------------------------- Ausgabe
+// ---------------------------------------------------------------- Output
 
-// ToMailHTML liefert das HTML für E-Mails: nur feste Tags mit Inline-Styles,
-// Links nur https (target=_blank, rel=noopener noreferrer nofollow). Das
-// Ergebnis ist IMMER einzeilig (kein CR/LF), damit der Header-Injection-Schutz
-// von sendAlertEmail (hasHeaderInjectionChars) nicht anschlägt.
+// ToMailHTML returns the HTML for emails: only fixed tags with inline styles,
+// links only https (target=_blank, rel=noopener noreferrer nofollow). The
+// result is ALWAYS single-line (no CR/LF), so that the header-injection protection
+// of sendAlertEmail (hasHeaderInjectionChars) does not trigger.
 func ToMailHTML(md string) string {
 	var sb strings.Builder
 	for _, b := range parse(md) {
@@ -146,8 +146,8 @@ func writeInlineHTML(sb *strings.Builder, nodes []node) {
 	}
 }
 
-// ToPlainText liefert lesbaren Klartext für Chat, Webhook und Suche: ohne
-// Markdown-Zeichen, Listen als "- " bzw. "1. ", Links als "Text (URL)".
+// ToPlainText returns readable plain text for chat, webhook and search: without
+// Markdown characters, lists as "- " or "1. ", links as "Text (URL)".
 func ToPlainText(md string) string {
 	var parts []string
 	for _, b := range parse(md) {
@@ -204,10 +204,10 @@ func plainInline(nodes []node) string {
 	return sb.String()
 }
 
-// ---------------------------------------------------------------- Blöcke
+// ---------------------------------------------------------------- Blocks
 
-// normalize vereinheitlicht Zeilenenden und ersetzt Steuerzeichen (außer
-// Tabulator und Zeilenumbruch) durch Leerzeichen.
+// normalize unifies line endings and replaces control characters (except
+// tab and line break) with spaces.
 func normalize(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", "\n")
 	s = strings.ReplaceAll(s, "\r", "\n")
@@ -235,7 +235,7 @@ func parse(md string) []block {
 		case strings.TrimSpace(line) == "":
 			i++
 		case isRule(line):
-			// Trennlinien gehören nicht zur Teilmenge: sichtbarer Text, eigener Absatz.
+			// Horizontal rules are not part of the subset: visible text, own paragraph.
 			blocks = append(blocks, block{kind: bPara, items: [][]node{{{kind: kText, text: strings.TrimSpace(line)}}}})
 			i++
 		case isFence(line):
@@ -261,8 +261,8 @@ func parse(md string) []block {
 	return blocks
 }
 
-// hasOversizedBlock meldet, ob Zeilen ohne Leerzeile dazwischen zusammen länger
-// als MaxBlockLen Zeichen sind (wie das Blocklimit im Frontend).
+// hasOversizedBlock reports whether lines without a blank line in between together are longer
+// than MaxBlockLen characters (like the block limit in the frontend).
 func hasOversizedBlock(lines []string) bool {
 	size := 0
 	for _, l := range lines {
@@ -271,7 +271,7 @@ func hasOversizedBlock(lines []string) bool {
 			continue
 		}
 		if size > 0 {
-			size++ // Zeilenumbruch
+			size++ // line break
 		}
 		size += utf8.RuneCountInString(l)
 		if size > MaxBlockLen {
@@ -281,7 +281,7 @@ func hasOversizedBlock(lines []string) bool {
 	return false
 }
 
-// plainParagraphs gibt überlange Altdaten ohne Formatierung aus.
+// plainParagraphs outputs overlong legacy data without formatting.
 func plainParagraphs(src string) []block {
 	var blocks []block
 	for _, para := range strings.Split(src, "\n\n") {
@@ -293,7 +293,7 @@ func plainParagraphs(src string) []block {
 	return blocks
 }
 
-// literalLines setzt Zeilen ohne Markdown-Auswertung zusammen (Text + Umbruch).
+// literalLines assembles lines without Markdown evaluation (text + break).
 func literalLines(lines []string) []node {
 	var out []node
 	for i, l := range lines {
@@ -305,10 +305,10 @@ func literalLines(lines []string) []node {
 	return out
 }
 
-// isFence erkennt den Beginn eines Zaun-Codeblocks. Nach CommonMark darf der
-// Infotext hinter ``` kein weiteres Backtick enthalten: "```npm install```" ist
-// ein Absatz mit Inline-Code und kein Zaun (sonst fiele der Inhalt
-// weg und der "Zaun" verschluckte alle folgenden Zeilen).
+// isFence detects the start of a fenced code block. Per CommonMark the
+// info text after ``` must not contain another backtick: "```npm install```" is
+// a paragraph with inline code and not a fence (otherwise the content would
+// be lost and the "fence" would swallow all following lines).
 func isFence(line string) bool {
 	t := strings.TrimSpace(line)
 	if strings.HasPrefix(t, "```") {
@@ -317,8 +317,8 @@ func isFence(line string) bool {
 	return strings.HasPrefix(t, "~~~")
 }
 
-// parseFence: Zaun-Codeblock. Es gibt kein <pre>; der Inhalt erscheint als
-// Code mit Zeilenumbrüchen.
+// parseFence: fenced code block. There is no <pre>; the content appears as
+// code with line breaks.
 func parseFence(lines []string, start int) (block, int) {
 	fence := strings.TrimSpace(lines[start])[:3]
 	var body []string
@@ -345,9 +345,9 @@ func parseQuote(lines []string, start int) (block, int) {
 	return block{kind: bQuote, items: [][]node{parseInline([]rune(strings.Join(content, "\n")), 0, false)}}, i
 }
 
-// listMarker erkennt "- ", "* ", "+ " und "1. " / "1) ". interrupting=true
-// (Absatz läuft) lässt nur Aufzählungszeichen und "1." zu, damit eine Zeile
-// wie "2024. Das Jahr" einen Absatz nicht zerreißt.
+// listMarker detects "- ", "* ", "+ " and "1. " / "1) ". interrupting=true
+// (a paragraph is running) only allows bullet characters and "1.", so that a line
+// like "2024. Das Jahr" does not tear a paragraph apart.
 func listMarker(line string, interrupting bool) (kind blockKind, rest string, ok bool) {
 	t := strings.TrimLeft(line, " \t")
 	if len(t) >= 2 && (t[0] == '-' || t[0] == '*' || t[0] == '+') && (t[1] == ' ' || t[1] == '\t') {
@@ -372,7 +372,7 @@ func listMarker(line string, interrupting bool) (kind blockKind, rest string, ok
 	return 0, "", false
 }
 
-// isRule erkennt Trennlinien (---, ***, ___): Sie bleiben sichtbarer Text.
+// isRule detects horizontal rules (---, ***, ___): they stay visible text.
 func isRule(line string) bool {
 	t := strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(line), " ", ""), "\t", "")
 	if len(t) < 3 {
@@ -386,8 +386,8 @@ func isRule(line string) bool {
 	return false
 }
 
-// listNumber liefert die Nummer vor "." bzw. ")" einer geordneten Listenzeile
-// (listMarker hat sie schon als solche erkannt: höchstens 9 Ziffern).
+// listNumber returns the number before "." or ")" of an ordered list line
+// (listMarker has already recognized it as such: at most 9 digits).
 func listNumber(line string) int {
 	n := 0
 	for _, c := range strings.TrimLeft(line, " \t") {
@@ -405,7 +405,7 @@ func parseList(lines []string, start int, kind blockKind) (block, int) {
 	for i < len(lines) {
 		line := lines[i]
 		if strings.TrimSpace(line) == "" {
-			// Leerzeile: die Liste geht nur weiter, wenn ein Eintrag gleicher Art folgt.
+			// Blank line: the list only continues if an item of the same kind follows.
 			j := i
 			for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
 				j++
@@ -505,7 +505,7 @@ func parseInline(rs []rune, depth int, inLink bool) []node {
 		case c == '[' && !inLink && depth < maxInlineDepth:
 			if nodes, next, ok := parseLink(rs, i, depth); ok {
 				if len(buf) > 0 && buf[len(buf)-1] == '!' {
-					// Bild-Syntax: kein <img>, die Schreibweise bleibt als Text sichtbar.
+					// Image syntax: no <img>, the notation stays visible as text.
 					buf = append(buf, rs[i:next]...)
 				} else {
 					flush()
@@ -572,10 +572,10 @@ func parseCodeSpan(rs []rune, start int) (node, int, bool) {
 	return node{}, 0, false
 }
 
-// parseEmphasis: **fett**, __fett__, *kursiv*, _kursiv_, ***beides***. Der
-// öffnende Marker steht vor einem Nicht-Leerzeichen, der schließende hinter
-// einem; "_" gilt nicht mitten im Wort (snake_case bleibt Text). Überzählige
-// Marker vor dem öffnenden bleiben als Text stehen.
+// parseEmphasis: **bold**, __bold__, *italic*, _italic_, ***both***. The
+// opening marker stands before a non-space, the closing one after
+// one; "_" does not apply mid-word (snake_case stays text). Surplus
+// markers before the opening one stay as text.
 func parseEmphasis(rs []rune, start, depth int, inLink bool) ([]node, int, bool) {
 	c := rs[start]
 	run := 0
@@ -614,7 +614,7 @@ func emphasisNode(k int, inner []node) node {
 	return node{kind: kEm, children: []node{{kind: kStrong, children: inner}}}
 }
 
-// findCloser sucht ab from den schließenden Marker aus genau k Zeichen c.
+// findCloser searches from from for the closing marker of exactly k characters c.
 func findCloser(rs []rune, from int, c rune, k int) (int, bool) {
 	for j := from; j+k <= len(rs); j++ {
 		if rs[j] != c {
@@ -632,9 +632,9 @@ func findCloser(rs []rune, from int, c rune, k int) (int, bool) {
 	return 0, false
 }
 
-// parseLink: [Text](https://ziel "Titel"). Nur https wird zum Link; ein
-// syntaktisch gültiger Link mit anderem Schema (http:, javascript:, data:, ...)
-// erscheint als "Text (Ziel)" ohne Link. Ungültige Schreibweisen bleiben Text.
+// parseLink: [text](https://target "title"). Only https becomes a link; a
+// syntactically valid link with another scheme (http:, javascript:, data:, ...)
+// appears as "Text (target)" without a link. Invalid notations stay text.
 func parseLink(rs []rune, start, depth int) ([]node, int, bool) {
 	closeIdx, ok := matchBracket(rs, start, '[', ']')
 	if !ok || closeIdx+1 >= len(rs) || rs[closeIdx+1] != '(' {
@@ -659,8 +659,8 @@ func parseLink(rs []rune, start, depth int) ([]node, int, bool) {
 	return append(children, node{kind: kText, text: " (" + dest + ")"}), parenIdx + 1, true
 }
 
-// matchBracket findet die passende schließende Klammer (verschachtelt,
-// Backslash-Escapes beachtet).
+// matchBracket finds the matching closing bracket (nested,
+// backslash escapes respected).
 func matchBracket(rs []rune, start int, open, closeCh rune) (int, bool) {
 	level := 0
 	for j := start; j < len(rs); j++ {
@@ -679,9 +679,9 @@ func matchBracket(rs []rune, start int, open, closeCh rune) (int, bool) {
 	return 0, false
 }
 
-// linkDestination zerlegt den Inhalt der runden Klammern in Ziel und
-// optionalen Titel (wird verworfen). Leerraum, Steuerzeichen oder <>" im Ziel
-// machen den Link ungültig (kein Whitespace-Trick).
+// linkDestination splits the content of the round brackets into target and
+// optional title (discarded). Whitespace, control characters or <>" in the target
+// make the link invalid (no whitespace trick).
 func linkDestination(inner string) (string, bool) {
 	inner = strings.TrimSpace(inner)
 	if inner == "" {
@@ -711,8 +711,8 @@ func validLinkTitle(t string) bool {
 	return ok && t[len(t)-1] == end
 }
 
-// httpsURL gibt die normalisierte https-URL zurück. Andere Schemata, fehlender
-// Host und Zugangsdaten in der URL (https://nutzer@host) werden abgelehnt.
+// httpsURL returns the normalized https URL. Other schemes, missing
+// host and credentials in the URL (https://user@host) are rejected.
 func httpsURL(raw string) (string, bool) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Hostname() == "" {
@@ -721,8 +721,8 @@ func httpsURL(raw string) (string, bool) {
 	return u.String(), true
 }
 
-// parseAutolink macht eine nackte https://-Adresse zum Link. Satzzeichen am
-// Ende gehören nicht zur Adresse.
+// parseAutolink turns a bare https:// address into a link. Punctuation at the
+// end does not belong to the address.
 func parseAutolink(rs []rune, start int) (node, int, bool) {
 	const prefix = "https://"
 	if start+len(prefix) > len(rs) || !strings.EqualFold(string(rs[start:start+len(prefix)]), prefix) {

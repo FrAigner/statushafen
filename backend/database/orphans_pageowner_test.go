@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestRemoveOrphanedRoleAndUserReferences: DefaultRoleID auf eine
-// gelöschte Rolle wird NULL, UserTag und UserSSOIdentity gelöschter Benutzer
-// verschwinden; alles andere bleibt, der zweite Lauf ändert nichts.
+// TestRemoveOrphanedRoleAndUserReferences: DefaultRoleID pointing to a
+// deleted role becomes NULL, UserTag and UserSSOIdentity of deleted users
+// disappear; everything else stays, the second run changes nothing.
 func TestRemoveOrphanedRoleAndUserReferences(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	require.NoError(t, db.AutoMigrate(&models.UserTag{}, &models.UserSSOIdentity{}))
@@ -60,15 +60,15 @@ func TestRemoveOrphanedRoleAndUserReferences(t *testing.T) {
 	assert.Equal(t, userOK.ID, ids[0].UserID)
 }
 
-// Fehlende Tabellen brechen den Start nicht ab (nur Warnung).
+// Missing tables do not abort the start (warning only).
 func TestRemoveOrphanedRoleAndUserReferences_ErrorIsNotFatal(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	assert.NotPanics(t, func() { removeOrphanedRoleAndUserReferences(db) })
 }
 
-// TestSeedPageOwnerRole: legt die Rolle mit pages:write an,
-// ist idempotent und überschreibt weder eine vom Betreiber angepasste noch
-// eine bewusst gelöschte Rolle gleichen Namens.
+// TestSeedPageOwnerRole: creates the role with pages:write,
+// is idempotent and overwrites neither a role of the same name adapted by the operator nor
+// a deliberately deleted one.
 func TestSeedPageOwnerRole(t *testing.T) {
 	db := newIntegrityTestDB(t)
 	seedPageOwnerRole(db)
@@ -77,7 +77,7 @@ func TestSeedPageOwnerRole(t *testing.T) {
 	var roles []models.Role
 	require.NoError(t, db.Where("name = ?", PageOwnerRoleName).Find(&roles).Error)
 	require.Len(t, roles, 1)
-	// CRUD statt write, mit allen früher gekoppelten Tabs.
+	// CRUD instead of write, with all previously coupled tabs.
 	for _, p := range []string{"pages:create", "pages:update", "pages:delete", "components:update", "external_sources:update",
 		"maintenance:create", "incident_templates:delete", "notification_templates:update", "languages:update",
 		"ui_translations:update", "sso:update", "subscribers:delete", "admin_dashboard"} {

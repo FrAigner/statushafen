@@ -31,6 +31,7 @@ function makeRouter() {
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: Empty },
+      { path: '/status/:slug', component: Empty },
       // wie router/index.js: Startseite (meta.home) und Tabs mit meta.permission.
       { path: '/admin', component: Empty, meta: { home: true } },
       ...NAV_GROUPS.flatMap(g => g.items).filter(i => i.resource && i.to !== '/admin/overview' && i.to !== '/admin/components')
@@ -308,7 +309,7 @@ describe('AdminLayout', () => {
     global.fetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ([{ ID: 5, Name: 'Page A' }, { ID: 6, Name: 'Page B' }]),
+      json: async () => ([{ ID: 5, Name: 'Page A', Permissions: 'components:read' }, { ID: 6, Name: 'Page B', Permissions: 'components:read' }]),
     })
 
     const { wrapper } = await mountLayout()
@@ -326,7 +327,7 @@ describe('AdminLayout', () => {
     global.fetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ([{ ID: 5, Name: 'Page A' }]),
+      json: async () => ([{ ID: 5, Name: 'Page A', Permissions: 'components:read' }]),
     })
 
     await mountLayout()
@@ -1144,11 +1145,76 @@ describe('AdminLayout', () => {
     })
 
     it('ohne jede Rolle erklärt die Seite, dass noch kein Zugriff vergeben ist', async () => {
-      asRole('')
+      useAuth().setAuth('jwt-1', { email: 'user@x.de', is_global_admin: false, permissions: '' })
+      useTenant().setMyPages([])
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [] })
       const { wrapper } = await mountLayout({ initialPath: '/admin/components' })
       expect(wrapper.find('h2').text()).toBe('Keine Berechtigung')
       expect(wrapper.find('.forbidden__text').text()).toContain('noch keine Rolle')
       expect(wrapper.find('.forbidden__link').exists()).toBe(false)
+    })
+
+    // Status page only: a role without any admin right (empty, or only
+    // admin_dashboard) has no admin area; its members land on their status page.
+    describe('Rolle „Nur Statusseite“', () => {
+      const asPageOnly = (pages) => {
+        useAuth().setAuth('jwt-1', { email: 'user@x.de', is_global_admin: false, permissions: '' })
+        useTenant().setMyPages(pages)
+        useTenant().setActiveTenant(pages[0].ID)
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => pages })
+      }
+
+      for (const perms of ['', 'admin_dashboard']) {
+        it(`leitet Tabs und Startseite zur Statusseite um (Rechte: "${perms}")`, async () => {
+          for (const path of ['/admin', '/admin/components', '/admin/incidents']) {
+            asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: perms }])
+            const { wrapper, router } = await mountLayout({ initialPath: path })
+            await flushPromises()
+            expect(router.currentRoute.value.path, path).toBe('/status/acme')
+            expect(probeMounted).toBe(0)
+            expect(wrapper.find('section[data-status="forbidden"]').exists()).toBe(false)
+            wrapper.unmount()
+          }
+        })
+      }
+
+      it('uses the first status page when the active page is not among the memberships', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }, { ID: 9, Name: 'Beta', Slug: 'beta', Permissions: '' }])
+        useTenant().setActiveTenant(42)
+        const { router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/status/acme')
+      })
+
+      it('treats an empty pages answer as no membership', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }])
+        global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => null })
+        const { wrapper, router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/admin/components')
+        expect(wrapper.find('section[data-status="forbidden"]').exists()).toBe(true)
+      })
+
+      it('lässt das eigene Profil erreichbar', async () => {
+        asPageOnly([{ ID: 7, Name: 'Acme', Slug: 'acme', Permissions: '' }])
+        const { router } = await mountLayout({ initialPath: '/admin/profile' })
+        await flushPromises()
+        expect(router.currentRoute.value.path).toBe('/admin/profile')
+      })
+
+      it('bietet in der Seitenwahl nur Seiten mit Admin-Recht und wechselt weg von einer reinen Statusseite', async () => {
+        const pages = [
+          { ID: 8, Name: 'Nur lesen', Slug: 'lesen', Permissions: '' },
+          { ID: 7, Name: 'Acme', Slug: 'acme', Permissions: 'components:read' },
+        ]
+        asPageOnly(pages)
+        const { wrapper, router } = await mountLayout({ initialPath: '/admin/components' })
+        await flushPromises()
+        expect(String(useTenant().activeTenantId.value)).toBe('7')
+        expect(router.currentRoute.value.path).toBe('/admin/components')
+        expect(wrapper.find('.probe').exists()).toBe(true)
+        expect(wrapper.findAll('#tenant-select option').map(o => o.text())).toEqual(['Acme'])
+      })
     })
 
     it('Startseite /admin führt zum ersten sichtbaren Tab', async () => {
@@ -1157,16 +1223,11 @@ describe('AdminLayout', () => {
       expect(router.currentRoute.value.path).toBe('/admin/notices')
     })
 
-    it('Startseite führt Global Admins zur Übersicht und Nutzern ohne Rechte zu „Keine Berechtigung“', async () => {
+    // A role with only admin_dashboard is "status page only" (see above).
+    it('Startseite führt Global Admins zur Übersicht', async () => {
       useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
       const admin = await mountLayout({ initialPath: '/admin' })
       expect(admin.router.currentRoute.value.path).toBe('/admin/overview')
-      admin.wrapper.unmount()
-
-      asRole('admin_dashboard')
-      const { wrapper, router } = await mountLayout({ initialPath: '/admin' })
-      expect(router.currentRoute.value.path).toBe('/admin')
-      expect(wrapper.find('h2').text()).toBe('Keine Berechtigung')
     })
 
     it('hat in „Keine Berechtigung“ keine axe-Funde', async () => {

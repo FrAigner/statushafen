@@ -92,3 +92,17 @@ Unter **Abonnenten** sieht man alle Abos der Seite mit Kanal, Kontakt, Komponent
 **Sprache der Benachrichtigungen** je Abonnent fest (ohne Angabe: Standardsprache der Seite).
 Als Ersteller erscheint die E-Mail-Adresse des anlegenden Kontos nur, wenn es selbst zum Personal dieser Seite gehört (oder du selbst es angelegt hast); hat ein fremdes Konto die Seite abonniert, zeigt die Liste nur „mit Konto verknüpft“ und keine weiteren Kontodaten.
 Anlegen, Ändern und Löschen brauchen `subscribers:create`, `subscribers:update` bzw. `subscribers:delete`.
+
+### Testnachricht aus dem Formular
+
+Im Formular **Abonnent hinzufügen** bzw. beim Bearbeiten schickt **Testnachricht senden** sofort
+eine kurze Nachricht an das eingetragene Ziel – an die E-Mail-Adresse oder an den
+Google-Chat-Webhook –, auch bevor du speicherst. Es wird dabei nichts gespeichert und kein Abo
+angelegt. Die Nachricht kommt in der Sprache, die gerade oben im Admin-Bereich eingestellt ist
+(Deutsch oder Englisch), nicht in der Benachrichtigungssprache des Abonnenten. Die Schaltfläche
+ist gesperrt, solange keine gültige E-Mail-Adresse bzw. keine https-URL eingetragen ist; der
+Server prüft das Ziel genauso wie beim Anlegen (keine internen Adressen). Das Ergebnis erscheint
+direkt unter der Schaltfläche. Mögliche Fehler: Das Webhook-Ziel lehnt ab oder ist nicht
+erreichbar, die E-Mail ließ sich nicht senden oder der E-Mail-Versand ist in den
+Systemeinstellungen abgeschaltet. Nötig ist `subscribers:create` oder `subscribers:update`; je
+Absender sind höchstens 5 Testnachrichten pro Minute möglich.

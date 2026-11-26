@@ -12,9 +12,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// a: Liefert die Prüfung dauerhaft "nicht prüfbar" (Backup-Datei
-// fehlt), obwohl der Admin die Komponente gelöscht hat, räumt der Monitor seine
-// Waise trotzdem auf (Marker weg, Vorfall geschlossen).
+// a: if the check permanently returns "not checkable" (backup file
+// missing) although the admin deleted the component, the monitor still cleans up its
+// orphan (marker gone, incident closed).
 func TestMonitor_SkipRaeumtWaiseNachGeloeschterKomponenteAuf(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -26,7 +26,7 @@ func TestMonitor_SkipRaeumtWaiseNachGeloeschterKomponenteAuf(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.AuditLog{}, "action = ?", "selfmonitor.component_released"))
 }
 
-// Gegenprobe zu (a): Existiert die Komponente, lässt "nicht prüfbar" alles unverändert.
+// Control sample for (a): if the component exists, "not checkable" leaves everything unchanged.
 func TestMonitor_SkipMitVorhandenerKomponenteAendertNichts(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -37,7 +37,7 @@ func TestMonitor_SkipMitVorhandenerKomponenteAendertNichts(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.Incident{}, "status <> ?", "resolved"))
 }
 
-// verschiebe legt eine Kundenseite an und ordnet die Komponente ihr zu.
+// verschiebe creates a customer page and assigns the component to it.
 func verschiebe(t *testing.T, f *fixture) models.StatusPage {
 	t.Helper()
 	other := models.StatusPage{Name: "Kunde", Slug: "kunde"}
@@ -53,10 +53,10 @@ func releasedAudit(t *testing.T, f *fixture) models.AuditLog {
 	return a
 }
 
-// b: Wird die Komponente einer anderen Seite zugeordnet, beendet der
-// Monitor seine Verfolgung. Die Identität kommt exakt aus dem markierten Vorfall
-// (IncidentComponent); steht die Komponente noch auf dem Ausfallstatus des
-// Monitors, den er selbst gesetzt hat, wird er per bedingtem Update zurückgesetzt.
+// b: if the component is assigned to another page, the
+// monitor ends its tracking. The identity comes exactly from the marked incident
+// (IncidentComponent); if the component still has the monitor's outage status
+// that it set itself, it is reset via a conditional update.
 func TestMonitor_VerschobeneKomponenteSetztEigenenStatusZurueck(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -70,7 +70,7 @@ func TestMonitor_VerschobeneKomponenteSetztEigenenStatusZurueck(t *testing.T) {
 	assert.Equal(t, "1", a.TargetID)
 }
 
-// Hat der Admin inzwischen einen anderen Status gesetzt, bleibt er.
+// If the admin has meanwhile set a different status, it stays.
 func TestMonitor_VerschobeneKomponenteMitFremdemStatusBleibtUnangetastet(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -81,8 +81,8 @@ func TestMonitor_VerschobeneKomponenteMitFremdemStatusBleibtUnangetastet(t *test
 	assert.Equal(t, "Komponente auf eine andere Seite verschoben; Vorfall 1 geschlossen; Status unverändert", releasedAudit(t, f).Details)
 }
 
-// Ohne Vorfall ist die Identität nicht exakt bekannt: nicht nach dem Slug raten,
-// nichts anfassen, neutrales Audit.
+// Without an incident the identity is not known exactly: do not guess by slug,
+// touch nothing, neutral audit.
 func TestMonitor_VerschobenOhneVorfallRaetNichtNachSlug(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -96,8 +96,8 @@ func TestMonitor_VerschobenOhneVorfallRaetNichtNachSlug(t *testing.T) {
 	assert.Equal(t, "0", a.TargetID)
 }
 
-// Hart gelöscht, aber auf einer Kundenseite steht zufällig derselbe Slug: das
-// Audit nennt die fremde Komponente nicht und ihr Status bleibt.
+// Hard-deleted, but a customer page happens to have the same slug: the
+// audit does not name the foreign component and its status stays.
 func TestMonitor_HartGeloeschtMitFremdemGleichenSlugNenntFremdeKomponenteNicht(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)
@@ -116,8 +116,8 @@ func TestMonitor_HartGeloeschtMitFremdemGleichenSlugNenntFremdeKomponenteNicht(t
 	assert.Equal(t, "major_outage", fr.Status)
 }
 
-// Skip plus Lesefehler bei der Komponentensuche: nichts aufräumen (ein Lesefehler
-// ist keine gelöschte Komponente).
+// Skip plus read error in the component lookup: clean up nothing (a read error
+// is not a deleted component).
 func TestMonitor_SkipMitLesefehlerBeiKomponentensucheRaeumtNichtAuf(t *testing.T) {
 	f := newFixture(t)
 	offeneStoerung(t, f)

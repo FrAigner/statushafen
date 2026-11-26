@@ -34,7 +34,7 @@ func loadParity(t *testing.T) parityFixture {
 	return f
 }
 
-// hasMarkup: das Ergebnis enthält Formatierung (nicht nur Absätze und Umbrüche).
+// hasMarkup: the result contains formatting (not just paragraphs and breaks).
 func hasMarkup(html string) bool {
 	for _, tag := range []string{"<ul", "<ol", "<li", "<strong", "<em", "<code", "<blockquote", "<a "} {
 		if strings.Contains(html, tag) {
@@ -44,9 +44,9 @@ func hasMarkup(html string) bool {
 	return false
 }
 
-// Fund 9: Seite (Frontend) und Mail (Backend) müssen denselben Text
-// gleich formatieren oder gleich unformatiert lassen. Das Frontend prüft dieselbe
-// Datei (richText.test.js).
+// Finding 9: page (frontend) and mail (backend) must format the same text
+// identically or leave it unformatted identically. The frontend checks the same
+// file (richText.test.js).
 func TestParity_GrenzenUndFaelleWieImFrontend(t *testing.T) {
 	f := loadParity(t)
 	assert.Equal(t, f.Limits.MaxRenderLen, MaxRenderLen)
@@ -60,13 +60,13 @@ func TestParity_GrenzenUndFaelleWieImFrontend(t *testing.T) {
 }
 
 func TestToMailHTML_ErlaubteLaengeIstImmerFormatiert(t *testing.T) {
-	// 5.000 Zeichen in EINEM Block (Liste ohne Leerzeile) bleiben formatiert.
+	// 5,000 characters in ONE block (list without a blank line) stay formatted.
 	in := strings.Repeat("- ab\n", MaxLen/5)
 	require.False(t, TooLong(in))
 	assert.Contains(t, ToMailHTML(in), "<ul ")
 }
 
-// Messung mit großzügiger Zeitgrenze: Der Aufwand am Limit bleibt klein.
+// Measurement with a generous time limit: the effort at the limit stays small.
 func TestToMailHTML_WorstCaseAmLimitIstSchnell(t *testing.T) {
 	block := func(unit string, n int) string { return strings.Repeat(unit, n) }
 	inputs := []string{
@@ -83,8 +83,8 @@ func TestToMailHTML_WorstCaseAmLimitIstSchnell(t *testing.T) {
 	assert.Less(t, time.Since(start), 10*time.Second)
 }
 
-// Fund 11: eine einzeilige ```...``` ist Inline-Code, kein Zaun;
-// nichts darf wegfallen und die folgenden Zeilen bleiben normaler Text.
+// Finding 11: a single-line ```...``` is inline code, not a fence;
+// nothing may be dropped and the following lines stay normal text.
 func TestToMailHTML_EinzeiligeDreierBackticksSindInlineCode(t *testing.T) {
 	out := ToMailHTML("```npm install```\nDanach **fett**\n\nNoch ein Absatz")
 	assert.Contains(t, out, ">npm install</code>")
@@ -92,18 +92,18 @@ func TestToMailHTML_EinzeiligeDreierBackticksSindInlineCode(t *testing.T) {
 	assert.Contains(t, out, "Noch ein Absatz")
 	plain := ToPlainText("```npm install```\nDanach\n\nEnde")
 	assert.Equal(t, "npm install\nDanach\n\nEnde", plain)
-	// Mitten im Absatz unterbricht so eine Zeile den Absatz nicht.
+	// In the middle of a paragraph such a line does not interrupt the paragraph.
 	out = ToMailHTML("Vorher\n```a``` b\nNachher")
 	assert.Equal(t, 1, strings.Count(out, "<p "))
 	assert.Contains(t, out, "Vorher<br><code")
-	// Echter Zaun mit Infotext bleibt ein Zaun, auch in einer Liste endet er.
+	// A real fence with info text stays a fence, and in a list it also ends.
 	assert.Contains(t, ToMailHTML("```js\nlet a\n```\nEnde"), ">let a</code>")
 	assert.Contains(t, ToMailHTML("~~~ a`b\nx\n~~~"), ">x</code>")
-	// Nicht geschlossener Zaun: der Rest bleibt sichtbar (kein Textverlust).
+	// Unclosed fence: the rest stays visible (no text loss).
 	assert.Contains(t, ToPlainText("```\nA\nB"), "A\nB")
 }
 
-// Fund 12: '2024. Das Jahr' / '3. Schritt' behalten ihre Nummer.
+// Finding 12: '2024. Das Jahr' / '3. Schritt' keep their number.
 func TestToMailHTML_ListeBeginntMitIhrerNummer(t *testing.T) {
 	out := ToMailHTML("3. Schritt\n4. Weiter")
 	assert.Contains(t, out, `<ol start="3" `)
@@ -112,7 +112,7 @@ func TestToMailHTML_ListeBeginntMitIhrerNummer(t *testing.T) {
 	assert.Contains(t, ToMailHTML("2024. Das Jahr"), `<ol start="2024" `)
 	assert.NotContains(t, ToMailHTML("1. a\n2. b"), "start=")
 	assert.Contains(t, ToMailHTML("0. a"), `<ol start="0" `)
-	// Ein laufender Absatz wird nur von "1." unterbrochen.
+	// A running paragraph is only interrupted by "1.".
 	assert.Equal(t, 1, strings.Count(ToMailHTML("Text\n2024. Das Jahr"), "<p "))
 	assert.Empty(t, checkSafeMailHTML(ToMailHTML("999999999. x")))
 }

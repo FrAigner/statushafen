@@ -20,11 +20,11 @@ import (
 
 const checkTimeout = 5 * time.Second
 
-// BackupExitOffsiteFailed ist der Exit-Code des Backup-Skripts der Installation, wenn
-// nur der optionale Offsite-Upload scheitert und das lokale Backup bleibt.
+// BackupExitOffsiteFailed is the exit code of the installation's backup script when
+// only the optional offsite upload fails and the local backup remains.
 const BackupExitOffsiteFailed = 3
 
-// DBCheck prüft die Datenbank mit einer echten Abfrage (nicht nur Ping).
+// DBCheck checks the database with a real query (not just a ping).
 func DBCheck(db *gorm.DB) func(context.Context) Result {
 	return func(ctx context.Context) Result {
 		ctx, cancel := context.WithTimeout(ctx, checkTimeout)
@@ -37,7 +37,7 @@ func DBCheck(db *gorm.DB) func(context.Context) Result {
 	}
 }
 
-// HTTPCheck ruft die Adresse ab; jeder 2xx-Status gilt als gesund.
+// HTTPCheck fetches the address; any 2xx status counts as healthy.
 func HTTPCheck(client *http.Client, url string) func(context.Context) Result {
 	return func(ctx context.Context) Result {
 		ctx, cancel := context.WithTimeout(ctx, 2*checkTimeout)
@@ -47,23 +47,23 @@ func HTTPCheck(client *http.Client, url string) func(context.Context) Result {
 	}
 }
 
-// maxFrontendBody begrenzt, wie viel der Startseite gelesen wird.
+// maxFrontendBody limits how much of the start page is read.
 const maxFrontendBody = 1 << 20
 
-// frontendEntry erkennt den Einstieg der SPA im ausgelieferten HTML.
+// frontendEntry detects the SPA entry point in the served HTML.
 const frontendEntry = `<div id="app"`
 
-// assetRef findet die erste vom HTML referenzierte Datei unter /assets/.
+// assetRef finds the first file under /assets/ referenced by the HTML.
 var assetRef = regexp.MustCompile(`(?:src|href)="(/assets/[^"?#]+)`)
 
-// FrontendCheck prüft das von der App selbst ausgelieferte Frontend. base ist
-// die interne Adresse der eigenen Anwendung (http://127.0.0.1:<Port>), nie die
-// öffentliche: Cloudflare/Caddy (Bot-Schutz, Zugangssperre) antworten Go-Clients
-// mit 401/403 und würden die Komponente dauerhaft auf Störung setzen. Erwartet
-// werden 2xx und HTML mit dem Einstieg der SPA; verweist das HTML auf eine Datei
-// unter /assets/, muss auch sie mit 2xx antworten. 401/403 zählen weiterhin als
-// Fehler. Cloudflare und Caddy davor erfasst die Prüfung bewusst nicht
-// (Überwachung von außen bleibt nötig).
+// FrontendCheck checks the frontend served by the app itself. base is
+// the internal address of the own application (http://127.0.0.1:<port>), never the
+// public one: Cloudflare/Caddy (bot protection, access barrier) answer Go clients
+// with 401/403 and would permanently set the component to outage. Expected
+// are 2xx and HTML with the SPA entry point; if the HTML references a file
+// under /assets/, it must also answer with 2xx. 401/403 still count as an
+// error. The check deliberately does not cover Cloudflare and Caddy in front
+// (monitoring from outside remains necessary).
 func FrontendCheck(client *http.Client, base string) func(context.Context) Result {
 	return func(ctx context.Context) Result {
 		ctx, cancel := context.WithTimeout(ctx, 2*checkTimeout)
@@ -80,8 +80,8 @@ func FrontendCheck(client *http.Client, base string) func(context.Context) Resul
 			if !res.OK {
 				return Result{Detail: "Frontend-Datei: " + res.Detail}
 			}
-			// Fehlt die Datei, fällt der Router auf index.html (200,
-			// text/html) zurück. Eine Skript-/CSS-Datei darf nie HTML sein.
+			// If the file is missing, the router falls back to index.html (200,
+			// text/html). A script/CSS file must never be HTML.
 			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(ctype)), "text/html") {
 				return Result{Detail: "Frontend-Datei fehlt (HTML statt Datei)"}
 			}
@@ -90,8 +90,8 @@ func FrontendCheck(client *http.Client, base string) func(context.Context) Resul
 	}
 }
 
-// fetchOK ruft url ab und liefert bei 2xx bis zu limit Byte des Bodys (0 = nichts
-// lesen) sowie den Content-Type der Antwort.
+// fetchOK fetches url and, on 2xx, returns up to limit bytes of the body (0 = read
+// nothing) as well as the response's Content-Type.
 func fetchOK(ctx context.Context, client *http.Client, url string, limit int64) ([]byte, string, Result) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -112,10 +112,10 @@ func fetchOK(ctx context.Context, client *http.Client, url string, limit int64) 
 	return body, resp.Header.Get("Content-Type"), Result{OK: true}
 }
 
-// SMTPCheck baut eine Verbindung zum Mailserver auf und erwartet den 220-Gruß.
-// Es wird nichts versendet und nicht angemeldet. enabled == false (Versand
-// abgeschaltet) ergibt "abgeschaltet" (Result.Off): eine zuvor gesetzte Störung
-// wird dann freigegeben.
+// SMTPCheck opens a connection to the mail server and expects the 220 greeting.
+// Nothing is sent and no login is made. enabled == false (sending
+// switched off) yields "switched off" (Result.Off): a previously set outage
+// is then released.
 func SMTPCheck(addr string, enabled func() bool) func(context.Context) Result {
 	return func(ctx context.Context) Result {
 		if !enabled() {
@@ -138,49 +138,49 @@ func SMTPCheck(addr string, enabled func() bool) func(context.Context) Result {
 
 var jobNamePattern = regexp.MustCompile(`^[a-z0-9-]+$`)
 
-// ValidJobName: Der job-run-Name geht in den Dateinamen der Metrik; Pfadanteile
-// ("../", "/") sind ausgeschlossen.
+// ValidJobName: the job-run name goes into the metric's file name; path parts
+// ("../", "/") are excluded.
 func ValidJobName(job string) bool { return jobNamePattern.MatchString(job) }
 
-// maxMetricsFile begrenzt die Metrikdatei; echte Dateien sind
-// wenige Zeilen groß.
+// maxMetricsFile limits the metrics file; real files are
+// a few lines in size.
 const maxMetricsFile = 64 << 10
 
-// openMetrics öffnet die Metrikdatei; Funktionsvariable als Injektionsnaht für
-// den Test des Fensters zwischen Lstat und Open.
+// openMetrics opens the metrics file; function variable as an injection seam for
+// testing the window between Lstat and Open.
 var openMetrics = func(path string) (*os.File, error) {
-	return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0) //nolint:gosec // Pfad aus der Betreiber-Konfiguration
+	return os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0) //nolint:gosec // Path comes from the operator configuration
 }
 
-// readMetricsFile liest die Metrikdatei gehärtet: nur reguläre
-// Datei (kein Symlink, FIFO, Gerät), nicht blockierend geöffnet, höchstens
-// maxMetricsFile Byte. Fehler liefern einen festen Text ohne Pfad.
+// readMetricsFile reads the metrics file hardened: only a regular
+// file (no symlink, FIFO, device), opened non-blocking, at most
+// maxMetricsFile bytes. Errors return a fixed text without a path.
 func readMetricsFile(dir, path string) (raw []byte, res Result, ok bool) {
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
-		// Betreiber-Entscheidung: Fehlt das Verzeichnis selbst (Mount
-		// fehlt) bei gesetztem Job, ist das ein Fehlschlag; fehlt nur die Datei im
-		// vorhandenen Verzeichnis (z. B. Staging ohne Timer), ist es nicht prüfbar.
+		// Operator decision: if the directory itself is missing (mount
+		// missing) with a job set, that is a failure; if only the file is missing in an
+		// existing directory (e.g. staging without a timer), it is not checkable.
 		if _, derr := os.Stat(dir); os.IsNotExist(derr) {
 			return nil, Result{Detail: "Backup-Metrik-Verzeichnis fehlt"}, false
 		}
 		return nil, Result{Skip: true}, false
 	}
 	if err != nil {
-		// Berechtigung/Mount-Fehler bei gesetztem Job ist kein
-		// "nicht prüfbar", sonst wäre die Backup-Überwachung still blind.
+		// A permission/mount error with a job set is not
+		// "not checkable", otherwise the backup monitoring would be silently blind.
 		return nil, Result{Detail: "Backup-Metrik nicht lesbar"}, false
 	}
 	if !info.Mode().IsRegular() {
 		return nil, Result{Detail: "Backup-Metrik ist keine reguläre Datei"}, false
 	}
-	// O_NOFOLLOW verhindert einen untergeschobenen Symlink; O_NONBLOCK lässt das
-	// Öffnen eines FIFO nicht hängen. Zwischen Lstat und Open kann die Datei aber
-	// ausgetauscht werden: Erst der fstat auf den OFFENEN Deskriptor schließt das
-	// Fenster (nur reguläre Dateien). Go meldet O_NONBLOCK-Dateien beim Netpoller
-	// an, ein Read auf einen FIFO mit stillem Schreiber würde also warten; der
-	// fstat kommt deshalb vor dem ersten Read, die Frist ist zusätzlicher Schutz
-	// (der Monitor hält währenddessen m.mu).
+	// O_NOFOLLOW prevents a planted symlink; O_NONBLOCK keeps opening a
+	// FIFO from hanging. Between Lstat and Open, however, the file can be
+	// swapped: only the fstat on the OPEN descriptor closes the
+	// window (regular files only). Go registers O_NONBLOCK files with the netpoller,
+	// so a read on a FIFO with a silent writer would wait; the
+	// fstat therefore comes before the first read, the deadline is additional protection
+	// (the monitor holds m.mu meanwhile).
 	f, err := openMetrics(path)
 	if err != nil {
 		return nil, Result{Detail: "Backup-Metrik nicht lesbar"}, false
@@ -189,14 +189,14 @@ func readMetricsFile(dir, path string) (raw []byte, res Result, ok bool) {
 	if st, serr := f.Stat(); serr != nil || !st.Mode().IsRegular() {
 		return nil, Result{Detail: "Backup-Metrik ist keine reguläre Datei"}, false
 	}
-	_ = f.SetReadDeadline(time.Now().Add(metricsReadTimeout)) // reguläre Dateien kennen keine Frist: Fehler ist egal
+	_ = f.SetReadDeadline(time.Now().Add(metricsReadTimeout)) // regular files know no deadline: error is irrelevant
 	return readLimited(f)
 }
 
-// metricsReadTimeout begrenzt das Lesen der Metrikdatei, soweit der Deskriptor Fristen kennt.
+// metricsReadTimeout limits reading the metrics file, as far as the descriptor supports deadlines.
 const metricsReadTimeout = 2 * time.Second
 
-// readLimited liest höchstens maxMetricsFile Byte; mehr ist ein Fehlschlag.
+// readLimited reads at most maxMetricsFile bytes; more is a failure.
 func readLimited(r io.Reader) (raw []byte, res Result, ok bool) {
 	raw, err := io.ReadAll(io.LimitReader(r, maxMetricsFile+1))
 	if err != nil {
@@ -208,13 +208,13 @@ func readLimited(r io.Reader) (raw []byte, res Result, ok bool) {
 	return raw, Result{}, true
 }
 
-// BackupCheck liest die job-run-Metrik backup-<env> (Prometheus-Textfile, vom
-// Backup-Job der Installation geschrieben) und prüft das Alter des letzten Backups. Fehlt
-// bei gesetztem Job das Metrik-Verzeichnis (Mount fehlt), ist das ein
-// Fehlschlag; fehlt nur die Datei im vorhandenen Verzeichnis
-// (z. B. Staging ohne Timer), ist das nicht prüfbar; jeder andere Lesefehler
-// ist ein Fehlschlag. Ein Lauf, der nur am Offsite-Upload scheiterte
-// (Exit-Code 3), zählt als frisch: das lokale Backup liegt vor.
+// BackupCheck reads the job-run metric backup-<env> (Prometheus textfile, written by the
+// installation's backup job) and checks the age of the last backup. If, with
+// a job set, the metrics directory is missing (mount missing), that is a
+// failure; if only the file is missing in the existing directory
+// (e.g. staging without a timer), it is not checkable; every other read error
+// is a failure. A run that failed only at the offsite upload
+// (exit code 3) counts as fresh: the local backup exists.
 func BackupCheck(dir, job string, maxAge time.Duration, now func() time.Time) func(context.Context) Result {
 	return func(context.Context) Result {
 		raw, res, ok := readMetricsFile(dir, filepath.Join(dir, "job_"+job+".prom"))
@@ -237,7 +237,7 @@ func BackupCheck(dir, job string, maxAge time.Duration, now func() time.Time) fu
 	}
 }
 
-// parseJobMetrics liest Zeilen der Form `name{job_name="x"} 123`.
+// parseJobMetrics reads lines of the form `name{job_name="x"} 123`.
 func parseJobMetrics(text string) map[string]float64 {
 	out := map[string]float64{}
 	for _, line := range strings.Split(text, "\n") {

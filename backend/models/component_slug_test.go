@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Ableitung und Prüfung der Komponenten-Kennung.
+// Derivation and validation of the component identifier.
 func TestComponentSlugBase(t *testing.T) {
 	cases := map[string]string{
 		"Mail Server":         "mail-server",

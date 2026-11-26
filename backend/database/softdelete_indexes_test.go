@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// indexNames liefert die Namen der expliziten SQLite-Indizes einer Tabelle.
+// indexNames returns the names of the explicit SQLite indexes of a table.
 func indexNames(t *testing.T, db *gorm.DB, table string) []string {
 	t.Helper()
 	var names []string
@@ -19,17 +19,17 @@ func indexNames(t *testing.T, db *gorm.DB, table string) []string {
 }
 
 // TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyIndexes:
-// Die alten, nicht-partiellen Indizes (Stand vor dem Fix) werden entfernt und
-// durch partielle ersetzt; danach sind gelöschte Namen und Slugs wieder frei.
+// the old, non-partial indexes (state before the fix) are removed and
+// replaced by partial ones; afterwards deleted names and slugs are free again.
 func TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyIndexes(t *testing.T) {
 	db := setupTagMigrationTestDB(t)
-	// Stand vor der Umstellung nachbilden: Slug per gorm-uniqueIndex, Tags ohne deleted_at.
+	// Recreate the state before the changeover: slug via gorm uniqueIndex, tags without deleted_at.
 	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_status_pages_slug ON status_pages (slug)`).Error)
 	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX idx_tags_global_name ON tags (LOWER(name)) WHERE status_page_id IS NULL`).Error)
 	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX idx_tags_scoped_name ON tags (LOWER(name), status_page_id) WHERE status_page_id IS NOT NULL`).Error)
 
 	CreateSoftDeleteUniqueIndexes(db)
-	CreateSoftDeleteUniqueIndexes(db) // zweiter Lauf: No-Op
+	CreateSoftDeleteUniqueIndexes(db) // second run: no-op
 
 	assert.Equal(t, []string{"idx_status_pages_custom_domain_live", "idx_status_pages_slug_active", "idx_status_pages_system_active"}, indexNames(t, db, "status_pages"))
 	assert.Equal(t, []string{"idx_tags_global_name_active", "idx_tags_scoped_name_active"}, indexNames(t, db, "tags"))
@@ -51,9 +51,9 @@ func TestCreateSoftDeleteUniqueIndexes_ReplacesLegacyIndexes(t *testing.T) {
 	}
 }
 
-// TestSeedSystemStatusPage_SoftDeletedPageSurvives: Eine
-// soft-gelöschte Systemseite darf den Start nicht abbrechen (früher: Fatal am
-// Slug-Index) und wird auch nicht still neu angelegt.
+// TestSeedSystemStatusPage_SoftDeletedPageSurvives: a
+// soft-deleted system page must not abort the start (formerly: fatal on the
+// slug index) and is not silently re-created either.
 func TestSeedSystemStatusPage_SoftDeletedPageSurvives(t *testing.T) {
 	db := setupTagMigrationTestDB(t)
 	CreateSoftDeleteUniqueIndexes(db)

@@ -10,15 +10,15 @@ import (
 )
 
 const (
-	// RequestTimeout begrenzt einen einzelnen Aufruf des Dienstes.
+	// RequestTimeout limits a single call to the service.
 	RequestTimeout = 15 * time.Second
-	// maxResponseBytes begrenzt die gelesene Antwort (Titel/Meldung sind kurz).
+	// maxResponseBytes limits the response read (title/message are short).
 	maxResponseBytes = 1 << 20
 )
 
-// postJSON schickt body als JSON und liest höchstens maxResponseBytes zurück.
-// Fehler des http.Clients (enthalten die URL) werden zu ErrUnavailable
-// verkürzt, damit weder Adresse noch Schlüssel in Fehlertexten stehen.
+// postJSON sends body as JSON and reads back at most maxResponseBytes.
+// Errors of the http.Client (which contain the URL) are shortened to ErrUnavailable
+// so that neither address nor key appear in error texts.
 func postJSON(client *http.Client, target string, header map[string]string, body any) (status int, raw []byte, err error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -48,12 +48,12 @@ func postJSON(client *http.Client, target string, header map[string]string, body
 	return resp.StatusCode, raw, nil
 }
 
-// statusError bildet einen HTTP-Status ungleich 200 auf die Fehler oben ab.
+// statusError maps an HTTP status other than 200 to the errors above.
 func statusError(status int) error {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return ErrAuth
-	case http.StatusTooManyRequests, 456: // 456: DeepL "Kontingent erschöpft"
+	case http.StatusTooManyRequests, 456: // 456: DeepL "quota exceeded"
 		return ErrQuota
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
 		return ErrUnsupportedLanguage

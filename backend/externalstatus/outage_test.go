@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ausfall-Erkennung einer externen Quelle.
+// Outage detection of an external source.
 
 type recordingNotifier struct {
 	mu     sync.Mutex
@@ -39,8 +39,8 @@ func (r *recordingNotifier) kinds() []OutageKind {
 
 var boom = fakeResponse{err: errors.New("HTTP 503 von https://example.com/api/v2/summary.json")}
 
-// outageFixture: Quelle mit gekoppelter Komponente (externer Status
-// major_outage), letzter Erfolg vor 50 Minuten, Frist 60 Minuten.
+// outageFixture: source with linked component (external status
+// major_outage), last success 50 minutes ago, grace period 60 minutes.
 type outageFixture struct {
 	*serviceFixture
 	notifier *recordingNotifier
@@ -71,14 +71,14 @@ func TestOutage_UebergaengeMailNurEinmalErinnerungNach24h(t *testing.T) {
 	ctx := context.Background()
 	start := f.now
 
-	// Fehler, aber erst 50 Minuten Funkstille: kein Ausfall, Status zählt noch.
+	// Error, but only 50 minutes of radio silence: no outage, status still counts.
 	f.svc.RunOnce(ctx)
 	require.Equal(t, 1, f.provider.calls())
 	assert.Empty(t, f.notifier.kinds())
 	assert.Nil(t, f.source(t).OutageSince)
 	assert.Equal(t, componentstatus.MajorOutage, f.effective(t))
 
-	// Genau 60 Minuten nach dem letzten Erfolg: Ausfall.
+	// Exactly 60 minutes after the last success: outage.
 	f.now = start.Add(10 * time.Minute)
 	f.svc.RunOnce(ctx)
 	require.Equal(t, 2, f.provider.calls())
@@ -95,13 +95,13 @@ func TestOutage_UebergaengeMailNurEinmalErinnerungNach24h(t *testing.T) {
 	assert.Equal(t, StatusChange{StatusPageID: f.page.ID, ComponentID: f.comp.ID, Previous: componentstatus.MajorOutage,
 		Current: componentstatus.Operational, Cause: CauseOutage, SourceID: f.src.ID}, f.listener.changes[0])
 
-	// Weitere fehlgeschlagene Abrufe: keine weitere Mail.
+	// Further failed fetches: no further mail.
 	f.now = start.Add(time.Hour)
 	f.svc.RunOnce(ctx)
 	require.Equal(t, 3, f.provider.calls())
 	assert.Equal(t, []OutageKind{OutageStarted}, f.notifier.kinds())
 
-	// Knapp vor 24 h nach der ersten Meldung: noch keine Erinnerung; dann genau eine.
+	// Just before 24 h after the first notification: no reminder yet; then exactly one.
 	f.now = start.Add(10*time.Minute + OutageReminderAfter - time.Second)
 	f.svc.RunOnce(ctx)
 	require.Equal(t, 4, f.provider.calls())
@@ -115,7 +115,7 @@ func TestOutage_UebergaengeMailNurEinmalErinnerungNach24h(t *testing.T) {
 	assert.Equal(t, []OutageKind{OutageStarted, OutageReminder}, f.notifier.kinds(), "nur eine Erinnerung")
 	require.NotNil(t, f.source(t).OutageRemindedAt)
 
-	// Wiederherstellung: Entwarnung, Zustand gelöscht, frischer Status zählt.
+	// Recovery: all-clear, state cleared, fresh status counts.
 	f.svc.RunOnce(ctx)
 	require.Equal(t, 5, f.provider.calls())
 	assert.Equal(t, []OutageKind{OutageStarted, OutageReminder, OutageRecovered}, f.notifier.kinds())
@@ -151,7 +151,7 @@ func TestOutage_NeustartMeldetNichtErneut(t *testing.T) {
 	f.svc.RunOnce(ctx)
 	require.Equal(t, []OutageKind{OutageStarted}, f.notifier.kinds())
 
-	// Neuer Dienst auf derselben DB = Neustart bzw. zweite Instanz.
+	// New service on the same DB = restart or second instance.
 	again := &recordingNotifier{}
 	svc := NewService(f.db, Options{
 		Providers: map[string]Provider{ProviderSummaryV2: f.provider}, Listener: f.listener, Locker: f.locker,
@@ -168,7 +168,7 @@ func TestOutage_ZweiInstanzenBeanspruchenGenauEineMail(t *testing.T) {
 	f := newOutageFixture(t, boom)
 	f.now = f.now.Add(10 * time.Minute)
 	ctx := context.Background()
-	// Beide Instanzen lesen den Stand vor dem Ausfall; erst danach schreibt eine.
+	// Both instances read the state before the outage; only then does one write.
 	var stale models.ExternalSource
 	require.NoError(t, f.db.First(&stale, f.src.ID).Error)
 	f.svc.evaluateOutage(ctx, f.src.ID)
@@ -181,7 +181,7 @@ func TestOutage_ZweiInstanzenBeanspruchenGenauEineMail(t *testing.T) {
 func TestOutage_NichtFaelligeQuelleWirdTrotzdemBewertet(t *testing.T) {
 	f := newOutageFixture(t, boom)
 	f.now = f.now.Add(10 * time.Minute)
-	// Gerade erst abgerufen (nicht fällig), aber seit 60 Minuten kein Erfolg.
+	// Just fetched (not due), but no success for 60 minutes.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("last_fetch_at", f.now).Error)
 	f.svc.RunOnce(context.Background())
 	assert.Equal(t, 0, f.provider.calls())
@@ -190,7 +190,7 @@ func TestOutage_NichtFaelligeQuelleWirdTrotzdemBewertet(t *testing.T) {
 
 func TestOutage_304ZaehltAlsErfolg(t *testing.T) {
 	f := newOutageFixture(t, fakeResponse{sum: &Summary{NotModified: true}})
-	f.now = f.now.Add(15 * time.Minute) // 65 Minuten seit dem letzten Erfolg
+	f.now = f.now.Add(15 * time.Minute) // 65 minutes since the last success
 	f.svc.RunOnce(context.Background())
 	assert.Empty(t, f.notifier.kinds(), "Erfolg (304) vor der Bewertung")
 	assert.Nil(t, f.source(t).OutageSince)
@@ -199,7 +199,7 @@ func TestOutage_304ZaehltAlsErfolg(t *testing.T) {
 func TestOutage_FristJeQuelle(t *testing.T) {
 	f := newOutageFixture(t, boom)
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("outage_after_minutes", 120).Error)
-	f.now = f.now.Add(15 * time.Minute) // 65 Minuten
+	f.now = f.now.Add(15 * time.Minute) // 65 minutes
 	f.svc.RunOnce(context.Background())
 	assert.Empty(t, f.notifier.kinds(), "Frist 120 Minuten noch nicht erreicht")
 	f.now = f.now.Add(55 * time.Minute)
@@ -209,7 +209,7 @@ func TestOutage_FristJeQuelle(t *testing.T) {
 
 func TestOutage_OhneAusfallMailKeineEntwarnung(t *testing.T) {
 	f := newOutageFixture(t, okSummary("e1", comp("vm", "VM", "operational")))
-	// Ausfall ist gesetzt, die Mail aber nie beansprucht worden (z. B. Absturz).
+	// Outage is set, but the mail was never claimed (e.g. crash).
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("outage_since", f.lastOK).Error)
 	f.svc.RunOnce(context.Background())
 	assert.Nil(t, f.source(t).OutageSince)
@@ -256,7 +256,7 @@ func TestOutage_DBFehler(t *testing.T) {
 		f := newOutageFixture(t, okSummary("e1", comp("vm", "VM", "operational")))
 		require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).
 			Updates(map[string]any{"outage_since": f.lastOK, "outage_notified_at": f.now}).Error)
-		failOn(t, f.db, "update", "external_sources", 1) // 0 = Abrufstatus
+		failOn(t, f.db, "update", "external_sources", 1) // 0 = fetch status
 		f.svc.RunOnce(context.Background())
 		assert.Empty(t, f.notifier.kinds())
 		assert.NotNil(t, f.source(t).OutageSince)
@@ -315,9 +315,9 @@ func TestLinkedRefs_MarkiertAusfall(t *testing.T) {
 	assert.True(t, refs[f.comp.ID][0].SourceOutage)
 }
 
-// ein Abruf je Quelle.
+// one fetch per source.
 
-// blockingProvider hält den Abruf an, bis release geschlossen wird.
+// blockingProvider holds the fetch until release is closed.
 type blockingProvider struct {
 	entered chan struct{}
 	release chan struct{}
@@ -345,7 +345,7 @@ func TestPoll_LaeuftSchonEinAbrufMeldetFetchInProgress(t *testing.T) {
 	assert.True(t, res.FetchedAt.Equal(f.now))
 	assert.Equal(t, "fetch_in_progress", ErrFetchInProgress)
 
-	// Der Hintergrund-Takt überspringt die Quelle ebenfalls, ohne sie zu planen.
+	// The background tick skips the source as well, without scheduling it.
 	f.svc.RunOnce(context.Background())
 	assert.NotContains(t, f.svc.state, f.src.ID)
 
@@ -353,7 +353,7 @@ func TestPoll_LaeuftSchonEinAbrufMeldetFetchInProgress(t *testing.T) {
 	first := <-done
 	assert.True(t, first.OK)
 
-	// Danach ist die Quelle wieder frei.
+	// After that the source is free again.
 	bp.release = make(chan struct{})
 	close(bp.release)
 	go func() { <-bp.entered }()

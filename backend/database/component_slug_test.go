@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Der Backfill vergibt Kennungen deterministisch nach ID, löst
-// Kollisionen auf, schützt vorhandene Kennungen, ignoriert gelöschte Zeilen
-// und ist beim zweiten Lauf ein No-Op. Danach lässt sich der Index anlegen.
+// The backfill assigns identifiers deterministically by ID, resolves
+// collisions, protects existing identifiers, ignores deleted rows
+// and is a no-op on the second run. Afterwards the index can be created.
 func TestBackfillComponentSlugs(t *testing.T) {
 	db := setupTagMigrationTestDB(t)
 	p1 := models.StatusPage{Name: "P1", Slug: "p1-577"}
@@ -26,7 +26,7 @@ func TestBackfillComponentSlugs(t *testing.T) {
 		return id
 	}
 	a := insert(p1.ID, "Mail Server", "")
-	vergeben := insert(p1.ID, "Irgendwas", "mail-server-2") // belegt die Kollisionsvariante
+	vergeben := insert(p1.ID, "Irgendwas", "mail-server-2") // occupies the collision variant
 	b := insert(p1.ID, "Mail Server", "")
 	c := insert(p1.ID, "Mail Server", "")
 	d := insert(p2.ID, "Mail Server", "")
@@ -47,7 +47,7 @@ func TestBackfillComponentSlugs(t *testing.T) {
 	assert.Equal(t, "mail-server", slug(d), "andere Statusseite hat ihren eigenen Raum")
 	assert.Equal(t, "", slug(gelöscht), "gelöschte Zeilen bleiben unberührt")
 
-	// Zweiter Lauf: nichts ändert sich.
+	// Second run: nothing changes.
 	var vorher []string
 	require.NoError(t, db.Raw(`SELECT slug FROM components ORDER BY id`).Scan(&vorher).Error)
 	BackfillComponentSlugs(db)
@@ -55,7 +55,7 @@ func TestBackfillComponentSlugs(t *testing.T) {
 	require.NoError(t, db.Raw(`SELECT slug FROM components ORDER BY id`).Scan(&nachher).Error)
 	assert.Equal(t, vorher, nachher)
 
-	// Index lässt sich danach anlegen und erzwingt Eindeutigkeit.
+	// The index can be created afterwards and enforces uniqueness.
 	CreateSoftDeleteUniqueIndexes(db)
 	assert.Contains(t, indexNames(t, db, "components"), "idx_components_slug_active")
 	require.Error(t, db.Exec(`INSERT INTO components (created_at, updated_at, status_page_id, name, slug, status, visible) VALUES (datetime('now'), datetime('now'), ?, 'X', 'mail-server', 'operational', 1)`, p1.ID).Error)
@@ -67,8 +67,8 @@ func TestBackfillComponentSlugs_FehlerBrichtNichtAb(t *testing.T) {
 	assert.NotPanics(t, func() { BackfillComponentSlugs(db) })
 }
 
-// Scheitert das Schreiben einer Zeile, geht der Backfill mit den übrigen weiter
-// (nur Warnung, kein Abbruch); die Zeile wird beim nächsten Start erneut versucht.
+// If writing a row fails, the backfill continues with the others
+// (warning only, no abort); the row is retried on the next start.
 func TestBackfillComponentSlugs_EinzelfehlerUeberspringtZeile(t *testing.T) {
 	db := setupTagMigrationTestDB(t)
 	p := models.StatusPage{Name: "P", Slug: "p-577-fehler"}

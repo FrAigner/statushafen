@@ -9,24 +9,24 @@ import (
 	"gorm.io/gorm"
 )
 
-// tokenColumns sind die Spalten, die früher den Token im Klartext hielten und
-// jetzt nur noch dessen Hash (models.HashToken) tragen.
+// tokenColumns are the columns that used to hold the token in plain text and
+// now carry only its hash (models.HashToken).
 var tokenColumns = []struct{ table, column string }{
 	{"status_pages", "webhook_token"},
 	{"page_orders", "confirm_token"},
 	{"page_orders", "set_password_token"},
 }
 
-// tokenMigrationBatch begrenzt die Zeilen je Durchgang.
+// tokenMigrationBatch limits the rows per pass.
 const tokenMigrationBatch = 500
 
-// hashLegacyTokens ersetzt Klartext-Token in den Spalten aus tokenColumns durch
-// ihren Hash. Idempotent und sicher bei gleichzeitigen Starts: Angefasst werden
-// nur nicht-leere Werte ohne Hash-Marke (models.TokenHashPrefix); jede Zeile
-// wird bedingt auf ihren alten Wert geschrieben, ein zweiter Lauf findet nichts
-// mehr. Gelöschte Zeilen (Soft Delete) sind mit dabei, updated_at bleibt
-// unverändert. Bereits verschickte Links und angezeigte Token bleiben gültig,
-// weil beim Einlösen der vorgelegte Klartext gehasht und verglichen wird.
+// hashLegacyTokens replaces plain-text tokens in the columns of tokenColumns with
+// their hash. Idempotent and safe with concurrent starts: only
+// non-empty values without a hash marker (models.TokenHashPrefix) are touched; each row
+// is written conditionally on its old value, a second run finds nothing
+// anymore. Deleted rows (soft delete) are included, updated_at stays
+// unchanged. Links already sent and tokens already shown remain valid,
+// because on redemption the presented plain text is hashed and compared.
 func hashLegacyTokens(db *gorm.DB) error {
 	for _, tc := range tokenColumns {
 		for {
@@ -55,9 +55,9 @@ func hashLegacyTokens(db *gorm.DB) error {
 	return nil
 }
 
-// migrateLegacyTokens führt hashLegacyTokens beim Start aus. Ein Fehler wird
-// geloggt und verhindert den Start nicht; der nächste Start versucht es erneut,
-// bis dahin gelten Klartextwerte als ungültig (TokenMatches).
+// migrateLegacyTokens runs hashLegacyTokens at startup. An error is
+// logged and does not prevent startup; the next start tries again,
+// until then plain-text values count as invalid (TokenMatches).
 func migrateLegacyTokens(db *gorm.DB) {
 	if err := hashLegacyTokens(db); err != nil {
 		slog.Error("Failed to hash legacy tokens", "error", err)

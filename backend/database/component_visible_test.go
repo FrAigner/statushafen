@@ -12,10 +12,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// Bestandskomponenten stammen aus einem Schema ohne Spalte
-// `visible`. Nach der Migration müssen sie sichtbar sein (Default true), sonst
-// verschwände nach dem Deploy die ganze öffentliche Statusseite. Ein zweiter
-// Lauf ändert nichts, auch nicht an bewusst ausgeblendeten Zeilen.
+// Existing components come from a schema without the column
+// `visible`. After the migration they must be visible (default true), otherwise
+// the whole public status page would vanish after the deploy. A second
+// run changes nothing, not even on deliberately hidden rows.
 func TestAutoMigrate_ComponentVisibleDefaultTrue(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "legacy.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -31,7 +31,7 @@ func TestAutoMigrate_ComponentVisibleDefaultTrue(t *testing.T) {
 		assert.True(t, c.Visible, "Bestand %q muss nach der Migration sichtbar sein", c.Name)
 	}
 
-	// Idempotent: eine bewusst ausgeblendete Zeile überlebt den nächsten Lauf.
+	// Idempotent: a deliberately hidden row survives the next run.
 	require.NoError(t, db.Model(&models.Component{}).Where("id = ?", comps[0].ID).Update("visible", false).Error)
 	require.NoError(t, db.AutoMigrate(&models.Component{}))
 	var hidden models.Component

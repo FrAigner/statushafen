@@ -7,16 +7,16 @@ import (
 	"strings"
 )
 
-// TokenHashPrefix kennzeichnet einen gespeicherten Token-Hash. Klartext-Token
-// (64 Hex-Zeichen) und SHA-256-Hash (64 Hex-Zeichen) sehen sonst gleich aus; mit
-// der Marke lässt sich die Umstellung bestehender Klartextwerte beliebig oft
-// wiederholen, ohne Hashes ein zweites Mal zu hashen.
+// TokenHashPrefix marks a stored token hash. A plaintext token
+// (64 hex characters) and a SHA-256 hash (64 hex characters) otherwise look the same; with
+// the marker, the conversion of existing plaintext values can be repeated
+// any number of times without hashing hashes a second time.
 const TokenHashPrefix = "sha256:"
 
-// HashToken liefert die gespeicherte Form eines Zufalls-Tokens: SHA-256 mit
-// Marke. Ein schneller Hash genügt, weil die Tokens 256 Bit Zufall tragen
-// (kein Passwort, kein Wörterbuchangriff). Ein leerer Token bleibt leer, damit
-// "kein Token vergeben" weiter als leerer Wert gespeichert wird.
+// HashToken returns the stored form of a random token: SHA-256 with
+// marker. A fast hash suffices because the tokens carry 256 bits of randomness
+// (not a password, no dictionary attack). An empty token stays empty, so that
+// "no token issued" continues to be stored as an empty value.
 func HashToken(token string) string {
 	if token == "" {
 		return ""
@@ -25,12 +25,12 @@ func HashToken(token string) string {
 	return TokenHashPrefix + hex.EncodeToString(sum[:])
 }
 
-// IsTokenHash sagt, ob der gespeicherte Wert schon ein Token-Hash ist.
+// IsTokenHash says whether the stored value is already a token hash.
 func IsTokenHash(stored string) bool { return strings.HasPrefix(stored, TokenHashPrefix) }
 
-// TokenMatches vergleicht einen vorgelegten Klartext-Token zeitkonstant mit dem
-// gespeicherten Hash. Leere Werte passen nie; ein gespeicherter Klartext (nicht
-// migrierter Altwert) ebenfalls nicht.
+// TokenMatches compares a presented plaintext token with the stored hash
+// in constant time. Empty values never match; a stored plaintext (not
+// migrated legacy value) does not match either.
 func TokenMatches(stored, provided string) bool {
 	if stored == "" || provided == "" || !IsTokenHash(stored) {
 		return false

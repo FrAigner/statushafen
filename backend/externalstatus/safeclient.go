@@ -16,49 +16,49 @@ import (
 	"github.com/fraigner/statushafen/netguard"
 )
 
-// SSRF-Schutz: Admins geben die Basis-URL einer Quelle ein, der
-// Server ruft sie ab. Jede Prüfung sitzt so tief wie möglich:
+// SSRF protection: admins enter the base URL of a source, the
+// server fetches it. Every check sits as deep as possible:
 //
-//   - Schema/Port/Credentials prüft validateTargetURL - bei der Eingabe
-//     (ValidateBaseURL) und für jedes Redirect-Ziel (CheckRedirect).
-//   - Die Ziel-IP prüft guardedDial NACH der DNS-Auflösung und verbindet sich
-//     direkt mit der geprüften Adresse. Es gibt keinen zweiten Lookup, der bei
-//     DNS-Rebinding ein anderes Ergebnis liefern könnte, und auch jedes
-//     Redirect-Ziel läuft durch denselben Dialer.
-//   - Kein Proxy (sonst ginge die Verbindung an den Proxy und die IP-Prüfung
-//     liefe ins Leere), kein Cookie-Jar, keine Credentials.
+//   - validateTargetURL checks scheme/port/credentials - on input
+//     (ValidateBaseURL) and for every redirect target (CheckRedirect).
+//   - guardedDial checks the target IP AFTER DNS resolution and connects
+//     directly to the checked address. There is no second lookup that could
+//     return a different result on DNS rebinding, and every redirect target
+//     also goes through the same dialer.
+//   - No proxy (otherwise the connection would go to the proxy and the IP check
+//     would be pointless), no cookie jar, no credentials.
 const (
-	// UserAgent kennzeichnet unsere Abrufe gegenüber den Anbietern.
+	// UserAgent identifies our requests to the vendors.
 	UserAgent = "Statushafen-StatusImport/1.0 (+https://github.com/fraigner/statushafen)"
-	// MaxResponseBytes begrenzt die gelesene Antwort (typische Antworten sind ~50 kB).
+	// MaxResponseBytes limits the response read (typical responses are ~50 kB).
 	MaxResponseBytes = 2 << 20
-	// MaxRedirects: mehr Weiterleitungen gelten als Fehler.
+	// MaxRedirects: more redirects count as an error.
 	MaxRedirects = 3
-	// RequestTimeout gilt für den gesamten Abruf inkl. Redirects und Body.
+	// RequestTimeout applies to the whole fetch incl. redirects and body.
 	RequestTimeout = 10 * time.Second
 )
 
-// ErrBlockedTarget kennzeichnet ein aus Sicherheitsgründen abgelehntes Ziel.
+// ErrBlockedTarget marks a target rejected for security reasons.
 var ErrBlockedTarget = errors.New("ziel nicht erlaubt")
 
-// Resolver löst Hostnamen auf; injizierbar, damit Tests DNS-Antworten
-// (private IPs, Rebinding) vorgeben können. *net.Resolver erfüllt es.
+// Resolver resolves host names; injectable so tests can supply DNS answers
+// (private IPs, rebinding). *net.Resolver satisfies it.
 type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
-// ClientConfig konfiguriert NewSafeClient. Leere Felder = Produktionswerte.
+// ClientConfig configures NewSafeClient. Empty fields = production values.
 type ClientConfig struct {
 	Resolver Resolver
-	// Dial verbindet mit einer bereits geprüften "IP:Port"-Adresse. Tests
-	// leiten sie auf einen lokalen httptest-Server um; die Prüfung davor
-	// läuft trotzdem vollständig.
+	// Dial connects to an already checked "IP:port" address. Tests
+	// redirect it to a local httptest server; the check beforehand
+	// still runs completely.
 	Dial func(ctx context.Context, network, addr string) (net.Conn, error)
-	// TLSConfig: nur für Tests (RootCAs des httptest-Servers).
+	// TLSConfig: tests only (RootCAs of the httptest server).
 	TLSConfig *tls.Config
 }
 
-// NewSafeClient baut den HTTP-Client für alle Provider.
+// NewSafeClient builds the HTTP client for all providers.
 func NewSafeClient(cfg ClientConfig) *http.Client {
 	resolver := cfg.Resolver
 	if resolver == nil {
@@ -83,8 +83,8 @@ func NewSafeClient(cfg ClientConfig) *http.Client {
 	}
 }
 
-// checkRedirect erlaubt höchstens MaxRedirects Weiterleitungen, und nur auf
-// https-Ziele, die validateTargetURL bestehen (die IP prüft danach guardedDial).
+// checkRedirect allows at most MaxRedirects redirects, and only to
+// https targets that pass validateTargetURL (guardedDial checks the IP afterwards).
 func checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) > MaxRedirects {
 		return fmt.Errorf("%w: mehr als %d Weiterleitungen", ErrBlockedTarget, MaxRedirects)
@@ -92,7 +92,7 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 	return validateTargetURL(req.URL)
 }
 
-// validateTargetURL: nur https, Port 443, keine Zugangsdaten in der URL.
+// validateTargetURL: https only, port 443, no credentials in the URL.
 func validateTargetURL(u *url.URL) error {
 	if u.Scheme != "https" {
 		return fmt.Errorf("%w: nur https erlaubt", ErrBlockedTarget)
@@ -109,10 +109,10 @@ func validateTargetURL(u *url.URL) error {
 	return nil
 }
 
-// guardedDial löst den Host selbst auf, verwirft das Ziel, sobald EINE der
-// Adressen gesperrt ist (eine gemischte Antwort öffentlich/intern ist
-// verdächtig und würde sonst vom Zufall der Reihenfolge abhängen), und
-// verbindet sich direkt mit einer geprüften Adresse.
+// guardedDial resolves the host itself, rejects the target as soon as ONE of
+// the addresses is blocked (a mixed public/internal answer is
+// suspicious and would otherwise depend on the luck of the ordering), and
+// connects directly to a checked address.
 func guardedDial(resolver Resolver, dial func(ctx context.Context, network, addr string) (net.Conn, error)) func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(addr)
@@ -143,7 +143,7 @@ func guardedDial(resolver Resolver, dial func(ctx context.Context, network, addr
 	}
 }
 
-// resolveHost liefert die Adressen zu host: IP-Literale direkt, sonst per DNS.
+// resolveHost returns the addresses for host: IP literals directly, otherwise via DNS.
 func resolveHost(ctx context.Context, resolver Resolver, host string) ([]netip.Addr, error) {
 	if a, err := netip.ParseAddr(host); err == nil {
 		return []netip.Addr{a}, nil
@@ -161,17 +161,17 @@ func resolveHost(ctx context.Context, resolver Resolver, host string) ([]netip.A
 		if !ok {
 			return nil, fmt.Errorf("%w: ungültige Adresse für %s", ErrBlockedTarget, host)
 		}
-		// net.IP kommt oft in 16-Byte-Form; ungemappt wählen wir IPv4 als
-		// IPv4 statt als "[::ffff:…]" (ein reiner IPv4-Host scheitert sonst).
+		// net.IP often comes in 16-byte form; unmapped, we choose IPv4 as
+		// IPv4 rather than as "[::ffff:…]" (a pure IPv4 host would otherwise fail).
 		addrs = append(addrs, a.Unmap())
 	}
 	return addrs, nil
 }
 
-// ValidateBaseURL prüft und normalisiert die Basis-URL einer Quelle:
-// https, Port 443, ohne Zugangsdaten, Query oder Fragment; Ergebnis ohne
-// ":443" und ohne abschließenden Schrägstrich. Die IP-Prüfung folgt beim
-// Abruf (guardedDial), weil sich DNS bis dahin ändern kann.
+// ValidateBaseURL checks and normalizes the base URL of a source:
+// https, port 443, without credentials, query or fragment; result without
+// ":443" and without a trailing slash. The IP check follows on the
+// fetch (guardedDial), because DNS can change until then.
 func ValidateBaseURL(raw string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
@@ -186,7 +186,7 @@ func ValidateBaseURL(raw string) (string, error) {
 	return "https://" + strings.ToLower(u.Hostname()) + strings.TrimRight(u.EscapedPath(), "/"), nil
 }
 
-// fetchResult ist die Rohantwort von getJSON.
+// fetchResult is the raw response of getJSON.
 type fetchResult struct {
 	NotModified  bool
 	Body         []byte
@@ -194,9 +194,9 @@ type fetchResult struct {
 	LastModified string
 }
 
-// getJSON ruft target mit Conditional-Request-Headern ab und liest höchstens
-// MaxResponseBytes. Gemeinsamer Unterbau für alle Provider (Teil B ruft damit
-// auch incidents.json ab).
+// getJSON fetches target with conditional-request headers and reads at most
+// MaxResponseBytes. Common foundation for all providers (part B uses it to
+// fetch incidents.json as well).
 func getJSON(ctx context.Context, client *http.Client, target string, req FetchRequest) (*fetchResult, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {

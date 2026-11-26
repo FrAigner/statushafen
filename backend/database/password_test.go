@@ -9,8 +9,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// bcrypt verarbeitet höchstens 72 Byte. HashPassword darf bei längeren
-// Eingaben nie einen leeren Hash als Erfolg liefern.
+// bcrypt processes at most 72 bytes. HashPassword must never return an empty
+// hash as success for longer input.
 func TestHashPassword_LimitIs72Bytes(t *testing.T) {
 	ok := strings.Repeat("a", MaxPasswordBytes)
 	hash, err := HashPassword(ok)
@@ -24,7 +24,7 @@ func TestHashPassword_LimitIs72Bytes(t *testing.T) {
 }
 
 func TestHashPassword_CountsBytesNotRunes(t *testing.T) {
-	// 36 mal "ä" = 72 Byte, 37 mal = 74 Byte.
+	// 36 times "ä" = 72 bytes, 37 times = 74 bytes.
 	_, err := HashPassword(strings.Repeat("ä", 36))
 	assert.NoError(t, err)
 	_, err = HashPassword(strings.Repeat("ä", 37))
@@ -36,8 +36,8 @@ func TestHashPassword_EmptyHashNeverVerifies(t *testing.T) {
 	assert.False(t, CheckPasswordHash("egal", ""))
 }
 
-// Der Dummy-Hash für unbekannte Konten muss dieselben bcrypt-Kosten haben wie
-// ein echter Hash, sonst unterscheidet sich die Laufzeit des Logins trotzdem.
+// The dummy hash for unknown accounts must have the same bcrypt cost as
+// a real hash, otherwise the login runtime differs nevertheless.
 func TestDummyPasswordHash_HasProductionCost(t *testing.T) {
 	real, err := HashPassword("irgendein-passwort")
 	require.NoError(t, err)
@@ -53,7 +53,7 @@ func TestCheckPasswordConstantTime(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, CheckPasswordConstantTime("richtig-123", hash))
 	assert.False(t, CheckPasswordConstantTime("falsch", hash))
-	// Leerer Hash (unbekanntes Konto, SSO-Konto): nie wahr, auch nicht für ein leeres Passwort.
+	// Empty hash (unknown account, SSO account): never true, not even for an empty password.
 	assert.False(t, CheckPasswordConstantTime("kein-echtes-konto-nur-zeitausgleich", ""))
 	assert.False(t, CheckPasswordConstantTime("", ""))
 }

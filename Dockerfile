@@ -5,7 +5,7 @@
 # dort prüfen Digest-Pflicht und Lebenszyklen.
 
 # ---- Stage 1: Frontend (Vue.js) bauen ----
-FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS frontend-builder
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
@@ -15,7 +15,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---- Stage 2: Backend (Go) bauen ----
-FROM golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab AS backend-builder
+FROM golang:1.27.4-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS backend-builder
 WORKDIR /app/backend
 
 COPY backend/go.mod backend/go.sum ./
@@ -25,7 +25,7 @@ COPY backend/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/server .
 
 # ---- Stage 3: Minimales Laufzeit-Image ----
-FROM alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 WORKDIR /app
 
 # ca-certificates: needed for outgoing HTTPS calls (OIDC providers, webhooks)

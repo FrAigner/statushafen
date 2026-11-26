@@ -1,9 +1,9 @@
 package models
 
-// einzige Stelle im Backend, die festlegt, welche Vorfall- und
-// Wartungs-Status es gibt und welche als „behoben" gelten. Das Frontend
-// spiegelt die Regel in frontend/src/utils/incidentStatus.js
-// (RESOLVED_INCIDENT_STATUSES) und hat einen Test, der beide abgleicht.
+// the single place in the backend that defines which incident and
+// maintenance statuses exist and which count as "resolved". The frontend
+// mirrors the rule in frontend/src/utils/incidentStatus.js
+// (RESOLVED_INCIDENT_STATUSES) and has a test that compares both.
 const (
 	IncidentStatusInvestigating = "investigating"
 	IncidentStatusIdentified    = "identified"
@@ -14,21 +14,21 @@ const (
 	MaintenanceStatusInProgress = "in_progress"
 )
 
-// ResolvedIncidentStatuses sind die Status, die einen Vorfall bzw. ein
-// Wartungsfenster als behoben/abgeschlossen ausweisen.
+// ResolvedIncidentStatuses are the statuses that mark an incident or a
+// maintenance window as resolved/completed.
 //
-// Der Altwert "completed" (Wartungs-Updates vor der Umstellung) wird beim
-// Start von database.migrateCompletedIncidentStatus auf "resolved" umgestellt
-// und gilt hier nicht mehr.
+// The legacy value "completed" (maintenance updates before the changeover) is converted to "resolved"
+// at start by database.migrateCompletedIncidentStatus
+// and no longer applies here.
 var ResolvedIncidentStatuses = []string{IncidentStatusResolved}
 
-// IsResolvedIncidentStatus: true für resolved.
+// IsResolvedIncidentStatus: true for resolved.
 func IsResolvedIncidentStatus(status string) bool {
 	return status == IncidentStatusResolved
 }
 
-// IsValidIncidentStatus: erlaubte Status für neue Schreibvorgänge bei normalen
-// Vorfällen.
+// IsValidIncidentStatus: statuses allowed for new writes on normal
+// incidents.
 func IsValidIncidentStatus(status string) bool {
 	switch status {
 	case IncidentStatusInvestigating, IncidentStatusIdentified, IncidentStatusMonitoring, IncidentStatusResolved:
@@ -37,15 +37,15 @@ func IsValidIncidentStatus(status string) bool {
 	return false
 }
 
-// Schweregrade eines normalen Vorfalls; entsprechen den
-// Beeinträchtigungs-Stufen des Komponentenstatus und gewichten die Verfügbarkeit.
+// Severity levels of a normal incident; they correspond to the
+// impairment levels of the component status and weight the availability.
 const (
 	IncidentSeverityDegraded = "degraded_performance"
 	IncidentSeverityPartial  = "partial_outage"
 	IncidentSeverityMajor    = "major_outage"
 )
 
-// IsValidIncidentSeverity: erlaubte Schweregrade für Schreibvorgänge.
+// IsValidIncidentSeverity: severities allowed for writes.
 func IsValidIncidentSeverity(s string) bool {
 	switch s {
 	case IncidentSeverityDegraded, IncidentSeverityPartial, IncidentSeverityMajor:
@@ -54,8 +54,8 @@ func IsValidIncidentSeverity(s string) bool {
 	return false
 }
 
-// IsValidMaintenanceStatus: erlaubte Status für neue Schreibvorgänge bei
-// Wartungsfenstern.
+// IsValidMaintenanceStatus: statuses allowed for new writes on
+// maintenance windows.
 func IsValidMaintenanceStatus(status string) bool {
 	switch status {
 	case MaintenanceStatusScheduled, MaintenanceStatusInProgress, IncidentStatusResolved:

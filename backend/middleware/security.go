@@ -16,13 +16,13 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SecurityHeaders setzt Standard-Sicherheitsheader (Review-Befund S11).
-// In main.go direkt nach r.Use(CORSMiddleware()) einhängen:
+// SecurityHeaders sets standard security headers (review finding S11).
+// Mount in main.go directly after r.Use(CORSMiddleware()):
 //
 //	r.Use(middleware.SecurityHeaders())
 //
-// HSTS nur senden, wenn TLS terminiert wird: am Backend selbst oder von einem
-// vertrauten Reverse-Proxy (X-Forwarded-Proto, siehe requestIsHTTPS).
+// Send HSTS only when TLS is terminated: at the backend itself or by a
+// trusted reverse proxy (X-Forwarded-Proto, see requestIsHTTPS).
 // ─────────────────────────────────────────────────────────────────────────────
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -31,16 +31,16 @@ func SecurityHeaders() gin.HandlerFunc {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-		// Restriktive CSP – bei Bedarf für die konkrete Frontend-Herkunft anpassen.
-		// base-uri und form-action fallen nicht auf default-src zurück und stehen
-		// deshalb ausdrücklich da. img-src erlaubt https:, weil Seiten-Logos von
-		// beliebigen https-Adressen kommen dürfen (validLogoURL); der Preis ist,
-		// dass der Logo-Host IP und User-Agent der Besucher sieht.
-		// Cloudflares JavaScript Detections (auf dem Free-Plan nicht
-		// abschaltbar) spritzen ein Inline-Skript ein. Cloudflare übernimmt den
-		// Nonce aus diesem Header für seine Skripte; unsere eigenen Skripte
-		// laufen weiter über 'self'. Der Nonce ist je Anfrage neu (crypto/rand,
-		// 130 Bit), damit eingeschleuste Inline-Skripte ihn nicht kennen.
+		// Restrictive CSP – adjust for the concrete frontend origin if needed.
+		// base-uri and form-action do not fall back to default-src and are therefore
+		// listed explicitly. img-src allows https: because page logos may come from
+		// arbitrary https addresses (validLogoURL); the price is
+		// that the logo host sees visitors' IP and User-Agent.
+		// Cloudflare's JavaScript Detections (cannot be disabled on the Free
+		// plan) inject an inline script. Cloudflare takes the
+		// nonce from this header for its scripts; our own scripts
+		// keep running via 'self'. The nonce is new per request (crypto/rand,
+		// 130 bits), so that injected inline scripts do not know it.
 		h.Set("Content-Security-Policy",
 			"default-src 'self'; base-uri 'self'; form-action 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "+
 				"font-src 'self'; script-src 'self' 'nonce-"+rand.Text()+"'; connect-src 'self'; frame-ancestors 'none'")
@@ -51,16 +51,16 @@ func SecurityHeaders() gin.HandlerFunc {
 	}
 }
 
-// trustProbeAddr ist eine feste Dokumentationsadresse (RFC 5737), die nur als
-// Sonde in peerIsTrustedProxy dient.
+// trustProbeAddr is a fixed documentation address (RFC 5737) that serves only as a
+// probe in peerIsTrustedProxy.
 const trustProbeAddr = "192.0.2.254"
 
-// peerIsTrustedProxy meldet, ob der TCP-Absender nach den Regeln von gin ein
-// vertrauter Proxy ist (TRUSTED_PROXIES, Unix-Socket). Gin hält diese Prüfung
-// intern; ClientIP() gibt einen Weiterleitungs-Header nur für vertraute Absender
-// heraus. Deshalb setzt die Sonde auf einer Kopie der Anfrage einen eigenen
-// X-Forwarded-For und prüft, ob er durchkommt. Die echte Anfrage bleibt
-// unverändert.
+// peerIsTrustedProxy reports whether the TCP sender is a trusted proxy according to gin's
+// rules (TRUSTED_PROXIES, Unix socket). Gin keeps this check
+// internal; ClientIP() only hands out a forwarding header for trusted senders.
+// The probe therefore sets its own X-Forwarded-For on a copy of the request
+// and checks whether it comes through. The real request remains
+// unchanged.
 func peerIsTrustedProxy(c *gin.Context) bool {
 	orig := c.Request
 	probe := *orig
@@ -70,10 +70,10 @@ func peerIsTrustedProxy(c *gin.Context) bool {
 	return c.ClientIP() == trustProbeAddr
 }
 
-// requestIsHTTPS: TLS endet am Backend selbst, oder ein vertrauter Proxy meldet
-// per X-Forwarded-Proto, dass er TLS terminiert hat (maßgeblich ist der letzte,
-// vom nächsten Proxy angehängte Eintrag). Ohne vertrauten Absender zählt der
-// Header nie, sonst könnte jeder Client HSTS erzwingen oder unterdrücken.
+// requestIsHTTPS: TLS ends at the backend itself, or a trusted proxy reports
+// via X-Forwarded-Proto that it terminated TLS (the last entry, appended
+// by the nearest proxy, is authoritative). Without a trusted sender the
+// header never counts, otherwise any client could force or suppress HSTS.
 func requestIsHTTPS(c *gin.Context) bool {
 	if c.Request.TLS != nil {
 		return true
@@ -90,9 +90,9 @@ func requestIsHTTPS(c *gin.Context) bool {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RequireGlobalAdmin gated Endpunkte, die keinen page_id-Scope haben
-// (Audit-Log, Mandanten-Übersicht). Ersetzt den Missbrauch von
-// RequirePermission("…") auf globalen Routen.
+// RequireGlobalAdmin gates endpoints that have no page_id scope
+// (audit log, tenant overview). Replaces the misuse of
+// RequirePermission("…") on global routes.
 // ─────────────────────────────────────────────────────────────────────────────
 func RequireGlobalAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -114,7 +114,7 @@ func RequireGlobalAdmin() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		// nie aus einer Seiten-SSO-Sitzung.
+		// never from a page SSO session.
 		if !EffectiveGlobalAdmin(c, user) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied: global admin required", "code": "forbidden"})
 			c.Abort()
@@ -125,12 +125,12 @@ func RequireGlobalAdmin() gin.HandlerFunc {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RateLimiter: einfacher In-Memory Token-Bucket pro Client-IP (Review-Befund S7).
-// Für horizontale Skalierung später durch einen Redis-basierten Limiter ersetzen.
+// RateLimiter: simple in-memory token bucket per client IP (review finding S7).
+// For horizontal scaling, replace later with a Redis-based limiter.
 //
-// Einsatz an den sensiblen öffentlichen Endpunkten in main.go, z.B.:
+// Use on the sensitive public endpoints in main.go, e.g.:
 //
-//	loginLimiter := middleware.NewRateLimiter(5, time.Minute)   // 5 Versuche / Min.
+//	loginLimiter := middleware.NewRateLimiter(5, time.Minute)   // 5 attempts / min.
 //	r.POST("/api/login", loginLimiter, h.LoginHandler)
 //	r.POST("/api/subscribe", middleware.NewRateLimiter(10, time.Minute), h.SubscribeHandler)
 //
@@ -140,16 +140,16 @@ type visitor struct {
 	lastSeen time.Time
 }
 
-// rateLimiterMaxEntries ist die harte Obergrenze der Einträge je Limiter. Eine
-// Instanz belegt bei voller Tabelle wenige Megabyte; wer mit sehr vielen
-// Quelladressen anfragt, verdrängt nur die am längsten unberührten Einträge.
+// rateLimiterMaxEntries is the hard upper bound on entries per limiter. An
+// instance with a full table occupies a few megabytes; whoever requests from very many
+// source addresses only evicts the entries untouched for the longest time.
 const rateLimiterMaxEntries = 100_000
 
 type rateLimiter struct {
 	mu       sync.Mutex
 	visitors *lruTable[visitor]
 	max      float64
-	refill   float64 // Tokens pro Sekunde
+	refill   float64 // tokens per second
 	window   time.Duration
 	now      func() time.Time
 }
@@ -183,20 +183,20 @@ func newRateLimiter(max int, per time.Duration, maxEntries int) *rateLimiter {
 	}
 }
 
-// size liefert die Zahl der gemerkten Schlüssel.
+// size returns the number of remembered keys.
 func (rl *rateLimiter) size() int {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 	return rl.visitors.len()
 }
 
-// visitorExpired: Nach einem vollen Zeitfenster ohne Anfrage wäre der Bucket
-// wieder voll, der Eintrag also gleichwertig zu einem neuen und entbehrlich.
+// visitorExpired: after a full time window without a request the bucket would
+// be full again, so the entry is equivalent to a new one and dispensable.
 func (rl *rateLimiter) visitorExpired(v *visitor, now time.Time) bool {
 	return now.Sub(v.lastSeen) >= rl.window
 }
 
-// dropExpired entfernt die abgelaufenen Einträge vom älteren Ende der Tabelle.
+// dropExpired removes the expired entries from the older end of the table.
 func (rl *rateLimiter) dropExpired() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -206,8 +206,8 @@ func (rl *rateLimiter) dropExpired() {
 	}
 }
 
-// cleanupStaleVisitors räumt regelmäßig ab, damit die Tabelle auch bei seltenem
-// Verkehr klein bleibt. Die Obergrenze hält sie unabhängig davon in jedem Fall ein.
+// cleanupStaleVisitors cleans up regularly so that the table stays small even with infrequent
+// traffic. The upper bound enforces itself in every case regardless.
 func (rl *rateLimiter) cleanupStaleVisitors(every time.Duration) {
 	for {
 		time.Sleep(every)
@@ -215,10 +215,10 @@ func (rl *rateLimiter) cleanupStaleVisitors(every time.Duration) {
 	}
 }
 
-// allow prüft und verbraucht (Token-Bucket) ein Kontingent für die gegebene
-// Client-IP. Ist die Tabelle voll, verdrängt ein neuer Schlüssel den am längsten
-// unberührten Eintrag: Er wird weiter gezählt und gebremst, und niemand wird
-// ausgesperrt (ein verdrängter Schlüssel startet höchstens mit vollem Kontingent).
+// allow checks and consumes (token bucket) a quota for the given
+// client IP. If the table is full, a new key evicts the entry untouched for the
+// longest time: it is still counted and throttled, and nobody is
+// locked out (an evicted key starts at most with a full quota).
 func (rl *rateLimiter) allow(ip string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
@@ -228,7 +228,7 @@ func (rl *rateLimiter) allow(ip string) bool {
 	if !ok {
 		v = rl.visitors.add(ip, &visitor{tokens: rl.max, lastSeen: now}, now, rl.visitorExpired)
 	} else {
-		// Bucket auffüllen
+		// refill bucket
 		v.tokens += now.Sub(v.lastSeen).Seconds() * rl.refill
 		if v.tokens > rl.max {
 			v.tokens = rl.max
@@ -243,10 +243,10 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return true
 }
 
-// limiterKey bildet eine Client-IP auf den Schlüssel des Buckets ab. Ein
-// IPv6-Anschluss bekommt üblicherweise ein ganzes /64 und kann darin beliebig
-// die Hostadresse wechseln; deshalb zählt bei IPv6 das /64-Präfix. IPv4 und
-// IPv4-in-IPv6 bleiben je Adresse.
+// limiterKey maps a client IP to the bucket key. An
+// IPv6 connection usually gets an entire /64 and can switch the host address
+// within it at will; therefore for IPv6 the /64 prefix counts. IPv4 and
+// IPv4-in-IPv6 stay per address.
 func limiterKey(ip string) string {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil {
@@ -256,12 +256,12 @@ func limiterKey(ip string) string {
 	if addr.Is4() {
 		return addr.String()
 	}
-	// Prefix(64) schlägt für eine gültige IPv6-Adresse nie fehl.
+	// Prefix(64) never fails for a valid IPv6 address.
 	prefix, _ := addr.Prefix(64)
 	return prefix.String()
 }
 
-// NewRateLimiter erlaubt `max` Anfragen pro `per`-Zeitfenster (Burst = max).
+// NewRateLimiter allows `max` requests per `per` time window (burst = max).
 func NewRateLimiter(max int, per time.Duration) gin.HandlerFunc {
 	rl := newRateLimiter(max, per, rateLimiterMaxEntries)
 	go rl.cleanupStaleVisitors(10 * time.Minute)

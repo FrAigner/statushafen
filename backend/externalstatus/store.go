@@ -9,19 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
-// UpsertResult zählt, was ein Abruf an den externen Komponenten geändert hat.
+// UpsertResult counts what a fetch changed on the external components.
 type UpsertResult struct {
 	Seen     int `json:"seen"`
 	Created  int `json:"created"`
 	Vanished int `json:"vanished"`
 }
 
-// upsertComponents gleicht die externen Komponenten einer Quelle mit sum ab.
-// Idempotent: derselbe Abruf zweimal ändert beim zweiten Mal nur LastSeenAt.
-// Komponenten, die fehlen, werden als verschwunden markiert statt gelöscht,
-// damit Kopplungen erhalten bleiben; tauchen sie wieder auf, wird die
-// Markierung zurückgenommen. Doppelte IDs in einer (fehlerhaften) Antwort
-// zählen nur beim ersten Vorkommen.
+// upsertComponents reconciles a source's external components with sum.
+// Idempotent: the same fetch twice only changes LastSeenAt the second time.
+// Components that are missing are marked as vanished instead of deleted,
+// so links are preserved; if they reappear, the mark is reverted.
+// Duplicate IDs in a (faulty) response count only on first occurrence.
 func upsertComponents(tx *gorm.DB, src models.ExternalSource, sum *Summary, now time.Time) (UpsertResult, error) {
 	var existing []models.ExternalComponent
 	if err := tx.Where("external_source_id = ?", src.ID).Find(&existing).Error; err != nil {
@@ -79,7 +78,7 @@ func upsertComponents(tx *gorm.DB, src models.ExternalSource, sum *Summary, now 
 	return res, nil
 }
 
-// linkedRefRow ist eine Ergebniszeile von LinkedRefs.
+// linkedRefRow is a result row of LinkedRefs.
 type linkedRefRow struct {
 	ComponentID      uint
 	ExternalID       string
@@ -87,13 +86,13 @@ type linkedRefRow struct {
 	models.ExternalStatusRef
 }
 
-// groupKey identifiziert eine externe Gruppe innerhalb einer Quelle.
+// groupKey identifies an external group within a source.
 type groupKey struct {
 	sourceID   uint
 	externalID string
 }
 
-// groupMember ist ein aktuelles Mitglied einer externen Gruppe.
+// groupMember is a current member of an external group.
 type groupMember struct {
 	ExternalSourceID uint
 	GroupExternalID  string
@@ -101,14 +100,14 @@ type groupMember struct {
 	Status           string
 }
 
-// LinkedRefs liefert je eigener Komponente einer Statusseite die gekoppelten
-// externen Komponenten. Nur Quellen, die aktiv sind und zur selben
-// Statusseite gehören (Mandantentrennung doppelt abgesichert: Link und
-// Quelle müssen auf pageID zeigen). Verschwundene sind mit Vanished=true
-// enthalten, zählen aber nicht in Effective.
+// LinkedRefs returns, per own component of a status page, the linked
+// external components. Only sources that are active and belong to the same
+// status page (tenant separation secured twice: link and
+// source must point to pageID). Vanished ones are included with Vanished=true
+// but do not count in Effective.
 //
-// Zeigt eine Kopplung auf eine Gruppe, steht in Status das
-// Schlimmste ihrer aktuellen Mitglieder (siehe groupStatus).
+// If a link points to a group, Status holds the
+// worst of its current members (see groupStatus).
 func LinkedRefs(db *gorm.DB, pageID uint) (map[uint][]models.ExternalStatusRef, error) {
 	var rows []linkedRefRow
 	err := db.Table("external_component_links AS l").
@@ -140,7 +139,7 @@ func LinkedRefs(db *gorm.DB, pageID uint) (map[uint][]models.ExternalStatusRef, 
 	return refs, nil
 }
 
-// groupSourceIDs liefert die Quellen, deren Gruppen in rows gekoppelt sind.
+// groupSourceIDs returns the sources whose groups are linked in rows.
 func groupSourceIDs(rows []linkedRefRow) []uint {
 	seen := map[uint]bool{}
 	var ids []uint
@@ -153,9 +152,9 @@ func groupSourceIDs(rows []linkedRefRow) []uint {
 	return ids
 }
 
-// groupMembers lädt die aktuellen Mitglieder der Gruppen der Quellen
-// sourceIDs (eine Abfrage). Mitglieder sind dynamisch über group_external_id
-// bestimmt: Neue Bausteine zählen sofort, verschwundene nicht.
+// groupMembers loads the current members of the groups of the sources
+// sourceIDs (one query). Members are determined dynamically via group_external_id:
+// new components count immediately, vanished ones do not.
 func groupMembers(db *gorm.DB, sourceIDs []uint) (map[groupKey][]groupMember, error) {
 	out := map[groupKey][]groupMember{}
 	if len(sourceIDs) == 0 {
@@ -177,8 +176,8 @@ func groupMembers(db *gorm.DB, sourceIDs []uint) (map[groupKey][]groupMember, er
 	return out, nil
 }
 
-// GroupWorst liefert Status und schlechtesten Baustein einer externen Gruppe
-// (für Listen außerhalb von LinkedRefs, z. B. die Kopplungsliste im Admin).
+// GroupWorst returns the status and worst component of an external group
+// (for lists outside LinkedRefs, e.g. the link list in the admin).
 func GroupWorst(db *gorm.DB, sourceID uint, groupExternalID string) (string, *models.ExternalWorst, error) {
 	members, err := groupMembers(db, []uint{sourceID})
 	if err != nil {
@@ -188,11 +187,11 @@ func GroupWorst(db *gorm.DB, sourceID uint, groupExternalID string) (string, *mo
 	return status, worst, nil
 }
 
-// groupStatus bestimmt den Status einer Gruppe aus ihren Mitgliedern: das
-// Schlimmste nach componentstatus.Severity (bei Gleichstand das erste nach
-// Name) samt dem Baustein, der es liefert. Eine leere Gruppe - und eine, deren
-// Mitglieder alle "unknown"/"group" sind - liefert "unknown" und kein Worst:
-// Sie verschlechtert nichts und löst keinen Fehlalarm aus.
+// groupStatus determines a group's status from its members: the
+// worst by componentstatus.Severity (on a tie the first by
+// name) together with the component that yields it. An empty group - and one whose
+// members are all "unknown"/"group" - yields "unknown" and no Worst:
+// it worsens nothing and triggers no false alarm.
 func groupStatus(members []groupMember) (string, *models.ExternalWorst) {
 	var worst *groupMember
 	for i := range members {
@@ -209,13 +208,13 @@ func groupStatus(members []groupMember) (string, *models.ExternalWorst) {
 	return worst.Status, &models.ExternalWorst{Name: worst.Name, Status: worst.Status}
 }
 
-// Effective ist der effektive Status einer Komponente: das Schlimmste aus
-// ihrem eigenen Status (inkl. Überlagerung durch offene Vorfälle) und allen
-// gekoppelten, nicht verschwundenen externen Komponenten. Rangfolge und
-// Einordnung von Wartung/unknown: componentstatus.Severity. Ist die Quelle
-// ausgefallen, gilt ihr letzter bekannter Status als veraltet
-// und zählt nicht mehr, damit die öffentliche Seite nicht stundenlang eine
-// überholte Störung zeigt.
+// Effective is the effective status of a component: the worst of
+// its own status (incl. overlay by open incidents) and all
+// linked, non-vanished external components. Ranking and
+// classification of maintenance/unknown: componentstatus.Severity. If the source
+// is down, its last known status is considered stale
+// and no longer counts, so the public page does not show an
+// outdated disruption for hours.
 func Effective(own string, refs []models.ExternalStatusRef) string {
 	statuses := []string{own}
 	for _, r := range refs {
@@ -226,8 +225,8 @@ func Effective(own string, refs []models.ExternalStatusRef) string {
 	return componentstatus.Worst(statuses...)
 }
 
-// EffectiveStatuses berechnet den effektiven Status aller Komponenten einer
-// Statusseite (ohne reine Gruppen, deren Status aus den Kindern folgt).
+// EffectiveStatuses computes the effective status of all components of a
+// status page (excluding pure groups, whose status follows from the children).
 func EffectiveStatuses(db *gorm.DB, pageID uint) (map[uint]string, error) {
 	var comps []models.Component
 	if err := db.Select("id", "status").Where("status_page_id = ? AND status <> ? AND archived_at IS NULL", pageID, componentstatus.Group).Find(&comps).Error; err != nil {

@@ -266,7 +266,7 @@ const onMenuSelect = (l, key) => {
           <ListState v-else :loading="loading" :error="loadFailed" :count="catalog.length" :empty-text="t('languages.emptyCatalog')" icon="globe" />
         </ListCard>
 
-        <section v-if="activeTenantId" class="edit-card">
+        <section v-if="activeTenantId" id="page-languages" class="edit-card">
           <h3>{{ t('languages.pageLanguagesHeading') }}</h3>
           <p class="panel-lead">{{ t('languages.pageLanguagesDescription') }}</p>
           <p v-if="!translationEnabled" class="panel-lead" data-test="page-languages-single">{{ t('languages.singleLanguageHint') }}</p>

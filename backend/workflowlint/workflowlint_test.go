@@ -31,12 +31,12 @@ jobs:
 	require.Equal(t, "wf.yml", f[0].File)
 	require.Contains(t, f[0].Message, "review")
 	require.Contains(t, f[0].Message, "self-hosted")
-	// Die Meldung nennt nur noch GitHub-gehostete Runner als erlaubt, keine Ausnahme.
+	// The message names only GitHub-hosted runners as allowed, no exception.
 	require.Contains(t, f[0].Message, "nur GitHub-gehostete Runner")
 }
 
-// Es gibt keine Ausnahme für eigene Runner: Auch ein internes CI-Label (ci-intern)
-// ist bei PR-Ereignissen ein Verstoß.
+// There is no exception for own runners: even an internal CI label (ci-intern)
+// is a violation on PR events.
 func TestEigenerRunnerOhneAusnahmeBeiPullRequestIstVerboten(t *testing.T) {
 	f := pruefe(t, `
 on:
@@ -81,7 +81,7 @@ jobs:
 }
 
 func TestRunsOnMitLabelsObjektOhneGruppe(t *testing.T) {
-	// labels als erster Schlüssel: Die Labels selbst entscheiden, nicht der Nachbarschlüssel.
+	// labels as first key: the labels themselves decide, not the neighbor key.
 	f := pruefe(t, `
 on: pull_request
 jobs:
@@ -101,7 +101,7 @@ jobs:
 }
 
 func TestRunnerGruppeOhneLabelsIstSelfHosted(t *testing.T) {
-	// Runner-Gruppen enthalten nur self-hosted Runner.
+	// Runner groups contain only self-hosted runners.
 	require.Len(t, pruefe(t, `
 on: pull_request
 jobs:
@@ -133,7 +133,7 @@ jobs:
 }
 
 func TestJobNurBeiPushIstErlaubt(t *testing.T) {
-	// Ein Deploy-Job nur für push läuft auf einem eigenen Runner, aber nie für einen PR.
+	// A deploy job only for push runs on an own runner, but never for a PR.
 	require.Empty(t, pruefe(t, `
 on: [push, pull_request]
 jobs:
@@ -153,9 +153,9 @@ jobs:
 }
 
 func TestPushAusnahmeNurWennBedingungBeiPRFalschIst(t *testing.T) {
-	// Review-Befund 3: Die Ausnahme darf nur greifen, wenn das if:
-	// bei einem PR sicher falsch ist, also eine reine &&-Kette mit
-	// github.event_name == 'push' als einem Glied.
+	// Review finding 3: the exception may only apply if the if:
+	// is certainly false on a PR, i.e. a pure &&-chain with
+	// github.event_name == 'push' as one link.
 	faelle := []struct {
 		bedingung string
 		befunde   int
@@ -290,7 +290,7 @@ func TestCheckDirFehlerBeiKaputterDatei(t *testing.T) {
 
 func TestCheckDirFehlerBeiUnlesbarerDatei(t *testing.T) {
 	dir := t.TempDir()
-	// Ein Ordner mit .yml-Namen lässt sich nicht als Datei lesen (greift auch als root).
+	// A folder with a .yml name cannot be read as a file (also applies as root).
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "a.yml"), 0o700))
 	_, err := CheckDir(dir)
 	require.ErrorContains(t, err, "a.yml")
@@ -323,8 +323,8 @@ func TestRunAufruffehlerExit2(t *testing.T) {
 	require.Contains(t, errOut.String(), "Fehler")
 }
 
-// Allowlist statt Blocklist. Ein Label ohne
-// "self-hosted" reicht GitHub für die Zuordnung zu einem eigenen Runner.
+// Allowlist instead of blocklist. A label without
+// "self-hosted" suffices for GitHub to assign to an own runner.
 func TestPullRequestJobNurAufErlaubtenRunnern(t *testing.T) {
 	faelle := []struct {
 		name    string
@@ -355,8 +355,8 @@ func TestPullRequestJobNurAufErlaubtenRunnern(t *testing.T) {
 	}
 }
 
-// Auch Ereignisse außer pull_request und
-// pull_request_target führen ungemergten PR-Code aus.
+// Also events other than pull_request and
+// pull_request_target execute unmerged PR code.
 func TestAllePREreignisseWerdenGeprueft(t *testing.T) {
 	faelle := []struct {
 		name    string
@@ -379,7 +379,7 @@ func TestAllePREreignisseWerdenGeprueft(t *testing.T) {
 	}
 }
 
-// dirMit legt Workflow-Dateien in ein Temp-Verzeichnis und prüft es (Review-Befund 5).
+// dirMit puts workflow files into a temp directory and checks it (review finding 5).
 func dirMit(t *testing.T, dateien map[string]string) []Finding {
 	t.Helper()
 	dir := t.TempDir()
@@ -479,12 +479,12 @@ func TestAufrufMitYamlEndungUndMehrfachAufruf(t *testing.T) {
 	require.Len(t, f, 1)
 }
 
-// Der Lint wurde gezielt auf Umgehungen abgeklopft. Jeder Fund
-// steht hier als eigener Test; die Nicht-Funde sichern die Tests darunter ab.
+// The lint was deliberately probed for bypasses. Every finding
+// is here as its own test; the non-findings are secured by the tests below.
 
-// Fund 1: Ein YAML-Alias in runs-on kam als AliasNode an und ergab keine
-// Labels, also "erlaubt". Ein Job mit Push-Ausnahme verankert den Runner, ein
-// zweiter ohne Ausnahme übernimmt ihn per Alias.
+// Finding 1: a YAML alias in runs-on arrived as an AliasNode and yielded no
+// labels, hence "allowed". A job with a push exception anchors the runner, a
+// second one without an exception takes it over via alias.
 func TestRunsOnAlsAliasWirdAufgeloest(t *testing.T) {
 	f := pruefe(t, `
 on: [push, pull_request]
@@ -502,8 +502,8 @@ jobs:
 	require.Contains(t, f[0].Message, "custom-runner")
 }
 
-// Fund 2: Ein Alias als Listenelement lieferte den Namen des Ankers statt
-// seines Werts. Ein Anker namens ubuntu-latest schaltete so die Allowlist frei.
+// Finding 2: an alias as a list element yielded the name of the anchor instead of
+// its value. An anchor named ubuntu-latest thus unlocked the allowlist.
 func TestAliasNameGiltNichtAlsLabel(t *testing.T) {
 	require.Len(t, pruefe(t, `
 on: [push, pull_request]
@@ -518,9 +518,9 @@ jobs:
 `), 1)
 }
 
-// Fund 3: Ein Alias in on: blieb unerkannt, der Workflow galt als nicht
-// PR-ausgelöst. Gleiches gilt für Aliase in der Ereignisliste, Aliase als
-// Schlüssel und Merge-Keys in der on:-Map.
+// Finding 3: an alias in on: went undetected, the workflow counted as not
+// PR-triggered. The same applies to aliases in the event list, aliases as
+// keys and merge keys in the on: map.
 func TestOnAlsAliasOderMergeKeyWirdAufgeloest(t *testing.T) {
 	faelle := map[string]string{
 		"on als Alias":       "name: &ev pull_request\non: *ev\n",
@@ -535,8 +535,8 @@ func TestOnAlsAliasOderMergeKeyWirdAufgeloest(t *testing.T) {
 	}
 }
 
-// Fund 4: Merge-Key in einem runs-on-Objekt. Labels und Runner-Gruppe kommen
-// aus dem Anker und wurden übersehen.
+// Finding 4: merge key in a runs-on object. Labels and runner group come
+// from the anchor and were overlooked.
 func TestRunsOnObjektMitMergeKey(t *testing.T) {
 	require.Len(t, pruefe(t, `
 on: [push, pull_request]
@@ -551,18 +551,18 @@ jobs:
 `), 1)
 }
 
-// Fund 5: Unbekannte Schlüssel im runs-on-Objekt (z. B. Group/Labels in
-// anderer Schreibweise) wurden ignoriert; das Objekt galt als leer und damit
-// erlaubt. Ob GitHub sie akzeptiert, ist nicht dokumentiert, also Verstoß.
+// Finding 5: unknown keys in the runs-on object (e.g. Group/Labels in
+// a different spelling) were ignored; the object counted as empty and thus
+// allowed. Whether GitHub accepts them is undocumented, so a violation.
 func TestRunsOnObjektMitUnbekanntemSchluessel(t *testing.T) {
 	for _, runsOn := range []string{"{Group: prod}", "{Labels: [self-hosted, custom-runner]}", "{labels: [ubuntu-latest], runner: custom-runner}"} {
 		require.Len(t, pruefe(t, "on: pull_request\njobs:\n  x:\n    runs-on: "+runsOn+"\n    steps: [{run: echo}]\n"), 1, runsOn)
 	}
 }
 
-// Fund 6: Die gehosteten Labels wurden nur am Präfix erkannt. Damit gingen
-// Ausdrücke wie ubuntu-${{ matrix.x }} und eigene Labels wie ubuntu-custom
-// durch, obwohl GitHub sie einem self-hosted Runner zuordnen kann.
+// Finding 6: the hosted labels were only recognized by prefix. That let
+// expressions like ubuntu-${{ matrix.x }} and custom labels like ubuntu-custom
+// through, although GitHub can assign them to a self-hosted runner.
 func TestGehosteteLabelsNurExakt(t *testing.T) {
 	faelle := map[string]int{
 		"ubuntu-${{ matrix.version }}": 1,
@@ -587,19 +587,19 @@ func TestGehosteteLabelsNurExakt(t *testing.T) {
 	}
 }
 
-// Fund 7: workflow_run und issue_comment laufen im Repo-Kontext und werden
-// durch PR-Aktivität ausgelöst (Abschluss des PR-CI-Laufs bzw. Kommentar am
-// PR). Sie checken typischerweise den PR-Stand aus (head_sha, ChatOps) und
-// zählen deshalb wie pull_request_target als PR-Ereignis.
+// Finding 7: workflow_run and issue_comment run in the repo context and are
+// triggered by PR activity (completion of the PR CI run or comment on the
+// PR). They typically check out the PR state (head_sha, ChatOps) and
+// therefore count as a PR event, like pull_request_target.
 func TestWorkflowRunUndIssueCommentZaehlenAlsPR(t *testing.T) {
 	for _, on := range []string{"workflow_run", "{workflow_run: {workflows: [CI], types: [completed]}}", "[issue_comment]"} {
 		require.Len(t, pruefe(t, "on: "+on+"\njobs:\n  x:\n    runs-on: custom-runner\n    steps: [{run: echo}]\n"), 1, on)
 	}
 }
 
-// Fund 8: Ein lokaler Aufruf mit anderer Schreibweise des Pfads
-// (./.GitHub/workflows/…) wurde weder verfolgt noch gemeldet. Jeder lokale
-// Job-uses: außerhalb von ./.github/workflows/ ist ein Befund.
+// Finding 8: a local call with a different spelling of the path
+// (./.GitHub/workflows/…) was neither followed nor reported. Every local
+// job uses: outside ./.github/workflows/ is a finding.
 func TestLokalerAufrufAusserhalbVonWorkflowsIstBefund(t *testing.T) {
 	f := dirMit(t, map[string]string{
 		"a.yml": strings.Replace(aufrufer, "./.github/workflows/b.yml", "./.GitHub/workflows/b.yml", 1),
@@ -609,22 +609,22 @@ func TestLokalerAufrufAusserhalbVonWorkflowsIstBefund(t *testing.T) {
 	require.Contains(t, f[0].File, "a.yml")
 }
 
-// Nicht-Funde, als Regressionstests festgehalten.
+// Non-findings, recorded as regression tests.
 
 func TestMapMitNichtStringSchluessel(t *testing.T) {
-	// yaml.v3 dekodiert solche Maps als map[any]any.
+	// yaml.v3 decodes such maps as map[any]any.
 	require.Len(t, pruefe(t, "on: {pull_request: {}, 1: x}\njobs:\n  x:\n    runs-on: custom-runner\n    steps: [{run: echo}]\n"), 1)
 	f := pruefe(t, "on: pull_request\njobs:\n  x:\n    runs-on: {1: x, labels: [ubuntu-latest]}\n    steps: [{run: echo}]\n")
 	require.Len(t, f, 1)
 	require.Contains(t, f[0].Message, "[1 ubuntu-latest]")
-	// Ohne on: oder mit einem Wert, der kein Ereignis nennt, ist nichts PR-ausgelöst.
+	// Without on: or with a value that names no event, nothing is PR-triggered.
 	for _, on := range []string{"", "on:\n", "on: 1\n"} {
 		require.Empty(t, pruefe(t, on+"jobs:\n  x:\n    runs-on: custom-runner\n    steps: [{run: echo}]\n"), on)
 	}
 }
 
 func TestMergeKeyImJobWirdAufgeloest(t *testing.T) {
-	// yaml.v3 wendet Merge-Keys beim Dekodieren in Structs an.
+	// yaml.v3 applies merge keys when decoding into structs.
 	require.Len(t, pruefe(t, `
 on: [push, pull_request]
 jobs:

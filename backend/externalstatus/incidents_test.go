@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Spiegelung von Vorfällen und Wartungen, stiller Erstimport,
-// Idempotenz und Mandantentrennung auf Dienst-Ebene.
+// Mirroring of incidents and maintenances, silent initial import,
+// idempotency and tenant separation at service level.
 
-// incProvider ergänzt den Fake-Provider um die Feeds.
+// incProvider extends the fake provider with the feeds.
 type incProvider struct {
 	*fakeProvider
 	mu    sync.Mutex
@@ -48,7 +48,7 @@ func (p *incProvider) set(kind string, items ...Incident) {
 type incRecorder struct {
 	mu     sync.Mutex
 	events []IncidentEvent
-	// Aufräum-Meldungen (RetentionReporter).
+	// Cleanup reports (RetentionReporter).
 	pruned    []int
 	retention time.Duration
 }
@@ -83,8 +83,8 @@ type incFixture struct {
 	rec  *incRecorder
 }
 
-// newIncFixture: Dienst mit Vorfall-Provider und Recorder; "vm" ist an die
-// eigene Komponente gekoppelt.
+// newIncFixture: service with incident provider and recorder; "vm" is linked to the
+// own component.
 func newIncFixture(t *testing.T) *incFixture {
 	t.Helper()
 	sf := newServiceFixture(t, okSummary("e1", comp("vm", "Service 03", "operational")))
@@ -163,7 +163,7 @@ func TestIncidents_ErstimportIstStill(t *testing.T) {
 	assert.Empty(t, src.IncidentsError)
 	assert.Equal(t, `"incident"`, src.IncidentsETag)
 
-	// Danach: neues Update und neuer Vorfall melden.
+	// After that: a new update and a new incident are reported.
 	f.prov.set(models.ExternalIncidentKindIncident,
 		inc("i1", "identified", "Wir prüfen", "Ursache gefunden"), inc("i2", "resolved", "Behoben"), inc("i3", "investigating", "Neu"))
 	f.prov.set(models.ExternalIncidentKindMaintenance, maint("m1", "scheduled"))
@@ -184,7 +184,7 @@ func TestIncidents_ErstimportIstStill(t *testing.T) {
 func TestIncidents_ZweimalPollenKeineZweiteMeldung(t *testing.T) {
 	f := newIncFixture(t)
 	f.prov.set(models.ExternalIncidentKindIncident)
-	f.poll() // Erstimport (leer)
+	f.poll() // initial import (empty)
 
 	f.prov.set(models.ExternalIncidentKindIncident, inc("i1", "investigating", "Wir prüfen"))
 	f.poll()
@@ -208,8 +208,8 @@ func TestIncidents_BedingtesUpdateGegenParallelenAbruf(t *testing.T) {
 	f.poll()
 	f.rec.take()
 
-	// Eine andere Instanz hat den neuen Stand schon beansprucht: unser (veralteter)
-	// Abruf darf ihn nicht noch einmal melden.
+	// Another instance has already claimed the new state: our (stale)
+	// fetch must not report it again.
 	stale := f.rows(t)[0]
 	newer := inc("i1", "monitoring", "a", "b")
 	require.NoError(t, f.db.Model(&models.ExternalIncident{}).Where("id = ?", stale.ID).Update("notify_key", fingerprint(newer)).Error)
@@ -236,7 +236,7 @@ func TestIncidents_NurGekoppelteKomponentenZaehlen(t *testing.T) {
 	assert.Equal(t, "i3", got[0].Incident.ExternalID)
 	assert.Len(t, f.rows(t), 3, "die übrigen werden trotzdem gespiegelt")
 
-	// Wird später gekoppelt, meldet erst das nächste Update.
+	// If linked later, only the next update reports.
 	other2 := inc("i1", "identified", "x", "y")
 	other2.Components = other.Components
 	f.prov.set(models.ExternalIncidentKindIncident, other2)
@@ -246,7 +246,7 @@ func TestIncidents_NurGekoppelteKomponentenZaehlen(t *testing.T) {
 
 func TestIncidents_GruppenKopplungGiltFuerMitglieder(t *testing.T) {
 	f := newIncFixture(t)
-	// Gruppe "g1" mit Mitglied "vm2"; die eigene Komponente koppelt die Gruppe.
+	// Group "g1" with member "vm2"; the own component links the group.
 	grp := models.ExternalComponent{ExternalSourceID: f.src.ID, ExternalID: "g1", Name: "Gruppe", IsGroup: true, Status: componentstatus.Operational, LastSeenAt: f.now}
 	member := models.ExternalComponent{ExternalSourceID: f.src.ID, ExternalID: "vm2", Name: "VM2", GroupExternalID: "g1", Status: componentstatus.Operational, LastSeenAt: f.now}
 	require.NoError(t, f.db.Create(&grp).Error)
@@ -278,7 +278,7 @@ func TestIncidents_BereitsBeendetBeimAuftauchenIstStill(t *testing.T) {
 	assert.Empty(t, f.rec.notified(), "Vorfall, der schon beendet auftaucht, löst nichts aus")
 	assert.Len(t, f.rows(t), 1)
 
-	// Nachträgliches Update einer beendeten Meldung (z. B. Postmortem) ebenfalls nicht.
+	// A later update of a finished report (e.g. postmortem) likewise not.
 	f.prov.set(models.ExternalIncidentKindIncident, inc("alt", "resolved", "Behoben", "Postmortem"))
 	f.poll()
 	assert.Empty(t, f.rec.notified())
@@ -295,9 +295,9 @@ func TestIncidents_VerlaufMeldetErstellungUpdateUndBehebung(t *testing.T) {
 	}{
 		{inc("i1", "investigating", "a"), IncidentCreated},
 		{inc("i1", "identified", "a", "b"), IncidentUpdated},
-		{inc("i1", "identified", "a", "b", "c"), IncidentUpdated}, // gleicher Status, neues Update
+		{inc("i1", "identified", "a", "b", "c"), IncidentUpdated}, // same status, new update
 		{inc("i1", "resolved", "a", "b", "c", "d"), IncidentResolved},
-		{inc("i1", "investigating", "a", "b", "c", "d", "e"), IncidentUpdated}, // wieder geöffnet
+		{inc("i1", "investigating", "a", "b", "c", "d", "e"), IncidentUpdated}, // reopened
 	}
 	for _, s := range steps {
 		f.prov.set(models.ExternalIncidentKindIncident, s.it)
@@ -316,7 +316,7 @@ func TestIncidents_RueckdatiertesUpdateWirdGemeldet(t *testing.T) {
 	f.poll()
 	f.rec.take()
 
-	// Neues Update mit älterem display_at, gleicher Status.
+	// New update with an older display_at, same status.
 	it := inc("i1", "investigating", "a", "b")
 	it.Updates = append(it.Updates, IncidentUpdate{ExternalID: "i1-uX", Status: "investigating", Body: "nachgetragen", DisplayAt: it.Updates[0].DisplayAt.Add(-time.Hour)})
 	f.prov.set(models.ExternalIncidentKindIncident, it)
@@ -326,7 +326,7 @@ func TestIncidents_RueckdatiertesUpdateWirdGemeldet(t *testing.T) {
 
 func TestIncidents_WartungenUndEigenerMarker(t *testing.T) {
 	f := newIncFixture(t)
-	// Nur die Vorfälle sind beim ersten Abruf lesbar; die Wartungen scheitern.
+	// Only the incidents are readable on the first fetch; the maintenances fail.
 	f.prov.errs[models.ExternalIncidentKindMaintenance] = errors.New("HTTP 500")
 	f.prov.set(models.ExternalIncidentKindIncident, inc("i1", "investigating", "a"))
 	res := f.poll()
@@ -337,7 +337,7 @@ func TestIncidents_WartungenUndEigenerMarker(t *testing.T) {
 	assert.Contains(t, src.IncidentsError, "maintenance: HTTP 500")
 	assert.True(t, *src.LastFetchOK)
 
-	// Die Wartungen kommen später: ihr Erstimport ist still, auch wenn die Vorfälle schon laufen.
+	// The maintenances arrive later: their initial import is silent even if the incidents are already running.
 	delete(f.prov.errs, models.ExternalIncidentKindMaintenance)
 	f.prov.set(models.ExternalIncidentKindMaintenance, maint("m1", "in_progress"))
 	f.poll()
@@ -346,7 +346,7 @@ func TestIncidents_WartungenUndEigenerMarker(t *testing.T) {
 	assert.NotNil(t, src.MaintenancesSyncedAt)
 	assert.Empty(t, src.IncidentsError, "Fehlertext wird nach Erfolg gelöscht")
 
-	// Ab jetzt melden Wartungen: Beginn, Ende.
+	// From now on maintenances report: start, end.
 	f.prov.set(models.ExternalIncidentKindMaintenance, maint("m1", "in_progress"), maint("m2", "scheduled"))
 	f.poll()
 	got := f.rec.notified()
@@ -411,7 +411,7 @@ func TestIncidents_InaktiveQuelleSpiegeltOhneMeldung(t *testing.T) {
 	f.poll()
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("active", false).Error)
 	f.prov.set(models.ExternalIncidentKindIncident, inc("i1", "investigating", "a"))
-	f.poll() // "Jetzt abrufen" geht auch bei inaktiven Quellen
+	f.poll() // "Fetch now" also works for inactive sources
 	got := f.rec.take()
 	require.Len(t, got, 1)
 	assert.False(t, got[0].Notify)
@@ -459,9 +459,9 @@ func TestIncidents_ProviderOhneVorfallUnterstuetzung(t *testing.T) {
 
 func TestOwnComponentMap_Mandantentrennung(t *testing.T) {
 	f := newIncFixture(t)
-	// Fremde Seite koppelt ihre eigene "vm" - darf in unserer Auswertung nicht auftauchen.
+	// Foreign page links its own "vm" - must not show up in our evaluation.
 	f.link(t, f.otherPage.ID, f.otherComp.ID, f.otherExt.ID)
-	// Gelöschte eigene Komponente zählt nicht.
+	// Deleted own component does not count.
 	gone := models.Component{StatusPageID: f.page.ID, Name: "Weg", Status: componentstatus.Operational}
 	require.NoError(t, f.db.Create(&gone).Error)
 	f.link(t, f.page.ID, gone.ID, f.ext.ID)
@@ -473,18 +473,18 @@ func TestOwnComponentMap_Mandantentrennung(t *testing.T) {
 	require.Len(t, m[f.src.ID]["vm"], 1)
 	assert.Equal(t, f.comp.ID, m[f.src.ID]["vm"][0].ID)
 
-	other, err := OwnComponentMap(f.db, f.otherPage.ID, f.otherSrc.ID) // otherSrc ist im Fixture inaktiv
+	other, err := OwnComponentMap(f.db, f.otherPage.ID, f.otherSrc.ID) // otherSrc is inactive in the fixture
 	require.NoError(t, err)
 	assert.Len(t, other[f.otherSrc.ID]["vm"], 1)
 	assert.Empty(t, other[f.src.ID])
 
-	// Inaktive Quellen entfallen bei sourceID 0, mit expliziter ID nicht.
+	// Inactive sources are omitted for sourceID 0, but not with an explicit ID.
 	require.NoError(t, f.db.Model(&models.ExternalSource{}).Where("id = ?", f.src.ID).Update("active", false).Error)
 	m, _ = OwnComponentMap(f.db, f.page.ID, 0)
 	assert.Empty(t, m)
 	m, _ = OwnComponentMap(f.db, f.page.ID, f.src.ID)
 	assert.Len(t, m[f.src.ID]["vm"], 1)
-	// Seite und Quelle passen nicht zusammen: nichts.
+	// Page and source do not match: nothing.
 	m, _ = OwnComponentMap(f.db, f.otherPage.ID, f.src.ID)
 	assert.Empty(t, m)
 }
@@ -523,7 +523,7 @@ func TestAffectedOwn_SortierungUndDoppelte(t *testing.T) {
 
 func TestOwnComponentMap_GruppeUndMitgliedGleichzeitigGekoppelt(t *testing.T) {
 	f, _ := prepareChangeState(t)
-	// "Backend" koppelt die Gruppe g1 und zusätzlich direkt deren Mitglied: ein Eintrag, nicht zwei.
+	// "Backend" links group g1 and additionally its member directly: one entry, not two.
 	member := models.ExternalComponent{ExternalSourceID: f.src.ID, ExternalID: "m1", Name: "Mitglied", GroupExternalID: "g1", Status: componentstatus.Operational, LastSeenAt: f.now}
 	require.NoError(t, f.db.Create(&member).Error)
 	var backend models.Component

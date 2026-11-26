@@ -1,19 +1,19 @@
-// Package workflowlint prüft die GitHub-Actions-Workflows auf zwei Regeln:
+// Package workflowlint checks the GitHub Actions workflows against two rules:
 //
-//  1. Kein Job, den ein Pull Request auslösen kann, läuft auf einem
-//     self-hosted Runner. Erlaubt sind nur GitHub-gehostete Runner. Sonst
-//     führt Code aus einem fremden PR auf einer eigenen Maschine aus (bei
-//     einem öffentlichen Repository kann jeder einen PR stellen).
-//  2. Jede fremde Action und jeder fremde wiederverwendbare Workflow ist per
-//     vollständigem Commit-SHA gepinnt, nicht per Tag oder Branch.
+//  1. No job that a pull request can trigger runs on a
+//     self-hosted runner. Only GitHub-hosted runners are allowed. Otherwise
+//     code from a foreign PR runs on an own machine (with
+//     a public repository anyone can open a PR).
+//  2. Every third-party action and every third-party reusable workflow is pinned
+//     by full commit SHA, not by tag or branch.
 //
-// Dazu kommen die Härtungsregeln in haertung.go: ausdrückliche permissions und
-// persist-credentials: false bei jedem Checkout.
+// In addition there are the hardening rules in haertung.go: explicit permissions and
+// persist-credentials: false on every checkout.
 //
-// Ein PR kann diese Prüfung im eigenen Branch abschalten (pull_request nutzt
-// die Workflow-Dateien des PRs). Sie verhindert also Versehen, keinen Angriff
-// mit Schreibrechten; dagegen hilft nur, dass die Agent-Tokens keine
-// workflow-Berechtigung haben.
+// A PR can disable this check in its own branch (pull_request uses
+// the PR's workflow files). It therefore prevents mistakes, not an attack
+// with write permissions; the only defense against that is that the agent tokens have no
+// workflow permission.
 package workflowlint
 
 import (
@@ -28,7 +28,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Finding ist ein Verstoß in einer Workflow-Datei.
+// Finding is a violation in a workflow file.
 type Finding struct {
 	File    string
 	Message string
@@ -37,17 +37,17 @@ type Finding struct {
 var (
 	pinned   = regexp.MustCompile(`@[0-9a-f]{40}$`)
 	gehostet = regexp.MustCompile(`^(ubuntu|windows|macos)-(latest|slim|\d+(\.\d+)?)(-(arm|intel|large|xlarge))?$`)
-	// Ein Glied einer &&-Kette, das bei PR-Ereignissen immer falsch ist (z. B. ein Deploy-Job nur für push).
+	// A link of an &&-chain that is always false on PR events (e.g. a deploy job only for push).
 	nurPush  = regexp.MustCompile(`^github\.event_name\s*==\s*['"]push['"]$`)
 	ausdruck = regexp.MustCompile(`^\$\{\{(.*)\}\}$`)
-	// Argumentlose Statusfunktionen sind harmlose Glieder einer &&-Kette.
+	// Argument-less status functions are harmless links of an &&-chain.
 	statusFunktion = regexp.MustCompile(`\b(success|always|failure|cancelled)\(\)`)
 )
 
-// On und RunsOn sind any statt yaml.Node: Beim Dekodieren nach
-// any löst yaml.v3 Aliase und Merge-Keys auf. Ein yaml.Node behielt sie roh,
-// sodass runs-on: *anker als leer (= erlaubt) galt und ein Alias-Element den
-// Ankernamen statt des Werts lieferte (Anker &ubuntu-latest → "ubuntu-latest").
+// On and RunsOn are any instead of yaml.Node: when decoding into
+// any, yaml.v3 resolves aliases and merge keys. A yaml.Node kept them raw,
+// so runs-on: *anchor counted as empty (= allowed) and an alias element yielded
+// the anchor name instead of the value (anchor &ubuntu-latest → "ubuntu-latest").
 type workflow struct {
 	On   any            `yaml:"on"`
 	Jobs map[string]job `yaml:"jobs"`
@@ -62,7 +62,7 @@ type job struct {
 	} `yaml:"steps"`
 }
 
-// CheckWorkflow prüft eine Workflow-Datei; name erscheint in den Befunden.
+// CheckWorkflow checks a workflow file; name appears in the findings.
 func CheckWorkflow(name string, data []byte) ([]Finding, error) {
 	var wf workflow
 	if err := yaml.Unmarshal(data, &wf); err != nil {
@@ -71,8 +71,8 @@ func CheckWorkflow(name string, data []byte) ([]Finding, error) {
 	return pruefeWorkflow(name, wf, triggeredByPR(wf.On), ""), nil
 }
 
-// pruefeWorkflow prüft einen geparsten Workflow. pr sagt, ob ein PR ihn auslöst;
-// aufrufer nennt bei wiederverwendbaren Workflows den PR-Job, der ihn einbindet.
+// pruefeWorkflow checks a parsed workflow. pr says whether a PR triggers it;
+// aufrufer names, for reusable workflows, the PR job that includes it.
 func pruefeWorkflow(name string, wf workflow, pr bool, aufrufer string) []Finding {
 	var findings []Finding
 	add := func(format string, args ...any) {
@@ -111,16 +111,16 @@ func jobIDs(wf workflow) []string {
 	return ids
 }
 
-// prEvents sind alle Ereignisse, die ungemergten PR-Code ausführen:
-// pull_request_review(_comment) laufen auf refs/pull/<N>/merge, merge_group
-// auf dem Stand der Merge-Queue. pull_request_target, workflow_run und
-// issue_comment laufen zwar im Repo-Kontext, werden aber durch PR-Aktivität
-// ausgelöst (PR-CI-Lauf beendet, Kommentar am PR) und checken typischerweise
-// den PR-Stand aus.
+// prEvents are all events that execute unmerged PR code:
+// pull_request_review(_comment) run on refs/pull/<N>/merge, merge_group
+// on the state of the merge queue. pull_request_target, workflow_run and
+// issue_comment do run in the repo context, but are triggered by PR activity
+// (PR CI run finished, comment on the PR) and typically check
+// out the PR state.
 var prEvents = []string{"pull_request", "pull_request_target", "pull_request_review", "pull_request_review_comment", "merge_group", "workflow_run", "issue_comment"}
 
-// triggeredByPR erkennt die prEvents in allen drei Schreibweisen von "on":
-// String, Liste oder Map.
+// triggeredByPR detects the prEvents in all three notations of "on":
+// string, list or map.
 func triggeredByPR(on any) bool {
 	var events []string
 	switch v := on.(type) {
@@ -141,11 +141,11 @@ func triggeredByPR(on any) bool {
 	return false
 }
 
-// runnerLabels liest runs-on als String, Liste oder {group: …, labels: …}.
-// Eine Runner-Gruppe enthält nur self-hosted Runner, auch ohne das Label;
-// sie wird als "self-hosted" gezählt und von der Allowlist abgelehnt. Andere
-// Schlüssel (etwa Group/Labels in anderer Schreibweise) zählen selbst als
-// fremdes Label, statt still ignoriert zu werden.
+// runnerLabels reads runs-on as a string, list or {group: …, labels: …}.
+// A runner group contains only self-hosted runners, even without the label;
+// it is counted as "self-hosted" and rejected by the allowlist. Other
+// keys (e.g. Group/Labels in a different spelling) themselves count as a
+// foreign label, instead of being silently ignored.
 func runnerLabels(v any) []string {
 	var out []string
 	switch r := v.(type) {
@@ -172,9 +172,9 @@ func runnerLabels(v any) []string {
 	return out
 }
 
-// alsMap macht aus einer dekodierten YAML-Map eine map[string]any, für alles
-// andere nil. yaml.v3 dekodiert eine Map mit einem Nicht-String-Schlüssel
-// (on: {pull_request: …, 1: x}) als map[any]any.
+// alsMap turns a decoded YAML map into a map[string]any, for everything
+// else nil. yaml.v3 decodes a map with a non-string key
+// (on: {pull_request: …, 1: x}) as map[any]any.
 func alsMap(v any) map[string]any {
 	switch m := v.(type) {
 	case map[string]any:
@@ -189,7 +189,7 @@ func alsMap(v any) map[string]any {
 	return nil
 }
 
-// mapSchluessel liefert die Schlüssel von alsMap(v) sortiert.
+// mapSchluessel returns the keys of alsMap(v) sorted.
 func mapSchluessel(v any) []string {
 	var keys []string
 	for k := range alsMap(v) {
@@ -199,13 +199,13 @@ func mapSchluessel(v any) []string {
 	return keys
 }
 
-// erlaubterPRRunner ist eine Allowlist: Erlaubt sind nur Labelsätze aus
-// ausschließlich GitHub-gehosteten Labels. Alles andere (eigene Labels
-// wie "custom-runner", Runner-Gruppen, nicht auflösbare Ausdrücke) zählt als
-// Verstoß, denn GitHub ordnet einen Job auch ohne das Label self-hosted einem
-// Runner mit passenden Labels zu. GitHub vergleicht Labels ohne Beachtung
-// der Groß- und Kleinschreibung. Ohne runs-on (wiederverwendbarer Workflow)
-// ist die Liste leer und damit erlaubt.
+// erlaubterPRRunner is an allowlist: only label sets consisting
+// exclusively of GitHub-hosted labels are allowed. Everything else (custom labels
+// like "custom-runner", runner groups, unresolvable expressions) counts as a
+// violation, because GitHub assigns a job to a runner with matching labels
+// even without the self-hosted label. GitHub compares labels case-insensitively.
+// Without runs-on (reusable workflow)
+// the list is empty and therefore allowed.
 func erlaubterPRRunner(labels []string) bool {
 	hosted := true
 	for _, l := range labels {
@@ -216,20 +216,20 @@ func erlaubterPRRunner(labels []string) bool {
 	return hosted
 }
 
-// githubGehostet erkennt die Labels der GitHub-gehosteten Standard-Runner
-// (ubuntu-latest, ubuntu-24.04-arm, windows-2025, macos-15-intel, …) exakt.
-// Ein reiner Präfix-Vergleich ließ ubuntu-${{ matrix.x }} und eigene Labels
-// wie ubuntu-custom durch. Larger Runner mit frei gewählten
-// Namen fallen bewusst durch und müssten hier ergänzt werden.
+// githubGehostet recognizes the labels of the GitHub-hosted standard runners
+// (ubuntu-latest, ubuntu-24.04-arm, windows-2025, macos-15-intel, …) exactly.
+// A plain prefix comparison let ubuntu-${{ matrix.x }} and custom labels
+// like ubuntu-custom through. Larger runners with freely chosen
+// names deliberately fall through and would have to be added here.
 func githubGehostet(label string) bool {
 	return gehostet.MatchString(label)
 }
 
-// nieBeiPR erkennt ein if:, das bei PR-Ereignissen sicher falsch ist: eine reine
-// &&-Kette, von der ein Glied genau github.event_name == 'push' ist.
-// Mit || ist die Kette nicht mehr sicher falsch; Negation oder Klammern
-// irgendwo in der Bedingung (Befund 4) → keine Ausnahme, denn dann ist der Split an
-// && nicht mehr korrekt. Im Zweifel wird der Job geprüft.
+// nieBeiPR detects an if: that is certainly false on PR events: a pure
+// &&-chain of which one link is exactly github.event_name == 'push'.
+// With || the chain is no longer certainly false; negation or parentheses
+// anywhere in the condition (finding 4) → no exception, because then the split at
+// && is no longer correct. When in doubt, the job is checked.
 func nieBeiPR(bedingung string) bool {
 	b := strings.TrimSpace(bedingung)
 	if m := ausdruck.FindStringSubmatch(b); m != nil {
@@ -262,7 +262,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// lokalerWorkflow ist das Präfix von uses: bei wiederverwendbaren Workflows im selben Repo.
+// lokalerWorkflow is the prefix of uses: for reusable workflows in the same repo.
 const lokalerWorkflow = "./.github/workflows/"
 
 type datei struct {
@@ -270,9 +270,9 @@ type datei struct {
 	wf   workflow
 }
 
-// CheckDir prüft alle *.yml/*.yaml in dir. Ein wiederverwendbarer Workflow, den
-// ein PR-Job per uses: ./.github/workflows/<datei> einbindet (auch über mehrere
-// Ebenen), läuft im Kontext des PRs und zählt selbst als PR-ausgelöst.
+// CheckDir checks all *.yml/*.yaml in dir. A reusable workflow that
+// a PR job includes via uses: ./.github/workflows/<file> (even across several
+// levels) runs in the context of the PR and itself counts as PR-triggered.
 func CheckDir(dir string) ([]Finding, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -299,7 +299,7 @@ func CheckDir(dir string) ([]Finding, error) {
 	}
 	sort.Strings(namen)
 
-	// aufrufer: Datei → PR-Job, über den sie erreicht wird ("" = direkt PR-ausgelöst).
+	// aufrufer: file → PR job through which it is reached ("" = directly PR-triggered).
 	aufrufer := map[string]string{}
 	var queue []string
 	for _, n := range namen {
@@ -315,9 +315,9 @@ func CheckDir(dir string) ([]Finding, error) {
 		d := dateien[n]
 		for _, id := range jobIDs(d.wf) {
 			j := d.wf.Jobs[id]
-			// Jeder lokale Aufruf (./…) zählt; einer außerhalb von
-			// ./.github/workflows/ (z. B. ./.GitHub/…) blieb sonst ungeprüft.
-			// Er behält nach TrimPrefix sein "./…" und passt auf keinen Dateinamen.
+			// Every local call (./…) counts; one outside
+			// ./.github/workflows/ (e.g. ./.GitHub/…) would otherwise remain unchecked.
+			// After TrimPrefix it keeps its "./…" and matches no file name.
 			if !strings.HasPrefix(j.Uses, "./") || nieBeiPR(j.If) {
 				continue
 			}
@@ -339,9 +339,9 @@ func CheckDir(dir string) ([]Finding, error) {
 	return findings, nil
 }
 
-// Run ist die CLI (cmd/workflowlint): 0 = sauber, 1 = Befunde, 2 = Aufruf-
-// oder Lesefehler. Die Logik steht hier statt in package main, weil gremlins
-// Mutanten in cmd/ dem falschen Paket zuordnet (siehe CONTRIBUTING.md).
+// Run is the CLI (cmd/workflowlint): 0 = clean, 1 = findings, 2 = invocation
+// or read error. The logic lives here instead of in package main because gremlins
+// assigns mutants in cmd/ to the wrong package (see CONTRIBUTING.md).
 func Run(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		_, _ = fmt.Fprintln(stderr, "Aufruf: workflowlint <workflow-ordner>")

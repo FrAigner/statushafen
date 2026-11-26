@@ -24,8 +24,8 @@ func methodMetricsRouter(reg *metrics.Registry) *gin.Engine {
 	return r
 }
 
-// Die HTTP-Methode ist ein freier Token; als Label würde jede erfundene
-// Methode eine neue Zeitreihe anlegen (Speicher wächst bis zum Neustart).
+// The HTTP method is a free token; as a label, every invented
+// method would create a new time series (memory grows until restart).
 func TestGoldenSignals_UnknownMethodsShareOneLabel(t *testing.T) {
 	reg := metrics.NewRegistry()
 	r := methodMetricsRouter(reg)
@@ -54,7 +54,7 @@ func TestGoldenSignals_VeryLongMethodIsNotStored(t *testing.T) {
 	}
 }
 
-// Gegenprobe: die üblichen Methoden behalten ihr Label.
+// Control check: the usual methods keep their label.
 func TestGoldenSignals_KnownMethodsKeepTheirLabel(t *testing.T) {
 	reg := metrics.NewRegistry()
 	r := methodMetricsRouter(reg)
@@ -70,7 +70,7 @@ func TestGoldenSignals_KnownMethodsKeepTheirLabel(t *testing.T) {
 	}
 	assert.ElementsMatch(t, known, got)
 
-	// Kleinschreibung ist kein bekannter Methodenname.
+	// Lowercase is not a known method name.
 	req := httptest.NewRequest(http.MethodGet, "/probe", nil)
 	req.Method = "get"
 	r.ServeHTTP(httptest.NewRecorder(), req)

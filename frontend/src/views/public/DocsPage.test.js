@@ -92,7 +92,7 @@ describe('DocsPage', () => {
     it('scrolls anchored headings below the sticky header', () => {
       const css = docsSource.split('<style scoped>')[1]
       const headings = css.match(/\.docs-markdown :deep\(h3\) \{\s*scroll-margin-top:([^;]*);/)?.[1] ?? ''
-      expect(headings).toMatch(/var\(--lp-header-height\)/)
+      expect(headings).toMatch(/var\(--docs-anchor-offset, var\(--lp-header-height\)\)/)
     })
   })
 
@@ -126,7 +126,10 @@ describe('DocsPage', () => {
       document.body.appendChild(bar)
       try {
         ;({ wrapper } = await mountDocs('/admin/docs/faq'))
-        expect(wrapper.find('.docs').attributes('style')).toContain('--lp-header-height: 125px')
+        const style = wrapper.find('.docs').attributes('style')
+        expect(style).toContain('--docs-anchor-offset: 125px')
+        // The sticky sidebar refers to the admin content area (below the top bar), so it keeps no offset.
+        expect(style).not.toContain('--lp-header-height')
       } finally {
         bar.remove()
       }
@@ -150,7 +153,7 @@ describe('DocsPage', () => {
         height = 180
         observers[0].cb()
         await flushPromises()
-        expect(wrapper.find('.docs').attributes('style')).toContain('--lp-header-height: 180px')
+        expect(wrapper.find('.docs').attributes('style')).toContain('--docs-anchor-offset: 180px')
         wrapper.unmount()
         wrapper = undefined
         expect(observers[0].disconnect).toHaveBeenCalled()

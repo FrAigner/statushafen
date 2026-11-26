@@ -11,31 +11,31 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Umstellung des Rechtemodells von "<ressource>:read|write" auf
-// "<ressource>:create|read|update|delete" je Tab.
+// Changeover of the permission model from "<resource>:read|write" to
+// "<resource>:create|read|update|delete" per tab.
 const (
-	// permissionsMigrationKey markiert (SystemSetting), dass die Umstellung
-	// gelaufen ist. Ohne Marker würde ein späterer Start jede Rolle erneut
-	// koppeln (z. B. components:read -> external_sources:read) und damit
-	// Rechte zurückholen, die ein Admin inzwischen bewusst entzogen hat.
+	// permissionsMigrationKey marks (SystemSetting) that the changeover
+	// has run. Without the marker a later start would couple every role again
+	// (e.g. components:read -> external_sources:read) and thereby bring back
+	// permissions that an admin has deliberately revoked in the meantime.
 	permissionsMigrationKey = "permissions.crud_migrated"
-	// permissionsBackupKey hält die Rechte-Strings aller geänderten Rollen
-	// vor der Umstellung (JSON {"<rollen-id>": "<alt>"}), damit ein Rollback
-	// auf eine ältere App-Version ohne DB-Backup möglich bleibt.
-	// Er wird nur angelegt und nie überschrieben.
+	// permissionsBackupKey holds the permission strings of all changed roles
+	// before the changeover (JSON {"<role-id>": "<old>"}), so a rollback
+	// to an older app version remains possible without a DB backup.
+	// It is only created and never overwritten.
 	permissionsBackupKey = "permissions.crud_backup"
 )
 
-// migrateRolePermissionsToCRUD ersetzt in ALLEN Rollen (auch benutzerdefinierte
-// und soft-gelöschte) "<ressource>:write" durch create+read+update+delete und
-// koppelt die Tabs, die bisher an eine andere Ressource hingen, 1:1 so, dass
-// niemand Rechte gewinnt oder verliert (permissions.MigrateLegacy). Die Rolle
-// "Global Admin" bekommt zusätzlich alle Rechte.
+// migrateRolePermissionsToCRUD replaces in ALL roles (also custom
+// and soft-deleted ones) "<resource>:write" with create+read+update+delete and
+// couples the tabs that previously depended on another resource 1:1 so that
+// nobody gains or loses permissions (permissions.MigrateLegacy). The role
+// "Global Admin" additionally gets all permissions.
 //
-// Prod-sicher: läuft in einer Transaktion samt Backup und Marker, genau einmal
-// (Marker), ändert updated_at nicht und bricht den Start bei einem Fehler nicht
-// ab - es gibt dann nur eine Warnung, und der nächste Start versucht es erneut.
-// Bis dahin gelten Alt-Strings über die Kompatibilität in permissions.Has weiter.
+// Prod-safe: runs in one transaction including backup and marker, exactly once
+// (marker), does not change updated_at and does not abort the start on an error
+// - there is then only a warning, and the next start tries again.
+// Until then legacy strings continue to apply via the compatibility in permissions.Has.
 func migrateRolePermissionsToCRUD(db *gorm.DB) {
 	var done int64
 	if err := db.Unscoped().Model(&models.SystemSetting{}).Where("key = ?", permissionsMigrationKey).Count(&done).Error; err != nil {
@@ -61,16 +61,16 @@ func migrateRolePermissionsToCRUD(db *gorm.DB) {
 				continue
 			}
 			backup[r.ID] = r.Permissions
-			// UpdateColumn: updated_at bleibt, die Rolle erscheint nicht als „gerade geändert“.
+			// UpdateColumn: updated_at stays, the role does not appear as "just changed".
 			if err := tx.Unscoped().Model(&models.Role{}).Where("id = ?", r.ID).UpdateColumn("permissions", migrated).Error; err != nil {
 				return err
 			}
 		}
-		// Eine Map aus Zahlen und Texten lässt sich immer serialisieren.
+		// A map of numbers and texts can always be serialized.
 		raw, _ := json.Marshal(backup)
-		// Nur anlegen: Läuft die Umstellung nach gelöschtem oder
-		// zurückgespieltem Marker erneut, würde ein Upsert den vollständigen
-		// Ursprungsstand durch die dann (fast) leere Sicherung ersetzen.
+		// Only create: if the changeover runs again after a deleted or
+		// restored marker, an upsert would replace the complete
+		// original state with the then (almost) empty backup.
 		if err := createSettingIfMissing(tx, permissionsBackupKey, string(raw)); err != nil {
 			return err
 		}
@@ -92,8 +92,8 @@ func upsertSetting(tx *gorm.DB, key, value string) error {
 	}).Create(&models.SystemSetting{Key: key, Value: value}).Error
 }
 
-// createSettingIfMissing legt den Schlüssel an und lässt einen vorhandenen
-// Wert unverändert.
+// createSettingIfMissing creates the key and leaves an existing
+// value unchanged.
 func createSettingIfMissing(tx *gorm.DB, key, value string) error {
 	return tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "key"}}, DoNothing: true}).
 		Create(&models.SystemSetting{Key: key, Value: value}).Error

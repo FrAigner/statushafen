@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { ACTIONS, RESOURCES, GROUPS, grants, normalizePermissions, isGlobalResource, perm } from './permissions'
+import { ACTIONS, RESOURCES, GROUPS, grants, grantsAdminArea, normalizePermissions, isGlobalResource, perm } from './permissions'
 import { NAV_GROUPS, firstAllowedItem } from './adminNav'
 
 describe('grants', () => {
@@ -89,5 +89,20 @@ describe('Navigation als Daten', () => {
     expect(firstAllowedItem(p => p === 'subscribers:read').to).toBe('/admin/subscribers')
     expect(firstAllowedItem(p => p === 'notification_templates:read').to).toBe('/admin/notification-templates')
     expect(firstAllowedItem(() => false)).toBeNull()
+  })
+})
+
+// Mirror of backend permissions.GrantsAdminArea: only a right on a known
+// resource opens the admin area; otherwise the role is "status page only".
+describe('grantsAdminArea', () => {
+  it('ist false ohne Recht auf einer bekannten Ressource', () => {
+    for (const list of ['', ' , ', 'admin_dashboard', 'unknown:read', 'nonsense', []]) {
+      expect(grantsAdminArea(list), JSON.stringify(list)).toBe(false)
+    }
+  })
+  it('ist true mit irgendeiner Aktion auf einer Ressource, auch dem Altwert :write', () => {
+    for (const list of ['incidents:read', 'subscribers:create', 'components:write', 'admin_dashboard,maintenance:read', ['notices:delete']]) {
+      expect(grantsAdminArea(list), JSON.stringify(list)).toBe(true)
+    }
   })
 })

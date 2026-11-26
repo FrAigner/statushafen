@@ -150,6 +150,25 @@ bleiben erhalten und erscheinen wieder, sobald er an ist. Beim Start werden Kata
 angeboten noch ausgeliefert); Statusseiten mit einer solchen Standardsprache fallen auf Deutsch
 zurück (mit Log-Eintrag).
 
+## Upgrade-Hinweis: PostgreSQL 18 in der Entwicklungs-Compose-Datei
+
+`docker-compose.yml` startet jetzt PostgreSQL 18 (vorher 15). PostgreSQL liest das
+Datenverzeichnis einer anderen Hauptversion nicht, und ab Version 18 legt das Image seine Daten
+unter `/var/lib/postgresql` statt `/var/lib/postgresql/data` ab. Ein vorhandenes lokales Volume
+muss deshalb einmal umgezogen werden:
+
+```bash
+docker compose exec db pg_dumpall -U postgres > statushafen-pg15.sql   # noch mit dem alten Image
+docker compose down
+docker volume rm statushafen_postgres_data                               # Name: docker volume ls
+docker compose up -d db
+docker compose exec -T db psql -U postgres < statushafen-pg15.sql
+```
+
+Ohne erhaltenswerte Daten reicht `docker compose down -v` und danach `docker compose up -d db`.
+Produktivdatenbanken betrifft diese Datei nicht; für sie siehe
+[Sicherung und Wiederherstellung](docs/backup-restore.md).
+
 ## Dokumentation
 
 - Hilfe in der Anwendung (Deutsch und Englisch) unter `/docs`, Quellen in [`frontend/src/docs`](frontend/src/docs).

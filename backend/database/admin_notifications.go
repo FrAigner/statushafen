@@ -6,16 +6,16 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateAdminNotificationIndexes legt die Indizes des
-// Nachrichtencenters an. AutoMigrate kann keine partiellen Indizes:
-//   - idx_admin_notification_dedup: höchstens eine OFFENE Meldung je DedupKey
-//     (leerer Schlüssel = erledigt, abgelöst oder ohne Zusammenfassung). Das
-//     macht das Zusammenfassen konkurrenzsicher: Legen zwei Anfragen
-//     gleichzeitig dieselbe Meldung an, scheitert die zweite mit einer
-//     Unique-Verletzung und zählt stattdessen hoch.
-//   - idx_notification_read_user: ein Lesestatus je Nachricht und Benutzer.
+// CreateAdminNotificationIndexes creates the indexes of the
+// message center. AutoMigrate cannot create partial indexes:
+//   - idx_admin_notification_dedup: at most one OPEN notification per DedupKey
+//     (empty key = done, superseded or without aggregation). This
+//     makes aggregation concurrency-safe: if two requests create
+//     the same notification at the same time, the second fails with a
+//     unique violation and counts up instead.
+//   - idx_notification_read_user: one read status per message and user.
 //
-// Idempotent per IF NOT EXISTS.
+// Idempotent via IF NOT EXISTS.
 func CreateAdminNotificationIndexes(db *gorm.DB) {
 	statements := []string{
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_admin_notification_dedup ON admin_notifications (dedup_key) WHERE dedup_key <> ''`,

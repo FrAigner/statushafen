@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// pruefeAdvisoryLock läuft im Postgres-Migrationstest: Nur eine
-// Instanz bekommt die Sperre, nach Unlock die nächste; eine abgerissene
-// Verbindung wird neu aufgebaut; Fehler beim Verbindungsaufbau melden false.
+// pruefeAdvisoryLock runs in the Postgres migration test: only one
+// instance gets the lock, after Unlock the next one; a dropped
+// connection is re-established; errors on connecting report false.
 func pruefeAdvisoryLock(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -32,12 +32,12 @@ func pruefeAdvisoryLock(t *testing.T) {
 	assert.Nil(t, b.conn, "Verlierer gibt die Verbindung zurück")
 
 	a.Unlock()
-	a.Unlock() // zweites Unlock ist ein No-Op
+	a.Unlock() // second Unlock is a no-op
 	ok, err = b.TryLock(ctx)
 	require.NoError(t, err)
 	assert.True(t, ok, "nach Unlock übernimmt die zweite Instanz")
 
-	// Abgerissene Verbindung: Postgres gibt die Sperre frei, TryLock baut neu auf.
+	// Dropped connection: Postgres releases the lock, TryLock reconnects.
 	require.NoError(t, b.conn.Close())
 	ok, err = b.TryLock(ctx)
 	require.NoError(t, err)
@@ -51,9 +51,9 @@ func pruefeAdvisoryLock(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// pruefeExternalStatusIndexes: Die partiellen Unique-Indizes für Kopplungen
-// und externe Komponenten greifen auf Postgres und lassen ein Neuanlegen
-// nach Soft-Delete zu.
+// pruefeExternalStatusIndexes: the partial unique indexes for couplings
+// and external components apply on Postgres and allow re-creating
+// after soft delete.
 func pruefeExternalStatusIndexes(t *testing.T) {
 	t.Helper()
 	page := models.StatusPage{Name: "Ext", Slug: "ext-507"}
@@ -62,7 +62,7 @@ func pruefeExternalStatusIndexes(t *testing.T) {
 	require.NoError(t, DB.Create(&comp).Error)
 	src := models.ExternalSource{StatusPageID: page.ID, Name: "S", BaseURL: "https://example.com", Provider: "summaryv2", PollIntervalSeconds: 120, Active: true}
 	require.NoError(t, DB.Create(&src).Error)
-	// neue Ausfall-Spalten - Altzeilen/Inserts ohne Wert bekommen den Standard.
+	// new outage columns - legacy rows/inserts without a value get the default.
 	var stored models.ExternalSource
 	require.NoError(t, DB.First(&stored, src.ID).Error)
 	assert.Equal(t, 60, stored.OutageAfterMinutes)
@@ -79,7 +79,7 @@ func pruefeExternalStatusIndexes(t *testing.T) {
 	require.NoError(t, DB.Delete(&link).Error)
 	require.NoError(t, DB.Create(&models.ExternalComponentLink{StatusPageID: page.ID, ComponentID: comp.ID, ExternalComponentID: ext.ID}).Error, "nach Soft-Delete wieder koppelbar")
 
-	// gespiegelte Vorfälle - dieselbe Garantie für alle drei Tabellen.
+	// mirrored incidents - the same guarantee for all three tables.
 	inc := models.ExternalIncident{StatusPageID: page.ID, ExternalSourceID: src.ID, ExternalID: "i1", Title: "T", LastSeenAt: time.Now()}
 	require.NoError(t, DB.Create(&inc).Error)
 	assert.Error(t, DB.Create(&models.ExternalIncident{StatusPageID: page.ID, ExternalSourceID: src.ID, ExternalID: "i1", Title: "doppelt", LastSeenAt: time.Now()}).Error, "doppelte Meldung je Quelle")
@@ -99,9 +99,9 @@ func pruefeExternalStatusIndexes(t *testing.T) {
 	assert.Empty(t, stored2.IncidentsError)
 }
 
-// pruefeAdminNotifications: Nachrichtencenter auf echtem Postgres.
-// Partieller Unique-Index (offene Meldung je Schlüssel), Lesestatus je Benutzer
-// und die FK-Cascades (Seite/Benutzer gelöscht).
+// pruefeAdminNotifications: message center on real Postgres.
+// Partial unique index (open notification per key), read status per user
+// and the FK cascades (page/user deleted).
 func pruefeAdminNotifications(t *testing.T) {
 	t.Helper()
 	page := models.StatusPage{Name: "Glocke", Slug: "glocke-644"}

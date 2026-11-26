@@ -13,12 +13,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// Datenbankfehler in jedem Schritt der Spiegelung. Ein Fehler darf
-// weder ein Ereignis auslösen noch halb gespeicherte Meldungen hinterlassen.
+// Database errors at every step of the mirroring. An error must
+// neither trigger an event nor leave half-stored reports behind.
 
-// prepareChangeState legt den Stand an, auf dem der nächste Feed alle
-// Schreibpfade berührt: bestehende Meldung (Update-Text, Komponenten ändern
-// sich) und eine gekoppelte externe Gruppe (Mitglieder-Abfrage).
+// prepareChangeState sets up the state in which the next feed touches all
+// write paths: existing report (update text, components change)
+// and a linked external group (member query).
 func prepareChangeState(t *testing.T) (*incFixture, Incident) {
 	t.Helper()
 	f := newIncFixture(t)
@@ -113,7 +113,7 @@ func TestSyncIncidents_FehlerPfade(t *testing.T) {
 	t.Run("Validatoren nicht speicherbar: Rollback", func(t *testing.T) {
 		f := newIncFixture(t)
 		f.prov.set(models.ExternalIncidentKindIncident, inc("i1", "investigating", "a"))
-		failOn(t, f.db, "update", "external_sources", 1) // 0 = Abrufstatus des Komponenten-Abrufs
+		failOn(t, f.db, "update", "external_sources", 1) // 0 = fetch status of the component fetch
 		f.poll()
 		assert.Empty(t, f.rows(t))
 	})

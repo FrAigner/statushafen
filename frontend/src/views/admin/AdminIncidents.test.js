@@ -243,6 +243,10 @@ describe('AdminIncidents', () => {
       expect(wrapper.findAll('tbody tr')).toHaveLength(200)
       expect(wrapper.find('[data-test="load-more"]').exists()).toBe(true)
       expect(wrapper.find('.alert-error').exists()).toBe(true)
+
+      // The close button dismisses the message.
+      await wrapper.find('.alert-close').trigger('click')
+      expect(wrapper.find('.alert-error').exists()).toBe(false)
     })
   })
 

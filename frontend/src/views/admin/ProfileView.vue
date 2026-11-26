@@ -64,7 +64,7 @@ const saveLanguage = async () => {
       </div>
 
       <form novalidate class="edit-form" @submit.prevent="saveLanguage">
-        <div class="form-group">
+        <div id="profile-language" class="form-group">
           <OnyxSelect
             v-model="selectedLanguage"
             :options="languageOptions"

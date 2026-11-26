@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../i18n'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
@@ -8,8 +9,17 @@ import { useTenant } from '../composables/useTenant'
 import { HELP_PARTS } from '../composables/useHelpText'
 import { onyxFormStubs } from '../test-support/onyxStubs'
 import { vueSources, lookup } from '../test-support/templateScan.js'
+import { NAV_GROUPS } from '../utils/adminNav'
+import routerSource from '../router/index.js?raw'
 import AdminComponents from './admin/AdminComponents.vue'
 import AdminExternalSources from './admin/AdminExternalSources.vue'
+import AdminOverview from './admin/AdminOverview.vue'
+import AdminIncidents from './admin/AdminIncidents.vue'
+import AdminIncidentDetail from './admin/AdminIncidentDetail.vue'
+import AdminMaintenance from './admin/AdminMaintenance.vue'
+import AdminNotices from './admin/AdminNotices.vue'
+import AdminIncidentTemplates from './admin/AdminIncidentTemplates.vue'
+import AdminSubscribers from './admin/AdminSubscribers.vue'
 
 // Abdeckungs-Test für Hilfetexte (Was / Auswirkung / Beispiel).
 //
@@ -52,14 +62,22 @@ function jsonResponse(body) {
   return { ok: true, status: 200, json: async () => body }
 }
 
-async function mountAdminView(component, routes) {
+// Views with router-links or route params get a memory router: `route` is the
+// path pattern the view is mounted under, `path` the URL it starts at.
+async function mountAdminView(component, routes, { route = '/', path = '/' } = {}) {
   useAuth().setAuth('jwt-1', { permissions: '*', is_global_admin: true })
   useTenant().setActiveTenant('1')
   global.fetch = vi.fn(async (url) => {
     const hit = Object.entries(routes).find(([pattern]) => new RegExp(pattern).test(url))
     return jsonResponse(hit ? hit[1] : [])
   })
-  const wrapper = mount(component, { attachTo: document.body, global: { plugins: [i18n], stubs: onyxFormStubs } })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: route, component }, { path: '/:rest(.*)*', component: { template: '<div/>' } }],
+  })
+  router.push(path)
+  await router.isReady()
+  const wrapper = mount(component, { attachTo: document.body, global: { plugins: [i18n, router], stubs: onyxFormStubs } })
   wrappers.push(wrapper)
   await flushPromises()
   return wrapper
@@ -105,7 +123,165 @@ export const HELP_COMPLETE_VIEWS = [
       await check('Bausteine übernehmen: Auswahl')
     },
   },
+  {
+    file: 'views/admin/AdminOverview.vue',
+    async states(check) {
+      await mountAdminView(AdminOverview, {
+        '/api/admin/overview$': {
+          total_pages: 1, total_open_incidents: 1, total_subscribers: 12, worst_status: 'partial_outage',
+          pages: [{ id: 1, name: 'Acme Corp', slug: 'acme', status: 'partial_outage', components: 5, subscribers: 12, open_incidents: 1 }],
+        },
+      })
+      await check('Liste')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidents.vue',
+    async states(check) {
+      // A full first batch (ADMIN_PAGE_SIZE) shows "Load more".
+      const incidents = Array.from({ length: 200 }, (_, i) => ({
+        ID: i + 1, Title: `Vorfall ${i + 1}`, Message: 'API antwortet nicht', Status: i ? 'resolved' : 'investigating',
+        Severity: 'partial_outage', Components: [{ ID: 10, Name: 'API' }], Tags: [{ ID: 5, Name: 'EU' }], CreatedAt: '2026-07-01T10:00:00Z',
+      }))
+      const wrapper = await mountAdminView(AdminIncidents, {
+        '/incident-templates$': [{ ID: 1, Name: 'Standard-Ausfall', Kind: 'incident', Title: 'X ist gestört', Message: 'Wir untersuchen.', DefaultStatus: 'monitoring', ComponentIDs: '10' }],
+        '/incidents\\?limit=200$': incidents,
+        '/components$': [{ ID: 10, Name: 'API', Status: 'operational' }],
+        '/api/tags': [{ ID: 5, Name: 'EU' }],
+      }, { route: '/admin/incidents', path: '/admin/incidents' })
+      await check('Liste')
+      await wrapper.find('[role="menuitem"]').trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('incidents.newButton'))).trigger('click')
+      await check('Neu')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidentDetail.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminIncidentDetail, {
+        '/api/pages/1/incidents/1$': {
+          ID: 1, Title: 'API down', Status: 'identified', CreatedAt: '2026-07-01T10:00:00Z', Components: [{ ID: 10, Name: 'API' }], Tags: [],
+          updates: [{ id: 1, status: 'investigating', message: 'Untersuchung läuft', created_at: '2026-07-01T10:05:00Z', author_email: 'ops@example.com' }],
+          post_mortem: {
+            summary: 'Zertifikat abgelaufen', root_cause: 'Ablauf übersehen', impact: 'Login', resolution: 'Erneuert', detection: 'Monitoring',
+            published_at: null, actions: [{ id: 1, text: 'Ablauf überwachen', owner: 'Ops', state: 'open' }],
+          },
+        },
+      }, { route: '/admin/incidents/:pageId/:id', path: '/admin/incidents/1/1' })
+      await check('Detail')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('incidentDetail.addActionButton')).trigger('click')
+      await check('Folgemaßnahme hinzugefügt')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('incidentDetail.saveDraftButton')).trigger('click')
+      await flushPromises()
+      expect(wrapper.find('.alert-success').exists()).toBe(true)
+      await check('Entwurf gespeichert')
+    },
+  },
+  {
+    file: 'views/admin/AdminMaintenance.vue',
+    async states(check) {
+      const window = (id) => ({
+        ID: id, Title: `Datenbank-Upgrade ${id}`, Message: 'Kurze Unterbrechung.', Status: 'scheduled', IsMaintenance: true,
+        Components: [{ ID: 10, Name: 'API' }], Tags: [{ ID: 5, Name: 'EU' }],
+        ScheduledStartAt: '2026-08-01T10:00:00Z', ScheduledEndAt: '2026-08-01T12:00:00Z', ReminderLeadMinutes: 120,
+      })
+      const routes = {
+        '/incident-templates$': [{ ID: 1, Name: 'DB-Wartung', Kind: 'maintenance', Title: 'Datenbank-Wartung', Message: 'Kurze Unterbrechung.', ComponentIDs: '10' }],
+        '/incidents\\?is_maintenance=true': [window(1)],
+        '/components$': [{ ID: 10, Name: 'API', Status: 'operational' }],
+        '/api/tags': [{ ID: 5, Name: 'EU' }],
+      }
+      const wrapper = await mountAdminView(AdminMaintenance, routes)
+      await check('Liste')
+      await wrapper.findAll('[role="menuitem"]').find(i => i.text().includes(i18n.global.t('common.edit'))).trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('maintenance.newButton'))).trigger('click')
+      await check('Neu (mit Vorlagen)')
+      // A full first page (ADMIN_PAGE_SIZE) shows "Load more".
+      await mountAdminView(AdminMaintenance, { ...routes, '/incidents\\?is_maintenance=true': Array.from({ length: 200 }, (_, i) => window(i + 1)) })
+      await check('Weitere laden')
+    },
+  },
+  {
+    file: 'views/admin/AdminNotices.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminNotices, {
+        '/notices/all$': [{ ID: 1, Title: 'Neue Supportzeiten', Message: 'Ab 1. 11. rund um die Uhr.', Level: 'info', IsActive: true, Collapsed: false, NotifySubscribers: false, StartAt: null, EndAt: null, CreatedAt: '2026-07-01T10:00:00Z' }],
+      })
+      await check('Liste')
+      await wrapper.findAll('[role="menuitem"]').find(i => i.text().includes(i18n.global.t('common.edit'))).trigger('click')
+      await check('Bearbeiten')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('notices.newButton'))).trigger('click')
+      await check('Neu')
+    },
+  },
+  {
+    file: 'views/admin/AdminIncidentTemplates.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminIncidentTemplates, {
+        '/incident-templates$': [
+          { ID: 1, Name: 'DB-Wartung', Kind: 'maintenance', Title: 'Datenbank-Wartung', Message: 'Details', ComponentIDs: '10' },
+          { ID: 2, Name: 'API-Ausfall', Kind: 'incident', Title: 'API gestört', Message: 'Wir prüfen', DefaultStatus: 'investigating', ComponentIDs: '' },
+        ],
+        '/components$': [{ ID: 10, Name: 'API', Children: [] }, { ID: 11, Name: 'Web' }],
+      })
+      await check('Liste')
+      const editItems = () => wrapper.findAll('[role="menuitem"]').filter(i => i.text().includes(i18n.global.t('common.edit')))
+      await editItems().at(1).trigger('click')
+      await check('Bearbeiten (Vorfall)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await editItems().at(0).trigger('click')
+      await check('Bearbeiten (Wartung)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('incidentTemplates.newButton'))).trigger('click')
+      await check('Neu')
+      await wrapper.find('.rte__btn--preview').trigger('click')
+      await check('Neu: Vorschau')
+      await wrapper.find('form').trigger('submit')
+      await check('Neu: Pflichtfelder fehlen')
+    },
+  },
+  {
+    file: 'views/admin/AdminSubscribers.vue',
+    async states(check) {
+      const wrapper = await mountAdminView(AdminSubscribers, {
+        '/subscribers$': [
+          { ID: 1, Channel: 'email', Email: 'a@example.com', Status: 'pending', SubscribedComponentIDs: '10', CreatedBy: { Email: 'admin@example.com' } },
+          { ID: 2, Channel: 'google_chat', WebhookURL: 'https://chat.googleapis.com/hook-1', SubscribedComponentIDs: '', CreatedBy: null },
+        ],
+        '/components$': [{ ID: 10, Name: 'API', Children: [] }, { ID: 11, Name: 'Web' }],
+        '/languages$': [
+          { LanguageCode: 'de', IsDefault: true, Language: { Name: 'Deutsch' } },
+          { LanguageCode: 'en', IsDefault: false, Language: { Name: 'English' } },
+        ],
+      })
+      await check('Liste')
+      await wrapper.find('[role="menuitem"]').trigger('click')
+      await check('Bearbeiten (E-Mail)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('[role="menuitem"]').filter(i => i.text().includes(i18n.global.t('common.edit'))).at(1).trigger('click')
+      await check('Bearbeiten (Google Chat)')
+      await wrapper.findAll('button').find(b => b.text() === i18n.global.t('common.cancel')).trigger('click')
+      await wrapper.findAll('button').find(b => b.text().includes(i18n.global.t('subscribers.newButton'))).trigger('click')
+      await check('Neu')
+      await wrapper.find('form').trigger('submit')
+      await check('Neu: Pflichtfeld fehlt (Meldung)')
+      await wrapper.find('form select').setValue('google_chat')
+      await check('Neu: Google Chat')
+    },
+  },
 ]
+
+// Admin route path ("/admin/incidents") -> view file from router/index.js.
+export function viewFileFor(to) {
+  const path = to.replace(/^\/admin\//, '')
+  const route = routerSource.match(new RegExp(`path: '${path}', component: (\\w+)`))
+  return route ? `views/admin/${route[1]}.vue` : null
+}
 
 function describedByHelp(el) {
   const ids = (el.getAttribute('aria-describedby') || '').split(/\s+/).filter(id => id.startsWith('help-'))
@@ -179,6 +355,19 @@ describe('Hilfetexte vollständig', () => {
       expect(keys.flatMap(incompleteEntries)).toEqual([])
     })
   }
+
+  // Every page of the "Operations" nav group shows help tooltips; a new page
+  // in that group must be added to HELP_COMPLETE_VIEWS.
+  it('jede Seite der Gruppe „Betrieb“ steht in HELP_COMPLETE_VIEWS', () => {
+    const items = NAV_GROUPS.find(g => g.key === 'operations').items
+    const files = items.map(item => viewFileFor(item.to))
+    expect(files.every(Boolean), JSON.stringify(files)).toBe(true)
+    const covered = HELP_COMPLETE_VIEWS.map(v => v.file)
+    expect(files.filter(f => !covered.includes(f))).toEqual([])
+    // Counter-check: the mapping resolves a route and rejects an unknown one.
+    expect(viewFileFor('/admin/incidents')).toBe('views/admin/AdminIncidents.vue')
+    expect(viewFileFor('/admin/does-not-exist')).toBeNull()
+  })
 
   it('der help-Katalog ist in de und en vollständig', () => {
     // parts sind die Überschriften des Tooltips selbst, kein Bereich.

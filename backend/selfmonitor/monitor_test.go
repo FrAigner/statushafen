@@ -27,7 +27,7 @@ type fixture struct {
 	m    *Monitor
 }
 
-// newFixture legt Systemseite und Komponente an; res steuert das Prüfergebnis.
+// newFixture creates system page and component; res controls the check result.
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	db := testutils.SetupTestDB()
@@ -134,7 +134,7 @@ func TestMonitor_ErholungSchliesstVorfallUndGibtStatusFrei(t *testing.T) {
 	assert.EqualValues(t, 1, f.count(t, &models.IncidentUpdate{}, "incident_id = ? AND status = ?", inc.ID, "resolved"))
 	assert.Zero(t, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"), "Merker entfernt")
 	assert.EqualValues(t, 1, f.count(t, &models.AuditLog{}, "action = ?", "selfmonitor.component_recovered"))
-	// Neue Störung danach: wieder entprellt, neuer Vorfall möglich
+	// New outage afterwards: debounced again, new incident possible
 	f.fail()
 	f.run(3)
 	assert.Equal(t, "major_outage", f.status(t))
@@ -157,7 +157,7 @@ func TestMonitor_ErholungLaesstGeaendertenAdminStatusUndGeschlossenenVorfall(t *
 func TestMonitor_ErholungOhneBesitzIstNoop(t *testing.T) {
 	f := newFixture(t)
 	require.NoError(t, f.db.Model(&f.comp).Update("status", "major_outage").Error)
-	f.run(2) // Admin hat selbst auf Störung gesetzt, Prüfung ok
+	f.run(2) // admin set the outage themselves, check ok
 	assert.Equal(t, "major_outage", f.status(t))
 }
 
@@ -167,7 +167,7 @@ func TestMonitor_NeustartMitStoerungErholtSauber(t *testing.T) {
 	f.run(3)
 	f.now = f.now.Add(20 * time.Minute)
 	f.run(1)
-	// frischer Monitor (Neustart): Zähler leer, Besitz steht in der DB
+	// fresh monitor (restart): counter empty, ownership is in the DB
 	neu := New(f.db, f.m.Checks, nil)
 	neu.Now = f.m.Now
 	f.res = &Result{OK: true}
@@ -255,7 +255,7 @@ func TestMonitor_StartStopp(t *testing.T) {
 	stop()
 }
 
-// failOn lässt Schreibzugriffe auf die Tabelle fehlschlagen (Fehlerpfade).
+// failOn makes write accesses to the table fail (error paths).
 func failOn(t *testing.T, db *gorm.DB, table string) {
 	t.Helper()
 	inject := func(tx *gorm.DB) {
@@ -319,7 +319,7 @@ func TestMonitor_FehlerpfadAuditNichtSchreibbar(t *testing.T) {
 	assert.Equal(t, "major_outage", f.status(t), "Audit-Panne blockiert die Aktion nicht")
 }
 
-// logPuffer leitet slog über das Projekt-Setup (mit Bereinigung) in einen Puffer.
+// logPuffer routes slog through the project setup (with sanitizing) into a buffer.
 func logPuffer(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	alt := slog.Default()
@@ -329,8 +329,8 @@ func logPuffer(t *testing.T) *bytes.Buffer {
 	return buf
 }
 
-// sperre legt einen SQLite-Trigger an, der Schreibzugriffe auf system_settings
-// zu key-Mustern abbricht (Fehlermeldung enthält eine URL mit Geheimnis).
+// sperre creates a SQLite trigger that aborts write accesses to system_settings
+// for key patterns (error message contains a URL with a secret).
 func (f *fixture) sperre(t *testing.T, ereignis, keyMuster string) {
 	t.Helper()
 	ref := "NEW"
@@ -342,8 +342,8 @@ func (f *fixture) sperre(t *testing.T, ereignis, keyMuster string) {
 	require.NoError(t, f.db.Exec(sql).Error)
 }
 
-// Fund 14: Scheitert die Besitzmarke, darf die Komponente nicht
-// ohne Marke auf Störung stehen bleiben (Status und Marke in einer Transaktion).
+// Finding 14: if the ownership marker fails, the component must not
+// remain in outage without a marker (status and marker in one transaction).
 func TestMonitor_MarkeScheitertStatusBleibtUnveraendert(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -355,8 +355,8 @@ func TestMonitor_MarkeScheitertStatusBleibtUnveraendert(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123", "Geheimnis aus Fehlertext nicht im Log")
 }
 
-// Fund 14: Scheitert die Vorfall-Marke, entsteht nicht bei jedem
-// Takt ein neuer Vorfall.
+// Finding 14: if the incident marker fails, a new incident does not arise
+// on every tick.
 func TestMonitor_VorfallMarkeScheitertKeinVorfallProTakt(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -370,8 +370,8 @@ func TestMonitor_VorfallMarkeScheitertKeinVorfallProTakt(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Fund 14: Schlägt das Löschen der Marke fehl, wird nicht
-// "erholt" gemeldet und der Fehler steht im Log.
+// Finding 14: if deleting the marker fails, "recovered"
+// is not reported and the error appears in the log.
 func TestMonitor_MarkeLoeschenScheitertKeineErholungsmeldung(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -385,8 +385,8 @@ func TestMonitor_MarkeLoeschenScheitertKeineErholungsmeldung(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Fund 14: Ein beschädigter Zeitwert wird repariert, sonst würde
-// IncidentAfter nie erreicht.
+// Finding 14: a corrupted time value is repaired, otherwise
+// IncidentAfter would never be reached.
 func TestMonitor_BeschaedigterZeitwertVerschiebtVorfallNichtEndlos(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -399,8 +399,8 @@ func TestMonitor_BeschaedigterZeitwertVerschiebtVorfallNichtEndlos(t *testing.T)
 	assert.EqualValues(t, 1, f.count(t, &models.Incident{}, "1 = 1"))
 }
 
-// Fund 8a: Wird die Überwachung ausgeschaltet, während eine
-// Komponente auf Störung steht, wird sie freigegeben und der Vorfall geschlossen.
+// Finding 8a: if monitoring is switched off while a
+// component is in outage, it is released and the incident closed.
 func TestMonitor_AusschaltenGibtStoerungFrei(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -415,8 +415,8 @@ func TestMonitor_AusschaltenGibtStoerungFrei(t *testing.T) {
 	assert.EqualValues(t, 0, f.count(t, &models.SystemSetting{}, "key LIKE ?", "selfmonitor.%"))
 }
 
-// Fund 8a: Meldet eine Prüfung "abgeschaltet" (Mailversand aus),
-// wird ihre Störung ebenso freigegeben; "nicht prüfbar" (Skip) lässt sie stehen.
+// Finding 8a: if a check reports "switched off" (mail sending off),
+// its outage is released likewise; "not checkable" (Skip) leaves it standing.
 func TestMonitor_PruefungAbgeschaltetGibtStoerungFrei(t *testing.T) {
 	f := newFixture(t)
 	f.fail()

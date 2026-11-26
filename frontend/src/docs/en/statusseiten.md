@@ -55,6 +55,16 @@ The list under **Status Pages** can be searched by name, slug, description and d
 menu offers "Open" (public page) and "Users" (roles on this page). When you delete a page,
 Statushafen removes all its data.
 
+### Design preview
+
+When you edit a saved page, the **Open preview** button appears below the design fields (logo URL,
+primary and secondary color, header design, page layout). It shows the real status page with its
+components, incidents and announcements in a large window, rendered with the values from the form
+that you have not saved yet. The preview is only a view: visitors keep seeing the saved version until
+you click **Save**. Buttons and links (subscribe, filters, history) are disabled in the preview. After
+closing it (Esc or the close button) you can keep editing and open the preview again. For a new page
+the preview is available once it has been saved for the first time.
+
 ### Private and automatic joining
 
 A **private** page is only visible after login, and only to users with a role on the page. Users
@@ -69,6 +79,11 @@ does not include `mail.acme.example`). If either field is empty, only explicitly
 get access. The default role must not contain permissions to create, update or delete (`…:create`, `…:update`, `…:delete`) or access to
 subscribers; Statushafen checks this when saving and again when someone joins. Someone an admin
 has removed from the page does not rejoin automatically.
+
+If users should only see and subscribe to the private page but not enter the admin area, give them
+a role without rights in the matrix ("Status page only", see
+[Users, roles and permissions](/docs/benutzer-und-rollen#permissions)). This also works as the default
+role.
 
 Without permission (not signed in, no role, not entitled to join) a private page looks no different
 from a page that does not exist: all requests answer with 404, and the interface shows "Status page

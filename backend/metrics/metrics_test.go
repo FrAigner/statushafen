@@ -153,8 +153,8 @@ func TestDefaultRegistry_IsUsable(t *testing.T) {
 	}
 }
 
-// Regression: normale 4xx-Antworten (404 ohne Abo, 409, 422, 429) sind keine
-// Fehler; nur Status >= 500 zaehlt in ErrorCount.
+// Regression: normal 4xx responses (404 without subscription, 409, 422, 429) are not
+// errors; only status >= 500 counts in ErrorCount.
 func TestRegistry_OnlyServerErrorsCountAsErrors(t *testing.T) {
 	reg := NewRegistry()
 	for _, code := range []int{200, 302, 399, 400, 404, 409, 422, 429, 499} {
@@ -171,7 +171,7 @@ func TestRegistry_OnlyServerErrorsCountAsErrors(t *testing.T) {
 	}
 }
 
-// Routen ohne Requests erscheinen mit 0 im Snapshot.
+// Routes without requests appear with 0 in the snapshot.
 func TestRegisterRoute_AppearsWithZeroRequests(t *testing.T) {
 	reg := NewRegistry()
 	reg.RegisterRoute("GET", "/api/pages/:page_id/incidents")
@@ -194,7 +194,7 @@ func TestRegisterRoute_IdempotentAndKeepsCounts(t *testing.T) {
 	reg.RegisterRoute("GET", "/a")
 	reg.RegisterRoute("GET", "/a")
 	reg.Observe("GET", "/a", 200, time.Millisecond)
-	reg.RegisterRoute("GET", "/a") // darf den Zähler nicht zurücksetzen
+	reg.RegisterRoute("GET", "/a") // must not reset the counter
 	reg.RegisterRoute("POST", "/a")
 
 	snaps := reg.Snapshot()
@@ -209,8 +209,8 @@ func TestRegisterRoute_IdempotentAndKeepsCounts(t *testing.T) {
 	}
 }
 
-// Prometheus-Kardinalität: registrierte, nie aufgerufene Routen erzeugen
-// keine Zeitreihen.
+// Prometheus cardinality: registered, never-called routes create
+// no time series.
 func TestRegisterRoute_NoPrometheusSeries(t *testing.T) {
 	reg := NewRegistry()
 	reg.RegisterRoute("GET", "/ungenutzt")

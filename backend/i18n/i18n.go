@@ -1,32 +1,32 @@
-// Package i18n bündelt (Stage 1 von 5 des Mehrsprachigkeits-
-// Features) die gemeinsamen Bausteine, die alle künftigen lokalisierten
-// Content-Modelle (Incident-Übersetzungen, Component,
-// Maintenance/Notice) teilen: den Draft/Confirmed-Lebenszyklus einer
-// Übersetzung und einen Query-Scope, der öffentlichen Endpunkten nur
-// freigegebene Übersetzungen zeigt.
+// Package i18n bundles (stage 1 of 5 of the multilingual
+// feature) the shared building blocks that all future localized
+// content models (incident translations, component,
+// maintenance/notice) share: the draft/confirmed lifecycle of a
+// translation and a query scope that shows public endpoints only
+// approved translations.
 package i18n
 
 import "gorm.io/gorm"
 
-// Status-Konstanten für eine einzelne lokalisierte Content-Zeile:
-//   - StatusDraft: vom Übersetzungs-Provider (siehe backend/translation)
-//     vorgeschlagen oder manuell angelegt, aber noch nicht von einem Admin
-//     bestätigt. Wird NICHT auf der öffentlichen Statusseite angezeigt.
-//   - StatusConfirmed: von einem Admin geprüft/bestätigt. Erst ab hier
-//     öffentlich sichtbar.
+// Status constants for a single localized content row:
+//   - StatusDraft: proposed by the translation provider (see backend/translation)
+//     or created manually, but not yet confirmed
+//     by an admin. Is NOT shown on the public status page.
+//   - StatusConfirmed: reviewed/confirmed by an admin. Only from here on
+//     publicly visible.
 const (
 	StatusDraft     = "draft"
 	StatusConfirmed = "confirmed"
 )
 
-// ScopeConfirmedOnly ist ein GORM-Scope, der eine Query auf ausschließlich
-// bestätigte Übersetzungen einschränkt - für öffentliche Lesepfade, die nie
-// unbestätigte (potenziell falsche) Übersetzungsvorschläge ausliefern
-// dürfen. Admin-Endpunkte lesen ohne diesen Scope, damit sie auch Drafts zum
-// Bestätigen sehen.
+// ScopeConfirmedOnly is a GORM scope that restricts a query to confirmed
+// translations only - for public read paths that must never
+// deliver unconfirmed (potentially wrong) translation suggestions.
+// Admin endpoints read without this scope, so that they also see drafts to
+// confirm.
 //
-// Erwartet eine Tabelle mit einer "status"-Spalte, die einen der beiden
-// obigen Werte enthält.
+// Expects a table with a "status" column that contains one of the two
+// values above.
 func ScopeConfirmedOnly(db *gorm.DB) *gorm.DB {
 	return db.Where("status = ?", StatusConfirmed)
 }

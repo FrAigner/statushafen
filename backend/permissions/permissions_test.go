@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// create/update/delete schließen read ein, aber nicht umgekehrt
-// und nicht über Ressourcengrenzen hinweg.
+// create/update/delete imply read, but not the reverse
+// and not across resource boundaries.
 func TestHas_Implikation(t *testing.T) {
 	tests := []struct {
 		name, list, required string
@@ -34,8 +34,8 @@ func TestHas_Implikation(t *testing.T) {
 	}
 }
 
-// Kompatibilitätsschicht: ein Alt-Eintrag "res:write" zählt als
-// create+read+update+delete derselben Ressource, aber nur dort.
+// Compatibility layer: a legacy entry "res:write" counts as
+// create+read+update+delete of the same resource, but only there.
 func TestHas_AltwertWriteGiltAlsCrud(t *testing.T) {
 	for _, act := range Actions {
 		assert.True(t, Has("components:write", Perm("components", act)), act)
@@ -131,9 +131,9 @@ func TestMigrateLegacy_KopplungEinsZuEins(t *testing.T) {
 	})
 }
 
-// Keine Rechte gewonnen: Für jede Altkombination gewährt die migrierte Liste
-// jede Aktion auf jeder Ressource genau dann, wenn die alte Prüfung sie
-// gewährt hätte (alte Prüfung: je Tab das Recht aus der Kopplung).
+// No permissions gained: for every legacy combination the migrated list grants
+// each action on each resource exactly when the old check would have
+// granted it (old check: per tab the permission from the coupling).
 func TestMigrateLegacy_WirkungGleich(t *testing.T) {
 	type tab struct{ res, oldRead, oldWrite string }
 	tabs := []tab{
@@ -158,7 +158,7 @@ func TestMigrateLegacy_WirkungGleich(t *testing.T) {
 		return false
 	}
 	bases := []string{"components", "incidents", "notices", "subscribers", "pages"}
-	// Alle Teilmengen aus read/write je Basisressource.
+	// All subsets of read/write per base resource.
 	for mask := 0; mask < 1<<(2*len(bases)); mask++ {
 		var parts []string
 		for i, b := range bases {
@@ -207,9 +207,9 @@ func TestHasLegacyWrite(t *testing.T) {
 	assert.False(t, HasLegacyWrite(""))
 }
 
-// Alt-"key:write" gilt in Has auch für die Tabs, die vor der Umstellung
-// an die Schlüsselressource gekoppelt waren (sonst Rechteverlust bei
-// fehlgeschlagener Migration oder nach einem Rollback).
+// Legacy "key:write" in Has also applies to the tabs that before the switch
+// were coupled to the key resource (otherwise permission loss on
+// failed migration or after a rollback).
 func TestHas_AltwertWriteMitKopplung(t *testing.T) {
 	kopplung := map[string][]string{
 		"components": {"external_sources"},
@@ -225,8 +225,8 @@ func TestHas_AltwertWriteMitKopplung(t *testing.T) {
 			}
 		}
 	}
-	// Keine Rechte-Eskalation: nur die Kopplung, sonst nichts (auch nicht andere
-	// Schlüssel und nicht die Gegenrichtung).
+	// No privilege escalation: only the coupling, nothing else (not other
+	// keys and not the reverse direction).
 	for key := range kopplung {
 		for _, r := range Resources {
 			erlaubt := r.Key == key
@@ -246,7 +246,7 @@ func TestHas_AltwertWriteMitKopplung(t *testing.T) {
 	assert.False(t, Has("pages:update", "languages:update"), "Neu-Recht koppelt nicht")
 }
 
-// Normalize löst Alt-"key:write" samt Kopplung auf, wie die Migration.
+// Normalize resolves legacy "key:write" including coupling, like the migration.
 func TestNormalize_AltwertMitKopplung(t *testing.T) {
 	assert.Equal(t,
 		"components:create,components:read,components:update,components:delete,"+
@@ -257,7 +257,7 @@ func TestNormalize_AltwertMitKopplung(t *testing.T) {
 	}
 }
 
-// Covers entscheidet, ob eine Rolle von jemandem vergeben werden darf.
+// Covers decides whether a role may be granted by someone.
 func TestCovers(t *testing.T) {
 	assert.True(t, Covers("pages:create,pages:read", "pages:read"))
 	assert.True(t, Covers("pages:create,pages:read", ""))
@@ -265,17 +265,39 @@ func TestCovers(t *testing.T) {
 	assert.True(t, Covers("pages:write", "pages:create,pages:delete"))
 	assert.False(t, Covers("", "pages:read"))
 	assert.False(t, Covers("incidents:read", "incidents:write"))
-	// Altwert in want wird normalisiert: pages:write gegen migrierte CRUD-Liste samt gekoppelten Tabs.
+	// Legacy value in want is normalized: pages:write against migrated CRUD list including coupled tabs.
 	assert.True(t, Covers(MigrateLegacy("pages:write"), "pages:write"))
 	assert.False(t, Covers("pages:create,pages:read,pages:update,pages:delete", "pages:write"))
 	assert.False(t, Covers(MigrateLegacy("pages:write"), "pages:write,sso:delete,roles:read"))
 	assert.True(t, Covers(MigrateLegacy("pages:write,roles:read"), "pages:write,roles:read"))
-	assert.False(t, Covers("pages:create,pages:read", "pages:create,pages:read,pages:update")) // nur teilweise
-	assert.False(t, Covers("pages:read", "unbekannt:xyz"))                                     // unbekanntes Recht
-	assert.False(t, Covers("pages:read", "foo"))                                               // Eintrag ohne Doppelpunkt
+	assert.False(t, Covers("pages:create,pages:read", "pages:create,pages:read,pages:update")) // only partial
+	assert.False(t, Covers("pages:read", "unbekannt:xyz"))                                     // unknown permission
+	assert.False(t, Covers("pages:read", "foo"))                                               // entry without a colon
 	assert.True(t, Covers(AdminDashboard, AdminDashboard))
-	// Sonderrecht ohne Doppelpunkt: exakter Treffer (Review).
+	// Special permission without colon: exact match (review).
 	assert.True(t, Covers("pages:read,"+AdminDashboard, "pages:read,"+AdminDashboard))
 	assert.False(t, Covers("pages:read", "pages:read,"+AdminDashboard))
 	assert.False(t, Covers("pages:read,admin_dashboardx", AdminDashboard))
+}
+
+// TestGrantsAdminArea: only a right on a known resource opens the admin area.
+// A role without one (empty, or only admin_dashboard) is "status page only":
+// view and subscribe the (private) page, no admin area.
+func TestGrantsAdminArea(t *testing.T) {
+	cases := map[string]bool{
+		"":                                   false,
+		" , ":                                false,
+		AdminDashboard:                       false,
+		"unknown:read":                       false,
+		"nonsense":                           false,
+		"incidents:read":                     true,
+		"subscribers:create":                 true,
+		"components:write":                   true,
+		AdminDashboard + ",maintenance:read": true,
+	}
+	for list, want := range cases {
+		if got := GrantsAdminArea(list); got != want {
+			t.Errorf("GrantsAdminArea(%q) = %v, want %v", list, got, want)
+		}
+	}
 }

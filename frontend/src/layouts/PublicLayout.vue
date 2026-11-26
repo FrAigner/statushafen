@@ -6,7 +6,7 @@ import { OnyxBasicPopover } from 'sit-onyx'
 import { useAuth } from '../composables/useAuth'
 import { useTenant } from '../composables/useTenant'
 import { useApi } from '../composables/useApi'
-import { grants, ADMIN_DASHBOARD } from '../utils/permissions'
+import { grants, grantsAdminArea, ADMIN_DASHBOARD } from '../utils/permissions'
 import { useTheme } from '../composables/useTheme'
 import { useCurrentPageSlug } from '../composables/useCurrentPageSlug'
 import { useLandingChrome } from '../composables/useLandingChrome'
@@ -78,12 +78,22 @@ watch(currentUser, async (user) => {
 // the admin area (localStorage), must not offer this page's dashboard. Off a
 // status page (landing, order page) the first page granting it is used.
 const isGlobalAdmin = computed(() => !!currentUser.value?.is_global_admin)
-const grantsDashboard = (page) => isGlobalAdmin.value || grants(page.Permissions, ADMIN_DASHBOARD)
+// admin_dashboard only counts with an admin right: a "status page only" role
+// has no admin area to open.
+const grantsDashboard = (page) => isGlobalAdmin.value
+  || (grants(page.Permissions, ADMIN_DASHBOARD) && grantsAdminArea(page.Permissions))
 const dashboardPage = computed(() => (currentPageSlug.value
   ? myPages.value.find(p => p.Slug === currentPageSlug.value && grantsDashboard(p))
   : myPages.value.find(grantsDashboard)))
 const showDashboard = computed(() =>
   !!currentUser.value && (isGlobalAdmin.value || !!dashboardPage.value))
+
+// The profile (language, SSO links, export, account deletion) is open to every
+// signed-in account, also to "status page only" members without admin area.
+const goToProfile = () => {
+  isUserMenuOpen.value = false
+  router.push('/admin/profile')
+}
 
 const goToDashboard = () => {
   isUserMenuOpen.value = false
@@ -170,6 +180,11 @@ const goToDashboard = () => {
                 <li>
                   <button class="user-menu-item" @click="openSubscriptionSettings">
                     <AppIcon name="settings" :size="14" /> {{ t('layout.public.subscriptionSettings') }}
+                  </button>
+                </li>
+                <li>
+                  <button class="user-menu-item" @click="goToProfile">
+                    <AppIcon name="user" :size="14" /> {{ t('nav.profile') }}
                   </button>
                 </li>
                 <li v-if="showDashboard">

@@ -146,6 +146,25 @@ catalog languages other than `de` and `en` are deactivated (rows and translation
 database but are no longer offered or delivered), and status pages with such a default language
 fall back to German (logged).
 
+## Upgrade note: PostgreSQL 18 in the development compose file
+
+`docker-compose.yml` now starts PostgreSQL 18 (before: 15). PostgreSQL does not read the data
+directory of another major version, and from version 18 on the image keeps its data below
+`/var/lib/postgresql` instead of `/var/lib/postgresql/data`. An existing local volume therefore
+has to be moved over once:
+
+```bash
+docker compose exec db pg_dumpall -U postgres > statushafen-pg15.sql   # still on the old image
+docker compose down
+docker volume rm statushafen_postgres_data                               # name: docker volume ls
+docker compose up -d db
+docker compose exec -T db psql -U postgres < statushafen-pg15.sql
+```
+
+Without data worth keeping, `docker compose down -v` followed by `docker compose up -d db` is
+enough. Production databases are not affected by this file; for them see
+[backup and restore](docs/backup-restore.en.md).
+
 ## Documentation
 
 - In-app help (German and English) in the app under `/docs`, sources in [`frontend/src/docs`](frontend/src/docs).

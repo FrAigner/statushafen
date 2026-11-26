@@ -36,6 +36,7 @@ function jsonResponse(body, status = 200) {
 function makeFetchRouter({
   subscribersOk = true, componentsOk = true, writeOk = true, writeStatus,
   subscribersFixtureOverride, testWebhookOk = true, testWebhookResponse, languages, languagesOk = true,
+  testMessageResponse,
 } = {}) {
   return vi.fn(async (url, options = {}) => {
     const method = options.method || 'GET'
@@ -56,6 +57,9 @@ function makeFetchRouter({
     }
     if (method === 'DELETE' && /\/subscribers\/\d+$/.test(url)) {
       return writeOk ? { ok: true, status: 204 } : jsonResponse({ error: 'Löschen kaputt' }, writeStatus || 500)
+    }
+    if (method === 'POST' && /\/subscribers\/test$/.test(url)) {
+      return testMessageResponse ?? jsonResponse({ message: 'Test message sent' })
     }
     if (method === 'POST' && /\/subscribe\/test-webhook$/.test(url)) {
       if (testWebhookResponse) return testWebhookResponse
@@ -150,6 +154,10 @@ describe('AdminSubscribers', () => {
 
     expect(wrapper.find('.alert-error').exists()).toBe(true)
     expect(wrapper.text()).toContain('Fehler beim Laden')
+
+    // The close button dismisses the message.
+    await wrapper.find('.alert-close').trigger('click')
+    expect(wrapper.find('.alert-error').exists()).toBe(false)
   })
 
   // unbestätigte Abos (Double-Opt-in) sind in der Liste markiert.
@@ -573,6 +581,124 @@ describe('AdminSubscribers', () => {
         expect(wrapper.find('.alert-error').exists()).toBe(false)
         activeWrapper.unmount()
       }
+    })
+  })
+})
+
+// Test message straight from the form, before saving, in the admin UI language.
+describe('AdminSubscribers – Testnachricht im Formular', () => {
+  beforeEach(() => {
+    useAuth().logout()
+    useTenant().setActiveTenant(null)
+    localStorage.clear()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    i18n.global.locale.value = 'de'
+    setAuthAsPageRole('jwt-1', { permissions: 'subscribers:create,subscribers:update' })
+  })
+  afterEach(() => {
+    activeWrapper?.unmount()
+    activeWrapper = null
+    vi.restoreAllMocks()
+    i18n.global.locale.value = 'de'
+  })
+
+  const testButton = (wrapper) => wrapper.find('[data-test="send-test-message"]')
+  const testCalls = (fetchMock) => fetchMock.mock.calls.filter(([url]) => /\/subscribers\/test$/.test(url))
+
+  async function openNewForm(fetchMock) {
+    const { wrapper } = await mountAdminSubscribers({ fetchImpl: fetchMock })
+    await wrapper.find('.page-head__actions button').trigger('click')
+    return wrapper
+  }
+
+  it('ist ohne gültiges Ziel gesperrt', async () => {
+    const wrapper = await openNewForm(makeFetchRouter())
+    expect(testButton(wrapper).exists()).toBe(true)
+    expect(testButton(wrapper).attributes('disabled')).toBeDefined()
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('keine-adresse')
+    expect(testButton(wrapper).attributes('disabled')).toBeDefined()
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('ops@example.com')
+    expect(testButton(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('sendet vor dem Speichern an die eingetragene Adresse in der Admin-Sprache, ohne zu speichern', async () => {
+    const fetchMock = makeFetchRouter()
+    const wrapper = await openNewForm(fetchMock)
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('ops@example.com')
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(testCalls(fetchMock)).toHaveLength(1)
+    const [url, opts] = testCalls(fetchMock)[0]
+    expect(url).toBe('/api/pages/1/subscribers/test')
+    expect(opts.method).toBe('POST')
+    expect(JSON.parse(opts.body)).toEqual({ Channel: 'email', Email: 'ops@example.com', Language: 'de' })
+    expect(fetchMock.mock.calls.some(([u, o]) => /\/subscribers$/.test(u) && o?.method === 'POST')).toBe(false)
+    expect(wrapper.find('[data-test="test-message-result"]').text()).toContain('Testnachricht gesendet.')
+    expect(wrapper.find('.edit-form').exists()).toBe(true)
+  })
+
+  it('nimmt die eingestellte Admin-Sprache (Englisch) und den Webhook', async () => {
+    i18n.global.locale.value = 'en'
+    const fetchMock = makeFetchRouter()
+    const wrapper = await openNewForm(fetchMock)
+    await fieldByLabel(wrapper, 'Channel').setValue('google_chat')
+    await fieldByLabel(wrapper, 'Webhook URL').setValue('http://chat.example.com/hook')
+    expect(testButton(wrapper).attributes('disabled')).toBeDefined()
+    await fieldByLabel(wrapper, 'Webhook URL').setValue('https://chat.googleapis.com/v1/spaces/x')
+    expect(testButton(wrapper).text()).toBe('Send test message')
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(JSON.parse(testCalls(fetchMock)[0][1].body)).toEqual({
+      Channel: 'google_chat', WebhookURL: 'https://chat.googleapis.com/v1/spaces/x', Language: 'en',
+    })
+    expect(wrapper.find('[data-test="test-message-result"]').text()).toContain('Test message sent.')
+  })
+
+  it('zeigt einen Fehler übersetzt am Formular', async () => {
+    const response = jsonResponse({ error: 'Webhook-Ziel hat die Anfrage abgelehnt', code: 'webhook_rejected' }, 502)
+    const wrapper = await openNewForm(makeFetchRouter({ testMessageResponse: response }))
+    await fieldByLabel(wrapper, 'Kanal').setValue('google_chat')
+    await fieldByLabel(wrapper, 'Webhook URL').setValue('https://chat.googleapis.com/v1/spaces/x')
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+
+    const result = wrapper.find('[data-test="test-message-result"]')
+    expect(result.classes()).toContain('alert-error')
+    expect(result.text()).toContain('Testnachricht fehlgeschlagen: ')
+    expect(result.text()).toContain('Das Webhook-Ziel hat die Anfrage abgelehnt')
+  })
+
+  it('verwirft das Ergebnis, sobald das Ziel geändert wird', async () => {
+    const wrapper = await openNewForm(makeFetchRouter())
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('ops@example.com')
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="test-message-result"]').exists()).toBe(true)
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('ops2@example.com')
+    expect(wrapper.find('[data-test="test-message-result"]').exists()).toBe(false)
+  })
+
+  it('zeigt nach Schließen und neuem Öffnen kein altes Ergebnis', async () => {
+    const wrapper = await openNewForm(makeFetchRouter())
+    await fieldByLabel(wrapper, 'E-Mail-Adresse').setValue('ops@example.com')
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.form-actions button').find(b => b.text() === 'Abbrechen').trigger('click')
+    await wrapper.find('.page-head__actions button').trigger('click')
+    expect(wrapper.find('[data-test="test-message-result"]').exists()).toBe(false)
+  })
+
+  it('gibt es auch beim Bearbeiten eines bestehenden Abonnenten', async () => {
+    const fetchMock = makeFetchRouter()
+    const { wrapper } = await mountAdminSubscribers({ fetchImpl: fetchMock })
+    await menuItem(wrapper.findAll('tbody tr')[1], 'Bearbeiten').trigger('click')
+    expect(testButton(wrapper).attributes('disabled')).toBeUndefined()
+    await testButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(JSON.parse(testCalls(fetchMock)[0][1].body)).toEqual({
+      Channel: 'google_chat', WebhookURL: 'https://chat.googleapis.com/hook-1', Language: 'de',
     })
   })
 })

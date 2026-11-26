@@ -12,9 +12,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// TestInitDB_MigratesOIDCTables lässt InitDB komplett gegen SQLite laufen
-// Die neuen OIDC-Tabellen müssen in der AutoMigrate-Liste der
-// Produktion stehen, nicht nur in testutils.SetupTestDB.
+// TestInitDB_MigratesOIDCTables lets InitDB run entirely against SQLite
+// The new OIDC tables must be in the production AutoMigrate list,
+// not only in testutils.SetupTestDB.
 func TestInitDB_MigratesOIDCTables(t *testing.T) {
 	prevDialector, prevDB := openDialector, DB
 	t.Cleanup(func() { openDialector, DB = prevDialector, prevDB })
@@ -30,17 +30,17 @@ func TestInitDB_MigratesOIDCTables(t *testing.T) {
 	// ones stay, AutoMigrate deletes nothing).
 	assert.False(t, DB.Migrator().HasTable("saml_login_states"))
 	assert.False(t, DB.Migrator().HasTable("saml_assertion_uses"))
-	// Security-Review: auch das NameID-Format gehört zum Schlüssel.
+	// Security review: the NameID format is also part of the key.
 	assert.True(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity_key"))
 	assert.False(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity_protocol"))
 	assert.False(t, DB.Migrator().HasIndex(&models.UserSSOIdentity{}, "idx_user_sso_identity"))
 	assert.False(t, DB.Migrator().HasColumn(&models.StatusPageSSOConfig{}, "saml_sp_key"))
 }
 
-// TestDropLegacySSOIdentityIndex: Eine Bestandsdatenbank hat noch
-// den Unique-Index ohne Protokoll. Er muss weg (sonst kollidieren OIDC- und
-// SAML-Identität mit gleichem Issuer und Subject), Bestandszeilen gelten als
-// OIDC, und ein zweiter Lauf ändert nichts.
+// TestDropLegacySSOIdentityIndex: an existing database still has
+// the unique index without protocol. It must go (otherwise OIDC and
+// SAML identities with the same issuer and subject collide), existing rows count as
+// OIDC, and a second run changes nothing.
 func TestDropLegacySSOIdentityIndex(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "legacy.db")), &gorm.Config{})
 	require.NoError(t, err)
@@ -60,15 +60,15 @@ func TestDropLegacySSOIdentityIndex(t *testing.T) {
 	var ident models.UserSSOIdentity
 	require.NoError(t, db.First(&ident).Error)
 	assert.Equal(t, models.SSOProtocolOIDC, ident.Protocol)
-	// Gleicher Issuer und Subject, anderes Protokoll: jetzt erlaubt.
+	// Same issuer and subject, different protocol: now allowed.
 	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: "saml", Issuer: "https://idp", Subject: "sub"}).Error)
-	// Gleicher Wert, anderes NameID-Format: eine eigene Identität.
+	// Same value, different NameID format: a separate identity.
 	assert.NoError(t, db.Create(&models.UserSSOIdentity{UserID: 1, StatusPageID: 1, Protocol: "saml", Issuer: "https://idp", Subject: "sub", SubjectFormat: "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"}).Error)
 	assert.Equal(t, "", ident.SubjectFormat)
 }
 
-// Die Statushistorie wird bei InitDB für Bestandskomponenten
-// nachgetragen (auch die der Systemseite) und ein zweiter Lauf ändert nichts.
+// The status history is backfilled at InitDB for existing components
+// (including those of the system page) and a second run changes nothing.
 func TestInitDB_StatushistorieNachtragIdempotent(t *testing.T) {
 	prevDialector, prevDB := openDialector, DB
 	t.Cleanup(func() { openDialector, DB = prevDialector, prevDB })
@@ -103,5 +103,5 @@ func TestInitDB_StatushistorieNachtragIdempotent(t *testing.T) {
 func TestBackfillStatusHistory_FehlerBrichtNichtAb(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "leer.db")), &gorm.Config{})
 	require.NoError(t, err)
-	assert.NotPanics(t, func() { backfillStatusHistory(db) }) // Tabellen fehlen: Fehler wird nur geloggt
+	assert.NotPanics(t, func() { backfillStatusHistory(db) }) // tables missing: error is only logged
 }

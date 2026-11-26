@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Abschaltung ohne Systemseite bzw. ohne Komponente ist harmlos.
+// Switch-off without a system page or without a component is harmless.
 func TestMonitor_AusschaltenOhneSeiteOderKomponenteIstHarmlos(t *testing.T) {
 	f := newFixture(t)
 	f.fail()
@@ -22,8 +22,8 @@ func TestMonitor_AusschaltenOhneSeiteOderKomponenteIstHarmlos(t *testing.T) {
 	assert.NotPanics(t, func() { f.run(1) })
 }
 
-// Schlägt das Löschen der Vorfall-Marke fehl, bleibt auch die
-// Störungs-Marke; keine Erholungsmeldung, Fehler im Log (ohne Geheimnis).
+// If deleting the incident marker fails, the outage marker also
+// stays; no recovery message, error in the log (without secret).
 func TestMonitor_VorfallMarkeLoeschenScheitert(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -40,7 +40,7 @@ func TestMonitor_VorfallMarkeLoeschenScheitert(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Scheitert das Abschluss-Update, wird der Fehler geloggt.
+// If the closing update fails, the error is logged.
 func TestMonitor_AbschlussUpdateScheitertWirdGeloggt(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)
@@ -55,8 +55,8 @@ func TestMonitor_AbschlussUpdateScheitertWirdGeloggt(t *testing.T) {
 	assert.NotContains(t, buf.String(), "GEHEIM123")
 }
 
-// Lässt sich der beschädigte Zeitwert nicht reparieren, steht der
-// Fehler im Log.
+// If the corrupted time value cannot be repaired, the
+// error appears in the log.
 func TestMonitor_ZeitwertReparaturScheitertWirdGeloggt(t *testing.T) {
 	buf := logPuffer(t)
 	f := newFixture(t)

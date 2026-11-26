@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Statusverlauf einer Komponente -> Intervalle.
+// Status history of a component -> intervals.
 func TestFromChanges(t *testing.T) {
 	now := time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 	h := func(n int) time.Time { return now.Add(time.Duration(-n) * time.Hour) }
@@ -49,7 +49,7 @@ func TestFromChanges(t *testing.T) {
 			{At: h(2), Status: "operational"},
 		}, now)
 		assert.Empty(t, got)
-		// ... und färbt den Tag nicht: 100 % verfügbar, Status operational.
+		// ... and does not color the day: 100 % available, status operational.
 		days := availability.Compute(got, h(30), now, 1)
 		assert.Equal(t, "operational", days[0].Status)
 	})

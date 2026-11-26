@@ -11,13 +11,13 @@ import (
 	"github.com/fraigner/statushafen/componentstatus"
 )
 
-// SummaryV2Provider: Summary-API v2 (viele öffentliche Statusseiten bieten sie
-// an), Endpunkt GET {base}/api/v2/summary.json.
+// SummaryV2Provider: Summary API v2 (many public status pages offer it),
+// endpoint GET {base}/api/v2/summary.json.
 type SummaryV2Provider struct {
 	Client *http.Client
 }
 
-// summaryV2Summary ist der für uns relevante Teil von summary.json.
+// summaryV2Summary is the part of summary.json that is relevant to us.
 type summaryV2Summary struct {
 	Page struct {
 		URL string `json:"url"`
@@ -32,10 +32,10 @@ type summaryV2Summary struct {
 	} `json:"components"`
 }
 
-// summaryV2StatusMap: Komponentenstatus der Summary-API → unser Status. Die
-// Werte stimmen 1:1 mit unseren Component.Status-Werten überein; die Tabelle
-// macht das Mapping trotzdem explizit, damit ein künftiger Unterschied nicht
-// unbemerkt durchrutscht.
+// summaryV2StatusMap: component status of the summary API → our status. The
+// values match our Component.Status values 1:1; the table
+// still makes the mapping explicit so a future difference does not slip
+// through unnoticed.
 var summaryV2StatusMap = map[string]string{
 	"operational":          componentstatus.Operational,
 	"degraded_performance": componentstatus.DegradedPerformance,
@@ -44,9 +44,9 @@ var summaryV2StatusMap = map[string]string{
 	"under_maintenance":    componentstatus.UnderMaintenance,
 }
 
-// NormalizeSummaryV2Status bildet einen Status der Summary-API ab. Unbekannte
-// Werte ergeben "unknown" (zählt nicht in den effektiven Status, siehe
-// componentstatus.Severity) und werden geloggt - nie ein Abbruch.
+// NormalizeSummaryV2Status maps a status of the summary API. Unknown
+// values yield "unknown" (does not count in the effective status, see
+// componentstatus.Severity) and are logged - never an abort.
 func NormalizeSummaryV2Status(raw string) string {
 	if s, ok := summaryV2StatusMap[raw]; ok {
 		return s
@@ -55,7 +55,7 @@ func NormalizeSummaryV2Status(raw string) string {
 	return componentstatus.Unknown
 }
 
-// FetchSummary implementiert Provider.
+// FetchSummary implements Provider.
 func (p SummaryV2Provider) FetchSummary(ctx context.Context, req FetchRequest) (*Summary, error) {
 	res, err := getJSON(ctx, p.Client, req.BaseURL+"/api/v2/summary.json", req)
 	if err != nil {
@@ -102,9 +102,9 @@ func (p SummaryV2Provider) FetchSummary(ctx context.Context, req FetchRequest) (
 	return sum, nil
 }
 
-// safeLinkURL übernimmt eine von der Fremdseite gelieferte URL nur, wenn sie
-// https ist - sie landet in Teil D als Link auf unserer Seite, ein
-// "javascript:"-Link der Fremdseite darf dort nicht ankommen.
+// safeLinkURL accepts a URL supplied by the third-party site only if it
+// is https - it ends up in part D as a link on our page, a
+// "javascript:" link from the third-party site must not arrive there.
 func safeLinkURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
