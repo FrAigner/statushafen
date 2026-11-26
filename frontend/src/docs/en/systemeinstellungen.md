@@ -37,13 +37,17 @@ Turns the automatic self-monitoring of the system page on or off (see
 ## Automatic translation
 
 The switch **Switch on automatic translation and a second language (German/English)** is **off**
-without an entry. While it is off, incidents, maintenance, notices, components, templates and
-notifications have only the default language of each status page: no language selection, no
-translations, and no maintaining of a second language by hand either. When it is on, German and
-English are available including translation suggestions (see [Languages](/docs/sprachen)). Stored
-translations are kept when you switch it off. **After upgrading** the switch is off even where
-translations were used so far: switch it on once to show them again. Every change is recorded in
-the audit log.
+without an entry.
+
+- **Off:** incidents, maintenance, notices, components, templates and notifications have only the
+  default language of each status page: no language selection, no translations, and no maintaining
+  of a second language by hand either.
+- **On:** German and English are available including translation suggestions (see
+  [Languages](/docs/sprachen)).
+- Stored translations are kept when you switch it off.
+- **After upgrading** the switch is off even where translations were used so far: switch it on once
+  to show them again.
+- Every change is recorded in the audit log.
 
 The other fields set which service handles the **Translate** button in the forms. The suggestion
 always lands as a draft.
@@ -56,9 +60,12 @@ always lands as a draft.
 - **DeepL (own key):** The texts are sent to DeepL for translation, mind data protection. A free
   personal key includes about 500,000 characters per month; keys for the free plan end in `:fx`.
 
-The key is only stored and never shown or returned again: the field stays empty, "Remove the stored
-key" deletes it. The audit log only says "set" or "removed". **Test connection** translates a sample
-text with the saved configuration.
+About the API key:
+
+- The key is only stored and never shown or returned again: the field stays empty.
+- "Remove the stored key" deletes it.
+- The audit log only says "set" or "removed".
+- **Test connection** translates a sample text with the saved configuration.
 
 ## Overview and monitoring
 
@@ -68,6 +75,11 @@ Two more pages are open to global admins only:
   incidents, subscribers and overall status, plus a searchable table of all pages with status,
   components, subscribers and open incidents.
 - **Monitoring** (System area) shows the server's operating figures from the built-in measurement:
-  requests, error rate (only responses with status 5xx; 4xx such as 404 or 409 are not counted; marked yellow from 5 %, red from 10 %), latency (mean, p50, p95, maximum), requests per minute and process uptime,
-  plus saturation (goroutines, heap, GC cycles, database pool) and a table per endpoint. A link
-  opens the operator's Grafana dashboard.
+  - requests
+  - error rate (only responses with status 5xx; 4xx such as 404 or 409 are not counted; marked
+    yellow from 5 %, red from 10 %)
+  - latency (mean, p50, p95, maximum)
+  - requests per minute and process uptime
+  - plus saturation (goroutines, heap, GC cycles, database pool) and a table per endpoint
+
+  A link opens the operator's Grafana dashboard.

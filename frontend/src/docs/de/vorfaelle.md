@@ -27,33 +27,44 @@ Ein Vorfall (Incident) meldet eine Störung. Vorfälle werden unter **Vorfälle*
 | `monitoring` | Beobachtung | Lösung eingespielt, Lage wird beobachtet |
 | `resolved` | Behoben | Vorfall abgeschlossen |
 
-Üblich ist die Reihenfolge von oben nach unten. Statushafen erzwingt sie aber nicht: Man kann
-jeden der vier Status direkt wählen und einen Vorfall auch wieder öffnen; andere Werte lehnt
-Statushafen ab. Setzt man einen Vorfall auf „Behoben“, hält Statushafen den Zeitpunkt als Ende
-fest (auch über ein Update). Wer ihn auf einen anderen Status setzt, löscht damit dessen
-Endzeit. Das Ende darf nicht vor dem Beginn liegen. Behobene Vorfälle erscheinen auf der
-Statusseite unter „Vergangene Vorfälle“.
+Üblich ist die Reihenfolge von oben nach unten. Statushafen erzwingt sie aber nicht:
+
+- Man kann jeden der vier Status direkt wählen und einen Vorfall auch wieder öffnen; andere Werte
+  lehnt Statushafen ab.
+- Setzt man einen Vorfall auf „Behoben“, hält Statushafen den Zeitpunkt als Ende fest (auch über
+  ein Update).
+- Wer ihn auf einen anderen Status setzt, löscht damit dessen Endzeit.
+- Das Ende darf nicht vor dem Beginn liegen.
+- Behobene Vorfälle erscheinen auf der Statusseite unter „Vergangene Vorfälle“.
 
 Solange ein Vorfall offen ist (`investigating`, `identified`, `monitoring`), zeigt die
 Statusseite seine Komponenten mindestens mit dem Status seines Schweregrads: „Beeinträchtigt“,
-„Teilausfall“ oder „Großstörung“. Das ist dieselbe Zuordnung wie bei den Verfügbarkeitsbalken, Anzeige
-und Balken widersprechen sich also nicht. Sind einer Komponente mehrere offene Vorfälle zugeordnet,
-gilt der schlimmste Schweregrad. Ein schlechterer, manuell gesetzter Status bleibt bestehen.
+„Teilausfall“ oder „Großstörung“.
+
+- Das ist dieselbe Zuordnung wie bei den Verfügbarkeitsbalken, Anzeige und Balken widersprechen
+  sich also nicht.
+- Sind einer Komponente mehrere offene Vorfälle zugeordnet, gilt der schlimmste Schweregrad.
+- Ein schlechterer, manuell gesetzter Status bleibt bestehen.
 
 ## Updates
 
-Ein Klick auf einen Vorfall öffnet die Detailansicht mit dem Verlauf. Dort fügt man mit
-„Update hinzufügen“ einen neuen Eintrag hinzu („Neuer Status *“, „Update-Nachricht *“). Das
-Update übernimmt den Status in den Vorfall und erscheint öffentlich im Verlauf. Die ursprüngliche
-Beschreibung des Vorfalls bleibt als **Erstmeldung** erhalten und steht im Verlauf ganz unten. Auf
-der Statusseite zeigt der Vorfall seine jüngsten Updates; das neueste trägt die Kennzeichnung
-„Letztes Update“, siehe [Die öffentliche Statusseite](/docs/oeffentliche-statusseite#vorfaelle-und-ihr-verlauf).
+Ein Klick auf einen Vorfall öffnet die Detailansicht mit dem Verlauf.
+
+1. Dort fügt man mit „Update hinzufügen“ einen neuen Eintrag hinzu („Neuer Status *“,
+   „Update-Nachricht *“).
+2. Das Update übernimmt den Status in den Vorfall und erscheint öffentlich im Verlauf.
+
+Die ursprüngliche Beschreibung des Vorfalls bleibt als **Erstmeldung** erhalten und steht im
+Verlauf ganz unten. Auf der Statusseite zeigt der Vorfall seine jüngsten Updates; das neueste trägt
+die Kennzeichnung „Letztes Update“, siehe [Die öffentliche Statusseite](/docs/oeffentliche-statusseite#vorfaelle-und-ihr-verlauf).
 
 Hat die Statusseite mehrere Sprachen und du darfst den Vorfall ändern, steht über der
-Update-Nachricht ein Sprachumschalter. Eine Nachricht je weiterer Sprache (kein Titel) wird beim
-Posten mitgespeichert. Schon gepostete Updates ergänzt du über **Übersetzungen** am Eintrag im
-Verlauf. Besucher sehen die Nachricht in ihrer Sprache, sobald die Übersetzung als fertig markiert
-ist; sonst die Standardsprache der Seite bzw. das Original.
+Update-Nachricht ein Sprachumschalter.
+
+- Eine Nachricht je weiterer Sprache (kein Titel) wird beim Posten mitgespeichert.
+- Schon gepostete Updates ergänzt du über **Übersetzungen** am Eintrag im Verlauf.
+- Besucher sehen die Nachricht in ihrer Sprache, sobald die Übersetzung als fertig markiert ist;
+  sonst die Standardsprache der Seite bzw. das Original.
 
 Beispiel-Verlauf:
 
@@ -73,10 +84,13 @@ Die Texte kommen aus den [Mail-Templates](/docs/mail-templates). Ein Update mit 
 nutzt das Template „Vorfall behoben“.
 
 Damit ein Fehlgriff oder ein missbrauchtes Konto nicht tausende Mails auslöst, gelten Grenzen je Seite
-und je Nutzer: höchstens 30 neue Vorfälle, Wartungen und Meldungen pro Stunde je Seite (60 je Nutzer)
-sowie 120 Änderungen und Updates pro Stunde. Darüber antwortet die Oberfläche mit „Zu viele Anfragen“;
-nach dem Zeitraum aus `Retry-After` geht es weiter. Der normale Betrieb, auch ein langer Vorfall mit
-vielen Updates, bleibt weit darunter.
+und je Nutzer:
+
+- höchstens 30 neue Vorfälle, Wartungen und Meldungen pro Stunde je Seite (60 je Nutzer),
+- 120 Änderungen und Updates pro Stunde.
+
+Darüber antwortet die Oberfläche mit „Zu viele Anfragen“; nach dem Zeitraum aus `Retry-After` geht
+es weiter. Der normale Betrieb, auch ein langer Vorfall mit vielen Updates, bleibt weit darunter.
 
 ## Post-Mortem
 

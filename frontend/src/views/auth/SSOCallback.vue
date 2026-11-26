@@ -21,9 +21,12 @@ onMounted(async () => {
   }
 
   try {
+    // The backend redeems the code only with the browser binding cookie set at
+    // the login start (login CSRF); send it also to an API on another origin.
     const result = await apiFetch('/api/auth/sso-exchange', {
       method: 'POST',
-      body: JSON.stringify({ code })
+      body: JSON.stringify({ code }),
+      credentials: 'include'
     })
     loginWithToken(result.token)
     // After linking go back to the profile (fixed value, never a target from the URL).

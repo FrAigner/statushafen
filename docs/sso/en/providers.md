@@ -120,6 +120,9 @@ domain. This applies to global providers, page SSO and the password login.
 1. A login start that arrives on the custom domain first redirects to the same path under `BASE_URL`
    and adds the domain as `return_host`. The state cookie has to reach the callback under `BASE_URL`.
    The `Host` of the request wins over a `return_host` in the query.
+   On the custom domain the server sets the cookie `sso_binding` and adds only its hash as
+   `login_binding`: the one-time code is redeemed only in the browser of the login start (login
+   CSRF). A `return_host` without a valid `login_binding` is dropped.
 2. The server keeps `return_host` only if it is exactly the hostname of a custom domain in the state
    "Verified" or "Active"; for page SSO only the domain of that same page. Anything else (unverified,
    unknown or other tenants' domains, scheme, port, path, upper case, trailing dot) is dropped; the
@@ -131,9 +134,9 @@ domain. This applies to global providers, page SSO and the password login.
    page (they never trigger an auto-join). A role from the auto-join never counts, because the tenant
    maintains its e-mail domains; such roles are marked (`joined_via`). If the account then accepts an
    invitation to the same page, the membership becomes an agreed one (with the invited role). If only a
-   page admin changes the role, the marking stays. Roles from before this
-   marking count only if the page has no auto-join set up now and the audit log knows no auto-join of
-   this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
+   page admin changes the role, the marking stays; when a global admin saves the account, unchanged
+   roles keep it too. Roles from before this marking count unless the audit log (which has always
+   recorded every auto-join) knows an auto-join of this account on this page. Callback errors always go to `FRONTEND_URL`, only errors of the login
    start (without any account) go to the custom domain.
 4. The frontend there redeems the code on the same origin. The code is bound to that origin: a code
    for a custom domain is redeemed only there, a code for `FRONTEND_URL` never on a custom domain. The
@@ -148,6 +151,11 @@ linking or unlinking sign-ins (`POST /api/auth/oidc/link`, `POST /api/auth/provi
 (`GET /api/me/sso`) is empty there. For these, sign in under
 `FRONTEND_URL`. A private page needs a role on that page; global admins administer under
 `FRONTEND_URL`.
+
+A page SSO session under `FRONTEND_URL` is issued by the tenant's IdP as well. Without a password
+it therefore deletes the account only if the account exists solely through that page (no other
+sign-in, no role on another page); otherwise `DELETE /api/me` answers `403 page_sso_session`.
+Accounts with a password confirm the deletion with the password as always.
 
 Contract with the reverse proxy: for custom domains it passes the `Host` header on and serves `/api`
 on the same origin (default image, `VITE_API_URL` empty). Whether a request comes from a custom domain

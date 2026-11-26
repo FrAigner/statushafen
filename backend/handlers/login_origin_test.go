@@ -162,7 +162,10 @@ func TestLoginStartOnCustomDomain_MovesToTheBaseHost(t *testing.T) {
 	loc, err := url.Parse(w.Header().Get("Location"))
 	require.NoError(t, err)
 	assert.Equal(t, "https://status.example.org/api/auth/provider/corp/login", loc.Scheme+"://"+loc.Host+loc.Path)
-	assert.Equal(t, url.Values{"return_to": {"/"}, "return_host": {acmeHost}}, loc.Query())
+	q := loc.Query()
+	assert.True(t, validLoginBindingHash(q.Get(loginBindingParam)), "the domain's binding goes along as a hash")
+	q.Del(loginBindingParam)
+	assert.Equal(t, url.Values{"return_to": {"/"}, "return_host": {acmeHost}}, q)
 	assert.Nil(t, stateCookie(w), "no state on the custom domain: the cookie would never reach the callback")
 	var n int64
 	f.db.Model(&models.OIDCLoginState{}).Count(&n)
@@ -238,12 +241,18 @@ func TestLoginStartOnCustomDomain_PageSSOAndSlugMoveToo(t *testing.T) {
 	}
 }
 
+// testDomainBinding is the query part a move from a custom domain adds: the
+// hash of the binding cookie set there (moveLoginToBaseHost).
+func testDomainBinding() string {
+	return loginBindingParam + "=" + hashLoginBinding(randomToken(32))
+}
+
 // providerLoginFrom runs a full global provider login started with the given
 // return_host on the BASE_URL host.
 func (f *globalOIDCFixture) providerLoginFrom(t *testing.T, returnHost string) *httptest.ResponseRecorder {
 	t.Helper()
 	w := serveProvider(f.h.ProviderLoginHandler, http.MethodGet,
-		"/api/auth/provider/corp/login?return_to=%2F&return_host="+url.QueryEscape(returnHost), "corp", nil, 0)
+		"/api/auth/provider/corp/login?return_to=%2F&return_host="+url.QueryEscape(returnHost)+"&"+testDomainBinding(), "corp", nil, 0)
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 	state := f.rememberAuthorizeURL(t, w.Header().Get("Location"))
 	return f.callback("corp", state, "good-code", stateCookie(w))
@@ -344,7 +353,7 @@ func TestProviderLoginFromCustomDomain_DomainRemovedDuringLogin(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://app.example.org")
 	pages := customDomainPages(t, f.db)
 	w := serveProvider(f.h.ProviderLoginHandler, http.MethodGet,
-		"/api/auth/provider/corp/login?return_host="+acmeHost, "corp", nil, 0)
+		"/api/auth/provider/corp/login?return_host="+acmeHost+"&"+testDomainBinding(), "corp", nil, 0)
 	state := f.rememberAuthorizeURL(t, w.Header().Get("Location"))
 	var st models.OIDCLoginState
 	require.NoError(t, f.db.Where("state = ?", state).First(&st).Error)
@@ -407,7 +416,7 @@ func TestProviderLoginStartError_GoesBackToTheCustomDomain(t *testing.T) {
 func (f *oidcFixture) pageLoginFrom(t *testing.T, returnHost string) *httptest.ResponseRecorder {
 	t.Helper()
 	w := serveOIDC(f.h.OIDCLoginHandler, http.MethodGet,
-		"/api/auth/oidc/login?"+f.pageQuery()+"&return_to=%2F&return_host="+url.QueryEscape(returnHost), nil, 0)
+		"/api/auth/oidc/login?"+f.pageQuery()+"&return_to=%2F&return_host="+url.QueryEscape(returnHost)+"&"+testDomainBinding(), nil, 0)
 	require.Equal(t, http.StatusTemporaryRedirect, w.Code, w.Body.String())
 	state := f.rememberAuthorizeURL(t, w.Header().Get("Location"))
 	return f.callback(state, "good-code", stateCookie(w))
@@ -461,8 +470,9 @@ func TestPageSSOLoginWithOtherTenantsDomain_EndsOnTheMainDomain(t *testing.T) {
 	assert.Equal(t, f.page.ID, claims.SSOPageID)
 }
 
-// exchangeOn redeems a one-time code as the frontend on host does.
-func exchangeOn(h *Handler, code, host, origin string) (int, map[string]string) {
+// exchangeOn redeems a one-time code as the frontend on host does, with the
+// binding cookie of that browser (nonce; "" for none).
+func exchangeOn(h *Handler, code, host, origin, nonce string) (int, map[string]string) {
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/auth/sso-exchange", strings.NewReader(`{"code":"`+code+`"}`))
@@ -470,6 +480,9 @@ func exchangeOn(h *Handler, code, host, origin string) (int, map[string]string) 
 	c.Request.Host = host
 	if origin != "" {
 		c.Request.Header.Set("Origin", origin)
+	}
+	if nonce != "" {
+		c.Request.AddCookie(&http.Cookie{Name: loginBindingCookie, Value: nonce})
 	}
 	h.SSOExchangeHandler(c)
 	body := map[string]string{}
@@ -495,21 +508,42 @@ func TestSSOCode_IsBoundToItsOrigin(t *testing.T) {
 	require.NoError(t, f.db.Create(&member).Error)
 	grantPageRole(t, f.db, member.ID, pages[acmeHost].ID)
 
-	code := codeOf(t, f.providerLoginFrom(t, acmeHost))
-	status, body := exchangeOn(f.h, code, "status.example.org", "https://status.example.org")
+	// fromDomain runs a login started on the custom domain (with the move to
+	// the BASE_URL host) and returns the code and the domain's binding nonce.
+	fromDomain := func() (string, string) {
+		onDomain := serveOnHost(f.h.ProviderLoginHandler, acmeHost, "/api/auth/provider/corp/login", "corp")
+		moved, err := url.Parse(onDomain.Header().Get("Location"))
+		require.NoError(t, err)
+		start := serveProvider(f.h.ProviderLoginHandler, http.MethodGet, moved.RequestURI(), "corp", nil, 0)
+		state := f.rememberAuthorizeURL(t, start.Header().Get("Location"))
+		return codeOf(t, f.callback("corp", state, "good-code", stateCookie(start))), bindingCookie(onDomain).Value
+	}
+	// onMain runs a login on the main domain and returns code and nonce.
+	onMain := func() (string, string) {
+		start := serveProvider(f.h.ProviderLoginHandler, http.MethodGet, "/api/auth/provider/corp/login", "corp", nil, 0)
+		state := f.rememberAuthorizeURL(t, start.Header().Get("Location"))
+		return codeOf(t, f.callback("corp", state, "good-code", stateCookie(start))), bindingCookie(start).Value
+	}
+
+	code, nonce := fromDomain()
+	status, body := exchangeOn(f.h, code, "status.example.org", "https://status.example.org", nonce)
 	assert.Equal(t, http.StatusUnauthorized, status)
 	assert.Equal(t, "login_code_invalid", body["code"])
-	status, _ = exchangeOn(f.h, code, acmeHost, "https://"+acmeHost)
+	status, _ = exchangeOn(f.h, code, acmeHost, "https://"+acmeHost, nonce)
 	assert.Equal(t, http.StatusUnauthorized, status, "a refused code is gone")
 
-	status, _ = exchangeOn(f.h, codeOf(t, f.providerLoginFrom(t, acmeHost)), acmeHost, "https://"+acmeHost)
+	code, nonce = fromDomain()
+	status, _ = exchangeOn(f.h, code, acmeHost, "https://"+acmeHost, nonce)
 	assert.Equal(t, http.StatusOK, status)
-	status, _ = exchangeOn(f.h, codeOf(t, f.providerLoginFrom(t, acmeHost)), "backend:8080", "https://"+acmeHost)
+	code, nonce = fromDomain()
+	status, _ = exchangeOn(f.h, code, "backend:8080", "https://"+acmeHost, nonce)
 	assert.Equal(t, http.StatusOK, status, "the browser's Origin counts when the proxy rewrites Host")
 
-	status, _ = exchangeOn(f.h, codeOf(t, f.login(t)), acmeHost, "https://"+acmeHost)
+	code, nonce = onMain()
+	status, _ = exchangeOn(f.h, code, acmeHost, "https://"+acmeHost, nonce)
 	assert.Equal(t, http.StatusUnauthorized, status, "a main domain code is not redeemed on a custom domain")
-	status, _ = exchangeOn(f.h, codeOf(t, f.login(t)), "status.example.org", "")
+	code, nonce = onMain()
+	status, _ = exchangeOn(f.h, code, "status.example.org", "", nonce)
 	assert.Equal(t, http.StatusOK, status)
 }
 
@@ -664,17 +698,23 @@ func TestProviderLoginFromCustomDomain_AutoJoinedRoleDoesNotCount(t *testing.T) 
 	assert.Zero(t, claims.SSOPageID)
 }
 
-// Memberships from before joined_via existed may stem from an auto-join. They
-// count only if the page has no auto-join set up now and no auto-join of this
-// account on this page is in the audit log.
+// Memberships from before joined_via existed (legacy, or still empty) count
+// as consented. Only an explicit auto-join does not: the auto-join has always
+// been recorded in the audit log, which is the evidence for legacy rows. An
+// auto-join set up on the page today says nothing about how an older
+// membership came about.
 func TestProviderLoginFromCustomDomain_LegacyMembership(t *testing.T) {
 	for name, tc := range map[string]struct {
+		joinedVia            string
 		autoJoinNow, audited bool
 		counts               bool
 	}{
-		"plain":              {counts: true},
-		"auto-join set up":   {autoJoinNow: true},
-		"auto-join recorded": {audited: true},
+		"plain":                     {joinedVia: models.JoinedViaLegacy, counts: true},
+		"empty":                     {joinedVia: "", counts: true},
+		"auto-join set up":          {joinedVia: models.JoinedViaLegacy, autoJoinNow: true, counts: true},
+		"empty, auto-join set up":   {joinedVia: "", autoJoinNow: true, counts: true},
+		"auto-join recorded":        {joinedVia: models.JoinedViaLegacy, audited: true},
+		"empty, auto-join recorded": {joinedVia: "", audited: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newGlobalOIDCFixture(t)
@@ -683,7 +723,10 @@ func TestProviderLoginFromCustomDomain_LegacyMembership(t *testing.T) {
 			page := pages[acmeHost]
 			member := models.User{Email: "neu@example.org", RoleID: f.viewer.ID}
 			require.NoError(t, f.db.Create(&member).Error)
-			require.NoError(t, f.db.Create(&models.UserStatusPageRole{UserID: member.ID, StatusPageID: page.ID, RoleID: f.viewer.ID, JoinedVia: models.JoinedViaLegacy}).Error)
+			row := models.UserStatusPageRole{UserID: member.ID, StatusPageID: page.ID, RoleID: f.viewer.ID}
+			require.NoError(t, f.db.Create(&row).Error)
+			// BeforeCreate never stores an empty origin; set it directly.
+			require.NoError(t, f.db.Model(&row).UpdateColumn("joined_via", tc.joinedVia).Error)
 			if tc.autoJoinNow {
 				enableAutoJoin(t, f.db, &page)
 			}

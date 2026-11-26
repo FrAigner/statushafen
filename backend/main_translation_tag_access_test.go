@@ -139,7 +139,8 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 				desc string
 				call func(parent uint, trs []uint, n int, token string) *httptest.ResponseRecorder
 			}
-			newLangs := []string{"fr", "pt", "pl"}
+			// Each parent gets one new translation in the page's additional language.
+			newLangs := []string{"en", "en", "en"}
 			ops := []op{
 				{"Anlegen", func(p uint, _ []uint, n int, tok string) *httptest.ResponseRecorder {
 					return do(http.MethodPost, coll(p), tc.createBody(newLangs[n]), tok)

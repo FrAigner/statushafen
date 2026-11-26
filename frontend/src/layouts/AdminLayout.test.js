@@ -126,7 +126,7 @@ describe('AdminLayout', () => {
     useAuth().setAuth('jwt-1', { email: 'admin@x.de', is_global_admin: true, permissions: '' })
     const { wrapper } = await mountLayout()
     const kids = Array.from(wrapper.find('.topbar-right').element.children).map(el => el.className.split(' ')[0])
-    expect(kids.slice(0, 3)).toEqual(['icon-btn', 'notif', 'language-switcher'])
+    expect(kids.slice(0, 3)).toEqual(['icon-btn', 'notif', 'language-switcher-root'])
     wrapper.unmount()
 
     asPageRole('jwt-2', { email: 'v@x.de', is_global_admin: false, permissions: 'components:read' })
@@ -854,19 +854,23 @@ describe('AdminLayout', () => {
       wrapper.unmount()
     })
 
-    it('schließt beim Klick außerhalb, nicht beim Klick im Panel', async () => {
+    // pointerdown covers mouse and touch; iOS sends no document click for taps
+    // on non-interactive areas.
+    it('schließt beim Klick/Tap außerhalb, nicht beim Klick im Panel', async () => {
       const { wrapper } = await mountWithUser()
+      const pointerdown = el => el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
       await button(wrapper).trigger('click')
 
-      await wrapper.find('.user-menu-info').trigger('click')
+      pointerdown(wrapper.find('.user-menu-info').element)
+      await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(true)
 
-      document.body.click()
+      pointerdown(document.body)
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
 
       // Ein Klick außerhalb bei geschlossenem Menü bleibt folgenlos.
-      document.body.click()
+      pointerdown(document.body)
       await flushPromises()
       expect(wrapper.find('.user-menu-panel').exists()).toBe(false)
       wrapper.unmount()

@@ -10,22 +10,26 @@ Content (incidents, maintenance, notices, components, templates and notification
 language depends on the switch **Automatic translation** in the
 [System settings](/docs/systemeinstellungen) (global admins only). It is **off by default**.
 
-- **Off:** Every status page has its default language only. There are no language tabs in the
-  forms, no translation pages and no "Translate" button; you cannot maintain a second language by
-  hand either. The public status page shows all content in the default language, and mails to
-  subscribers and internal users go out in the default language as well. The language selector at
-  the top then only switches the interface.
+- **Off:** Every status page has its default language only.
+  - There are no language tabs in the forms, no translation pages and no "Translate" button; you
+    cannot maintain a second language by hand either.
+  - The public status page shows all content in the default language, and mails to subscribers and
+    internal users go out in the default language as well.
+  - The language selector at the top then only switches the interface.
 - **On:** German and English as described below, including translation suggestions when a service
   is set up.
 
 Translations already stored are not lost when you switch it off: they reappear as soon as the
 switch is on.
 
-**After upgrading:** installations that used translations before start with the switch off. A
-global admin has to switch automatic translation on once in the system settings to show the second
-language and the translations again. Languages other than German and English from the former
-catalog are switched off at startup and no longer offered anywhere; their translations stay in the
-database. A status page that had such a language as its default language now uses German.
+**After upgrading:**
+
+- Installations that used translations before start with the switch off. A global admin has to
+  switch automatic translation on once in the system settings to show the second language and the
+  translations again.
+- Languages other than German and English from the former catalog are switched off at startup and
+  no longer offered anywhere; their translations stay in the database.
+- A status page that had such a language as its default language now uses German.
 
 ## Interface language
 
@@ -62,47 +66,61 @@ works if
   different default language there first) and
 - no **email templates** in this language exist any more (delete them under email templates first).
 
-Translations of incidents, components and announcements that were already saved are kept but no
-longer shown. If you create the same code again later, they are back. A deleted language does not
-come back by itself on restart. To merely take it out of the selection, set it to **inactive**
-instead.
+After deleting:
+
+- Translations of incidents, components and announcements that were already saved are kept but
+  no longer shown. If you create the same code again later, they are back.
+- A deleted language does not come back by itself on restart.
+- To merely take it out of the selection, set it to **inactive** instead.
 
 ## Translate content
 
 Only with automatic translation switched on: incidents (title and message), their updates (message
 only), components (name and description) and notices can be translated into the second language. Each translation starts as a **draft** and has to be **confirmed**; the public API
 only returns confirmed translations.
+Translations exist only in an additional language the page offers; Statushafen refuses the
+default language or a language the page does not offer with a message.
+
+### Display on the status page
 
 The public status page shows the names and descriptions of components and groups as well as the
 title and message of incidents and notices, as well as the messages of an incident's updates, in
-the language the visitor chose in the language switcher. If there is no confirmed translation in that language, Statushafen uses the translation
-in the default language of the page, otherwise the original text. Drafts and reports from external
-sources are never shown translated. The history texts have no translation and appear
-in the original.
+the language the visitor chose in the language switcher.
+
+- **Missing translation:** If there is no confirmed translation in that language, Statushafen uses
+  the translation in the default language of the page, otherwise the original text.
+- **Never translated:** Drafts and reports from external sources are never shown translated.
+- **Status history:** The history texts have no translation and appear in the original.
+
+### Translation suggestion
 
 You translate by hand or with a suggestion: in incidents, maintenance windows and notices, the tab
 of an additional language has the button **Translate from {default language}**. It sends the title
 and message of the default language to the configured translation service and fills the fields
-with the result. The result is a **draft**: the "Translation is done" checkbox is cleared, and
-nothing is published until you have checked it. You need the "Update" permission of the respective
-tab and a title in the default language (for updates: a message, since an update has no title); at
-most 5000 characters per request.
+with the result.
 
-If no service is set up, the service is not reachable or the language is not supported (the default
-service only knows the languages the operator has loaded), a message appears below the button and
-the form stays fully usable. Global admins set up the service under
-[System settings](/docs/systemeinstellungen).
+- **Draft:** The result is a **draft**: the "Translation is done" checkbox is cleared, and nothing
+  is published until you have checked it.
+- **Requirements:** You need the "Update" permission of the respective tab and a title in the
+  default language (for updates: a message, since an update has no title).
+- **Limit:** at most 5000 characters per request.
+- **No service:** If no service is set up, the service is not reachable or the language is not
+  supported (the default service only knows the languages the operator has loaded), a message
+  appears below the button and the form stays fully usable. Global admins set up the service under
+  [System settings](/docs/systemeinstellungen).
+- **Fallback for DeepL:** If DeepL is the selected service and fails (quota used up, access
+  rejected, not reachable or language not supported), the operator's default service
+  (LibreTranslate) translates instead, provided it is set up and knows the language. A note below
+  the button names the fallback service; if it fails too, the DeepL error is shown.
+- Title and message go to the service in a single request.
 
-If DeepL is the selected service and fails (quota used up, access rejected, not reachable or language
-not supported), the operator's default service (LibreTranslate) translates instead, provided it is set
-up and knows the language. A note below the button names the fallback service; if it fails too, the
-DeepL error is shown. Title and message go to the service in a single request.
+**Translate into all n empty languages** (above the tabs) translates the default language into
+every further language that is still empty, one after the other, each as a draft.
 
-**Translate into all n empty languages** (above the tabs) translates the default language into every
-further language that is still empty, one after the other, each as a draft. Languages that already
-have text stay untouched. Unsupported languages are skipped and counted in the closing message; any
-other error (quota, access, service or connection not reachable, session expired) stops the run and
-is shown.
+- Languages that already have text stay untouched.
+- Unsupported languages are skipped and counted in the closing message.
+- Any other error (quota, access, service or connection not reachable, session expired) stops the
+  run and is shown.
 
 Messages in the admin area (e.g. "saved") stay at the top of the content area and remain visible
 while scrolling. Success messages fade out by themselves after a few seconds; errors and warnings
@@ -119,7 +137,8 @@ Under **UI Texts** you can override individual interface texts, for example a bu
 
 The most specific value wins: page before global before the default text.
 
-The table can be filtered by area and language and searched (by key or text). Changed entries are
-marked "customized" or "unsaved"; "Save all" saves all open changes at once. An empty text cannot
-be saved: to remove a customization, use "Reset" (with a confirmation; it only affects the chosen
-language and scope).
+- **Search:** The table can be filtered by area and language and searched (by key or text).
+- **Saving:** Changed entries are marked "customized" or "unsaved"; "Save all" saves all open
+  changes at once.
+- **Reset:** An empty text cannot be saved: to remove a customization, use "Reset" (with a
+  confirmation; it only affects the chosen language and scope).

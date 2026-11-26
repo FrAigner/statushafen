@@ -32,11 +32,23 @@ admins can adjust, rename or delete it under **Roles & Permissions**; that is ke
 status page themselves becomes "Page Admin" of that page. If they should also maintain users, SSO,
 mail templates and languages of their own page, a global admin assigns them "Page Owner".
 
-Whoever may manage users on a page (`pages:create`/`pages:delete`) can only assign roles whose
-rights they hold themselves on that page, and can only invite new accounts by email address: the account becomes a member only once it accepts the invitation (see **Status pages**). Accounts with the old global SSO, a page SSO link or a role on another page, and global admin accounts, can only be added by a global admin. Picking
-arbitrary accounts by ID is reserved for global admins.
+### Rules for managing the users of a page
 
-Each account has exactly one role per page. As a non-global-admin you cannot remove your own role or downgrade it to a role without `pages:update` if you are the last member with that right on the page (message "last user with management rights"). Removing a member, deleting their role or taking the page away from the account also deletes the account's page SSO link for that page.
+Each account has exactly one role per page. Whoever may manage users on a page
+(`pages:create`/`pages:delete`) is bound by these rules:
+
+- They can only assign roles whose rights they hold themselves on that page.
+- They can only invite new accounts by email address: the account becomes a member only once it
+  accepts the invitation (see **Status pages**).
+- Accounts with the old global SSO, a page SSO link or a role on another page, and global admin
+  accounts, can only be added by a global admin.
+- Picking arbitrary accounts by ID is reserved for global admins.
+- As a non-global-admin you cannot remove your own role or downgrade it to a role without
+  `pages:update` if you are the last member with that right on the page (message "last user with
+  management rights").
+
+Removing a member, deleting their role or taking the page away from the account also deletes the
+account's page SSO link for that page.
 
 ## Permissions
 
@@ -44,6 +56,9 @@ Every tab of the admin navigation is its own resource with four actions: **Creat
 **Update** and **Delete**. A permission is called `<resource>:<action>`. Every API route checks the
 action that matches the HTTP method: GET needs read, POST create, PUT and PATCH update, DELETE
 delete. Special actions are assigned to one action (see the "Routes" column).
+
+![Permission matrix of the "Editor" role: for each area the columns Create, Read, Update and Delete (excerpt with the Operations and Content areas); rows reserved for global admins are locked](/docs-img/en/role-matrix.webp)
+
 
 | Area | Tab | Resource | Applies to | Permissions | Routes |
 |---|---|---|---|---|---|
@@ -72,20 +87,26 @@ It only counts on the page the role is assigned for, and only together with at l
 from the matrix.
 
 **Status page only:** a role without any right from the matrix (empty or only `admin_dashboard`)
-gives no access to the admin area. Members with this role see the status page, also in private
-mode, and can subscribe to it. If they open an address under `/admin`, they land on their status
-page; only their profile ("Profile" in the user menu of the public page) stays reachable. The
-admin area's API also rejects such accounts (403). The role editor shows above the matrix whether
-a role is "Status page only"; the button "Set to "Status page only"" removes all rights. The role
-list shows "Status page only" for such roles. If an account has roles on several pages, the page
-selector in the admin area only offers the pages with at least one right.
+gives no access to the admin area.
+
+- Members with this role see the status page, also in private mode, and can subscribe to it.
+- If they open an address under `/admin`, they land on their status page; only their profile
+  ("Profile" in the user menu of the public page) stays reachable.
+- The admin area's API also rejects such accounts (403).
+- The role editor shows above the matrix whether a role is "Status page only"; the button "Set to
+  "Status page only"" removes all rights. The role list shows "Status page only" for such roles.
+- If an account has roles on several pages, the page selector in the admin area only offers the
+  pages with at least one right.
 
 **Create, update and delete include read:** whoever has `components:update` may also read, without
 `components:read` being listed. Update does not include create or delete. This applies to every
-resource. Tabs without read permission are hidden, and so are areas without a visible tab; if
-someone opens the address of such a page directly, "No permission" appears. The role on the
-currently selected status page always counts. Buttons and menu entries appear per action: "New ..."
-with create, edit with update, delete with delete.
+resource.
+
+- Tabs without read permission are hidden, and so are areas without a visible tab; if someone
+  opens the address of such a page directly, "No permission" appears.
+- The role on the currently selected status page always counts.
+- Buttons and menu entries appear per action: "New ..." with create, edit with update, delete with
+  delete.
 
 **Global resources** (Overview, Users, Roles & Permissions, Tags, Audit Log, Monitoring, System
 Settings) do not apply to a single page but to the whole platform. They are reserved for global
@@ -94,14 +115,21 @@ matrix. The same applies to creating status pages, the language catalog and the 
 
 **Migration from `:write`:** Before this model there was only read and write per area
 (`<resource>:write`). At startup a one-time migration replaces `:write` in all roles with create,
-read, update and delete and adds the tabs that used to depend on another resource
-(`components:write` also grants `external_sources:*`, `incidents:write` also `maintenance:*` and
-`incident_templates:*`, `pages:write` also `notification_templates:*`, `languages:*`,
-`ui_translations:*` and `sso:*`). Nobody gains or loses permissions. The old values are kept as a
-backup in the system settings (`permissions.crud_backup`). Old login tokens containing `:write`
-keep working until they expire; the permissions are read fresh from the role on every request
-anyway. A remaining `:write` in a role counts as create, read, update and delete when checking, but
-is never saved again.
+read, update and delete and adds the tabs that used to depend on another resource:
+
+- `components:write` also grants `external_sources:*`.
+- `incidents:write` also grants `maintenance:*` and `incident_templates:*`.
+- `pages:write` also grants `notification_templates:*`, `languages:*`, `ui_translations:*` and
+  `sso:*`.
+
+For the migration:
+
+- Nobody gains or loses permissions.
+- The old values are kept as a backup in the system settings (`permissions.crud_backup`).
+- Old login tokens containing `:write` keep working until they expire; the permissions are read
+  fresh from the role on every request anyway.
+- A remaining `:write` in a role counts as create, read, update and delete when checking, but is
+  never saved again.
 
 The role editor shows a matrix with one row per tab, grouped by area, and the columns C (create),
 R (read), U (update) and D (delete). The "all" switches set a whole row or column; create, update
@@ -125,5 +153,7 @@ In addition to the role, tags can narrow access to individual components and inc
 Under **Profile** (user menu at the top right) every user sets their interface language, links
 their account to the SSO of a status page and can delete their account. If you are the only admin
 of a page, that page is deleted too after a separate confirmation. The last global admin cannot
-delete themselves. Your own data can be downloaded as a JSON file with "Download my data"
+delete themselves. Signed in through the SSO of a status page without a password, you can delete
+your account only if it exists solely through that page; otherwise sign in on the main address
+for this. Your own data can be downloaded as a JSON file with "Download my data"
 (technically `GET /api/me/export`, login required).

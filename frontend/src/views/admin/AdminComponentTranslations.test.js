@@ -390,6 +390,26 @@ describe('AdminComponentTranslations', () => {
     }
   })
 
+  it('zeigt die übersetzte Meldung, wenn die Seite die Sprache nicht anbietet', async () => {
+    const base = makeFetchRouter()
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (options.method === 'POST') return jsonResponse({ error: 'x', code: 'language_not_available' }, 400)
+      return base(url, options)
+    })
+    const { wrapper } = await mountComponent({ fetchImpl: fetchMock })
+
+    await wrapper.findAll('button').filter(b => b.text().includes('Neu'))[0].trigger('click')
+    await flushPromises()
+    await wrapper.find('select').setValue('en')
+    await wrapper.find('input[type="text"]').setValue('New Title')
+    await wrapper.findAll('textarea')[0].setValue('New Description')
+    await wrapper.findAll('form')[0].trigger('submit')
+    await flushPromises()
+
+    expect(fetchMock.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true)
+    expect(wrapper.text()).toContain(i18n.global.t('api.errors.language_not_available'))
+  })
+
   it('hat keine axe-Funde', async () => {
     const { wrapper } = await mountComponent()
     expect(await axe(wrapper)).toHaveNoViolations()

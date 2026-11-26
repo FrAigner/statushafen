@@ -10,6 +10,7 @@ import { grants, grantsAdminArea, ADMIN_DASHBOARD } from '../utils/permissions'
 import { useTheme } from '../composables/useTheme'
 import { useCurrentPageSlug } from '../composables/useCurrentPageSlug'
 import { useLandingChrome } from '../composables/useLandingChrome'
+import { useDismissable } from '../composables/useDismissable'
 import AppIcon from '../components/AppIcon.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
@@ -40,6 +41,14 @@ const goToLogin = () => {
 }
 
 const isUserMenuOpen = ref(false)
+// OnyxBasicPopover only toggles via its trigger; a click/tap outside the
+// popover (trigger + panel live inside its root) or Escape closes it too.
+const userMenuRef = ref(null)
+const userMenuTriggerRef = ref(null)
+useDismissable(isUserMenuOpen, [userMenuRef], (reason) => {
+  isUserMenuOpen.value = false
+  if (reason === 'escape') userMenuTriggerRef.value?.focus()
+})
 
 const handleLogout = () => {
   isUserMenuOpen.value = false
@@ -156,6 +165,7 @@ const goToDashboard = () => {
 
         <template v-if="currentUser">
           <OnyxBasicPopover
+            ref="userMenuRef"
             v-model:open="isUserMenuOpen"
             :label="t('layout.public.userMenu')"
             position="bottom"
@@ -164,6 +174,7 @@ const goToDashboard = () => {
             <template #default="{ trigger }">
               <button
                 v-bind="trigger"
+                ref="userMenuTriggerRef"
                 class="header-control header-control--icon user-menu-trigger"
                 :aria-label="t('layout.public.userMenuOpenAria')"
                 :title="t('layout.public.userMenu')"

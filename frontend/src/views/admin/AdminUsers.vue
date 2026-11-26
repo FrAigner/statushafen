@@ -338,7 +338,7 @@ const summarizeRoles = (user) => {
               <div v-for="page in pages" :key="page.ID" class="page-role-row">
                 <div class="page-name">{{ page.Name }}</div>
                 <div class="page-select">
-                  <select :value="getRoleForPage(page.ID)" :aria-label="t('users.roleForPageAria', { name: page.Name })" @change="e => setRoleForPage(page.ID, e.target.value)">
+                  <select class="form-select" :value="getRoleForPage(page.ID)" :aria-label="t('users.roleForPageAria', { name: page.Name })" @change="e => setRoleForPage(page.ID, e.target.value)">
                     <option value="0">{{ t('users.noAccessOption') }}</option>
                     <option v-for="r in pageRoleOptions(roles, getRoleForPage(page.ID))" :key="r.ID" :value="r.ID">{{ r.Name }}</option>
                   </select>

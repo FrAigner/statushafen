@@ -9,14 +9,15 @@ characters yourself (see [Editor](#editor)).
 ## Editor
 
 Above the field are buttons for bold, italic, bulleted list, quote, code and link (https only).
-They add the Markdown characters around the selected text or at the cursor; a second click on bold,
-italic or code removes them again. Ctrl+B (Cmd+B on Mac) and Ctrl+I set bold and italic from the
-keyboard. After "Link" the address `https://` is selected, so you can type over it.
 
-"Preview" shows the text exactly as the status page will show it, with the same filtering: raw
-HTML, images and headings appear as plain text there too. Click "Edit" to go back. Below the field a
-counter shows the number of characters against the limit of 5,000; if the text is longer, the
-counter turns red and saving is rejected.
+- They add the Markdown characters around the selected text or at the cursor; a second click on
+  bold, italic or code removes them again.
+- Ctrl+B (Cmd+B on Mac) and Ctrl+I set bold and italic from the keyboard.
+- After "Link" the address `https://` is selected, so you can type over it.
+- "Preview" shows the text exactly as the status page will show it, with the same filtering: raw
+  HTML, images and headings appear as plain text there too. Click "Edit" to go back.
+- Below the field a counter shows the number of characters against the limit of 5,000; if the
+  text is longer, the counter turns red and saving is rejected.
 
 ## Syntax
 

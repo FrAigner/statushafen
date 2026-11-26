@@ -16,6 +16,7 @@ import AdminNotificationBell from '../components/AdminNotificationBell.vue'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 import HelpTooltipsToggle from '../components/HelpTooltipsToggle.vue'
 import AdminQuickSearch from '../components/AdminQuickSearch.vue'
+import { useDismissable } from '../composables/useDismissable'
 
 const router = useRouter()
 const route  = useRoute()
@@ -239,9 +240,9 @@ const onUserMenuFocusout = (e) => {
   if (e.relatedTarget && !userMenuRef.value?.contains(e.relatedTarget)) closeUserMenu()
 }
 
-const onDocumentClick = (e) => {
-  if (userMenuOpen.value && !userMenuRef.value?.contains(e.target)) closeUserMenu()
-}
+// Click/tap outside closes; Escape stays with onKeydown below (it decides
+// between the user menu and the mobile navigation).
+useDismissable(userMenuOpen, [userMenuRef], () => closeUserMenu(), { escape: false })
 
 const goPublicView = () => {
   closeUserMenu()
@@ -267,11 +268,9 @@ const contentRef = ref(null)
 useAutoDismissAlerts(contentRef)
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
-  document.addEventListener('click', onDocumentClick)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('click', onDocumentClick)
   document.body.style.overflow = ''
   clearPageOverrides(locale.value)
 })

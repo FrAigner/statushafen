@@ -149,7 +149,11 @@ describe('AdminNotificationBell', () => {
     expect(w.find('[role="dialog"]').exists()).toBe(false)
     await w.find('.notif-button').trigger('click')
     await flushPromises()
-    document.body.click()
+    // pointerdown covers mouse and touch (iOS sends no document click for such taps).
+    w.find('.notif-item-title').element.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(w.find('[role="dialog"]').exists()).toBe(true)
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await flushPromises()
     expect(w.find('[role="dialog"]').exists()).toBe(false)
     w.unmount()

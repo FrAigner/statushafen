@@ -19,12 +19,17 @@ Die wichtigsten Abschnitte für Admins:
 
 Oben rechts im Admin-Bereich zeigt die Glocke Hinweise für Admins, z. B. wenn eine externe
 Statusquelle ausfällt oder ein Webhook-Kanal Anfragen drosselt (HTTP 429) beziehungsweise
-Benachrichtigungen dauerhaft ablehnt. Die Zahl am Symbol nennt die ungelesenen Nachrichten
-(ab zehn „9+“). Gleiche Meldungen innerhalb von 15 Minuten werden zusammengefasst („3-mal“) und
-leben als ungelesen wieder auf. „Als gelesen“ gilt nur für dein eigenes Konto. Sichtbar ist die Glocke
-für Global Admins und Rollen mit `components:write` oder `subscribers:write` auf der Seite;
-systemweite Nachrichten sehen nur Global Admins. Nachrichten werden nach 90 Tagen gelöscht.
-Webhook-Adressen, Schlüssel und E-Mail-Adressen von Abonnenten stehen nie in einer Nachricht.
+Benachrichtigungen dauerhaft ablehnt.
+
+- **Zähler:** Die Zahl am Symbol nennt die ungelesenen Nachrichten (ab zehn „9+“).
+- **Zusammenfassen:** Gleiche Meldungen innerhalb von 15 Minuten werden zusammengefasst („3-mal“)
+  und leben als ungelesen wieder auf.
+- **Gelesen:** „Als gelesen“ gilt nur für dein eigenes Konto.
+- **Sichtbarkeit:** Sichtbar ist die Glocke für Global Admins und Rollen mit `components:write`
+  oder `subscribers:write` auf der Seite; systemweite Nachrichten sehen nur Global Admins.
+- **Aufbewahrung:** Nachrichten werden nach 90 Tagen gelöscht.
+- **Datenschutz:** Webhook-Adressen, Schlüssel und E-Mail-Adressen von Abonnenten stehen nie in
+  einer Nachricht.
 
 ## Ausführliche Betreiber-Anleitungen
 

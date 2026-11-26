@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fraigner/statushafen/database"
+	"github.com/fraigner/statushafen/middleware"
 	"github.com/fraigner/statushafen/models"
 	"github.com/fraigner/statushafen/permissions"
 
@@ -67,6 +68,14 @@ func (h *Handler) DeleteMeHandler(c *gin.Context) {
 		return
 	}
 
+	if scope := middleware.SSOPageID(c); scope != 0 && !h.pageSSOMayDeleteAccount(user, scope) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Mit der Anmeldung über eine Statusseite nicht möglich. Melde dich dafür unter der Hauptadresse an.",
+			"code":  "page_sso_session",
+		})
+		return
+	}
+
 	if !accountDeletionConfirmed(user, req) {
 		// 403 statt 401: das Frontend meldet bei 401 ab, hier soll der Nutzer
 		// die Eingabe nur korrigieren können.
@@ -115,6 +124,31 @@ func accountDeletionConfirmed(user models.User, req meDeleteRequest) bool {
 		return false
 	}
 	return user.PasswordHash == "" || database.CheckPasswordHash(req.Password, user.PasswordHash)
+}
+
+// pageSSOMayDeleteAccount reports whether a session limited to the SSO of
+// pageID may delete the account. The page's IdP is run by the tenant and can
+// mint such a session for every account linked to it; without a password the
+// deletion is confirmed by e-mail only. So it may delete only an account that
+// exists solely through this page: no other sign-in (global provider, legacy
+// SSO, another page's SSO) and no membership on another page. With a password,
+// accountDeletionConfirmed re-authenticates by password. False on a database
+// error (fail closed).
+func (h *Handler) pageSSOMayDeleteAccount(user models.User, pageID uint) bool {
+	if user.PasswordHash != "" {
+		return true
+	}
+	if user.IsGlobalAdmin || user.SSOProvider != "" || user.SSOSubject != "" {
+		return false
+	}
+	var identities, memberships int64
+	if h.DB.Model(&models.UserSSOIdentity{}).Where("user_id = ? AND status_page_id <> ?", user.ID, pageID).Count(&identities).Error != nil {
+		return false
+	}
+	if h.DB.Model(&models.UserStatusPageRole{}).Where("user_id = ? AND status_page_id <> ?", user.ID, pageID).Count(&memberships).Error != nil {
+		return false
+	}
+	return identities == 0 && memberships == 0
 }
 
 // otherGlobalAdminExists: Fail-closed - schlägt die Zählung fehl, bleibt n 0

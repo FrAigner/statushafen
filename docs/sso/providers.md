@@ -117,6 +117,9 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
 1. Ein Login-Start, der auf der eigenen Domain ankommt, leitet zuerst auf denselben Pfad unter
    `BASE_URL` weiter und hängt die Domain als `return_host` an. Das State-Cookie muss den Callback
    unter `BASE_URL` erreichen. Der `Host` der Anfrage gewinnt gegen ein `return_host` in der Query.
+   Auf der eigenen Domain setzt der Server dabei das Cookie `sso_binding` und hängt nur dessen Hash
+   als `login_binding` an: Der Einmal-Code wird nur im Browser des Login-Starts eingelöst
+   (Login-CSRF). Ein `return_host` ohne gültiges `login_binding` wird verworfen.
 2. Der Server übernimmt `return_host` nur, wenn es exakt der Hostname einer eigenen Domain im Status
    „Verifiziert“ oder „Aktiv“ ist, beim Seiten-SSO nur die Domain derselben Seite. Alles andere
    (unbestätigte, unbekannte oder fremde Domains, Schema, Port, Pfad, Großschreibung, Punkt am Ende)
@@ -128,9 +131,10 @@ globale Anbieter, das Seiten-SSO und den Passwort-Login.
    (sie lösen keinen Auto-Join aus). Eine Rolle aus dem Auto-Join zählt nie, denn dessen E-Mail-Domains
    pflegt der Mandant; solche Rollen sind markiert (`joined_via`). Nimmt das Konto danach eine Einladung
    auf dieselbe Seite an, wird die Mitgliedschaft zur zugestimmten (mit der Rolle aus der Einladung). Ändert
-   nur ein Seiten-Admin die Rolle, bleibt die Markierung. Rollen aus der Zeit
-   vor dieser Markierung zählen nur, wenn die Seite gerade keinen Auto-Join eingerichtet hat und das
-   Audit-Log keinen Auto-Join dieses Kontos auf dieser Seite kennt. Fehler im Callback gehen immer an
+   nur ein Seiten-Admin die Rolle, bleibt die Markierung; speichert ein Global Admin das Konto, behalten
+   unveränderte Rollen sie ebenfalls. Rollen aus der Zeit vor dieser Markierung zählen, außer das
+   Audit-Log (das jeden Auto-Join schon immer protokolliert) kennt einen Auto-Join dieses Kontos auf
+   dieser Seite. Fehler im Callback gehen immer an
    `FRONTEND_URL`, nur Fehler beim Login-Start (ohne Kontobezug) an die eigene Domain.
 4. Das Frontend dort tauscht den Code auf demselben Origin ein. Der Code ist an diesen Origin gebunden:
    Ein Code für eine eigene Domain wird nur dort eingelöst, ein Code für `FRONTEND_URL` nie auf einer
@@ -145,6 +149,11 @@ Anmeldungen verknüpfen oder lösen (`POST /api/auth/oidc/link`, `POST /api/auth
 (`GET /api/me/sso`) ist dort leer. Dafür meldet man sich unter
 `FRONTEND_URL` an. Für eine private Seite braucht man eine Rolle auf dieser Seite; Global Admins
 verwalten unter `FRONTEND_URL`.
+
+Auch eine Seiten-SSO-Sitzung unter `FRONTEND_URL` stellt der IdP des Mandanten aus. Ohne Passwort
+löscht sie das Konto deshalb nur, wenn es ausschließlich über diese Seite besteht (keine andere
+Anmeldung, keine Rolle auf einer anderen Seite); sonst antwortet `DELETE /api/me` mit
+`403 page_sso_session`. Konten mit Passwort bestätigen die Löschung wie immer mit dem Passwort.
 
 Vertrag mit dem Reverse-Proxy: Er reicht für eigene Domains den `Host`-Header durch und liefert `/api`
 auf demselben Origin aus (Standard-Image, `VITE_API_URL` leer). Ob eine Anfrage von einer eigenen

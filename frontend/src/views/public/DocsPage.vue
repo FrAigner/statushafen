@@ -425,6 +425,15 @@ const backToTop = () => {
   margin-bottom: 4px;
 }
 
+/* Screenshots: never wider than the text column, keep their aspect ratio. */
+.docs-markdown :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
 .docs-markdown :deep(code) {
   font-family: var(--font-mono);
   font-size: 0.85em;

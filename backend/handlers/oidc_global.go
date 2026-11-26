@@ -187,7 +187,7 @@ func (h *Handler) completeProviderLogin(c *gin.Context, p globalOIDCProvider, st
 	if origin.pageID != 0 {
 		token, _ = middleware.GeneratePageSSOToken(user, claims.name, models.SSOProtocolOIDC, origin.pageID, middleware.WithCustomDomain(origin.host))
 	}
-	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host)+next)
+	c.Redirect(http.StatusTemporaryRedirect, origin.frontendURL()+"/auth/sso-callback?code="+storeSSOCode(token, returnTo, origin.host, codeBinding(st, origin))+next)
 	return nil
 }
 

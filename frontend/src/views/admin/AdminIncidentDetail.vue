@@ -404,25 +404,14 @@ const pmFields = computed(() => [
 .w-owner { width: 180px; }
 .w-state { width: 150px; }
 /* Eingaben und Auswahl der Folgemaßnahmen wie die übrigen kompakten Steuerelemente:
-   kleinere Schrift (16 px war zu groß für die Zeile), feste Höhe, eigener Pfeil
-   statt des Browser-Standards (Chevron aus zwei Verläufen in currentColor). */
+   kleinere Schrift (16 px war zu groß für die Zeile), feste Höhe. Den Pfeil bringt
+   die gemeinsame .form-select-Regel in style.css mit. */
 .action-row.edit .form-input,
 .action-row.edit .form-select {
   font-size: var(--fs-sm);
   height: var(--ctl-h);
   padding-top: 0;
   padding-bottom: 0;
-}
-.action-row.edit .form-select {
-  appearance: none;
-  -webkit-appearance: none;
-  padding-right: 28px;
-  background-image:
-    linear-gradient(to top right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px)),
-    linear-gradient(to bottom right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px));
-  background-repeat: no-repeat;
-  background-size: 5px 5px, 5px 5px;
-  background-position: right 15px center, right 10px center;
 }
 .action-add {
   background: none; border: 1px dashed var(--border-strong); border-radius: var(--r-sm);

@@ -22,12 +22,17 @@ saved, the field reports the excess and the text has to be shortened.
 
 If the status page has more languages, a language switch appears at the top of the form:
 "English (default)" and one tab per further language with its state ("empty", "draft",
-"done"). In a further language you can translate the name and the description; the description
-is optional there as in the default language, a translation only needs the name. Groups only have
-a name. With the "Translation is finished and shown on the status page" checkbox it appears there, without it the
-translation stays a draft. Everyone who may change components sees the switch; everything is saved
-with one click on "Save". Without text in a language, visitors see the default language. The
-translations page in the row menu remains available, see [Languages](/docs/sprachen).
+"done").
+
+- **What is translated:** In a further language you can translate the name and the description;
+  the description is optional there as in the default language, a translation only needs the
+  name. Groups only have a name.
+- **Publishing:** With the "Translation is finished and shown on the status page" checkbox it
+  appears there, without it the translation stays a draft.
+- **Permission and saving:** Everyone who may change components sees the switch; everything is
+  saved with one click on "Save".
+- **Missing text:** Without text in a language, visitors see the default language.
+- The translations page in the row menu remains available, see [Languages](/docs/sprachen).
 
 A component's ID is shown in the "ID" column. You need it for the
 [monitoring webhook](/docs/api-und-webhooks). The row menu "…" gives access to "Edit",
@@ -38,13 +43,19 @@ remain but lose their link to it.
 
 Instead of deleting, you can **archive** a component (row menu "Archive", permission `components:update`).
 The switch in the card header toggles between **Active** and **Archived** and shows the count of each; with nothing
-archived it reads "No archived components". Publicly, an archived component behaves like a hidden one: it is missing
-from the status page, the availability, the subscription wizard and the overall status. It is also no longer offered
-in the pickers for incidents, maintenance, templates and subscribers. History, availability, incident links and
-translations are kept. "Restore" in the row menu of the "Archived" segment makes it active again. A group takes its
-members into the archive and brings them back on restore (members archived earlier on their own stay archived); a
-member of an archived group can only be restored through the group. The monitoring webhook keeps working for archived
-components. Archiving and restoring appear in the [audit log](/docs/audit-log).
+archived it reads "No archived components".
+
+- **Publicly:** An archived component behaves like a hidden one: it is missing from the status
+  page, the availability, the subscription wizard and the overall status.
+- **Pickers:** It is also no longer offered in the pickers for incidents, maintenance, templates
+  and subscribers.
+- **What is kept:** History, availability, incident links and translations are kept. The
+  monitoring webhook keeps working for archived components.
+- **Restoring:** "Restore" in the row menu of the "Archived" segment makes it active again.
+- **Groups:** A group takes its members into the archive and brings them back on restore (members
+  archived earlier on their own stay archived); a member of an archived group can only be restored
+  through the group.
+- **Log:** Archiving and restoring appear in the [audit log](/docs/audit-log).
 
 ### Status values
 
@@ -94,12 +105,14 @@ regions such as `EU` or `US`. They are managed under **Tags** (global admins onl
 - **Publicly**, tags appear on the status page as the "Region:" filter, so visitors can filter
   components and incidents by region.
 - **Access:** If both a user and a component or incident have tags, the user may only edit
-  entries that share a tag. If either side has no tags, there is no restriction. Global admins
-  are never restricted, and the tag `global` acts as a wildcard. The restriction also covers
-  the translations of a component or incident (read, create, save, confirm, delete).
-  Deleting an **external source** also removes the links of all its linked components, so it
-  is only allowed if the user has tag access to every one of these components; otherwise it
-  is rejected and nothing is deleted.
+  entries that share a tag.
+  - If either side has no tags, there is no restriction.
+  - Global admins are never restricted, and the tag `global` acts as a wildcard.
+  - The restriction also covers the translations of a component or incident (read, create, save,
+    confirm, delete).
+  - Deleting an **external source** also removes the links of all its linked components, so it
+    is only allowed if the user has tag access to every one of these components; otherwise it
+    is rejected and nothing is deleted.
 - **Assignment:** page roles with write access see the tags of their page in the form and may
   assign **page-bound** tags. **Global** tags (for example regions that also control access)
   can only be assigned by global admins; a global tag already set is kept when editing.

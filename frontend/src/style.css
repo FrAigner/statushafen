@@ -109,7 +109,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
 /* Steuerelemente in der dunklen Kopfzeile */
 .icon-btn,
-.admin-topbar select.language-switcher,
+.admin-topbar .language-switcher,
 .tenant-select {
   height: var(--ctl-h);
   background: color-mix(in srgb, var(--top-text) 8%, transparent);
@@ -128,8 +128,10 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .icon-btn:hover,
 .tenant-select:hover,
-.admin-topbar select.language-switcher:hover {
-  background: color-mix(in srgb, var(--top-text) 16%, transparent);
+.admin-topbar .language-switcher:hover {
+  /* Only the colour: the shorthand would also drop the chevron image of the
+     language button (this rule is more specific than its arrow rule). */
+  background-color: color-mix(in srgb, var(--top-text) 16%, transparent);
 }
 /* Sprachwähler wie die Nachbarn (Theme-Knopf 36 px, Avatar): gleiche
    Höhe --ctl-h, gleicher Rand und Hintergrund (Gruppenregel oben), eigener
@@ -138,7 +140,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
    Farbwerte im Bild wären feste Hex-Werte). Der Fokusring kommt von
    .topbar-main :focus-visible (oben). Der Seitenwähler (.tenant-select) teilt
    die Regel, damit beide Auswahlfelder gleich aussehen. */
-.admin-topbar select.language-switcher,
+.admin-topbar .language-switcher,
 .admin-topbar select.tenant-select {
   appearance: none;
   -webkit-appearance: none;
@@ -151,7 +153,6 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   background-size: 5px 5px, 5px 5px;
   background-position: right 15px center, right 10px center;
 }
-.admin-topbar select.language-switcher option,
 .tenant-select option { background: var(--surface); color: var(--text); }
 
 /* Burger-Icon-Wechsel (Hamburger <-> X) mit Fade statt hartem Umschalten */
@@ -634,7 +635,6 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-group select:not(.onyx-component):not(.onyx-component *),
 .form-group textarea:not(.onyx-component):not(.onyx-component *),
 .form-input,
-.form-select,
 .form-textarea {
   /* width: 100% includes padding and border; otherwise the fields stick out of their card on the
      right (the global reset only reaches pseudo-elements, see the app-reset layer above). */
@@ -656,7 +656,6 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-group select:focus,
 .form-group textarea:focus,
 .form-input:focus,
-.form-select:focus,
 .form-textarea:focus {
   border-color: var(--focus);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 15%, transparent);
@@ -665,20 +664,6 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-group textarea,
 .form-textarea { min-height: 80px; resize: vertical; }
 
-.form-select option { background: var(--surface); color: var(--text); }
-
-.inline-select {
-  padding: 3px 6px;
-  font-size: 0.82rem;
-  font-family: var(--font-sans);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  cursor: pointer;
-  outline: none;
-}
-.inline-select:focus { border-color: var(--focus); }
 
 .form-actions {
   display: flex;
@@ -863,7 +848,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
   .topbar-brand .brand-logo { width: 20px; height: 20px; }
   .topbar-right { gap: 4px; }
-  .admin-topbar select.language-switcher,
+  .admin-topbar .language-switcher,
   .admin-topbar select.tenant-select { padding: 0 24px 0 var(--sp-2); }
 
   .area-tabs { display: none; }
@@ -1075,17 +1060,36 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   padding: 0 var(--sp-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-md);
-  background: var(--surface);
+  background-color: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: var(--fs-base);
 }
 .form-field__control textarea { padding: var(--sp-2) var(--sp-3); min-block-size: 80px; resize: vertical; }
-/* eigener Chevron statt des Browser-Pfeils (wie der Sprachwähler). */
-.form-field__control select {
+/* Shared look of every native <select> outside sit-onyx: form fields, .form-select (pager, user
+   roles, subscription manager, incident follow-ups) and the card toolbar filters (.comp-filter).
+   Same height, border, radius, colours and font as the inputs and buttons next to them, and the
+   app's own chevron instead of the browser arrow (like the language switcher). Only the header
+   language switcher, the tenant switcher and the "+ Tag" ghost select keep their own look.
+   Rules for these selectors elsewhere must not use the `background` shorthand: it would reset
+   the chevron. */
+.form-field__control select,
+.form-select,
+.comp-filter {
+  box-sizing: border-box;
+  max-inline-size: 100%;
+  min-block-size: var(--ctl-h);
+  padding: 0 var(--sp-3);
+  padding-inline-end: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background-color: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-base);
+  cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  padding-inline-end: 32px;
   text-overflow: ellipsis;
   background-image:
     linear-gradient(to top right, transparent calc(50% - 0.9px), currentColor calc(50% - 0.9px) calc(50% + 0.9px), transparent calc(50% + 0.9px)),
@@ -1096,10 +1100,16 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .form-field__control input:focus-visible,
 .form-field__control select:focus-visible,
+.form-select:focus-visible,
+.comp-filter:focus-visible,
 .form-field__control textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .form-field__control input:disabled,
 .form-field__control select:disabled,
+.form-select:disabled,
+.comp-filter:disabled,
 .form-field__control textarea:disabled { opacity: .6; cursor: not-allowed; }
+.form-select option,
+.comp-filter option { background-color: var(--surface); color: var(--text); }
 
 /* Zeilenaktionen und Zellen. */
 .cell-sub { display: block; font-size: var(--fs-sm); color: var(--text-2); }
@@ -1271,18 +1281,6 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 /* Werkzeuge im Kartenkopf (ListCard-Slot "tools"): Filter, Umschalter, Suche. */
 .comp-card__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); flex: 1 1 auto; min-inline-size: 0; }
 .comp-card__tools .comp-search { flex: 0 1 240px; }
-.comp-filter {
-  min-block-size: var(--ctl-h);
-  max-inline-size: 100%;
-  padding: 0 var(--sp-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: var(--fs-base);
-}
-.comp-filter:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 /* Tall forms (many sections) scroll with the whole page instead of inside their own frame;
    they are not sticky, otherwise their end could not be reached. */
 .form-panel--tall { position: static; }

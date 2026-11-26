@@ -89,6 +89,13 @@ describe('DocsPage', () => {
       expect(wrapper.find('.docs').classes()).toContain('docs--embedded')
     })
 
+    it('scales screenshots in the docs down to the content width', () => {
+      const css = docsSource.split('<style scoped>')[1]
+      const img = css.match(/\.docs-markdown :deep\(img\) \{([^}]*)\}/)?.[1] ?? ''
+      expect(img).toMatch(/max-width:\s*100%/)
+      expect(img).toMatch(/height:\s*auto/)
+    })
+
     it('scrolls anchored headings below the sticky header', () => {
       const css = docsSource.split('<style scoped>')[1]
       const headings = css.match(/\.docs-markdown :deep\(h3\) \{\s*scroll-margin-top:([^;]*);/)?.[1] ?? ''

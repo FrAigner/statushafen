@@ -1123,6 +1123,23 @@ describe('StatusPage', () => {
         expect(shown()).toBe(true)
       })
 
+      // Regression 2026-11-25: the help stayed open until the "?" was clicked again.
+      it('schließt bei Klick/Tap außerhalb, bleibt bei Klick in Hilfe oder Suchfeld offen', async () => {
+        const { wrapper } = await mountFilter()
+        const btn = wrapper.find('.search-help-btn')
+        const pointerdown = async (el) => {
+          el.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+          await flushPromises()
+        }
+        await btn.trigger('click')
+        await pointerdown(wrapper.find('.search-help').element)
+        await pointerdown(wrapper.find('.search-input').element)
+        expect(btn.attributes('aria-expanded')).toBe('true')
+
+        await pointerdown(document.body)
+        expect(btn.attributes('aria-expanded')).toBe('false')
+      })
+
       it('liefert die Hilfetexte auch auf Englisch', async () => {
         i18n.global.locale.value = 'en'
         const { wrapper } = await mountFilter()
