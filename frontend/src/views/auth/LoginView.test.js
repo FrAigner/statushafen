@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useAuthConfig, resetAuthConfig } from '../../composables/useAuthConfig'
 import LoginView from './LoginView.vue'
 import loginSource from './LoginView.vue?raw'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }

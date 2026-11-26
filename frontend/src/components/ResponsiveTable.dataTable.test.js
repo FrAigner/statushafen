@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ResponsiveTable from './ResponsiveTable.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Stufe 3: Tabellenstil (dataTable) auf Basis von ResponsiveTable.
 // Der JS-Umschalter (isMobile) spielt hier keine Rolle: im Tabellenstil gibt

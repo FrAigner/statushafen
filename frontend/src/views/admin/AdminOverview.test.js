@@ -3,8 +3,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import AdminOverview from './AdminOverview.vue'
-import { axe } from '../../test-support/axe.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
+import { axe } from '../../test-support/axe'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
 
 function overviewFixture() {
   return {

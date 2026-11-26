@@ -20,7 +20,7 @@ export default defineConfig({
     testTimeout: 20000,
     hookTimeout: 30000,
     environment: 'happy-dom',
-    setupFiles: ['./src/test-support/vitestSetup.js'],
+    setupFiles: ['./src/test-support/vitestSetup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['lcov', 'text'],

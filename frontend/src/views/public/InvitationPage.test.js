@@ -4,7 +4,7 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import InvitationPage from './InvitationPage.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 // Einladung auf eine Statusseite annehmen oder ablehnen.
 

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mount, enableAutoUnmount } from '@vue/test-utils'
 import i18n from '../i18n'
 import AvailabilityBars from './AvailabilityBars.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 enableAutoUnmount(afterEach)
 

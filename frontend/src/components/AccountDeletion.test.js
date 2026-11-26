@@ -4,7 +4,7 @@ import { routerKey } from 'vue-router'
 import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import AccountDeletion from './AccountDeletion.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Konto-löschen-Bereich im Profil.
 

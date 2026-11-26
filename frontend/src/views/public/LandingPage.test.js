@@ -8,7 +8,7 @@ import de from '../../i18n/locales/de.json'
 import en from '../../i18n/locales/en.json'
 import LandingPage from './LandingPage.vue'
 import landingSource from './LandingPage.vue?raw'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { useLandingChrome } from '../../composables/useLandingChrome'
 
 function pagesFixture() {

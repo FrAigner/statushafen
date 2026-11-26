@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import router from './index.js'
+import router from './index'
 import { useAuth } from '../composables/useAuth'
 
 describe('router beforeEach guard', () => {

@@ -5,7 +5,7 @@ import i18n from '../i18n'
 import { vHelp } from './vHelp'
 import { HELP_HIDE_DELAY_MS, HELP_SHOW_DELAY_MS, activeHelp, helpRegistry, tooltipPosition } from './helpTooltipState'
 import { useAuth } from '../composables/useAuth'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Hilfe per v-help direkt am Feld/Button, erst nach Verweilen,
 // abschaltbar pro Benutzer.

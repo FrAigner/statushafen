@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import de from './locales/de.json'
 import en from './locales/en.json'
-import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from '../test-support/templateScan.js'
+import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from '../test-support/templateScan'
 
 // Im Screenshot stand „Name * *“. Ursache: Das i18n-Label trug
 // den Pflichtstern schon im Text („Name *“), und sit-onyx hängt an

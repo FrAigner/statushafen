@@ -6,8 +6,8 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant as useTenantStatic } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminIncidentTranslations from './AdminIncidentTranslations.vue'
-import { axe } from '../../test-support/axe.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
+import { axe } from '../../test-support/axe'
+import { clickMenuItem } from '../../test-support/rowMenu'
 import { stubConfirm } from '../../test-support/confirm'
 
 function incidentFixture() {

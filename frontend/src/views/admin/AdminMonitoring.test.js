@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../../i18n'
 import AdminMonitoring from './AdminMonitoring.vue'
-import { ERROR_RATE_DEGRADED, ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds.js'
-import { axe } from '../../test-support/axe.js'
+import { ERROR_RATE_DEGRADED, ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds'
+import { axe } from '../../test-support/axe'
 
 function monitoringFixture() {
   return {

@@ -7,8 +7,8 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminComponents from './AdminComponents.vue'
 import { readFileSync } from 'node:fs'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel, chooseQuickStatus } from '../../test-support/fields.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel, chooseQuickStatus } from '../../test-support/fields'
 import { stubConfirm } from '../../test-support/confirm'
 
 function componentsFixture() {

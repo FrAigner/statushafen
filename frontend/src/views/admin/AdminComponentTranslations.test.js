@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant as useTenantStatic } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminComponentTranslations from './AdminComponentTranslations.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function componentFixture() {

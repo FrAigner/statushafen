@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import i18n from '../i18n'
 import SubscriptionManager from './SubscriptionManager.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { usePublicPageLanguages } from '../composables/usePublicPageLanguages'
 
 function jsonResponse(body, status = 200) {

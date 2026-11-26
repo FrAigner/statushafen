@@ -7,7 +7,7 @@ import { useTenant } from '../../composables/useTenant'
 import AdminUiTranslations from './AdminUiTranslations.vue'
 import de from '../../i18n/locales/de.json'
 import { flatten } from '../../i18n/overrides'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 // Die Liste rendert die rund 1.700 App-Texte seitenweise.
 // Die Daten sind die echten Katalog-Keys (kein Mock), damit die Größenordnung

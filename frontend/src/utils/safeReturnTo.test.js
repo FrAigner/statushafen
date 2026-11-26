@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import { safeReturnTo } from './safeReturnTo.js'
+import { safeReturnTo } from './safeReturnTo'
 
 // returnTo kommt aus der Query und ist damit Angreifer-Eingabe.
 const router = createRouter({

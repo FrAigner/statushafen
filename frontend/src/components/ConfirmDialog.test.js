@@ -6,7 +6,7 @@ import { useAuth } from '../composables/useAuth'
 import i18n from '../i18n'
 import ConfirmDialog from './ConfirmDialog.vue'
 import { confirmDialog, answerConfirm } from '../composables/useConfirm'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // gemeinsamer Bestätigungsdialog statt natives confirm().
 

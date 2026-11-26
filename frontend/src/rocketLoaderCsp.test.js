@@ -12,7 +12,7 @@ const indexHtml = readFileSync(resolve(root, 'index.html'), 'utf-8')
 
 describe('Rocket Loader CSP-Ausschluss', () => {
   it('main.js-Script-Tag trägt data-cfasync="false"', () => {
-    const scriptTag = indexHtml.match(/<script[^>]*src="\/src\/main\.js"[^>]*>/)
+    const scriptTag = indexHtml.match(/<script[^>]*src="\/src\/main\.ts"[^>]*>/)
     expect(scriptTag).toBeTruthy()
     expect(scriptTag[0]).toContain('data-cfasync="false"')
   })
@@ -34,7 +34,7 @@ describe('Rocket Loader CSP-Ausschluss', () => {
   })
 
   it('vite-Plugin fügt das Attribut nicht doppelt ein, falls es bereits vorhanden ist', () => {
-    const html = '<script type="module" src="/src/main.js" data-cfasync="false"></script>'
+    const html = '<script type="module" src="/src/main.ts" data-cfasync="false"></script>'
     const result = cloudflareRocketLoaderExclude().transformIndexHtml(html)
     expect(result.match(/data-cfasync/g)).toHaveLength(1)
   })

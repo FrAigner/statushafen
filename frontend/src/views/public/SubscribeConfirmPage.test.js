@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import SubscribeConfirmPage from './SubscribeConfirmPage.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 // Bestätigungsseite des Double-Opt-in für E-Mail-Abos.
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { vueSources, templatePart, startTags } from '../test-support/templateScan.js'
-import { installFormValidationGuard } from './formValidation.js'
+import { vueSources, templatePart, startTags } from '../test-support/templateScan'
+import { installFormValidationGuard } from './formValidation'
 
 // Der Screenshot zeigte „Fülle dieses Feld aus.“ schon beim Hover
 // über ein leeres Pflichtfeld, mitten in den neuen Hilfe-Tooltips. Ursache:

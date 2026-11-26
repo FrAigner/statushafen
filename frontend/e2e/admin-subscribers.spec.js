@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { clickRowMenuItem } from './rowMenu.js';
+import { clickRowMenuItem } from './rowMenu';
 
 // Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';

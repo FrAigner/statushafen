@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ssoMockRequired, ssoMockSkipReason } from '../src/test-support/ssoMockGate.js';
+import { ssoMockRequired, ssoMockSkipReason } from '../src/test-support/ssoMockGate';
 
 // OIDC-Anmeldung je Statusseite gegen den
 // Mock-OIDC-Dienst aus docker-compose.yml (Profil "sso"). Voraussetzungen,

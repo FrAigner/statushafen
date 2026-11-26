@@ -5,7 +5,7 @@ import { useAuth } from '../../composables/useAuth'
 import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
-import { fieldByLabel } from '../../test-support/fields.js'
+import { fieldByLabel } from '../../test-support/fields'
 import AdminComponents from './AdminComponents.vue'
 
 // Sprachumschalter im Komponenten-Formular (Name + optionale Beschreibung).

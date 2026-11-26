@@ -5,7 +5,7 @@ import { useAuth } from '../composables/useAuth'
 import DataExport from './DataExport.vue'
 import ProfileView from '../views/admin/ProfileView.vue'
 import { onyxFormStubs } from '../test-support/onyxStubs'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Knopf für den Datenexport (GET /api/me/export) im Profil.
 

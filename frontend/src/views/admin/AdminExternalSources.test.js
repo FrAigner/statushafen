@@ -8,7 +8,7 @@ import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminExternalSources from './AdminExternalSources.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 // Admin-Seite „Externe Quellen“.

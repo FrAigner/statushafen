@@ -9,7 +9,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminNotificationTemplates from './AdminNotificationTemplates.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 // previewBody kommt vom Backend-Preview-Endpoint (admin-editierbares

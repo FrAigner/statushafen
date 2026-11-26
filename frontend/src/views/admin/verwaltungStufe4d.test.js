@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vueSources, templatePart, startTags } from '../../test-support/templateScan.js'
+import { vueSources, templatePart, startTags } from '../../test-support/templateScan'
 
 // Redesign Stufe 4d, Verwaltung/System: Schutz gegen den Rückfall in
 // Inline-Styles und in eine zweite h1.

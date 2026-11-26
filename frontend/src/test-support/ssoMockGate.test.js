@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ssoMockRequired, ssoMockSkipReason } from './ssoMockGate.js'
+import { ssoMockRequired, ssoMockSkipReason } from './ssoMockGate'
 
 // Der Nachtjob e2e-sso-nachts.yml setzt E2E_REQUIRE_SSO_MOCK=1, damit
 // frontend/e2e/sso-oidc.spec.js dort nie still übersprungen wird.

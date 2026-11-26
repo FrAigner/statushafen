@@ -4,7 +4,7 @@ import i18n from '../i18n'
 import PageLayoutList from './PageLayoutList.vue'
 import StatusBadge from './StatusBadge.vue'
 import AvailabilityBars from './AvailabilityBars.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 enableAutoUnmount(afterEach)
 

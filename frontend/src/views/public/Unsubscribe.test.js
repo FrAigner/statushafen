@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import Unsubscribe from './Unsubscribe.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 // Die Seite beendet das Abo erst nach Klick per
 // POST. Vorher feuerte sie beim Mounten einen GET, der direkt löschte -

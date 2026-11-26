@@ -5,7 +5,7 @@ import i18n from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import { useTenant } from '../composables/useTenant'
 import { setAuthAsPageRole } from '../test-support/pageRole'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import AdminNotificationBell from './AdminNotificationBell.vue'
 
 // Nachrichtenglocke der Admin-Kopfzeile.

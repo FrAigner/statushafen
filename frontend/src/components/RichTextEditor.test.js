@@ -5,7 +5,7 @@ import { mount, enableAutoUnmount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import i18n from '../i18n'
 import RichTextEditor from './RichTextEditor.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 enableAutoUnmount(afterEach)
 beforeEach(() => { i18n.global.locale.value = 'de' })

@@ -12,7 +12,7 @@ import { useTheme } from '../../composables/useTheme'
 import StatusPage from './StatusPage.vue'
 import { BRAND_SECONDARY_BACKGROUNDS } from '../../utils/brandContrast'
 import { contrastRatio, parseHex } from '../../utils/contrast'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 let openEditAboMock = vi.fn()
 let revealEditAboMock = vi.fn()

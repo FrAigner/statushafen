@@ -14,8 +14,8 @@ import {
   stripTitle,
   resolveSection,
   plainText,
-} from './index.js'
-import { NOTIFICATION_TEMPLATE_PLACEHOLDERS } from '../utils/notificationTemplatePlaceholders.js'
+} from './index'
+import { NOTIFICATION_TEMPLATE_PLACEHOLDERS } from '../utils/notificationTemplatePlaceholders'
 import de from '../i18n/locales/de.json'
 import en from '../i18n/locales/en.json'
 

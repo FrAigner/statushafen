@@ -9,7 +9,7 @@ import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { componentTreeFixture } from '../../test-support/componentTree'
 import AdminMaintenance from './AdminMaintenance.vue'
 import AdminNotices from './AdminNotices.vue'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 
 // Sprachumschalter in Wartung und Ankündigungen (Vorfälle: AdminIncidentsLanguages.test.js).
 

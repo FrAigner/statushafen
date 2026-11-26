@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import KpiCard from './KpiCard.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const mountKpi = props => mount(KpiCard, { props, global: { plugins: [i18n] } })
 

@@ -7,9 +7,9 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { withArchivedComponent, componentTreeFixture, expectedTreeOptionLabels, multiSelectOptionLabels } from '../../test-support/componentTree'
 import AdminIncidentTemplates from './AdminIncidentTemplates.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel, hasLabel } from '../../test-support/fields.js'
-import { clickMenuItem } from '../../test-support/rowMenu.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel, hasLabel } from '../../test-support/fields'
+import { clickMenuItem } from '../../test-support/rowMenu'
 import { stubConfirm } from '../../test-support/confirm'
 
 function templatesFixture() {

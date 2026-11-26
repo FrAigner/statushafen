@@ -18,7 +18,7 @@ import KpiCard from '../../components/KpiCard.vue'
 import ResponsiveTable from '../../components/ResponsiveTable.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import SegmentControl from '../../components/SegmentControl.vue'
-import { ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds.js'
+import { ERROR_RATE_MAJOR, errorLevel } from './monitoringThresholds'
 
 const { apiFetch } = useApi()
 const { t } = useI18n()

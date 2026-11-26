@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminSSO from './AdminSSO.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 import { setConfirmHandler } from '../../composables/useConfirm'
 

@@ -6,7 +6,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 import AdminIncidentDetail from './AdminIncidentDetail.vue'
 
 // Sprachumschalter im Formular „Update posten“ und Editor „Übersetzungen“

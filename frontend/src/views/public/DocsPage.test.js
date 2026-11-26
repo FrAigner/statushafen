@@ -7,7 +7,7 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import DocsPage from './DocsPage.vue'
 import { SECTION_IDS, DOC_SOURCES, extractTitle } from '../../docs'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { useLandingChrome } from '../../composables/useLandingChrome'
 import docsSource from './DocsPage.vue?raw'
 

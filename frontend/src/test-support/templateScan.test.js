@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from './templateScan.js'
+import { vueSources, templatePart, startTags, i18nKeyOf, lookup } from './templateScan'
 
 // Der Scanner hinter den Quelltext-Guards muss selbst stimmen,
 // sonst prüfen die Guards still nichts.

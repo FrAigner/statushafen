@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import i18n from '../i18n'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 function mockIsMobile(isMobile) {
   vi.doMock('../composables/useMediaQuery', () => ({

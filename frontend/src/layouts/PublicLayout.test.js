@@ -10,7 +10,7 @@ import { useCurrentPageSlug } from '../composables/useCurrentPageSlug'
 import { useLandingChrome } from '../composables/useLandingChrome'
 import PublicLayout from './PublicLayout.vue'
 import layoutSource from './PublicLayout.vue?raw'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const Empty = { template: '<div />' }
 

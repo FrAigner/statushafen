@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import RowMenu from './RowMenu.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 const ITEMS = [
   { key: 'edit', label: 'Bearbeiten', icon: 'pencil' },

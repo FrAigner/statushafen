@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url'
 import i18n from '../i18n'
 import PermissionSummary from './PermissionSummary.vue'
 import { RESOURCES } from '../utils/permissions'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Rechte einer Rolle kompakt in der Liste.
 const mountSummary = (props) => mount(PermissionSummary, { props, global: { plugins: [i18n] } })

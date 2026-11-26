@@ -4,7 +4,7 @@ import i18n from '../../i18n'
 import { OnyxInputStub } from '../../test-support/onyxStubs'
 import i18n from '../../i18n'
 import AdminAuditLog from './AdminAuditLog.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function entriesFixture() {
   return [

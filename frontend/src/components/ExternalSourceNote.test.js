@@ -3,7 +3,7 @@ import { mount, enableAutoUnmount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ExternalSourceNote from './ExternalSourceNote.vue'
 import StatusBadge from './StatusBadge.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 enableAutoUnmount(afterEach)
 

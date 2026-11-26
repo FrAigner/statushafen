@@ -4,7 +4,7 @@ import i18n from '../i18n'
 import HelpTooltipsToggle from './HelpTooltipsToggle.vue'
 import { useAuth } from '../composables/useAuth'
 import { helpTooltipsEnabled, useHelpTooltips } from '../composables/useHelpTooltips'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Schalter „Hilfe-Tooltips anzeigen“, Default an, wirkt sofort,
 // gespeichert per PATCH /api/me.

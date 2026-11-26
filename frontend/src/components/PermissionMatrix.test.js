@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 import i18n from '../i18n'
 import PermissionMatrix from './PermissionMatrix.vue'
 import { RESOURCES } from '../utils/permissions'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Berechtigungs-Matrix mit einer Zeile je Tab, gruppiert nach Bereich.
 let wrapper = null

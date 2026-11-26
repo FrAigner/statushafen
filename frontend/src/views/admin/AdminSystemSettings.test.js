@@ -4,7 +4,7 @@ import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import { onyxFormStubs, OnyxCheckboxStub } from '../../test-support/onyxStubs'
 import AdminSystemSettings from './AdminSystemSettings.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 // Component-Tests für die Systemeinstellungen - beide
 // Schalter rendern, laden den Stand und speichern nur Änderungen (gemockter

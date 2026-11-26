@@ -8,7 +8,7 @@ import { setAuthAsPageRole } from '../test-support/pageRole'
 import { useTenant } from '../composables/useTenant'
 import AppIcon from '../components/AppIcon.vue'
 import AdminLayout from './AdminLayout.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { NAV_GROUPS } from '../utils/adminNav'
 
 const Empty = { template: '<div />' }

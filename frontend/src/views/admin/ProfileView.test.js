@@ -4,7 +4,7 @@ import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import ProfileView from './ProfileView.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }

@@ -5,7 +5,7 @@ import { useAuth } from '../../composables/useAuth'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminLanguages from './AdminLanguages.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 // Stage 1 von 5 der Mehrsprachigkeit: Component-Tests für die

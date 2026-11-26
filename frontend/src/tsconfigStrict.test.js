@@ -9,10 +9,11 @@
 //  - an explicit strict: true (TypeScript 6 defaults to it, but neither an older TypeScript nor a
 //    downgrade option may switch it off silently) and no strict sub-option switched off on its own,
 //  - `npm run typecheck` exists and runs in CI.
-// Existing code stays JavaScript (checkJs: false). The test deliberately does not pin that, so that
-// phase 2 can switch the check on step by step.
+// Phase 2 migrated all application code: src/ has no JavaScript besides tests, every SFC uses
+// lang="ts", and the app configuration no longer accepts JavaScript at all (allowJs: false). Tests stay
+// JavaScript for now, so only the Node configuration keeps allowJs (without checkJs).
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve, relative } from 'node:path'
 import ts from 'typescript'
@@ -104,14 +105,13 @@ describe('TypeScript configuration (migration phase 1)', () => {
       expect(messages, name).toEqual([])
       expect(options.strict, name).toBe(true)
       expect(STRICT_FAMILY.filter((o) => options[o] === false), name).toEqual([])
-      expect(options.allowJs, name).toBe(true)
       expect(options.noEmit, name).toBe(true)
     }
   })
 
   it('puts application code into the app configuration and tests into the Node configuration', () => {
     const app = parse(resolve(frontend, 'tsconfig.app.json'))
-    expect(app.rel).toEqual(expect.arrayContaining(['src/main.js', 'src/App.vue', 'env.d.ts']))
+    expect(app.rel).toEqual(expect.arrayContaining(['src/main.ts', 'src/App.vue', 'env.d.ts']))
     expect(app.rel.filter((f) => /\.(test|spec)\./.test(f))).toEqual([])
     // Node globals (process, Buffer) do not belong in code that runs in the browser.
     expect(app.options.types).not.toContain('node')
@@ -129,5 +129,40 @@ describe('TypeScript configuration (migration phase 1)', () => {
     expect(pkg.scripts.typecheck).toMatch(/^vue-tsc\b/)
     const ci = readFileSync(resolve(frontend, '..', '.github', 'workflows', 'ci.yml'), 'utf-8')
     expect(ci).toMatch(/cd frontend && npm run typecheck/)
+  })
+})
+
+// Walks src/ and returns paths relative to the frontend directory.
+function walk(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const path = resolve(dir, e.name)
+    return e.isDirectory() ? walk(path) : [relative(frontend, path)]
+  })
+}
+
+describe('TypeScript migration (phase 2)', () => {
+  const files = walk(resolve(frontend, 'src'))
+
+  it('leaves no JavaScript application code in src/', () => {
+    expect(files.filter((f) => f.endsWith('.js') && !/\.(test|spec)\.js$/.test(f))).toEqual([])
+  })
+
+  it('uses <script setup lang="ts"> in every single-file component', () => {
+    const vue = files.filter((f) => f.endsWith('.vue'))
+    expect(vue.length).toBeGreaterThan(0)
+    const withoutTs = vue.filter((f) => {
+      const scripts = readFileSync(resolve(frontend, f), 'utf-8').match(/<script\b[^>]*>/g) ?? []
+      return scripts.length === 0 || scripts.some((tag) => !/\blang="ts"/.test(tag))
+    })
+    expect(withoutTs).toEqual([])
+  })
+
+  it('accepts JavaScript only in the Node configuration (tests), never in the app', () => {
+    const app = parse(resolve(frontend, 'tsconfig.app.json'))
+    expect(app.options.allowJs).toBe(false)
+    expect(app.rel.filter((f) => f.endsWith('.js'))).toEqual([])
+    const node = parse(resolve(frontend, 'tsconfig.node.json'))
+    expect(node.options.allowJs).toBe(true)
+    expect(node.options.checkJs).toBe(false)
   })
 })

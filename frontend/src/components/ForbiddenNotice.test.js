@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ForbiddenNotice from './ForbiddenNotice.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 describe('ForbiddenNotice', () => {
   beforeEach(() => { i18n.global.locale.value = 'de' })

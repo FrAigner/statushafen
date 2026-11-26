@@ -4,7 +4,7 @@ import i18n from '../../i18n'
 import { useAuth } from '../../composables/useAuth'
 import AdminStatusPages from './AdminStatusPages.vue'
 import statusPagesSource from './AdminStatusPages.vue?raw'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 import { setConfirmHandler } from '../../composables/useConfirm'
 

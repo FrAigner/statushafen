@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import ListStateRow from './ListStateRow.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Lade-, Fehler- und Leerzustand einer Tabellenliste in einer Zeile.
 function mountRow(props) {

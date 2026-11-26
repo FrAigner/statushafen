@@ -7,7 +7,7 @@ import { useTenant } from '../../composables/useTenant'
 import { registerLocale, SUPPORTED_LOCALES } from '../../i18n'
 import { useContentLanguages } from '../../composables/useContentLanguages'
 import AdminUiTranslations from './AdminUiTranslations.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 import { stubConfirm } from '../../test-support/confirm'
 
 function jsonResponse(body, status = 200) {

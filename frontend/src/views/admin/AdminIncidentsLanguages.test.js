@@ -8,7 +8,7 @@ import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import { componentTreeFixture } from '../../test-support/componentTree'
 import AdminIncidents from './AdminIncidents.vue'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
 
 // Sprachumschalter im Vorfall-Formular.
 

@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import i18n from '../../i18n'
 import OrderConfirmPage from './OrderConfirmPage.vue'
-import { axe } from '../../test-support/axe.js'
+import { axe } from '../../test-support/axe'
 
 function jsonResponse(body, status = 200) {
   return { ok: status < 400, status, json: async () => body }

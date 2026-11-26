@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import i18n from '../i18n'
 import TagCheckboxList from './TagCheckboxList.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 function mountList(props) {
   return mount(TagCheckboxList, {

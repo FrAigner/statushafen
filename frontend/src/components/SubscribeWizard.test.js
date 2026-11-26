@@ -3,7 +3,7 @@ import { mount, DOMWrapper } from '@vue/test-utils'
 import i18n from '../i18n'
 import SubscribeWizard from './SubscribeWizard.vue'
 import { useAuth } from '../composables/useAuth'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 

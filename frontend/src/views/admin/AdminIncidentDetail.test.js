@@ -10,9 +10,9 @@ import { setAuthAsPageRole } from '../../test-support/pageRole'
 import { useTenant } from '../../composables/useTenant'
 import { onyxFormStubs } from '../../test-support/onyxStubs'
 import AdminIncidentDetail from './AdminIncidentDetail.vue'
-import { axe } from '../../test-support/axe.js'
-import { fieldByLabel } from '../../test-support/fieldByLabel.js'
-import { expectNoInlineStyles } from '../../test-support/noInlineStyles.js'
+import { axe } from '../../test-support/axe'
+import { fieldByLabel } from '../../test-support/fieldByLabel'
+import { expectNoInlineStyles } from '../../test-support/noInlineStyles'
 
 function incidentFixture(overrides = {}) {
   return {

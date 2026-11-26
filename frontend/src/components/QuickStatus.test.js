@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import i18n from '../i18n'
 import QuickStatus from './QuickStatus.vue'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 let wrapper = null
 

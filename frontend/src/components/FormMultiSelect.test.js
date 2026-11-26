@@ -4,7 +4,7 @@ import { defineComponent, h, ref } from 'vue'
 import i18n from '../i18n'
 import FormMultiSelect from './FormMultiSelect.vue'
 import { useFormPanel } from '../composables/useFormPanel'
-import { axe } from '../test-support/axe.js'
+import { axe } from '../test-support/axe'
 
 // Bewusst das ECHTE OnyxSelect (kein Stub): frühere Fehler betrafen genau das,
 // was Onyx am Eingabefeld rendert (id, aria-invalid, aria-describedby).
