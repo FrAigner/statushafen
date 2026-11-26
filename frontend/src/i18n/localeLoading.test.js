@@ -82,3 +82,20 @@ describe('Nachladbare Oberflächensprachen', () => {
     SUPPORTED_LOCALES.splice(SUPPORTED_LOCALES.indexOf('zy'), 1)
   })
 })
+
+describe('detectInitialLocale', () => {
+  beforeEach(() => { localStorage.clear() })
+  afterEach(() => { vi.restoreAllMocks() })
+
+  it('übernimmt eine unterstützte Browsersprache', () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-GB')
+    expect(detectInitialLocale()).toBe('en')
+  })
+
+  it('fällt bei nicht unterstützter oder fehlender Browsersprache auf die Standardsprache zurück', () => {
+    const lang = vi.spyOn(navigator, 'language', 'get').mockReturnValue('fr-FR')
+    expect(detectInitialLocale()).toBe('de')
+    lang.mockReturnValue('')
+    expect(detectInitialLocale()).toBe('de')
+  })
+})

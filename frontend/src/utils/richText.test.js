@@ -277,6 +277,17 @@ describe('renderRichText ohne unterstütztes DOMPurify', () => {
   })
 })
 
+describe('renderRichText bei einem Fehler des Sanitizers', () => {
+  it('liefert maskierten Klartext statt zu werfen', async () => {
+    vi.resetModules()
+    vi.doMock('dompurify', () => ({ default: () => ({ isSupported: true, addHook() {}, sanitize: () => { throw new RangeError('Maximum call stack size exceeded') } }) }))
+    const mod = await import('./richText')
+    expect(mod.renderRichText('**x** <b>y</b>')).toBe('<p>**x** &lt;b&gt;y&lt;/b&gt;</p>')
+    vi.doUnmock('dompurify')
+    vi.resetModules()
+  })
+})
+
 describe('markdownToPlainText mit unvollständigem DOM', () => {
   it('liest Text, der ohne Absatz-Element im body steht', async () => {
     vi.resetModules()

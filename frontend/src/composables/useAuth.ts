@@ -35,7 +35,7 @@ export function useAuth() {
   const hasPerm = (required: string): boolean => {
     if (currentUser.value?.is_global_admin) return true
     if (!currentUser.value) return false
-    if (isGlobalResource(required.split(':')[0] ?? '')) return false
+    if (isGlobalResource(required.split(':')[0] as string)) return false
     return grants(activeTenantPermissions.value, required)
   }
 

@@ -122,6 +122,23 @@ describe('useAutoDismissAlerts', () => {
     w.unmount()
   })
 
+  it('startet die Frist neu, wenn sich nur der Text einer Erfolgsmeldung ändert', async () => {
+    const w = mountHost()
+    const closed = addAlert(w.element, 'success')
+    const text = document.createTextNode('Gespeichert')
+    w.element.querySelector('.alert').appendChild(text)
+    await flushObserver()
+    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS - 100)
+
+    text.data = 'Erneut gespeichert' // characterData: target is the text node
+    await flushObserver()
+    vi.advanceTimersByTime(200)
+    expect(closed).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(ALERT_AUTO_DISMISS_MS)
+    expect(closed).toHaveBeenCalledTimes(1)
+    w.unmount()
+  })
+
   it('löscht den Timer, wenn aus Erfolg wieder ein Fehler wird', async () => {
     const w = mountHost()
     const closed = addAlert(w.element, 'success')

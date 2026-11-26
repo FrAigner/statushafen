@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { confirmDialog, answerConfirm, useConfirmState, setConfirmHandler } from './useConfirm'
 import { stubConfirm, resetConfirm } from '../test-support/confirm'
 
@@ -20,6 +20,16 @@ describe('useConfirm', () => {
     expect(useConfirmState()).toMatchObject({ danger: true, title: '', confirmLabel: '' })
     confirmDialog()
     expect(useConfirmState().message).toBeUndefined()
+  })
+
+  it('ohne document (SSR) gibt es keinen Auslöser und das öffentliche Theme', () => {
+    vi.stubGlobal('document', undefined)
+    try {
+      confirmDialog({ message: 'x' })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    expect(useConfirmState()).toMatchObject({ open: true, opener: null, themeClass: 'theme-public' })
   })
 
   it('answerConfirm ohne offenen Dialog ist wirkungslos', () => {

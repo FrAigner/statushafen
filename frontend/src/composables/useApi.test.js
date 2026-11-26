@@ -232,6 +232,15 @@ describe('useApi', () => {
     expect(err.status).toBe(502)
   })
 
+  it('ruft absolute URLs unverändert auf, ohne die API-Basis voranzustellen', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.example.test')
+    global.fetch = vi.fn().mockResolvedValue(res(200, {}))
+    await useApi().apiFetch('https://extern.example.test/x')
+    await useApi().apiFetch('/api/x')
+    vi.unstubAllEnvs()
+    expect(global.fetch.mock.calls.map(([u]) => u)).toEqual(['https://extern.example.test/x', 'https://api.example.test/api/x'])
+  })
+
   it('liefert JSON bei Erfolg und null bei 204', async () => {
     global.fetch = vi.fn().mockResolvedValueOnce(res(200, { a: 1 })).mockResolvedValueOnce(res(204))
     expect(await useApi().apiFetch('/api/x')).toEqual({ a: 1 })
