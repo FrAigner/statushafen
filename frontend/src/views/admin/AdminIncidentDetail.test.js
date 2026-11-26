@@ -376,10 +376,13 @@ describe('AdminIncidentDetail: Zeile der Folgemaßnahmen (Layout)', () => {
     expect(r).toMatch(/height:\s*var\(--ctl-h\)/)
   })
 
-  it('gibt der Auswahl einen eigenen Pfeil statt des Browser-Standards', () => {
+  // The arrow comes from the shared .form-select rule in style.css (see selectStyleCss.test.js);
+  // a local copy drifted (5 px instead of 6 px, other position).
+  it('übernimmt den Pfeil der gemeinsamen .form-select-Regel statt einer eigenen Kopie', () => {
     const r = rule('.action-row.edit .form-select')
-    expect(r).toMatch(/appearance:\s*none/)
-    expect(r).toMatch(/background-image:[^;]*linear-gradient[^;]*currentColor/)
+    expect(r).not.toMatch(/background-image/)
+    expect(r).not.toMatch(/appearance/)
+    expect(sfc.match(/class="form-select w-state"/)).not.toBeNull()
   })
 
   it('lässt dem Feld „Verantwortlich“ genug Breite für den Platzhalter', () => {

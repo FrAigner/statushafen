@@ -272,7 +272,7 @@ const confirmEndSubscription = async () => {
           </div>
           <div v-if="showLanguageChoice" class="edit-abo-language">
             <label for="edit-abo-language-select" class="edit-abo-language-label">{{ t('components.subscriptionManager.languageLabel') }}</label>
-            <select id="edit-abo-language-select" v-model="editLanguage" class="edit-abo-language-select" aria-describedby="edit-abo-language-hint">
+            <select id="edit-abo-language-select" v-model="editLanguage" class="form-select" aria-describedby="edit-abo-language-hint">
               <option v-for="o in languageOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
             <p id="edit-abo-language-hint" class="edit-abo-language-hint">{{ t('components.subscriptionManager.languageHint') }}</p>
@@ -551,7 +551,6 @@ const confirmEndSubscription = async () => {
 .edit-abo-matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--sp-2); }
 .edit-abo-language { margin-top: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1); max-width: 320px; }
 .edit-abo-language-label { font-size: var(--fs-base); color: var(--text-secondary); font-weight: 600; }
-.edit-abo-language-select { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; }
 .edit-abo-language-hint { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }
 .edit-abo-actions { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-3); }
 </style>
