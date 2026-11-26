@@ -250,6 +250,8 @@
     "customDomainDescPrefix": "Custom domain (e.g.",
     "customDomainDescMid": ") instead of the platform subdomain. After saving, point a CNAME at",
     "customDomainDescSuffix": "then verify.",
+    "apexDomainHint": "This is an apex domain: DNS allows no CNAME there. Use an ALIAS/ANAME record or “CNAME flattening” at your DNS provider, or a subdomain such as status.your-domain.",
+    "domainNotPointing": "The domain is yours (TXT record found) but does not point to {target} yet. Create the CNAME or wait until the DNS change has spread; then the page is reachable under the domain.",
     "fieldDomain": "Domain",
     "domainPlaceholder": "status.mycompany.com",
     "verifyingDomain": "Checking…",

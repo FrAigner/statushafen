@@ -250,6 +250,8 @@
     "customDomainDescPrefix": "Eigene Domain (z.B.",
     "customDomainDescMid": ") statt der Subdomain der Plattform. Nach dem Speichern per CNAME auf",
     "customDomainDescSuffix": "zeigen, dann verifizieren.",
+    "apexDomainHint": "Das ist eine Hauptdomain: Dort erlaubt DNS keinen CNAME. Nutze bei deinem DNS-Anbieter einen ALIAS/ANAME-Eintrag bzw. „CNAME-Flattening“ oder eine Subdomain wie status.deine-domain.",
+    "domainNotPointing": "Die Domain gehört dir (TXT-Eintrag gefunden), zeigt aber noch nicht auf {target}. Lege den CNAME an bzw. warte, bis die DNS-Änderung überall angekommen ist; danach ist die Seite unter der Domain erreichbar.",
     "fieldDomain": "Domain",
     "domainPlaceholder": "status.example.org",
     "verifyingDomain": "Prüfe…",

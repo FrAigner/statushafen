@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/fraigner/statushafen/models"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/publicsuffix"
 )
 
 // lookupTXT is declared as a package variable instead of a direct resolver call
@@ -24,6 +26,45 @@ import (
 // carries the deadline (previously there was no timeout and a hanging resolver
 // blocked the request).
 var lookupTXT = net.DefaultResolver.LookupTXT
+
+// lookupCNAME and lookupHost check after the TXT proof whether the domain already
+// points to the CNAME target (package variables for the same reason as lookupTXT).
+var (
+	lookupCNAME = net.DefaultResolver.LookupCNAME
+	lookupHost  = net.DefaultResolver.LookupHost
+)
+
+// isApexDomain reports whether the domain is the registrable domain itself
+// (e.g. example.org, example.co.uk). DNS allows no CNAME there; such a domain
+// needs ALIAS/ANAME or "CNAME flattening" at the DNS provider, or a subdomain.
+func isApexDomain(domain string) bool {
+	apex, err := publicsuffix.EffectiveTLDPlusOne(domain)
+	return err == nil && apex == domain
+}
+
+// customDomainPointsToTarget reports whether the domain already reaches the CNAME
+// target: either its CNAME chain ends at the target, or it resolves to one of
+// the target's addresses (ALIAS/ANAME and CNAME flattening hide the CNAME).
+// Every lookup error counts as "not yet".
+func customDomainPointsToTarget(ctx context.Context, domain, target string) bool {
+	if cname, err := lookupCNAME(ctx, domain); err == nil && strings.EqualFold(strings.TrimSuffix(cname, "."), target) {
+		return true
+	}
+	got, err := lookupHost(ctx, domain)
+	if err != nil {
+		return false
+	}
+	want, err := lookupHost(ctx, target)
+	if err != nil {
+		return false
+	}
+	for _, ip := range got {
+		if slices.Contains(want, ip) {
+			return true
+		}
+	}
+	return false
+}
 
 // customDomainLookupTimeout limits a single TXT lookup (a variable
 // so the timeout test does not wait 5 s).
@@ -186,9 +227,31 @@ func (h *Handler) SetCustomDomainHandler(c *gin.Context) {
 		"custom_domain":        page.CustomDomain,
 		"custom_domain_status": page.CustomDomainStatus,
 		"cname_target":         customDomainCNAMETarget(),
+		"apex_domain":          domain != "" && isApexDomain(domain),
 	}
 	if domain != "" {
 		resp["verification_token"] = page.CustomDomainVerificationToken
+		resp["txt_record_value"] = customDomainTXTChallenge(page.CustomDomainVerificationToken)
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GET /api/admin/pages/:page_id/custom-domain — the state of the custom domain for
+// the admin form: the CNAME target of this installation (also before a domain is
+// saved), whether the domain is an apex domain, and while the TXT proof is still
+// open the expected TXT value (so it is shown again when the form is reopened).
+func (h *Handler) GetCustomDomainHandler(c *gin.Context) {
+	page, _, ok := h.loadStatusPageForCustomDomain(c)
+	if !ok {
+		return
+	}
+	resp := gin.H{
+		"custom_domain":        page.CustomDomain,
+		"custom_domain_status": page.CustomDomainStatus,
+		"cname_target":         customDomainCNAMETarget(),
+		"apex_domain":          page.CustomDomain != "" && isApexDomain(page.CustomDomain),
+	}
+	if page.CustomDomainStatus == "pending" || page.CustomDomainStatus == "check_failed" {
 		resp["txt_record_value"] = customDomainTXTChallenge(page.CustomDomainVerificationToken)
 	}
 	c.JSON(http.StatusOK, resp)
@@ -320,9 +383,16 @@ func (h *Handler) VerifyCustomDomainHandler(c *gin.Context) {
 	}
 
 	h.RecordAudit(c, "statuspage.custom_domain_verified", "config", "StatusPage", strconv.FormatUint(pageID, 10), page.Name, page.CustomDomain)
+	// The TXT record proves ownership; whether the domain already reaches the edge
+	// server is only a hint for the next step (DNS changes take time to spread).
+	dnsCtx, dnsCancel := context.WithTimeout(c.Request.Context(), customDomainLookupTimeout)
+	pointsToTarget := customDomainPointsToTarget(dnsCtx, page.CustomDomain, target)
+	dnsCancel()
 	c.JSON(http.StatusOK, gin.H{
 		"custom_domain_status": status,
 		"verified":             true,
+		"points_to_target":     pointsToTarget,
+		"apex_domain":          isApexDomain(page.CustomDomain),
 		"message":              "Domain erfolgreich verifiziert. Bitte richte nun den CNAME auf " + target + " ein.",
 		"txt_record_value":     expected,
 		"cname_target":         target,

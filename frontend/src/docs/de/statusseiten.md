@@ -107,11 +107,15 @@ Aufruf nach der Anmeldung.
 Unter „Custom Domain“ trägt man die gewünschte Domain ein, zum Beispiel `status.acme.example`.
 Danach sind zwei DNS-Einträge nötig:
 
-1. Ein **CNAME** der Domain auf den angezeigten Zielhost (Standard `edge.example.com`).
+1. Ein **CNAME** der Domain auf den Zielhost, den das Formular anzeigt. Er gilt für die ganze
+   Installation, unabhängig von der eingetragenen Domain (`CUSTOM_DOMAIN_CNAME_TARGET`, sonst
+   `edge.<Host aus FRONTEND_URL>`).
 2. Als Besitznachweis ein **TXT-Eintrag** der Form `statushafen-verify=<token>`. Den genauen Wert
-   zeigt das Formular nach dem Speichern.
+   zeigt das Formular nach dem Speichern, auch beim erneuten Öffnen, solange der Nachweis fehlt.
 
-Anschließend klickt man auf „DNS verifizieren“. Der Zustand der Domain steht daneben:
+Anschließend klickt man auf „DNS verifizieren“. Geprüft wird der TXT-Eintrag. Ist er da, gilt die
+Domain als verifiziert; zeigt sie noch nicht auf den Zielhost, weist das Formular darauf hin (der CNAME
+kann einige Zeit brauchen, bis er überall angekommen ist). Der Zustand der Domain steht daneben:
 
 - „Ausstehend“,
 - „Verifiziert“ (wartet auf den ersten Aufruf über die Domain) und
@@ -124,6 +128,9 @@ Seite und je Nutzer begrenzt; darüber meldet die Oberfläche, dass zu viele Anf
 
 - Erlaubt sind nur gültige Hostnamen in Kleinbuchstaben (ohne abschließenden Punkt, ohne Wildcard,
   ohne IP-Adresse; internationale Namen in Punycode-Schreibweise).
+- Eine **Hauptdomain** wie `example.org` kann keinen CNAME haben. Dafür braucht es beim DNS-Anbieter
+  einen ALIAS/ANAME-Eintrag bzw. „CNAME-Flattening“, oder man nimmt eine Subdomain wie
+  `status.example.org`. Das Formular weist bei Hauptdomains darauf hin.
 - Das Eintragen reserviert die Domain nicht: Mehrere Seiten können dieselbe Domain eintragen, den
   Zuschlag bekommt die Seite, die sie **zuerst per TXT-Eintrag verifiziert**.
 - Ist die Domain bei einer anderen Seite bereits verifiziert oder aktiv, schlägt das Verifizieren

@@ -72,6 +72,7 @@ func setupCustomDomainRouter(h *Handler) http.Handler {
 	r := testutils.SetupRouter()
 	r.PUT("/api/admin/pages/:page_id/custom-domain", h.SetCustomDomainHandler)
 	r.DELETE("/api/admin/pages/:page_id/custom-domain", h.DeleteCustomDomainHandler)
+	r.GET("/api/admin/pages/:page_id/custom-domain", h.GetCustomDomainHandler)
 	r.POST("/api/admin/pages/:page_id/custom-domain/verify", h.VerifyCustomDomainHandler)
 	r.GET("/api/public/resolve-domain", h.ResolvePublicDomainHandler)
 	r.GET("/api/internal/custom-domain-check", h.InternalCustomDomainCheckHandler)

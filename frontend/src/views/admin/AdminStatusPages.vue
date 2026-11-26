@@ -142,6 +142,25 @@ const customDomainVerifiedAt = ref<string | null>(null)
 const customDomainCheckedAt = ref<string | null>(null)
 const customDomainCheckError = ref('')
 const txtCopied = ref(false)
+// DNS hints: apex domains need ALIAS/ANAME/CNAME flattening, and after a successful
+// TXT check the domain may not point to the CNAME target yet (null = not checked).
+const apexDomain = ref(false)
+const pointsToTarget = ref<boolean | null>(null)
+
+// The CNAME target and, while the TXT proof is open, the TXT value come from the
+// backend when the form opens (the TXT value is not part of the page data).
+// Without an answer the target stays unknown instead of being guessed.
+const loadCustomDomainInfo = async (pageId: number) => {
+  try {
+    const resp: CustomDomainResponse = await apiFetch(`/api/admin/pages/${pageId}/custom-domain`)
+    if (currentEditItem.value !== pageId) return
+    cnameTarget.value = resp.cname_target
+    apexDomain.value = !!resp.apex_domain
+    txtRecordValue.value = resp.txt_record_value || ''
+  } catch {
+    // The rest of the form works without it; the description shows "…".
+  }
+}
 
 // Stage 4d: table columns and field hints. The hints are plain text
 // (FormField knows no <strong> markup in the hint).
@@ -171,7 +190,6 @@ const slugHint = computed(() => {
     ? `${t('statusPages.slugHintPrefix')} ${slug}.${base} ${t('statusPages.slugHintSuffix')}`
     : t('statusPages.slugHintPath', { slug })
 })
-const edgeTargetFallback = computed(() => `edge.${primaryBaseDomain() || 'example.com'}`)
 
 // Direction C: page header, search, row menu and form errors at the field.
 const breadcrumbs = usePageCrumbs(computed(() => t('adminNav.items.pages')), { global: true })
@@ -298,6 +316,10 @@ const openEdit = (item: StatusPageModel | 'new', { focus = true }: { focus?: boo
   customDomainVerifiedAt.value = item === 'new' ? null : (item.CustomDomainVerifiedAt || null)
   customDomainCheckedAt.value = item === 'new' ? null : (item.CustomDomainCheckedAt || null)
   customDomainCheckError.value = item === 'new' ? '' : (item.CustomDomainCheckError || '')
+  cnameTarget.value = ''
+  apexDomain.value = false
+  pointsToTarget.value = null
+  if (item !== 'new') loadCustomDomainInfo(item.ID)
   formErrors.value = { name: '', slug: '' }
   showUsers.value = null
   isEditing.value = true
@@ -326,6 +348,8 @@ const cancelEdit = () => {
   customDomainVerifiedAt.value = null
   customDomainCheckedAt.value = null
   customDomainCheckError.value = ''
+  apexDomain.value = false
+  pointsToTarget.value = null
 }
 
 const customDomainStatusLabel = (status: string | undefined) => ({
@@ -358,6 +382,8 @@ const saveCustomDomain = async () => {
     })
     customDomainStatus.value = resp.custom_domain_status
     cnameTarget.value = resp.cname_target
+    apexDomain.value = !!resp.apex_domain
+    pointsToTarget.value = null
     txtRecordValue.value = resp.txt_record_value || ''
     await loadData()
   } catch (err) {
@@ -378,6 +404,8 @@ const verifyCustomDomain = async () => {
     customDomainCheckError.value = resp.custom_domain_check_error || ''
     customDomainMessage.value = resp.message
     cnameTarget.value = resp.cname_target
+    apexDomain.value = !!resp.apex_domain
+    pointsToTarget.value = resp.points_to_target ?? null
     txtRecordValue.value = resp.txt_record_value || ''
     if (resp.verified_at) {
       customDomainVerifiedAt.value = resp.verified_at
@@ -400,6 +428,8 @@ const removeCustomDomain = async () => {
     customDomainInput.value = ''
     customDomainStatus.value = ''
     customDomainMessage.value = ''
+    apexDomain.value = false
+    pointsToTarget.value = null
     await loadData()
   } catch (err) {
     alertMsg.value = t('statusPages.domainRemoveError') + (err as Error).message
@@ -792,9 +822,9 @@ const removeUser = async (assignment: PageUserAssignment) => {
         <!-- Custom domain -->
         <section v-if="currentEditItem !== 'new'" class="adm-section">
           <h4 class="adm-subhead">{{ t('statusPages.customDomainHeading') }}</h4>
-          <p class="section-text">
+          <p class="section-text" data-test="custom-domain-desc">
             {{ t('statusPages.customDomainDescPrefix') }} <code>status.example.org</code> {{ t('statusPages.customDomainDescMid') }}
-            <code v-if="cnameTarget">{{ cnameTarget }}</code><code v-else>{{ edgeTargetFallback }}</code> {{ t('statusPages.customDomainDescSuffix') }}
+            <code>{{ cnameTarget || '…' }}</code> {{ t('statusPages.customDomainDescSuffix') }}
           </p>
 
           <FormField v-slot="f" :label="t('statusPages.fieldDomain')" field-id="custom-domain-input">
@@ -805,6 +835,10 @@ const removeUser = async (assignment: PageUserAssignment) => {
               </button>
             </div>
           </FormField>
+
+          <p v-if="apexDomain" class="section-text section-text--small" data-test="apex-domain-hint">
+            {{ t('statusPages.apexDomainHint') }}
+          </p>
 
           <p v-if="customDomainStatus" class="status-line">
             <StatusBadge :status="domainStatusLevel(customDomainStatus)" :label="customDomainStatusLabel(customDomainStatus)" />
@@ -829,6 +863,10 @@ const removeUser = async (assignment: PageUserAssignment) => {
           </p>
 
           <p v-if="customDomainMessage" class="section-text">{{ customDomainMessage }}</p>
+
+          <p v-if="pointsToTarget === false" class="section-text section-text--small" data-test="domain-not-pointing">
+            {{ t('statusPages.domainNotPointing', { target: cnameTarget }) }}
+          </p>
 
           <p v-if="customDomainVerifiedAt && customDomainStatus === 'verified'" class="section-text section-text--small">
             {{ t('statusPages.verifiedAt', { date: new Date(customDomainVerifiedAt).toLocaleString() }) }}
