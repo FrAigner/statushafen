@@ -39,7 +39,7 @@ describe('style.css: Seitenformular (.form-panel)', () => {
 
 describe('style.css: Sprachwähler in der Admin-Kopfzeile', () => {
   it('teilt sich Höhe, Rand und Hintergrund mit Theme-Knopf und Mandanten-Auswahl', () => {
-    const group = blocks('.admin-topbar select.language-switcher').find(b => /height:\s*var\(--ctl-h\)/.test(b))
+    const group = blocks('.admin-topbar .language-switcher').find(b => /height:\s*var\(--ctl-h\)/.test(b))
     expect(group).toBeTruthy()
     expect(group).toMatch(/border:\s*1px solid/)
     expect(group).toMatch(/background:/)
@@ -47,15 +47,23 @@ describe('style.css: Sprachwähler in der Admin-Kopfzeile', () => {
   })
 
   it('hat einen eigenen Pfeil statt des Browser-Standards', () => {
-    const rule = declared('.admin-topbar select.language-switcher')
+    const rule = declared('.admin-topbar .language-switcher')
     expect(rule).toMatch(/appearance:\s*none/)
     expect(rule).toMatch(/background-image:[^;]*linear-gradient[^;]*currentColor/)
     expect(rule).toMatch(/background-repeat:\s*no-repeat/)
   })
 
+  // The language switcher is a button now; its hover rule is more specific
+  // than the arrow rule, so the shorthand `background` dropped the chevron.
+  it('behält den Pfeil beim Hover (nur background-color)', () => {
+    const hover = declared('.admin-topbar .language-switcher:hover')
+    expect(hover).toMatch(/background-color:/)
+    expect(hover).not.toMatch(/(^|[;\s])background:/)
+  })
+
   it('lässt dem Pfeil Platz (rechtes Padding) auch unter 768 px', () => {
-    expect(declared('.admin-topbar select.language-switcher')).toMatch(/padding:\s*0 28px 0 /)
-    expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*select\.language-switcher,\s*\.admin-topbar select\.tenant-select \{ padding: 0 24px 0 /)
+    expect(declared('.admin-topbar .language-switcher')).toMatch(/padding:\s*0 28px 0 /)
+    expect(css).toMatch(/@media \(max-width: 768px\)[\s\S]*\.language-switcher,\s*\.admin-topbar select\.tenant-select \{ padding: 0 24px 0 /)
   })
 })
 

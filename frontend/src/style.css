@@ -109,7 +109,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
 /* Steuerelemente in der dunklen Kopfzeile */
 .icon-btn,
-.admin-topbar select.language-switcher,
+.admin-topbar .language-switcher,
 .tenant-select {
   height: var(--ctl-h);
   background: color-mix(in srgb, var(--top-text) 8%, transparent);
@@ -128,8 +128,10 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .icon-btn:hover,
 .tenant-select:hover,
-.admin-topbar select.language-switcher:hover {
-  background: color-mix(in srgb, var(--top-text) 16%, transparent);
+.admin-topbar .language-switcher:hover {
+  /* Only the colour: the shorthand would also drop the chevron image of the
+     language button (this rule is more specific than its arrow rule). */
+  background-color: color-mix(in srgb, var(--top-text) 16%, transparent);
 }
 /* Sprachwähler wie die Nachbarn (Theme-Knopf 36 px, Avatar): gleiche
    Höhe --ctl-h, gleicher Rand und Hintergrund (Gruppenregel oben), eigener
@@ -138,7 +140,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
    Farbwerte im Bild wären feste Hex-Werte). Der Fokusring kommt von
    .topbar-main :focus-visible (oben). Der Seitenwähler (.tenant-select) teilt
    die Regel, damit beide Auswahlfelder gleich aussehen. */
-.admin-topbar select.language-switcher,
+.admin-topbar .language-switcher,
 .admin-topbar select.tenant-select {
   appearance: none;
   -webkit-appearance: none;
@@ -151,7 +153,6 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   background-size: 5px 5px, 5px 5px;
   background-position: right 15px center, right 10px center;
 }
-.admin-topbar select.language-switcher option,
 .tenant-select option { background: var(--surface); color: var(--text); }
 
 /* Burger-Icon-Wechsel (Hamburger <-> X) mit Fade statt hartem Umschalten */
@@ -847,7 +848,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
   .topbar-brand .brand-logo { width: 20px; height: 20px; }
   .topbar-right { gap: 4px; }
-  .admin-topbar select.language-switcher,
+  .admin-topbar .language-switcher,
   .admin-topbar select.tenant-select { padding: 0 24px 0 var(--sp-2); }
 
   .area-tabs { display: none; }
