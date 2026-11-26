@@ -7,10 +7,10 @@ import (
 	"github.com/fraigner/statushafen/permissions"
 )
 
-// expectedRequiredPermission ist der Wert von x-required-permission in der
-// OpenAPI-Spec für eine Route: "global-admin", "page-role", "<res>:<aktion>",
-// "a|b" (mindestens eines, auch mehrere Aktionen einer Ressource), "a&b" (alle) oder bei Wartung/Vorfall
-// "incidents:<aktion>|maintenance:<aktion>" (die Art des Datensatzes entscheidet).
+// expectedRequiredPermission is the value of x-required-permission in the
+// OpenAPI spec for a route: "global-admin", "page-role", "<res>:<action>",
+// "a|b" (at least one, also several actions of one resource), "a&b" (all) or, for maintenance/incident,
+// "incidents:<action>|maintenance:<action>" (the kind of the record decides).
 func expectedRequiredPermission(info routeInfo) string {
 	perms := make([]string, len(info.Resources))
 	for i, r := range info.Resources {
@@ -35,10 +35,10 @@ func expectedRequiredPermission(info routeInfo) string {
 	return perms[0]
 }
 
-// Die Spec nennt je Route dieselbe Berechtigung wie der Router.
+// For each route the spec names the same permission as the router.
 func TestOpenAPISpec_RequiredPermissionMatchesRouteGuards(t *testing.T) {
 	doc := loadOpenAPISpec(t)
-	newPermTestRouter(t) // füllt die Registry
+	newPermTestRouter(t) // fills the registry
 	checked := 0
 	for key, info := range guardedRoutes() {
 		method, path, _ := strings.Cut(key, " ")

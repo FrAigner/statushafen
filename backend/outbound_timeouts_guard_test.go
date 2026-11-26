@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Jeder ausgehende Verbindungsaufbau hat eine Zeitgrenze.
-// Ein net.Dialer oder http.Client ohne Timeout hält bei einem hängenden Ziel
-// (SMTP, Webhook, Identitätsanbieter, externe Statusseite) Goroutinen und
-// Anfragen beliebig lange offen. Der Test prüft in allen Quelldateien, dass
-// jedes net.Dialer- und http.Client-Literal ein Timeout setzt.
+// Structural guard: every outbound connection setup has a time limit.
+// A net.Dialer or http.Client without a timeout keeps goroutines and
+// requests open indefinitely against a hanging target (SMTP, webhook, identity provider, external status page).
+// The test checks in all source files that
+// every net.Dialer and http.Client literal sets a timeout.
 func literalsWithoutTimeout(t *testing.T, name, src string) []string {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), name, src, 0)

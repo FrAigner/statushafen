@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// lastStage liefert den Text ab der letzten FROM-Zeile (das Laufzeit-Image).
+// lastStage returns the text from the last FROM line onward (the runtime image).
 func lastStage(t *testing.T) string {
 	t.Helper()
 	raw, err := os.ReadFile("../Dockerfile")
@@ -21,8 +21,8 @@ func lastStage(t *testing.T) string {
 	return string(raw)[idx[len(idx)-1][0]:]
 }
 
-// Das Laufzeit-Image läuft nicht als root: Die letzte USER-Anweisung der
-// letzten Stufe nennt einen anderen Benutzer als root bzw. 0.
+// The runtime image does not run as root: the last USER instruction of the
+// last stage names a user other than root or 0.
 func TestDockerfile_RuntimeStageRunsAsNonRoot(t *testing.T) {
 	users := regexp.MustCompile(`(?im)^USER\s+(\S+)`).FindAllStringSubmatch(lastStage(t), -1)
 	if len(users) == 0 {
@@ -34,10 +34,10 @@ func TestDockerfile_RuntimeStageRunsAsNonRoot(t *testing.T) {
 	}
 }
 
-// Docker kennt für den Healthcheck nur die Rückgabewerte 0 (gesund) und 1
-// (nicht gesund); jeder andere Rückgabewert von wget (z. B. 4 bei einem
-// Netzfehler oder 8 bei einem Serverfehler) wäre ungültig. Die Zeile bildet
-// deshalb jeden Fehlschlag auf 1 ab.
+// For the healthcheck, Docker only knows the exit codes 0 (healthy) and 1
+// (unhealthy); any other exit code of wget (e.g. 4 on a
+// network error or 8 on a server error) would be invalid. The line
+// therefore maps every failure to 1.
 func TestDockerfile_HealthcheckMapsFailureToExit1(t *testing.T) {
 	raw, err := os.ReadFile("../Dockerfile")
 	if err != nil {

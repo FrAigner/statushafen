@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Jede Route, die einen Body annimmt, steht hinter der
-// Body-Grenze. Der Test schickt an jede registrierte POST/PUT/PATCH/DELETE-
-// Route einen Body knapp über der Grenze und erwartet 413, ohne dass ein
-// Handler läuft. Eine neue Routengruppe oder Middleware-Reihenfolge, die die
-// globale Grenze umgeht, fällt damit auf, ohne dass jemand die Route kennen muss.
+// Structure guard: every route that accepts a body sits behind the
+// body limit. The test sends to every registered POST/PUT/PATCH/DELETE
+// route a body just over the limit and expects 413, without a
+// handler running. A new route group or middleware order that bypasses the
+// global limit is thus noticed without anyone having to know the route.
 var routeParam = regexp.MustCompile(`[:*][A-Za-z_]+`)
 
 func routesWithoutBodyLimit(t *testing.T, r *gin.Engine) []string {
@@ -55,7 +55,7 @@ func TestRouter_EveryRouteWithBodyIsBehindBodyLimit(t *testing.T) {
 	assert.Empty(t, routesWithoutBodyLimit(t, r))
 }
 
-// Gegenprobe: Ein Router ohne die globale Grenze wird erkannt.
+// Control check: a router without the global limit is detected.
 func TestRoutesWithoutBodyLimit_FlagsRouterWithoutLimit(t *testing.T) {
 	r := gin.New()
 	r.POST("/offen/:id", func(c *gin.Context) { c.Status(http.StatusOK) })

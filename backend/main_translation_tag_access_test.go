@@ -19,22 +19,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// Die Tag-Einschränkung (Region EU darf Ressourcen der Region US nicht
-// bearbeiten) gilt für Vorfälle und Komponenten selbst. Dieselbe Einschränkung
-// muss für ihre Übersetzungen gelten, sonst lassen sich fremd getaggte Inhalte
-// über die Übersetzungsrouten lesen, veröffentlichen (confirm) und löschen.
+// The tag restriction (region EU may not edit resources of region US)
+// applies to incidents and components themselves. The same restriction
+// must apply to their translations, otherwise foreign-tagged content can
+// be read, published (confirm) and deleted via the translation routes.
 
 type tagTranslationCase struct {
 	name       string
 	permission string
-	// seed legt das Elternobjekt mit den angegebenen Tags und vier
-	// Übersetzungen (es, de, it, nl) an und liefert (parentID, Übersetzungs-IDs).
+	// seed creates the parent object with the given tags and four
+	// translations (es, de, it, nl) and returns (parentID, translation IDs).
 	seed func(t *testing.T, db *gorm.DB, pageID uint, tagIDs ...uint) (uint, []uint)
-	// createBody liefert den Body zum Anlegen einer Übersetzung in lang.
+	// createBody returns the body for creating a translation in lang.
 	createBody  func(lang string) string
 	saveBody    string
-	collection  string // %d = Eltern-ID
-	adminPrefix string // Präfix für /:translation_id
+	collection  string // %d = parent ID
+	adminPrefix string // prefix for /:translation_id
 }
 
 func tagTranslationCases() []tagTranslationCase {
@@ -95,7 +95,7 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 
 			page := models.StatusPage{Name: "Seite", Slug: "tag-tr-" + tc.name}
 			require.NoError(t, db.Create(&page).Error)
-			// Save verlangt eine zusätzliche Sprache der Seite.
+			// Save requires an additional language of the page.
 			require.NoError(t, db.FirstOrCreate(&models.Language{Code: "en"}, models.Language{Code: "en"}).Error)
 			require.NoError(t, db.Create(&models.StatusPageLanguage{StatusPageID: page.ID, LanguageCode: "en"}).Error)
 			tagEU := models.Tag{Name: "eu"}
@@ -133,8 +133,8 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 			euParent, euTr := tc.seed(t, db, page.ID, tagEU.ID)
 			plainParent, plainTr := tc.seed(t, db, page.ID)
 
-			// Jede Operation bekommt je Aufruf eine frische Sprache bzw.
-			// Übersetzung, damit sich die Aufrufe nicht gegenseitig stören.
+			// Each operation gets a fresh language or
+			// translation per call so that the calls do not interfere with each other.
 			type op struct {
 				desc string
 				call func(parent uint, trs []uint, n int, token string) *httptest.ResponseRecorder
@@ -159,9 +159,9 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 				}},
 			}
 
-			// Angriff: Nutzer mit Tag eu gegen Ressource mit Tag us; die
-			// Operationen laufen zuerst, damit ein fehlender Wächter sichtbar
-			// Daten verändert.
+			// Attack: user with tag eu against resource with tag us; the
+			// operations run first so that a missing guard visibly
+			// changes data.
 			for _, o := range ops {
 				w := o.call(usParent, usTr, 0, euToken)
 				assert.Equal(t, http.StatusForbidden, w.Code, "%s fremder Tag: %s", o.desc, w.Body.String())
@@ -179,8 +179,8 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 			assert.EqualValues(t, 4, cnt, "Übersetzungen der fremden Ressource unverändert")
 			assert.EqualValues(t, 0, confirmed, "nichts der fremden Ressource wurde veröffentlicht")
 
-			// Gegenprobe: gleicher Tag, Ressource ohne Tag und Nutzer ohne Tags
-			// sind erlaubt.
+			// Control case: same tag, resource without tag and user without tags
+			// are allowed.
 			for i, o := range ops {
 				w := o.call(euParent, euTr, 0, euToken)
 				assert.Less(t, w.Code, 300, "%s eigener Tag: %s", o.desc, w.Body.String())
@@ -193,15 +193,15 @@ func TestRouter_TranslationRoutesRespectTagRestriction(t *testing.T) {
 	}
 }
 
-// Strukturtest: Jede Admin-Route für Übersetzungen von Vorfällen und
-// Komponenten trägt den Tag-Wächter. Eine neue Route ohne ihn würde die
-// Tag-Einschränkung stillschweigend umgehen.
+// Structural test: every admin route for translations of incidents and
+// components carries the tag guard. A new route without it would silently
+// bypass the tag restriction.
 func TestMain_TranslationRoutesHaveTagGuard(t *testing.T) {
 	src, err := os.ReadFile("main.go")
 	require.NoError(t, err)
-	// Jede Admin-Route, die einen Vorfall oder eine Komponente über den Pfad
-	// adressiert (:incident_id, :component_id) oder eine ihrer Übersetzungen,
-	// braucht den Wächter - nicht nur die bekannten Übersetzungspfade.
+	// Every admin route that addresses an incident or a component via the path
+	// (:incident_id, :component_id) or one of their translations
+	// needs the guard - not only the known translation paths.
 	route := regexp.MustCompile(`guarded\(authGroup, http\.Method\w+, "([^"]*(?::incident_id|:component_id|/(?:incident|component)-translations/)[^"]*)"`)
 	found := 0
 	for _, line := range strings.Split(string(src), "\n") {

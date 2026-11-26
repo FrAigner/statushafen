@@ -17,11 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ein NUL-Byte (oder ungültiges UTF-8) in einem JSON-Text lehnt PostgreSQL erst
-// beim Schreiben ab, der Handler antwortete mit 500. Die globale Prüfung weist
-// solche Anfragen mit 400 input_invalid_characters ab, bevor ein Handler läuft.
-// Die Tests laufen gegen den echten Router; SQLite nimmt NUL klaglos an, die
-// Tests prüfen deshalb die Abweisung selbst, nicht den Datenbankfehler.
+// PostgreSQL only rejects a NUL byte (or invalid UTF-8) in a JSON text
+// when writing, and the handler used to answer with 500. The global check
+// rejects such requests with 400 input_invalid_characters before a handler runs.
+// The tests run against the real router; SQLite accepts NUL without complaint,
+// so the tests check the rejection itself, not the database error.
 
 const invalidCharactersCode = `"code":"input_invalid_characters"`
 
@@ -63,9 +63,9 @@ func concretePath(path, pageID string) string {
 	return routeParam.ReplaceAllString(path, "1")
 }
 
-// Tabellentest über alle Schreibrouten aus dem Router: Jede Route mit Body, die
-// NUL im JSON trägt, wird abgewiesen, bevor ein Handler läuft. Das gilt auch für
-// die Routen ohne Anmeldung (Login, Abo, Bestellung) und die mit eigener Prüfung.
+// Table test over all write routes from the router: every route with a body
+// that carries NUL in the JSON is rejected before a handler runs. This also holds for
+// the routes without login (login, subscription, order) and those with their own check.
 func TestRouter_EveryWriteRouteRejectsNULInJSONBody(t *testing.T) {
 	f := setupInputGuardFixture(t)
 	const nulBody = `{"name":"a\u0000b","title":"x","email":"nul@example.com"}`
@@ -84,9 +84,9 @@ func TestRouter_EveryWriteRouteRejectsNULInJSONBody(t *testing.T) {
 	require.Greater(t, checked, 80, "der Test soll die ganze Routentabelle sehen")
 }
 
-// Repräsentative Routen mit Anmeldung: je ein NUL im Wert, im Schlüssel und tief
-// verschachtelt. Zusätzlich die Wege, die ein einfaches Feld-für-Feld-Prüfen
-// verfehlt: fehlender Content-Type, andere Schreibweise, rohes Byte.
+// Representative routes with login: one NUL each in a value, in a key and deeply
+// nested. Additionally the paths that a simple field-by-field check
+// misses: missing Content-Type, different spelling, raw byte.
 func TestRouter_NULVariantsAreRejectedBeforeHandlers(t *testing.T) {
 	f := setupInputGuardFixture(t)
 	page := f.pageID
@@ -120,8 +120,8 @@ func TestRouter_NULVariantsAreRejectedBeforeHandlers(t *testing.T) {
 	}
 }
 
-// Gegenprobe: Umlaute, Emoji, Escape-Folgen, die kein NUL ergeben, und ein
-// Backslash vor „u0000“ als Text laufen unverändert zum Handler.
+// Control case: umlauts, emoji, escape sequences that do not yield NUL, and a
+// backslash before "u0000" as text reach the handler unchanged.
 func TestRouter_LegitimateTextPassesTheCharacterCheck(t *testing.T) {
 	f := setupInputGuardFixture(t)
 	for _, name := range []string{
@@ -142,9 +142,9 @@ func TestRouter_LegitimateTextPassesTheCharacterCheck(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 }
 
-// Reihenfolge: Die Größengrenze steht vor der Zeichenprüfung. Ein zu großer
-// Body wird mit 413 abgewiesen, ohne dass die Prüfung ihn vollständig liest;
-// andernfalls müsste der Server erst beliebig viele Bytes einlesen.
+// Order: the size limit comes before the character check. An oversized
+// body is rejected with 413 without the check reading it in full;
+// otherwise the server would first have to read an arbitrary number of bytes.
 func TestRouter_OversizedBodyGets413BeforeTheCharacterCheck(t *testing.T) {
 	f := setupInputGuardFixture(t)
 	body := `{"name":"a\u0000b","pad":"` + strings.Repeat("x", defaultMaxBodyBytes+10) + `"}`

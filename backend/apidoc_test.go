@@ -1,13 +1,13 @@
 package main
 
-// Drift-Test für die handgeschriebene API-Dokumentation
-// (docs/api/openapi.yaml). Die Spec ist bewusst nicht generiert (keine
-// Annotationen an den Handlern, keine Laufzeit-Abhängigkeit). Damit sie
-// trotzdem nicht veraltet, gleicht dieser Test sie in beide Richtungen mit
-// den tatsächlich in newRouter() registrierten Routen ab: eine neue Route
-// ohne Doku macht ihn ebenso rot wie ein dokumentierter Pfad, den es nicht
-// (mehr) gibt. kin-openapi wird nur hier im Test importiert und landet
-// deshalb nicht im Server-Binary.
+// Drift test for the hand-written API documentation
+// (docs/api/openapi.yaml). The spec is deliberately not generated (no
+// annotations on the handlers, no runtime dependency). To keep it from
+// going stale anyway, this test compares it in both directions with
+// the routes actually registered in newRouter(): a new route
+// without docs turns it red just like a documented path that does not
+// (or no longer) exist. kin-openapi is imported only here in the test and
+// therefore does not end up in the server binary.
 
 import (
 	"context"
@@ -25,11 +25,11 @@ import (
 
 const openAPISpecPath = "../docs/api/openapi.yaml"
 
-// ginParamPattern findet gin-Pfadparameter (":id") und Catch-all-Parameter
-// ("*filepath"), die OpenAPI als "{id}" bzw. "{filepath}" schreibt.
+// ginParamPattern finds gin path parameters (":id") and catch-all parameters
+// ("*filepath"), which OpenAPI writes as "{id}" and "{filepath}" respectively.
 var ginParamPattern = regexp.MustCompile(`[:*]([A-Za-z0-9_]+)`)
 
-// openAPIPath übersetzt einen gin-Routenpfad in die OpenAPI-Schreibweise.
+// openAPIPath translates a gin route path into OpenAPI notation.
 func openAPIPath(ginPath string) string {
 	return ginParamPattern.ReplaceAllString(ginPath, "{$1}")
 }
@@ -43,11 +43,11 @@ func loadOpenAPISpec(t *testing.T) *openapi3.T {
 	return doc
 }
 
-// registeredRoutes baut den echten Router und liefert alle Routen als
-// "METHOD /pfad/{param}". Die Metrics-Zugangsdaten werden gesetzt, damit
-// auch das nur bedingt registrierte /metrics geprüft wird. Die statischen
-// Frontend-Routen (registerStaticFrontend) entstehen nur mit gebautem
-// Frontend unter ./static und sind keine API; im Testlauf fehlen sie.
+// registeredRoutes builds the real router and returns all routes as
+// "METHOD /path/{param}". The metrics credentials are set so that
+// the conditionally registered /metrics is checked as well. The static
+// frontend routes (registerStaticFrontend) only exist with a built
+// frontend under ./static and are not API; they are absent in the test run.
 func registeredRoutes(t *testing.T) map[string]bool {
 	t.Helper()
 	t.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
@@ -62,7 +62,7 @@ func registeredRoutes(t *testing.T) map[string]bool {
 	return routes
 }
 
-// documentedRoutes liefert alle Operationen der Spec als "METHOD /pfad".
+// documentedRoutes returns all operations of the spec as "METHOD /path".
 func documentedRoutes(doc *openapi3.T) map[string]bool {
 	routes := map[string]bool{}
 	for path, item := range doc.Paths.Map() {
@@ -73,7 +73,7 @@ func documentedRoutes(doc *openapi3.T) map[string]bool {
 	return routes
 }
 
-// missingFrom liefert die Schlüssel aus want, die in have fehlen, sortiert.
+// missingFrom returns the keys from want that are missing in have, sorted.
 func missingFrom(want, have map[string]bool) []string {
 	var missing []string
 	for k := range want {
@@ -105,10 +105,10 @@ func TestMissingFrom(t *testing.T) {
 	}
 }
 
-// TestOpenAPISpec_IsValidOpenAPI31 stellt sicher, dass die Spec ein
-// gültiges OpenAPI-3.1-Dokument ist (Schema-Referenzen, Pfadparameter,
-// Antworten, Security-Schemes, Beispiele), damit Redoc/Swagger UI und
-// Client-Generatoren sie ohne Fehler verarbeiten.
+// TestOpenAPISpec_IsValidOpenAPI31 ensures that the spec is a
+// valid OpenAPI 3.1 document (schema references, path parameters,
+// responses, security schemes, examples) so that Redoc/Swagger UI and
+// client generators can process it without errors.
 func TestOpenAPISpec_IsValidOpenAPI31(t *testing.T) {
 	doc := loadOpenAPISpec(t)
 	if doc.OpenAPIMajorMinor() != "3.1" {
@@ -123,8 +123,8 @@ func TestOpenAPISpec_IsValidOpenAPI31(t *testing.T) {
 	}
 }
 
-// TestOpenAPISpec_MatchesRegisteredRoutes ist der eigentliche Drift-Test:
-// jede registrierte Route muss dokumentiert sein und umgekehrt.
+// TestOpenAPISpec_MatchesRegisteredRoutes is the actual drift test:
+// every registered route must be documented and vice versa.
 func TestOpenAPISpec_MatchesRegisteredRoutes(t *testing.T) {
 	registered := registeredRoutes(t)
 	documented := documentedRoutes(loadOpenAPISpec(t))
@@ -135,16 +135,16 @@ func TestOpenAPISpec_MatchesRegisteredRoutes(t *testing.T) {
 	for _, r := range missingFrom(documented, registered) {
 		t.Errorf("%s dokumentiert %s, die Route ist aber nicht registriert", openAPISpecPath, r)
 	}
-	// Plausibilitätsprüfung: ein nur halb aufgebauter Router würde sonst
-	// gegen eine ebenso unvollständige Spec grün melden.
+	// Sanity check: a half-built router would otherwise report green
+	// against an equally incomplete spec.
 	if !registered["GET /healthz"] || !registered["GET /metrics"] {
 		t.Errorf("Router unvollständig aufgebaut (healthz/metrics fehlen), %d Routen", len(registered))
 	}
 }
 
-// TestOpenAPISpec_OperationsAreDescribed verlangt pro Operation mindestens
-// eine Zusammenfassung und eine eindeutige operationId, damit die Doku
-// auch für Admin-Endpunkte mehr als eine nackte Pfadliste ist und
+// TestOpenAPISpec_OperationsAreDescribed requires at least
+// a summary and a unique operationId, so that the docs
+// are more than a bare path list even for admin endpoints and
 // generierte Clients stabile Methodennamen bekommen.
 func TestOpenAPISpec_OperationsAreDescribed(t *testing.T) {
 	doc := loadOpenAPISpec(t)
@@ -167,10 +167,10 @@ func TestOpenAPISpec_OperationsAreDescribed(t *testing.T) {
 	}
 }
 
-// TestOpenAPISpec_DocumentsAuthTokenHeaderAndErrorCode: Das Backend
-// liest das Login-Token zuerst aus X-Auth-Token; die Spec nannte
-// nur "Authorization: Bearer". Außerdem tragen Fehlerantworten längst einen
-// maschinenlesbaren "code", das Error-Schema kannte nur "error".
+// TestOpenAPISpec_DocumentsAuthTokenHeaderAndErrorCode: the backend
+// reads the login token from X-Auth-Token first; the spec only
+// mentioned "Authorization: Bearer". Also, error responses have long carried a
+// machine-readable "code", but the error schema only knew "error".
 func TestOpenAPISpec_DocumentsAuthTokenHeaderAndErrorCode(t *testing.T) {
 	doc := loadOpenAPISpec(t)
 
@@ -202,10 +202,10 @@ func TestOpenAPISpec_DocumentsAuthTokenHeaderAndErrorCode(t *testing.T) {
 	}
 }
 
-// Review N1: Die Antwort der öffentlichen Verfügbarkeit trägt `history_truncated`,
-// wenn die Statushistorie gekürzt wurde. Das Schema Availability muss es dokumentieren (sonst
-// sehen API-Nutzer nicht, dass ihre Verfügbarkeit zu gut sein kann). Dass die Antwort das Feld
-// wirklich liefert, prüft TestAvailability_DauerflatternWirdGekuerztUndGemeldet im Paket handlers.
+// Review N1: the public availability response carries `history_truncated`
+// when the status history was shortened. The Availability schema must document it (otherwise
+// API users cannot see that their availability may be too good). That the response
+// really delivers the field is checked by TestAvailability_DauerflatternWirdGekuerztUndGemeldet in the handlers package.
 func TestOpenAPISpec_AvailabilityDokumentiertHistoryTruncated(t *testing.T) {
 	doc := loadOpenAPISpec(t)
 	schema := doc.Components.Schemas["Availability"]

@@ -17,22 +17,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// Ein JWT aus einem Seiten-SSO-Login gilt nur für die Seite,
-// deren IdP es ausgestellt hat. Der Test prüft JEDE Route des echten Routers;
-// eine neue Route muss hier einer Kategorie zugeordnet werden.
+// A JWT from a page SSO login is valid only for the page
+// whose IdP issued it. The test checks EVERY route of the real router;
+// a new route must be assigned to a category here.
 type ssoRouteKind int
 
 const (
-	// ssoPageRoute: verlangt Rechte auf einer Seite (RequirePermission/
-	// RequirePageRole, auch über die *PageScope-Middlewares).
+	// ssoPageRoute: requires permissions on a page (RequirePermission/
+	// RequirePageRole, also via the *PageScope middlewares).
 	ssoPageRoute ssoRouteKind = iota
-	// ssoPageRead: liest Daten einer (hier privaten) Seite mit optionaler
-	// Anmeldung; eine fremde Seite bleibt verborgen (403 bzw. 404).
+	// ssoPageRead: reads data of a (here private) page with optional
+	// login; a foreign page stays hidden (403 or 404).
 	ssoPageRead
-	// ssoGlobalRoute: RequireGlobalAdmin - nie aus einer Seiten-SSO-Sitzung.
+	// ssoGlobalRoute: RequireGlobalAdmin - never from a page SSO session.
 	ssoGlobalRoute
-	// ssoUnchanged: eigenes Konto, öffentliche Routen und Routen ohne
-	// Rechteprüfung - Antwort wie mit einem Token ohne Seitenbezug.
+	// ssoUnchanged: own account, public routes and routes without a
+	// permission check - response as with a token without page binding.
 	ssoUnchanged
 	// ssoOwnAccountNoPageSession: own account, but refused (403) for a page
 	// SSO session, e.g. linking a global provider.
@@ -78,11 +78,11 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"GET /api/me/subscription":                           ssoUnchanged,
 	"PUT /api/me/subscription":                           ssoUnchanged,
 	"DELETE /api/me/subscription":                        ssoUnchanged,
-	// Sprachkatalog lesen: jeder eingeloggte Nutzer, keine Rechte nötig.
+	// Read language catalog: every logged-in user, no permissions needed.
 	"GET /api/languages": ssoUnchanged,
-	// Liefert ohnehin nur die SSO-Seite (siehe handlers/sso_page_scope_internal_test.go).
+	// Returns only the SSO page anyway (see handlers/sso_page_scope_internal_test.go).
 	"GET /api/me/pages": ssoUnchanged,
-	// eigene Einladung; Seiten-SSO-Sitzungen lehnt der Handler beim Annehmen ab (409).
+	// own invitation; page SSO sessions are rejected by the handler on accept (409).
 	"POST /api/invitations/preview": ssoUnchanged,
 	"POST /api/invitations/accept":  ssoUnchanged,
 	"POST /api/invitations/decline": ssoUnchanged,
@@ -179,7 +179,7 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"POST /api/pages/:page_id/notices":                                                     ssoPageRoute,
 	"PUT /api/pages/:page_id/notices/:id":                                                  ssoPageRoute,
 	"DELETE /api/pages/:page_id/notices/:id":                                               ssoPageRoute,
-	// externe Statusseiten.
+	// external status pages.
 	"GET /api/pages/:page_id/external-sources":                ssoPageRoute,
 	"POST /api/pages/:page_id/external-sources":               ssoPageRoute,
 	"GET /api/pages/:page_id/external-sources/:id":            ssoPageRoute,
@@ -191,8 +191,8 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"GET /api/pages/:page_id/external-incidents":              ssoPageRoute,
 	"GET /api/pages/:page_id/external-incidents/:id":          ssoPageRoute,
 	"GET /api/pages/:page_id/external-outages":                ssoPageRoute,
-	// Nachrichtencenter - Seiten-Routen prüfen Rolle und SSO-Seite selbst,
-	// systemweite verlangen Global Admin ohne Seiten-SSO.
+	// Message center - page routes check role and SSO page themselves,
+	// system-wide ones require Global Admin without page SSO.
 	"GET /api/pages/:page_id/admin-notifications":                                       ssoPageRoute,
 	"GET /api/pages/:page_id/admin-notifications/unread-count":                          ssoPageRoute,
 	"POST /api/pages/:page_id/admin-notifications/read-all":                             ssoPageRoute,
@@ -226,16 +226,16 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"DELETE /api/pages/:page_id/subscribers/:id":                                        ssoPageRoute,
 }
 
-// ssoScopePage: IDs der Inhalte einer Testseite für die Pfad-Parameter.
+// ssoScopePage: IDs of the contents of a test page for the path parameters.
 type ssoScopePage struct {
 	page                              models.StatusPage
 	component, incident, notice       uint
 	incidentTr, componentTr, noticeTr uint
 }
 
-// ssoScopeWorld: V hat auf den privaten Seiten A und B je eine Rolle mit
-// allen Seitenrechten und ist inzwischen Global Admin. scoped ist ein
-// Seiten-SSO-Token für A, plain ein normales Token desselben Nutzers.
+// ssoScopeWorld: V has a role with all page permissions on each of the private
+// pages A and B and has meanwhile become Global Admin. scoped is a
+// page SSO token for A, plain a normal token of the same user.
 type ssoScopeWorld struct {
 	r             *gin.Engine
 	a, b          ssoScopePage
@@ -278,7 +278,7 @@ func newSSOScopeWorld(t *testing.T) ssoScopeWorld {
 	return w
 }
 
-// ssoScopePath setzt die Parameter einer Route für die Zielseite p ein.
+// ssoScopePath fills in the parameters of a route for the target page p.
 func ssoScopePath(path string, p ssoScopePage) string {
 	id := func(v uint) string { return strconv.FormatUint(uint64(v), 10) }
 	itemID := "999"
@@ -318,8 +318,8 @@ func (w ssoScopeWorld) serve(method, path, token string) int {
 	return rec.Code
 }
 
-// serveFresh baut für jeden Aufruf eine frische Welt, damit schreibende
-// Routen sich nicht gegenseitig beeinflussen.
+// serveFresh builds a fresh world for each call so that write
+// routes do not influence each other.
 func serveFresh(t *testing.T, method, route string, target func(ssoScopeWorld) ssoScopePage, token func(ssoScopeWorld) string) int {
 	t.Helper()
 	w := newSSOScopeWorld(t)

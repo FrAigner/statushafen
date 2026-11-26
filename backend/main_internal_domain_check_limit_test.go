@@ -22,10 +22,10 @@ func domainCheck(r http.Handler, ip, domain string) *httptest.ResponseRecorder {
 	return w
 }
 
-// Der interne Domain-Check ist je IP begrenzt (120/min), damit er auch bei
-// durchgeschlagenem Netzzugriff oder Fehlkonfiguration (leeres Token in der
-// Entwicklung) kein unbegrenztes Orakel für Domain-Status ist. Normale Nutzung
-// (Caddy fragt nur für Hosts ohne Zertifikat) bleibt weit darunter.
+// The internal domain check is limited per IP (120/min) so that, even if
+// network access leaks through or on misconfiguration (empty token in
+// development), it is not an unlimited oracle for domain status. Normal use
+// (Caddy only asks for hosts without a certificate) stays far below it.
 func TestRouter_InternalDomainCheckRateLimit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("APP_ENV", "development")
@@ -36,7 +36,7 @@ func TestRouter_InternalDomainCheckRateLimit(t *testing.T) {
 
 	const limit = 120
 	for i := 0; i < limit; i++ {
-		// Bekannte und unbekannte Domains: normale Antworten, kein 429.
+		// Known and unknown domains: normal responses, no 429.
 		assert.Equal(t, http.StatusOK, domainCheck(r, "198.51.100.30", "status.example.org").Code, "Anfrage %d", i+1)
 	}
 	assert.Equal(t, http.StatusNotFound, domainCheck(r, "198.51.100.31", "unbekannt.example.org").Code, "andere IP: unbegrenzt unabhängig")

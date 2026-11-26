@@ -15,11 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Die Domain-Prüfung löst bei jedem Aufruf eine DNS-Abfrage des Servers aus.
-// Sie ist je Nutzer und je Seite begrenzt (10 je Minute), damit ein Seiten-
-// Admin den Server nicht als Werkzeug für beliebig viele Abfragen nutzt. Die
-// Seiten hier haben keine Domain eingetragen: Der Handler antwortet dann mit 400
-// (custom_domain_missing) und fragt kein DNS; der Test prüft nur die Begrenzung.
+// The domain check triggers a DNS lookup by the server on every call.
+// It is limited per user and per page (10 per minute), so that a page
+// admin cannot use the server as a tool for arbitrarily many lookups. The
+// pages here have no domain entered: the handler then answers with 400
+// (custom_domain_missing) and queries no DNS; the test only checks the limiting.
 func TestRouter_CustomDomainVerifyIsLimitedPerUserAndPage(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := newRouter(handlers.NewHandler(db))
@@ -45,7 +45,7 @@ func TestRouter_CustomDomainVerifyIsLimitedPerUserAndPage(t *testing.T) {
 		return w
 	}
 
-	// Gegenprobe: Die ersten zehn Aufrufe laufen bis zum Handler.
+	// Control check: the first ten calls run through to the handler.
 	for i := 1; i <= 10; i++ {
 		w := verify(alice, pageA)
 		require.Equal(t, http.StatusBadRequest, w.Code, "Aufruf %d: %s", i, w.Body.String())

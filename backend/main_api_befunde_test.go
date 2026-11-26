@@ -9,8 +9,8 @@ import (
 	"github.com/fraigner/statushafen/testutils"
 )
 
-// prüft die Verdrahtung in main.go über den echten
-// Router, nicht über nachgebaute Test-Router.
+// checks the wiring in main.go via the real
+// router, not via re-built test routers.
 
 func TestRouter_UnsubscribeGetRedirectsPostDeletes(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://status.example.test")

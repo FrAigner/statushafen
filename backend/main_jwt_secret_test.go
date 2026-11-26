@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ein schwaches Signatur-Geheimnis muss den Start abbrechen, bevor die Datenbank
-// geöffnet wird. main() richtet sein Log selbst ein (auf Stdout); der Test fängt
-// diese Ausgabe ab. Der Datenbankanschluss zeigt auf einen geschlossenen Port:
-// Ließe main() die Prüfung aus, bräche der Start erst dort mit einer anderen
-// Meldung ab.
+// A weak signing secret must abort startup before the database is
+// opened. main() sets up its own log (on stdout); the test captures
+// that output. The database connection points to a closed port:
+// if main() skipped the check, startup would only fail there, with a different
+// message.
 func TestMain_WeakJWTSecretStopsStartupBeforeDatabase(t *testing.T) {
 	for name, secret := range map[string]string{
 		"leer":        "",
@@ -24,12 +24,12 @@ func TestMain_WeakJWTSecretStopsStartupBeforeDatabase(t *testing.T) {
 		"Platzhalter": "your-super-secret-jwt-key",
 	} {
 		t.Run(name, func(t *testing.T) {
-			t.Chdir(t.TempDir()) // keine lokale .env
+			t.Chdir(t.TempDir()) // no local .env
 			t.Setenv("JWT_SECRET", secret)
 			t.Setenv("DB_DSN", "host=127.0.0.1 port=1 user=x password=x dbname=x sslmode=disable connect_timeout=1")
 
 			prevLogger := slog.Default()
-			t.Cleanup(func() { slog.SetDefault(prevLogger) }) // main() richtet das Log neu ein
+			t.Cleanup(func() { slog.SetDefault(prevLogger) }) // main() sets up the log anew
 			r, w, err := os.Pipe()
 			require.NoError(t, err)
 			prevStdout := os.Stdout

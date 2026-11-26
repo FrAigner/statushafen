@@ -16,11 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Jede anonym erreichbare schreibende Route (antwortet ohne
-// Anmeldung nicht mit 401/403) hat ein Anfragelimit je Client. Der Test ruft
-// jede dieser Routen mit leerem Body wiederholt von einer Adresse auf und
-// erwartet irgendwann 429. Eine neue öffentliche Route ohne Limit (Login-
-// Raten, Mail-Bombing, Ressourcenverbrauch) fällt damit auf.
+// Structural guard: every anonymously reachable write route (answers without
+// login not with 401/403) has a request limit per client. The test calls
+// each of these routes repeatedly with an empty body from one address and
+// expects a 429 at some point. A new public route without a limit (login
+// guessing, mail bombing, resource consumption) is thus caught.
 var publicRouteParam = regexp.MustCompile(`[:*][A-Za-z_]+`)
 
 func anonymousRoutesWithoutRateLimit(t *testing.T, r *gin.Engine) []string {
@@ -33,10 +33,10 @@ func anonymousRoutesWithoutRateLimit(t *testing.T, r *gin.Engine) []string {
 			continue
 		}
 		path := publicRouteParam.ReplaceAllString(ri.Path, "1")
-		addr := "198.51.100." + strconv.Itoa(i%250+1) + ":4000" // eigene Adresse je Route
+		addr := "198.51.100." + strconv.Itoa(i%250+1) + ":4000" // own address per route
 		first := doAnonymous(r, ri.Method, path, addr)
 		if first == http.StatusUnauthorized || first == http.StatusForbidden {
-			continue // nur mit Anmeldung erreichbar
+			continue // reachable only with login
 		}
 		checked++
 		limited := false
@@ -67,7 +67,7 @@ func TestRouter_EveryAnonymousWriteRouteIsRateLimited(t *testing.T) {
 	assert.Empty(t, anonymousRoutesWithoutRateLimit(t, r))
 }
 
-// Gegenprobe: Eine offene Route ohne Limit wird erkannt, eine geschützte nicht.
+// Control case: an open route without a limit is detected, a protected one is not.
 func TestAnonymousRoutesWithoutRateLimit_FlagsOpenRoute(t *testing.T) {
 	r := gin.New()
 	r.POST("/offen", func(c *gin.Context) { c.Status(http.StatusOK) })

@@ -17,26 +17,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Jede ohne Anmeldung lesbare GET-Route hat ein Limit je
-// Client-Adresse. Welche Routen anonym erreichbar sind, ermittelt der Test am
-// Router selbst: Eine Route, die ohne Token weder 401 noch 403 liefert, ist
-// anonym. Eine neue anonyme Leseroute ohne Limit fällt damit auf.
+// Structure guard: every GET route readable without login has a limit per
+// client address. Which routes are reachable anonymously is determined by the test on the
+// router itself: a route that returns neither 401 nor 403 without a token is
+// anonymous. A new anonymous read route without a limit is thus noticed.
 //
-// Die Liste bekannteUnbegrenzteLeseRouten ist eine Ratsche: Sie darf nur
-// kürzer werden. Wird eine dieser Routen begrenzt, muss sie hier gestrichen
-// werden (der Test meldet das); neue Einträge sind nicht vorgesehen.
+// The list bekannteUnbegrenzteLeseRouten is a ratchet: it may only
+// get shorter. If one of these routes gets a limit, it must be removed here
+// (the test reports this); new entries are not intended.
 //
-// /healthz bleibt bewusst ohne Limit: Orchestrator und Lastverteiler fragen die
-// Route im Sekundentakt ab und teilen sich dabei oft eine Adresse; ein Limit
-// ließe die Prüfung fehlschlagen und den Dienst unnötig neu starten. Die Route
-// liest nichts aus der Datenbank außer einem Ping und liefert 15 Byte.
+// /healthz deliberately stays without a limit: orchestrators and load balancers query the
+// route every second and often share one address; a limit
+// would make the check fail and restart the service unnecessarily. The route
+// reads nothing from the database except a ping and returns 15 bytes.
 var bekannteUnbegrenzteLeseRouten = map[string]bool{
 	"/healthz": true,
 }
 
 func TestRouter_EveryAnonymousReadRouteIsRateLimited(t *testing.T) {
 	r := newRouter(handlers.NewHandler(testutils.SetupTestDB()))
-	const maxRequests = 400 // über jedem Limit der Leseroutes (höchstens 120 je Minute)
+	const maxRequests = 400 // above every limit of the read routes (at most 120 per minute)
 
 	var anonymous, unlimited []string
 	for i, ri := range r.Routes() {
@@ -50,7 +50,7 @@ func TestRouter_EveryAnonymousReadRouteIsRateLimited(t *testing.T) {
 			}
 		}
 		path := strings.Join(parts, "/")
-		addr := "203.0.113." + strconv.Itoa(i%250+1) + ":4000" // eigene Adresse je Route
+		addr := "203.0.113." + strconv.Itoa(i%250+1) + ":4000" // own address per route
 		get := func() int {
 			req := httptest.NewRequest(http.MethodGet, path, nil)
 			req.RemoteAddr = addr
@@ -59,7 +59,7 @@ func TestRouter_EveryAnonymousReadRouteIsRateLimited(t *testing.T) {
 			return w.Code
 		}
 		if first := get(); first == http.StatusUnauthorized || first == http.StatusForbidden {
-			continue // nur mit Anmeldung lesbar
+			continue // readable only when logged in
 		}
 		anonymous = append(anonymous, ri.Path)
 		limited := false
@@ -85,8 +85,8 @@ func TestRouter_EveryAnonymousReadRouteIsRateLimited(t *testing.T) {
 	}
 }
 
-// Die Limits der zuvor unbegrenzten Routen (120 je Minute, die OAuth-Routen 20):
-// Das 121. bzw. 21. Anfrage wird mit 429 abgewiesen, normale Nutzung nicht.
+// The limits of the previously unlimited routes (120 per minute, the OAuth routes 20):
+// the 121st or 21st request is rejected with 429, normal use is not.
 func TestRouter_FormerlyUnlimitedReadRoutesHaveTheirLimit(t *testing.T) {
 	// Freeze the limiter clock: under -race the requests are slow enough for the token bucket
 	// to refill mid-loop, which let the request over the limit through (404 instead of 429).
@@ -110,7 +110,7 @@ func TestRouter_FormerlyUnlimitedReadRoutesHaveTheirLimit(t *testing.T) {
 		{"/api/public/auth-config", 60},
 	}
 	for i, tc := range cases {
-		addr := "198.51.100." + strconv.Itoa(i+1) + ":5000" // eigene Adresse je Route
+		addr := "198.51.100." + strconv.Itoa(i+1) + ":5000" // own address per route
 		get := func() int {
 			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
 			req.RemoteAddr = addr

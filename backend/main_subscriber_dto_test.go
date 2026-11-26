@@ -18,8 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Nacharbeit: Soft-Delete-Filter im Abonnenten-DTO, Sicht des
-// Anfragenden auf eigene Daten und Abgleich der DTO-Schlüssel mit openapi.yaml.
+// Follow-up work: soft-delete filter in the subscriber DTO, the requester's
+// view of their own data, and comparison of the DTO keys with openapi.yaml.
 func TestRouter_AbonnentenDTO_ErstellerSichtbarkeit(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := newRouter(handlers.NewHandler(db))

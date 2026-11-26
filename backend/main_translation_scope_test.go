@@ -15,23 +15,23 @@ import (
 	"gorm.io/gorm"
 )
 
-// Die Übersetzungs-Schreibrouten
+// The translation write routes
 // (POST /api/{incidents,components,notices}/:id/translations,
-// PATCH/DELETE /api/*-translations/:translation_id) hingen an
-// RequirePermission ohne :page_id und lieferten jedem Nicht-Global-Admin
-// 400. Die Seite wird jetzt aus der Ressource abgeleitet; geprüft wird die
-// Berechtigung auf genau dieser Seite - für fremde Seiten gibt es 403.
+// PATCH/DELETE /api/*-translations/:translation_id) were tied to
+// RequirePermission without :page_id and returned 400 to every non-Global
+// Admin. The page is now derived from the resource; the
+// permission on exactly this page is checked - foreign pages get 403.
 
 type translationRouteCase struct {
 	name       string
 	permission string
-	createPath string // %d = Eltern-ID
+	createPath string // %d = parent ID
 	createBody string
-	adminPath  string // Präfix für /:translation_id
-	// seed legt Elternobjekt + Übersetzung auf der Seite an und liefert
+	adminPath  string // prefix for /:translation_id
+	// seed creates parent object + translation on the page and returns
 	// (parentID, translationID).
 	seed func(db *gorm.DB, pageID uint, lang string) (uint, uint)
-	// orphan legt eine Übersetzung an, deren Elternobjekt gelöscht ist.
+	// orphan creates a translation whose parent object is deleted.
 	orphan func(db *gorm.DB, pageID uint) uint
 }
 

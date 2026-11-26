@@ -22,18 +22,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Jede Route, deren Handler (auch über Hilfsfunktionen) Mails
-// an Abonnenten, Mitglieder oder Empfänger versendet, hat ein Limit je Client
-// oder je Nutzer und Seite. Welche Handler Mails auslösen, ermittelt der Test
-// aus dem Quelltext des Pakets handlers (Aufrufgraph nach Funktionsnamen bis
-// deliverMail, dem einzigen Versandweg). Dann ruft er jede solche Route
-// wiederholt als Global Admin auf und erwartet irgendwann 429. Ein neuer
-// Handler mit Mailversand ohne Limit fällt damit auf, ohne dass jemand die
-// Liste pflegen muss.
+// Structural guard: every route whose handler (also via helper functions) sends mails
+// to subscribers, members or recipients has a limit per client
+// or per user and page. The test determines which handlers trigger mails
+// from the source of the handlers package (call graph by function name up to
+// deliverMail, the only delivery path). Then it calls each such route
+// repeatedly as Global Admin and expects a 429 at some point. A new
+// handler that sends mail without a limit is thus caught without anyone having to
+// maintain the list.
 
-// handlersReachingMail liefert die Namen aller Funktionen in handlers, die
-// deliverMail direkt oder indirekt aufrufen. Der Abgleich nach Namen kann zu
-// viel melden (gleichnamige Methoden), nie zu wenig.
+// handlersReachingMail returns the names of all functions in handlers that
+// call deliverMail directly or indirectly. Matching by name can report
+// too many (methods with the same name), never too few.
 func handlersReachingMail(t *testing.T) map[string]bool {
 	t.Helper()
 	files, err := filepath.Glob("handlers/*.go")
@@ -136,7 +136,7 @@ func TestRouter_EveryMailSendingRouteIsRateLimited(t *testing.T) {
 		require.True(t, reach[known], "%s müsste Mails auslösen, der Aufrufgraph ist unvollständig", known)
 	}
 	f := setupMailRouteFixture(t)
-	const maxRequests = 400 // über jeder Stundengrenze der Begrenzer
+	const maxRequests = 400 // the limiter above every hour boundary
 
 	var checked, offenders []string
 	for i, ri := range f.r.Routes() {
@@ -148,7 +148,7 @@ func TestRouter_EveryMailSendingRouteIsRateLimited(t *testing.T) {
 		}
 		key := ri.Method + " " + ri.Path
 		checked = append(checked, key)
-		addr := "203.0.113." + strconv.Itoa(i%250+1) + ":4000" // eigene Adresse je Route
+		addr := "203.0.113." + strconv.Itoa(i%250+1) + ":4000" // own address per route
 		limited := false
 		for n := 0; n < maxRequests && !limited; n++ {
 			limited = f.call(ri.Method, ri.Path, addr) == http.StatusTooManyRequests
@@ -163,8 +163,8 @@ func TestRouter_EveryMailSendingRouteIsRateLimited(t *testing.T) {
 	assert.Empty(t, offenders, "Routen mit Mailversand ohne Limit")
 }
 
-// Angriff und Gegenprobe an den echten Routen: Nach 30 neuen Vorfällen je
-// Stunde und Seite folgt 429 mit Retry-After; normale Nutzung bleibt frei.
+// Attack and control case on the real routes: after 30 new incidents per
+// hour and page, 429 with Retry-After follows; normal use stays free.
 func TestRouter_IncidentCreationIsLimitedPerPage(t *testing.T) {
 	f := setupMailRouteFixture(t)
 	post := func(addr string) *httptest.ResponseRecorder {
@@ -176,12 +176,12 @@ func TestRouter_IncidentCreationIsLimitedPerPage(t *testing.T) {
 		f.r.ServeHTTP(w, req)
 		return w
 	}
-	// Normale Nutzung: 30 Anlagen (hier mit leerem Body, also 400) werden nie gedrosselt.
+	// Normal use: 30 creations (here with an empty body, hence 400) are never throttled.
 	for i := 0; i < 30; i++ {
 		w := post("198.51.100.10:1")
 		require.NotEqual(t, http.StatusTooManyRequests, w.Code, "Aufruf %d", i+1)
 	}
-	// Angriff: der 31. Aufruf scheitert, auch von einer anderen IP.
+	// Attack: the 31st call fails, even from a different IP.
 	w := post("198.51.100.99:1")
 	require.Equal(t, http.StatusTooManyRequests, w.Code, w.Body.String())
 	assert.Contains(t, w.Body.String(), `"code":"rate_limited"`)

@@ -8,10 +8,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Die Dienste der Entwicklungsumgebung (Datenbank mit Standardpasswort, Mailfänger
-// ohne Anmeldung) dürfen nur vom eigenen Rechner erreichbar sein. Eine
-// Port-Zuordnung ohne Host-Adresse ("5432:5432") bindet an alle Schnittstellen,
-// also auch ins lokale Netz.
+// The development environment services (database with default password, mail catcher
+// without login) must only be reachable from the local machine. A
+// port mapping without a host address ("5432:5432") binds to all interfaces,
+// including the local network.
 func TestCompose_PortsAreBoundToLoopback(t *testing.T) {
 	raw, err := os.ReadFile("../docker-compose.yml")
 	if err != nil {

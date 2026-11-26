@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Wer 0.0.0.0/0 (oder ein ähnlich weites Netz) als vertrauenswürdigen Proxy
-// einträgt, lässt jeden Client X-Forwarded-For frei wählen: IP-Limits und
-// Audit-Adressen sind dann wirkungslos.
+// Anyone who registers 0.0.0.0/0 (or a similarly wide network) as a trusted proxy
+// lets every client choose X-Forwarded-For freely: IP limits and
+// audit addresses are then ineffective.
 func TestOverlyWideTrustedProxies(t *testing.T) {
 	cases := []struct {
 		name    string

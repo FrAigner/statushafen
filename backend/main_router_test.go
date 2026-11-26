@@ -157,13 +157,13 @@ func TestRegisterStaticFrontend_WithStaticDir(t *testing.T) {
 	})
 }
 
-// TestNewRouter_RegistersExpectedRoutes ist ein Rauch-Test für newRouter()
-// sowie die daraus ausgelagerten register*Routes-Funktionen (main.go): stellt
-// sicher, dass der komplette Router ohne Panik aufgebaut wird und ein paar
-// repräsentative öffentliche wie geschützte Routen tatsächlich registriert
-// sind (RouterGroup-Registrierung selbst enthält keine Verzweigungslogik, ein
-// einziger Smoke-Test deckt daher praktisch alle Zeilen von
-// registerPublicRoutes/registerAuthRoutes ab).
+// TestNewRouter_RegistersExpectedRoutes is a smoke test for newRouter()
+// and the register*Routes functions extracted from it (main.go): it makes
+// sure that the complete router is built without panic and that a few
+// representative public and protected routes are actually registered
+// (RouterGroup registration itself contains no branching logic, so a
+// single smoke test thus covers practically all lines of
+// registerPublicRoutes/registerAuthRoutes).
 func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 	_ = os.Setenv("JWT_SECRET", "test-jwt-secret-not-for-production")
 	db := testutils.SetupTestDB()
@@ -188,7 +188,7 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 		"GET /api/auth/provider/:id/callback",
 		"POST /api/auth/provider/:id/link",
 		"GET /api/public/auth-config",
-		// Frontend-Einstieg ins Seiten-SSO
+		// Frontend entry into page SSO
 		"GET /api/public/pages/:slug/sso",
 		"GET /api/me/sso",
 		"DELETE /api/me/sso/:id",
@@ -197,7 +197,7 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 		"POST /api/subscribe",
 		"GET /api/public/pages",
 		"GET /api/me",
-		"DELETE /api/me", // Konto löschen
+		"DELETE /api/me", // delete account
 		"GET /api/pages",
 		"POST /api/admin/pages",
 		"GET /api/users",
@@ -212,8 +212,8 @@ func TestNewRouter_RegistersExpectedRoutes(t *testing.T) {
 	}
 }
 
-// Nach dem Router-Aufbau stehen alle Routen (Templates) mit 0
-// Requests in der Registry, interne wie /metrics fehlen.
+// After the router is built, all routes (templates) are in the registry
+// with 0 requests; internal ones such as /metrics are missing.
 func TestRegisterRoutesInMetrics_ListsAllRoutesWithoutInternal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -223,7 +223,7 @@ func TestRegisterRoutesInMetrics_ListsAllRoutesWithoutInternal(t *testing.T) {
 
 	reg := metrics.NewRegistry()
 	registerRoutesInMetrics(r, reg)
-	registerRoutesInMetrics(r, reg) // erneutes Registrieren: keine Duplikate
+	registerRoutesInMetrics(r, reg) // registering again: no duplicates
 
 	snaps := reg.Snapshot()
 	if len(snaps) != 2 {

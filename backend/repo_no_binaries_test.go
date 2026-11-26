@@ -8,12 +8,12 @@ import (
 	"testing"
 )
 
-// Regression Ein lokales "go build" in backend/cmd/telegrambot/
-// legte dort ein 14-MB-Binary ab, das eingecheckt wurde. Der Test
-// prüft alle von git verfolgten Dateien im Backend auf ausführbare Formate
-// (ELF, Mach-O, PE) - .gitignore allein hält ein "git add -f" nicht auf.
-// Geprüft wird der Index, nicht das Dateisystem: Ein lokal gebautes, nicht
-// eingechecktes Binary soll den Test nicht rot machen.
+// Regression: a local "go build" in backend/cmd/telegrambot/
+// left a 14 MB binary there that was checked in. The test
+// checks all files tracked by git in the backend for executable formats
+// (ELF, Mach-O, PE) - .gitignore alone does not stop a "git add -f".
+// The index is checked, not the file system: a locally built, not
+// checked-in binary should not turn the test red.
 func TestKeineEingechecktenBinaries(t *testing.T) {
 	out, err := exec.Command("git", "ls-files", "-z", ".").Output()
 	if err != nil {
@@ -29,7 +29,7 @@ func TestKeineEingechecktenBinaries(t *testing.T) {
 	}
 }
 
-// binaryKind liefert das ausführbare Format anhand der Magic Bytes, sonst "".
+// binaryKind returns the executable format based on magic bytes, otherwise "".
 func binaryKind(path string) string {
 	fh, err := os.Open(path)
 	if err != nil {

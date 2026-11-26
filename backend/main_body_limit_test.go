@@ -23,8 +23,8 @@ func postBody(t *testing.T, path string, size int) *httptest.ResponseRecorder {
 	return w
 }
 
-// Der Router begrenzt jeden Body global; zu große Anfragen ergeben 413 mit
-// Fehlercode, bevor ein Handler sie liest (Login, Bestellung, Abo usw.).
+// The router limits every body globally; oversized requests yield 413 with an
+// error code before a handler reads them (login, order, subscription, etc.).
 func TestRouter_OversizedBodyIs413(t *testing.T) {
 	for _, path := range []string{"/api/login", "/api/public/orders", "/api/subscribe"} {
 		w := postBody(t, path, defaultMaxBodyBytes+1)
@@ -34,7 +34,7 @@ func TestRouter_OversizedBodyIs413(t *testing.T) {
 }
 
 func TestRouter_BodyAtLimitReachesHandler(t *testing.T) {
-	// Gegenprobe: ein Body genau an der Grenze erreicht den Handler (400, kein JSON).
+	// Control check: a body exactly at the limit reaches the handler (400, not JSON).
 	w := postBody(t, "/api/login", defaultMaxBodyBytes)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":"invalid_request"`)

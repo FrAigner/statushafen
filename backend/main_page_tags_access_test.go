@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// GET /api/pages/:page_id/tags verlangte components:read. Eine
-// Seitenrolle mit nur incidents:write (ohne components:*) bekam 403, das
-// Frontend blendete das Tag-Feld im Vorfallformular still aus. Der Test geht
-// über den echten Router (newRouter), nicht über eine nachgebaute Route.
+// GET /api/pages/:page_id/tags required components:read. A
+// page role with only incidents:write (without components:*) got 403, and the
+// frontend silently hid the tag field in the incident form. The test goes
+// through the real router (newRouter), not a re-built route.
 func TestRouter_PageTags_IncidentRolesDuerfenTagsLesen(t *testing.T) {
 	db := testutils.SetupTestDB()
 	r := newRouter(handlers.NewHandler(db))

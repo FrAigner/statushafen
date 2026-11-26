@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Strukturwächter: Der HTTP-Server entsteht nur über newHTTPServer (mit allen
-// Zeitgrenzen). Ein weiteres &http.Server{...}-Literal oder
-// http.ListenAndServe/ListenAndServeTLS in main.go liefe ohne ReadHeader-,
-// Lese-, Schreib- und Leerlauf-Grenzen (Slowloris).
+// Structural guard: the HTTP server is created only via newHTTPServer (with all
+// time limits). Another &http.Server{...} literal or
+// http.ListenAndServe/ListenAndServeTLS in main.go would run without ReadHeader,
+// read, write and idle limits (Slowloris).
 func serverConstructionOutsideHelper(t *testing.T, src string) []string {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), "main.go", src, 0)
