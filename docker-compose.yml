@@ -5,7 +5,7 @@ version: '3.8'
 # backend/compose_ports_test.go hält das fest.
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: statushafen_db
     environment:
       POSTGRES_DB: statushafen
