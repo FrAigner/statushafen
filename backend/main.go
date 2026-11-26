@@ -719,6 +719,12 @@ func staticFileFor(root, urlPath string) (string, bool) {
 	// No escape from root possible: for a path with a
 	// leading "/", path.Clean resolves every ".." (TestStaticFileFor, ../ variants in
 	// TestStatic_GibtKeineGeheimnisseOderVerzeichnisseHeraus).
+	// After Clean no ".." can remain as a path element; refusing it explicitly is the
+	// guard CodeQL (go/path-injection) recognises before the file system call below.
+	// Only the requested part is checked, so the configured root may contain "..".
+	if strings.Contains(clean, "..") {
+		return "", false
+	}
 	full := filepath.Join(root, filepath.FromSlash(clean))
 	// Resolve links and check the result first, only then touch the file: a link in
 	// the build folder must not point to files outside. Links within the folder
