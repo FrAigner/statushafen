@@ -119,6 +119,11 @@ func TestStaticFileFor(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(root, "dir"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A name containing ".." is refused even though it stays in the folder: the
+	// explicit ".." check is what CodeQL accepts as a guard before the file system call.
+	if err := os.WriteFile(filepath.Join(root, "a..b.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	tests := []struct {
 		url string
 		ok  bool
@@ -126,6 +131,7 @@ func TestStaticFileFor(t *testing.T) {
 		{"/a.txt", true}, {"a.txt", true}, {"/dir", false}, {"/nein.txt", false},
 		{"/", false}, {"/index.html", false}, {"/.a", false}, {"/dir/../a.txt", true},
 		{"/../a.txt", true}, // Clean resolves this to /a.txt, so it stays within the folder
+		{"/a..b.txt", false},
 	}
 	for _, tt := range tests {
 		if _, ok := staticFileFor(root, tt.url); ok != tt.ok {
@@ -205,6 +211,15 @@ func TestStaticFileFor_LinkAusDemOrdnerHeraus(t *testing.T) {
 		if _, ok := staticFileFor(root, url); !ok {
 			t.Errorf("staticFileFor(%q) lehnt eine Datei im Ordner ab", url)
 		}
+	}
+	// The link is resolved before anything is opened, so the file actually served is
+	// the checked target, not the link.
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := staticFileFor(root, "/alias.txt"); got != filepath.Join(realRoot, "echt.txt") {
+		t.Errorf("staticFileFor(/alias.txt) = %q, want the resolved target", got)
 	}
 }
 
