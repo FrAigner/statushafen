@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { clickRowMenuItem } from './rowMenu';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Zeilenaktionen stehen im Zeilenmenü („…“), Eintrag per Rolle wählen.
+// Row actions live in the row menu ("…"); pick the entry by role.
 async function rowAction(page, row, name) {
   await clickRowMenuItem(page, row.getByRole('button', { name: /^Aktionen für/ }), name);
 }
@@ -23,16 +23,16 @@ test.describe('Admin Subscribers Management', () => {
   });
 
   test('should create an email subscriber, edit it, and delete it', async ({ page }) => {
-    // 1. Create (Channel defaultet auf "email")
+    // 1. Create (channel defaults to "email")
     await page.locator('button', { hasText: '+ Abonnent hinzufügen' }).click();
     await page.locator('input[placeholder="name@beispiel.de"]').fill(subscriberEmail);
     await page.locator('button', { hasText: 'Speichern' }).click();
 
     await expect(page.locator('.data-table')).toContainText(subscriberEmail);
 
-    // 2. Edit: Komponenten-IDs einschränken
+    // 2. Edit: restrict component IDs
     await rowAction(page, page.locator('tr', { hasText: subscriberEmail }), 'Bearbeiten');
-    // Komponenten wählt man im Mehrfach-Auswahlfeld statt per ID-Liste.
+    // Components are picked in the multi-select field instead of an ID list.
     const combo = page.getByRole('combobox', { name: /Abonnierte Komponenten/ });
     await combo.click();
     await page.locator(`#${await combo.getAttribute('aria-controls')} [role="option"]`).first().click();
@@ -46,7 +46,7 @@ test.describe('Admin Subscribers Management', () => {
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await rowAction(page, page.locator('tr', { hasText: subscriberEmail }), 'Löschen');
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
@@ -57,10 +57,10 @@ test.describe('Admin Subscribers Management', () => {
   test('should switch to Google Chat channel and require a webhook URL', async ({ page }) => {
     await page.locator('button', { hasText: '+ Abonnent hinzufügen' }).click();
 
-    // Stufe 4c: Kanal ist jetzt ein natives Select (FormField).
+    // Stage 4c: the channel is now a native select (FormField).
     await page.getByLabel('Kanal').selectOption('google_chat');
 
-    // E-Mail-Feld verschwindet, Webhook-URL-Feld erscheint stattdessen
+    // The email field disappears, the webhook URL field appears instead
     await expect(page.locator('input[placeholder="name@beispiel.de"]')).not.toBeVisible();
     await expect(page.locator('input[type=url]')).toBeVisible();
   });

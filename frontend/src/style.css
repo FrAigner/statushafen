@@ -3,9 +3,9 @@
    Flat, data-dense
    ============================================================ */
 
-/* Design-Tokens (Farben, Schriften, Abstände, Radien, sit-onyx-Variablen)
-   stehen seit der Umstellung ausschließlich in assets/tokens.css. Diese Datei
-   enthält nur Komponenten-Regeln. */
+/* Design tokens (colors, fonts, spacing, radii, sit-onyx variables) have
+   lived exclusively in assets/tokens.css since the migration. This file only
+   contains component rules. */
 
 /* ── Reset ──
    The `app-reset` layer is pre-registered (lower priority than onyx's own
@@ -25,8 +25,8 @@ body {
   min-height: 100vh;
 }
 
-/* Links in --primary-text statt --primary: die Schriftvariante hält
-   auf der Fläche der Ebene 4,5:1 (admin dunkel: #7eaeff statt #2a64d6 = 3,4:1). */
+/* Links in --primary-text instead of --primary: the text variant keeps
+   4.5:1 on the level's surface (admin dark: #7eaeff instead of #2a64d6 = 3.4:1). */
 a { color: var(--primary-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
@@ -37,26 +37,26 @@ h3 { font-size: 1.05rem; font-weight: 600; }
 h4 { font-size: 0.95rem; font-weight: 600; }
 
 /* ============================================================
-   Admin Shell – Kopfzeile / Bereichs-Reiter / Content
-   Redesign Stufe 2, Richtung C „Lagebild“: dunkle Kopfzeile,
-   darunter die Bereiche als Reiter, darunter die Einträge des aktiven Bereichs.
-   Farben nur aus den Tokens der Ebene .theme-admin (--top-*, --nav-*).
+   Admin Shell – header / section tabs / content
+   Redesign stage 2, direction C "Lagebild": dark header, below it the
+   sections as tabs, below that the entries of the active section.
+   Colors only from the tokens of the .theme-admin level (--top-*, --nav-*).
    ============================================================ */
 .admin-shell {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  /* Höhe der ersten Kopfzeile auf Mobil: Burger (36) + je 6 px Rand. Darunter
-     fährt das Menü aus. */
+  /* Height of the first header row on mobile: burger (36) + 6 px margin each.
+     The menu slides out below it. */
   --admin-mobile-head-h: 48px;
-  /* clip statt hidden (2026-10-29): hidden macht .admin-shell zum
-     Scroll-Container, dann klebt die Kopfzeile (sticky) an ihm statt am
-     Fenster und scrollt mit dem Inhalt weg. clip schneidet das auf Mobile
-     ausgefahrene Menü genauso ab, ohne Scroll-Container. */
+  /* clip instead of hidden (2026-10-29): hidden turns .admin-shell into a
+     scroll container, so the (sticky) header sticks to it instead of the
+     window and scrolls away with the content. clip cuts off the expanded
+     mobile menu just the same, without a scroll container. */
   overflow-x: clip;
 }
 
-/* Kopfzeile + Reiter + Eintragszeile: ein sticky Block */
+/* Header + tabs + entry row: one sticky block */
 .admin-topbar {
   background: var(--top-bg);
   color: var(--top-text);
@@ -73,7 +73,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   padding: 0 var(--space-md);
 }
 
-/* Fokusring auf dunklem Grund: --top-text hat dort genug Kontrast, --focus nicht. */
+/* Focus ring on a dark background: --top-text has enough contrast there, --focus does not. */
 .topbar-main :focus-visible,
 .area-tabs :focus-visible {
   outline: 2px solid var(--top-text);
@@ -92,7 +92,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   color: var(--top-text);
   white-space: nowrap;
 }
-/* Logo statt Punkt: dekorativ (alt leer), der Name steht daneben im h1. */
+/* Logo instead of a dot: decorative (empty alt), the name sits next to it in the h1. */
 .topbar-brand .brand-logo {
   width: 24px; height: 24px;
   flex-shrink: 0;
@@ -107,7 +107,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   flex-shrink: 0;
 }
 
-/* Steuerelemente in der dunklen Kopfzeile */
+/* Controls in the dark header */
 .icon-btn,
 .admin-topbar .language-switcher,
 .tenant-select {
@@ -133,13 +133,13 @@ h4 { font-size: 0.95rem; font-weight: 600; }
      language button (this rule is more specific than its arrow rule). */
   background-color: color-mix(in srgb, var(--top-text) 16%, transparent);
 }
-/* Sprachwähler wie die Nachbarn (Theme-Knopf 36 px, Avatar): gleiche
-   Höhe --ctl-h, gleicher Rand und Hintergrund (Gruppenregel oben), eigener
-   Pfeil statt des Browser-Standards. Der Pfeil ist ein Chevron aus zwei
-   Verlaufs-Diagonalen in currentColor (ein select kennt kein ::after und
-   Farbwerte im Bild wären feste Hex-Werte). Der Fokusring kommt von
-   .topbar-main :focus-visible (oben). Der Seitenwähler (.tenant-select) teilt
-   die Regel, damit beide Auswahlfelder gleich aussehen. */
+/* Language switcher like its neighbours (theme button 36 px, avatar): same
+   height --ctl-h, same border and background (group rule above), own arrow
+   instead of the browser default. The arrow is a chevron made of two gradient
+   diagonals in currentColor (a select has no ::after, and color values in an
+   image would be fixed hex values). The focus ring comes from
+   .topbar-main :focus-visible (above). The page switcher (.tenant-select)
+   shares the rule so both select fields look the same. */
 .admin-topbar .language-switcher,
 .admin-topbar select.tenant-select {
   appearance: none;
@@ -155,12 +155,12 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .tenant-select option { background: var(--surface); color: var(--text); }
 
-/* Burger-Icon-Wechsel (Hamburger <-> X) mit Fade statt hartem Umschalten */
+/* Burger icon swap (hamburger <-> X) with a fade instead of a hard switch */
 .burger-icon-fade-enter-active, .burger-icon-fade-leave-active { transition: opacity 0.2s ease; }
 .burger-icon-fade-enter-from, .burger-icon-fade-leave-to { opacity: 0; }
 .burger-btn { display: none; }
 
-/* Mandanten-Umschalter: kompakt, das Label bleibt für Screenreader */
+/* Tenant switcher: compact, the label remains for screen readers */
 .tenant-switch { display: flex; align-items: center; min-width: 0; }
 .tenant-select-label {
   position: absolute;
@@ -172,7 +172,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .tenant-select { max-width: 240px; font-weight: 600; text-overflow: ellipsis; }
 .tenant-status { font-size: 0.8rem; color: var(--nav-text); }
 
-/* Benutzermenü */
+/* User menu */
 .user-menu { position: relative; }
 .user-menu-button {
   display: flex; align-items: center; justify-content: center;
@@ -212,7 +212,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .user-menu-info { padding: 6px 8px 10px; font-size: 0.82rem; line-height: 1.3; overflow-wrap: anywhere; }
 .user-menu-info strong { display: block; font-weight: 600; }
 .user-menu-info small { display: block; color: var(--text-3); }
-/* Schalter „Hilfe-Tooltips anzeigen“ im Benutzermenü. */
+/* "Show help tooltips" toggle in the user menu. */
 .user-menu-toggle { padding: 8px; font-size: 0.82rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .user-menu-actions { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; }
 .user-menu-link {
@@ -240,7 +240,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   border-top: 1px solid var(--border);
 }
 
-/* Bereichs-Reiter (dunkel) */
+/* Section tabs (dark) */
 .area-tabs {
   display: flex;
   align-items: flex-end;
@@ -265,10 +265,10 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   white-space: nowrap;
 }
 .area-tab:hover { color: var(--top-text); background: color-mix(in srgb, var(--top-text) 10%, transparent); text-decoration: none; }
-/* Der aktive Reiter hat die Farbe der Eintragszeile darunter und wächst mit ihr zusammen. */
+/* The active tab has the color of the entry row below and merges with it. */
 .area-tab.active { background: var(--nav-active-bg); color: var(--nav-active-text); font-weight: 600; }
 
-/* Einträge des aktiven Bereichs */
+/* Entries of the active section */
 .area-items-row { background: var(--nav-active-bg); border-bottom: 1px solid var(--border); }
 .area-items { display: none; }
 .area-items.is-shown { display: block; }
@@ -304,8 +304,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   min-width: 0;
 }
 
-/* Meldungen („gespeichert“, Fehler) kleben oben im Scrollbereich und bleiben sichtbar, auch wenn man
-   weit unten im Formular ist; Erfolgsmeldungen blendet useAutoDismissAlerts nach einigen Sekunden aus. */
+/* Alerts ("saved", errors) stick to the top of the scroll area and stay visible even when you are
+   far down in the form; useAutoDismissAlerts hides success alerts after a few seconds. */
 .admin-content .alert {
   position: sticky;
   top: var(--space-sm);
@@ -318,8 +318,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   flex: 1;
   padding: var(--space-sm) var(--space-md);
   overflow: auto;
-  /* Volle Breite nutzen: kein max-width, sonst bleibt rechts auf großen Schirmen
-     ein leerer Streifen und Tabellen samt Seitenformular werden gequetscht. */
+  /* Use the full width: no max-width, otherwise large screens get an empty
+     strip on the right and tables with their side form get squeezed. */
   min-width: 0;
 }
 
@@ -356,17 +356,17 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  /* waagerecht scrollen statt abschneiden (Aktionsknöpfe bleiben erreichbar),
-     senkrecht für die runden Ecken beschneiden */
+  /* scroll horizontally instead of cutting off (action buttons stay reachable),
+     clip vertically for the rounded corners */
   overflow-x: auto;
   overflow-y: hidden;
   box-shadow: var(--shadow-1);
 }
 
-/* Stufe 3: Tabellenstil. Kopf ruhig (12 px, keine Versalien),
-   Zeilen 52 px, Zahlen mit tabular-nums. Die Klassen .data-table und
-   .data-table-wrapper bleiben, die e2e-Specs und alle Views suchen danach.
-   (Die doppelte Definition in admin.css ist entfernt; sie überschrieb diese.) */
+/* Stage 3: table style. Calm header (12 px, no all caps),
+   rows 52 px, numbers with tabular-nums. The classes .data-table and
+   .data-table-wrapper stay; the e2e specs and all views look for them.
+   (The duplicate definition in admin.css was removed; it overrode this one.) */
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -398,9 +398,9 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   padding: 8px 16px;
   color: var(--text);
   vertical-align: middle;
-  /* Ein Titel ohne Leerzeichen (etwa eine lange URL) bricht um; "anywhere"
-     senkt anders als "break-word" auch die Mindestbreite der Zelle, sonst
-     weitete er die ganze Tabelle. */
+  /* A title without spaces (e.g. a long URL) wraps; unlike "break-word",
+     "anywhere" also lowers the cell's minimum width, otherwise it would
+     widen the whole table. */
   overflow-wrap: anywhere;
   max-inline-size: 36rem;
 }
@@ -413,12 +413,12 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   text-align: right;
 }
 
-/* Zahlen rechtsbündig (Spalte { numeric: true } in ResponsiveTable). */
+/* Numbers right-aligned (column { numeric: true } in ResponsiveTable). */
 .data-table .is-numeric { text-align: right; }
 
-/* Gruppenzeile (Item { isGroup: true }). */
-/* Gruppen setzen sich deutlich von ihren Komponenten ab (getönte
-   Fläche aus den Tokens, Akzentstreifen vorn); Komponentenzeilen bleiben ohne Hintergrund. */
+/* Group row (item { isGroup: true }). */
+/* Groups stand out clearly from their components (tinted background
+   from the tokens, accent stripe at the start); component rows have no background. */
 .data-table tbody tr.data-table__group { background: var(--primary-soft); }
 .data-table tbody tr.data-table__group:hover { background: var(--primary-soft); }
 .data-table tbody tr.data-table__group > :first-child { box-shadow: inset 3px 0 0 var(--primary); }
@@ -431,8 +431,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   color: var(--text-2);
 }
 
-/* Unter 860 px werden Zeilen zu Karten; die Zellen tragen data-label
-   (ResponsiveTable mit dataTable). Der Kopf bleibt für Screenreader. */
+/* Below 860 px rows become cards; the cells carry data-label
+   (ResponsiveTable with dataTable). The header remains for screen readers. */
 @media (max-width: 859px) {
   .data-table--cards thead {
     position: absolute;
@@ -520,8 +520,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 /* ============================================================
    Buttons (custom, supplement sit-onyx)
    ============================================================ */
-/* Stufe 3: Varianten primary / secondary / ghost / danger,
-   36 px hoch (--ctl-h), Fokusring 2 px --focus mit 2 px Abstand. */
+/* Stage 3: variants primary / secondary / ghost / danger,
+   36 px high (--ctl-h), focus ring 2 px --focus with 2 px offset. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -570,9 +570,9 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .btn-danger:hover:not(:disabled) { background: var(--major-soft); }
 
-/* Small action buttons in table rows. Auch als Link (<a>, z. B. „Übersetzungen“)
-   verwendet: box-sizing, line-height und text-decoration stehen deshalb fest,
-   damit Link und <button> gleich groß sind (Browser-Standards weichen ab). */
+/* Small action buttons in table rows. Also used as a link (<a>, e.g. "Translations"):
+   box-sizing, line-height and text-decoration are therefore fixed so that link
+   and <button> have the same size (browser defaults differ). */
 .action-btn {
   display: inline-flex;
   align-items: center;
@@ -627,10 +627,10 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   color: var(--text);
 }
 
-/* :not([type=checkbox|radio]) + :not(.onyx-component / .onyx-component *): ohne diese
-   Ausnahmen gewinnt diese unlayered Regel gegen die gelayerten sit-onyx-Defaults (z.B.
-   .onyx-select-option__checkbox) und drückt sie auf width:100% - sieht man z.B. an der
-   "Private Statusseite"-Checkbox oder am leeren Komponenten-Dropdown bei Vorfällen. */
+/* :not([type=checkbox|radio]) + :not(.onyx-component / .onyx-component *): without these
+   exceptions this unlayered rule beats the layered sit-onyx defaults (e.g.
+   .onyx-select-option__checkbox) and forces them to width:100% - visible e.g. on the
+   "private status page" checkbox or the empty component dropdown for incidents. */
 .form-group input:not([type="checkbox"]):not([type="radio"]):not(.onyx-component):not(.onyx-component *),
 .form-group select:not(.onyx-component):not(.onyx-component *),
 .form-group textarea:not(.onyx-component):not(.onyx-component *),
@@ -684,7 +684,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   box-shadow: var(--shadow-1);
 }
 
-/* Stufe 4b: unter der Seiten-h1 ist der Kartentitel eine h2 (.edit-card__title). */
+/* Stage 4b: below the page h1 the card title is an h2 (.edit-card__title). */
 .edit-card h3,
 .edit-card .edit-card__title {
   font-size: 1rem;
@@ -721,14 +721,14 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .alert button:hover { opacity: 1; }
 
-/* Töne aus den Status-Tokens statt fester Hex-Werte; die Dunkel-
-   Varianten ergeben sich aus den Tokens (vorher eigene [data-theme]-Regeln). */
+/* Tones from the status tokens instead of fixed hex values; the dark
+   variants follow from the tokens (previously separate [data-theme] rules). */
 .alert-warning { background: var(--deg-soft);     border-color: color-mix(in srgb, var(--deg) 35%, var(--surface));     color: var(--deg-text); }
 .alert-error   { background: var(--major-soft);   border-color: color-mix(in srgb, var(--major) 35%, var(--surface));   color: var(--major-text); }
 .alert-success { background: var(--ok-soft);      border-color: color-mix(in srgb, var(--ok) 35%, var(--surface));      color: var(--ok-text); }
 .alert-info    { background: var(--primary-soft); border-color: color-mix(in srgb, var(--primary) 35%, var(--surface)); color: var(--primary-text); }
 
-/* Ausfall-Banner für externe Quellen (AdminLayout). */
+/* Outage banner for external sources (AdminLayout). */
 .outage-banner__list { margin: var(--sp-1) 0 0; padding-inline-start: var(--sp-4); }
 .outage-banner__list li { overflow-wrap: anywhere; }
 .outage-banner__link { flex-shrink: 0; color: inherit; font-weight: 600; text-decoration: underline; }
@@ -783,8 +783,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
 .filter-bar .search-wrapper { flex: 1 1 100%; min-width: 0; }
 
-/* Region-/Status-Zeile als Raster, Chips beider Zeilen starten
-   in derselben Spalte. */
+/* Region/status rows as a grid; chips of both rows start
+   in the same column. */
 .filter-bar { --filter-label-width: 5.5rem; }
 .tag-group {
   display: grid;
@@ -832,11 +832,11 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .search-input:focus { border-color: var(--focus); }
 .search-input::placeholder { color: var(--text-3); }
 
-/* ── Mobile (<768px): Reiter werden zum Burger-Menü ──
-   Kopfzeile in zwei Zeilen: Burger, Marke und Knöpfe oben, der
-   Mandanten-Umschalter darunter über die volle Breite (die Marke
-   wurde vorher auf „Ad“ abgeschnitten). Die Bereiche stehen im Menü
-   untereinander, das unter der ersten Kopfzeile ausfährt. */
+/* ── Mobile (<768px): tabs become a burger menu ──
+   Header in two rows: burger, brand and buttons on top, the tenant
+   switcher below it at full width (the brand used to be cut off to
+   "Ad"). The sections are stacked in the menu, which slides out below
+   the first header row. */
 @media (max-width: 768px) {
   .burger-btn { display: flex; }
 
@@ -907,7 +907,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   }
 }
 
-/* Übergänge der Admin-Kopfzeile unter reduzierter Bewegung aus. */
+/* Disable admin header transitions under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .admin-nav.is-open .area-items-row { animation: none; }
   .icon-btn,
@@ -949,8 +949,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 
 .mb-16        { margin-bottom: 16px; }
 
-/* Karten-/KPI-/Pill-Hilfsklassen der Enterprise-Views (zuvor in
-   tokens.css; dort stehen jetzt nur noch Tokens). */
+/* Card/KPI/pill helper classes of the enterprise views (previously in
+   tokens.css; it now only holds tokens). */
 .ent-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -965,10 +965,10 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .ent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-/* Stufe 4d: gemeinsame Kleinteile der Verwaltungs-Views. Ersetzen
-   die Inline-Styles (style="…") in den Verwaltungs-Views (Statusseiten,
-   Benutzer, Rollen, Tags, SSO, Systemeinstellungen, Audit-Log); nur Tokens,
-   keine Hex-Werte. */
+/* Stage 4d: shared small parts of the management views. They replace
+   the inline styles (style="…") in the management views (status pages,
+   users, roles, tags, SSO, system settings, audit log); tokens only,
+   no hex values. */
 .adm-hint {
   display: block;
   margin-top: var(--sp-1);
@@ -1001,38 +1001,38 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 }
 .adm-actions-spaced { margin-top: var(--sp-5); }
 /* ============================================================
-   Stufe 4c: Liste + Formular nebeneinander, Feldstil für
-   FormField, Zeilen-Hilfsklassen (ersetzen Inline-Styles in den
-   „Statusseite verwalten“-Views).
+   Stage 4c: list + form side by side, field style for
+   FormField, row helper classes (replace inline styles in the
+   "manage status page" views).
    ============================================================ */
 
-/* Ohne offenes Formular nimmt die Liste die ganze Breite; mit Formular
-   (.split--open) steht es rechts daneben und klebt beim Scrollen. Unter
-   860 px (wie die Kartentabelle) liegt es darunter. */
+/* Without an open form the list takes the full width; with a form
+   (.split--open) it sits to the right and sticks while scrolling. Below
+   860 px (like the card table) it sits underneath. */
 .split {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
   align-items: start;
 }
-/* Betreiber-Wunsch 31.10.: Liste : Formular etwa 2 : 1 (vorher war das Formular auf 400 px begrenzt
-   und bei 1900 px Breite nur ~385 px schmal). minmax(0, …) lässt Tabellen schrumpfen statt überlaufen,
-   die Mindestbreite hält das Formular nutzbar. */
+/* Operator request 31.10.: list : form roughly 2 : 1 (previously the form was capped at 400 px
+   and only ~385 px wide at 1900 px). minmax(0, …) lets tables shrink instead of overflowing,
+   the minimum width keeps the form usable. */
 .split--open { grid-template-columns: minmax(0, 2fr) minmax(360px, 1fr); }
 .split__main { display: flex; flex-direction: column; gap: var(--sp-4); min-inline-size: 0; }
 .form-panel {
   position: sticky;
-  /* Bezug ist der Scrollbereich (main.admin-content), der erst unter
-     der Admin-Topbar beginnt. Die frühere Topbar-Höhe (122 px) kam obendrauf und
-     schob das Formular schon ohne Scrollen ~150 px unter die Oberkante der Liste.
-     Mit --sp-4 fluchtet es mit der Karte und klebt beim Scrollen 16 px unter dem Rand. */
+  /* The reference is the scroll area (main.admin-content), which only starts
+     below the admin top bar. The former top bar height (122 px) was added on top
+     and pushed the form ~150 px below the top of the list even without scrolling.
+     With --sp-4 it aligns with the card and sticks 16 px below the edge while scrolling. */
   inset-block-start: var(--sp-4);
   margin-bottom: 0;
   min-inline-size: 0;
 }
 .form-panel h3 { font-size: var(--fs-md); }
-/* Formular ohne Recht zum Ändern. Das fieldset sperrt alle Felder
-   (disabled), trägt aber selbst keinen Rahmen. */
+/* Form without permission to edit. The fieldset disables all fields
+   but has no border of its own. */
 .form-lock { border: 0; padding: 0; margin: 0; min-inline-size: 0; }
 .form-lock-hint {
   margin: 0 0 var(--sp-3);
@@ -1047,9 +1047,9 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   .form-panel { position: static; }
 }
 
-/* Native Felder in FormField (die Onyx-Felder bringen ihren Stil mit). */
-/* type=color ausgenommen: Die Farbfläche (z. B. Primärfarbe der Statusseite) behält ihre feste, kleine
-   Breite und drängt das Hex-Feld daneben nicht aus dem Panel. */
+/* Native fields in FormField (the Onyx fields bring their own style). */
+/* type=color excluded: the color swatch (e.g. the status page's primary color) keeps its fixed, small
+   width and does not push the hex field next to it out of the panel. */
 .form-field__control input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
 .form-field__control select,
 .form-field__control textarea {
@@ -1111,7 +1111,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-select option,
 .comp-filter option { background-color: var(--surface); color: var(--text); }
 
-/* Zeilenaktionen und Zellen. */
+/* Row actions and cells. */
 .cell-sub { display: block; font-size: var(--fs-sm); color: var(--text-2); }
 
 .cell-truncate { display: block; max-inline-size: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
@@ -1133,7 +1133,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .admin-section-gap { margin-top: var(--sp-5); }
 .col-id { inline-size: 50px; }
 .data-table .data-table__group th strong { font-size: var(--fs-base); color: var(--text); }
-/* Einrückung der Unterkomponenten nach Tiefe (Klassen statt Inline-Style). */
+/* Indentation of subcomponents by depth (classes instead of inline style). */
 .depth-1 { margin-inline-start: 1.5rem; }
 .depth-2 { margin-inline-start: 3rem; }
 .depth-3 { margin-inline-start: 4.5rem; }
@@ -1142,8 +1142,8 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .depth-6 { margin-inline-start: 9rem; }
 
 /* ============================================================
-   Komponentenseite nach Richtung C: Karte „Alle Komponenten“ mit
-   Suche im Kopf, einklappbare Gruppenzeilen, Tag-Pillen, Formular-Kopf.
+   Components page in direction C: "All components" card with
+   search in the header, collapsible group rows, tag pills, form header.
    ============================================================ */
 .comp-card {
   background: var(--surface);
@@ -1182,7 +1182,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   font-size: var(--fs-base);
 }
 .comp-search__input:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-/* Die Tabelle sitzt bündig in der Karte (Rand und Schatten hat die Karte). */
+/* The table sits flush in the card (the card has the border and shadow). */
 .comp-card .data-table-wrapper {
   border: 0;
   border-top: 1px solid var(--border);
@@ -1193,12 +1193,12 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .th-hint { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--text-3); }
 .data-table .cell-changed { white-space: nowrap; color: var(--text-2); font-size: var(--fs-sm); }
 
-/* Name fett, Beschreibung dezent daneben; Gruppenzeile mit Umschalter und Anzahl. */
+/* Name in bold, description subtle next to it; group row with toggle and count. */
 .component-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
 .component-name__title { font-weight: 600; color: var(--text); }
 .data-table .component-name__title { max-inline-size: 100%; overflow-wrap: anywhere; }
 .component-name__desc { font-size: var(--fs-sm); color: var(--text-2); }
-/* Kennung der Komponente, Monospace, wie die Beschreibung zurückhaltend. */
+/* Component identifier, monospace, as subdued as the description. */
 .component-name__slug { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text-2); }
 .input-mono { font-family: var(--font-mono); }
 .data-table .data-table__group .component-name__title { font-size: var(--fs-base); }
@@ -1232,7 +1232,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
   line-height: 1.4;
 }
 
-/* Formularkopf: Titel und Hinweis links, Schließen rechts. */
+/* Form header: title and hint on the left, close on the right. */
 .form-panel__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .form-panel__head h3 { margin: 0; padding: 0; border: 0; font-size: var(--fs-md); }
 .form-panel__hint { margin: var(--sp-1) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
@@ -1256,7 +1256,7 @@ h4 { font-size: 0.95rem; font-weight: 600; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--sp-3); }
 .form-grid--single { grid-template-columns: minmax(0, 1fr); }
 .form-grid > .form-field { min-inline-size: 0; }
-/* Eigene Feldgruppen (Tags, Status) neben FormField: dessen Regeln sind scoped. */
+/* Custom field groups (tags, status) next to FormField: its rules are scoped. */
 .form-field--manual { display: flex; flex-direction: column; gap: var(--sp-1); margin-bottom: var(--sp-4); min-inline-size: 0; }
 .form-field--manual .form-field__labelrow { display: flex; align-items: baseline; gap: var(--sp-1); }
 .form-field--manual .form-field__label { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
@@ -1270,27 +1270,27 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 }
 
 /* ============================================================
-   Richtung C, alle Admin-Seiten: gemeinsame Bausteine ListCard,
-   FormPanel, SearchBox, SegmentControl. Zusätze zu den .comp-card-/
-   .form-panel-Regeln der Komponentenseite oben; jede Klasse steht nur hier.
+   Direction C, all admin pages: shared building blocks ListCard,
+   FormPanel, SearchBox, SegmentControl. Additions to the .comp-card /
+   .form-panel rules of the components page above; each class lives only here.
    ============================================================ */
 .list-card { min-inline-size: 0; }
 .list-card + .list-card { margin-top: var(--sp-4); }
 .list-card__body { padding: var(--sp-2) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); }
 .comp-card--visible { overflow: visible; }
-/* Werkzeuge im Kartenkopf (ListCard-Slot "tools"): Filter, Umschalter, Suche. */
+/* Tools in the card header (ListCard slot "tools"): filters, toggles, search. */
 .comp-card__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--sp-3); flex: 1 1 auto; min-inline-size: 0; }
 .comp-card__tools .comp-search { flex: 0 1 240px; }
 /* Tall forms (many sections) scroll with the whole page instead of inside their own frame;
    they are not sticky, otherwise their end could not be reached. */
 .form-panel--tall { position: static; }
-/* Zeilenhinweise in Tabellenzellen. */
+/* Row hints in table cells. */
 .tag-pill--accent { border-color: transparent; background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
 .cell-contact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 /* Test message in the subscriber form: button, hint and inline result. */
 .test-message { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
 .test-message .alert { margin: 0; }
-/* Segment-Umschalter (SegmentControl). */
+/* Segment toggle (SegmentControl). */
 .segment { display: inline-flex; max-inline-size: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); overflow: hidden; }
 .segment__item {
   min-block-size: var(--ctl-h);
@@ -1309,8 +1309,8 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 .segment__item--on { background: var(--primary-soft); color: var(--primary-text); font-weight: 600; }
 .segment__item--on:hover { background: var(--primary-soft); color: var(--primary-text); }
 
-/* Checkbox mit Beschriftung (Abo-Assistent, Abo-Verwaltung):
-   Kästchen neben dem Text, 44 px Zielhöhe, sichtbarer Fokus. */
+/* Checkbox with label (subscription wizard, subscription manager):
+   box next to the text, 44 px target height, visible focus. */
 .perm-checkbox {
   display: inline-flex;
   align-items: center;
@@ -1328,8 +1328,8 @@ fieldset.form-field--set { border: 0; padding: 0; margin: 0 0 var(--sp-4); min-i
 }
 .perm-checkbox:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
 
-/* Bezugspunkt für das Nachrichten-Panel auf schmalen Bildschirmen
-   (AdminNotificationBell.vue hängt es dort an die Kopfzeile). */
+/* Positioning reference for the notification panel on narrow screens
+   (AdminNotificationBell.vue attaches it to the header there). */
 .admin-topbar .topbar-main { position: relative; }
 
 /* Quick search: the setting it jumped to is outlined for a moment (utils/revealSetting.js). */

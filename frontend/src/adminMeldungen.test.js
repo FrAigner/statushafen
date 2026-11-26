@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Meldungen im Admin-Bereich sind im Sichtbereich und blenden sich aus – zentral, nicht je Seite.
+// Alerts in the admin area stay in view and fade out – centrally, not per page.
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(here, 'style.css'), 'utf-8')
 

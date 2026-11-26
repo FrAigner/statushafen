@@ -7,9 +7,9 @@ const src = dirname(fileURLToPath(import.meta.url))
 const read = (...p) => readFileSync(resolve(src, ...p), 'utf8')
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '')
 
-// happy-dom rechnet kein CSS aus Dateien. Diese Tests prüfen den Quelltext auf
-// die Deklarationen, deren Fehlen sichtbare Fehler verursacht hat. Das echte
-// Layout bei 375/390 px prüft e2e/admin-schmal.spec.js (Chromium, gemockte API).
+// happy-dom does not compute CSS from files. These tests check the source for
+// the declarations whose absence caused visible bugs. The real layout at
+// 375/390 px is checked by e2e/admin-schmal.spec.js (Chromium, mocked API).
 
 function vueFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(e =>
@@ -56,8 +56,8 @@ describe('schmale Breiten im Admin', () => {
   })
 })
 
-// Betreiber-Fund 31.10.: Im Formular „Statusseite bearbeiten“ ragte die Farbfläche über die volle Breite
-// (Regel für alle Eingaben im FormField: inline-size 100 %) und schob das Hex-Feld aus dem Panel.
+// Operator finding 31.10.: in the "edit status page" form the color swatch spanned the full width
+// (rule for all inputs in FormField: inline-size 100 %) and pushed the hex field out of the panel.
 describe('Farbwähler im Formular (Statusseiten)', () => {
   it('die allgemeine Feldregel nimmt type=color aus', () => {
     const css = stripComments(read('style.css'))
@@ -74,10 +74,10 @@ describe('Farbwähler im Formular (Statusseiten)', () => {
   })
 })
 
-// Ein Titel ohne Leerzeichen (etwa eine lange URL) hat keine Umbruchstelle und
-// machte die Tabelle zehn Millionen Pixel breit; die Aktionsknöpfe lagen
-// außer Sicht. Serverseitig ist ein Titel auf 200 Zeichen begrenzt; die
-// Tabellen brechen zusätzlich selbst um, auch für ältere, längere Werte.
+// A title without spaces (e.g. a long URL) has no break opportunity and
+// made the table ten million pixels wide; the action buttons were out of
+// sight. Server-side a title is limited to 200 characters; the tables also
+// wrap on their own, including for older, longer values.
 describe('überlange Titel in den Admin-Tabellen', () => {
   const css = stripComments(read('style.css'))
   const rule = (selector) => {

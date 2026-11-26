@@ -1,41 +1,40 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Regressionstest: Ein Nicht-Global-Admin durfte die Mandanten-Übersicht
-// (/admin/overview) direkt per URL aufrufen. Das echte Backend lehnte den
-// Aufruf zwar mit 403 ab, aber AdminOverview.vue fiel dann auf einen
-// Degraded-Mode zurück, der ungefiltert ALLE Statusseiten über /api/pages
-// nachlud (dieser Endpunkt hatte gar keine Berechtigungsprüfung) — sichtbar
-// als Liste aller Mandanten inkl. solcher, auf die der Nutzer keinen Zugriff
-// hatte. Fix: /api/pages erfordert jetzt Global Admin, der Degraded-Mode-
-// Fallback wurde entfernt, und ein Router-Guard verhindert die Navigation
-// direkt im Frontend.
+// Regression test: a non-global admin could open the tenant overview
+// (/admin/overview) directly via URL. The real backend did reject the call
+// with 403, but AdminOverview.vue then fell back to a degraded mode that
+// reloaded ALL status pages unfiltered via /api/pages (this endpoint had no
+// permission check at all) — visible as a list of all tenants, including
+// ones the user had no access to. Fix: /api/pages now requires global admin,
+// the degraded-mode fallback was removed, and a router guard prevents the
+// navigation directly in the frontend.
 test.describe('Admin Overview RBAC', () => {
   test('Nicht-Global-Admin wird von /admin/overview weggeleitet und sieht keine fremden Mandanten', async ({ page }) => {
     page.on('console', msg => { if (msg.type() === 'error') console.log('CONSOLE ERROR:', msg.text()); });
 
-    // Login als "Editor" (kein Global Admin) über das reguläre Login-Formular.
+    // Log in as "Editor" (not a global admin) via the regular login form.
     await page.goto(`http://localhost:${PORT}/login?returnTo=/admin`);
     await page.locator('input[type=email]').fill('editor@statushafen.local');
     await page.locator('input[type=password]').fill('editor123');
     await page.locator('button.btn-login').click();
 
-    // Der Standard-Redirect nach Login zielt auf /admin/overview, der Router-Guard
-    // muss einen Nicht-Global-Admin aber sofort davon wegleiten.
+    // The default redirect after login targets /admin/overview, but the router guard
+    // must immediately redirect a non-global admin away from it.
     await expect(page).not.toHaveURL(/\/admin\/overview/);
     await expect(page).toHaveURL(/\/admin\/components/);
 
-    // Auch direkte URL-Navigation darf nicht durchkommen.
+    // Direct URL navigation must not get through either.
     await page.goto(`http://localhost:${PORT}/admin/overview`);
     await expect(page).not.toHaveURL(/\/admin\/overview/);
     await expect(page).toHaveURL(/\/admin\/components/);
 
-    // Die Seite darf an keiner Stelle Namen anderer Mandanten (z.B. "TechStart") zeigen.
+    // The page must not show names of other tenants (e.g. "TechStart") anywhere.
     await expect(page.locator('body')).not.toContainText('TechStart');
 
-    // Nav-Einträge für Global-Admin-only Bereiche dürfen nicht sichtbar sein.
+    // Nav entries for global-admin-only areas must not be visible.
     await expect(page.locator('.area-items a[href="/admin/overview"]')).toHaveCount(0);
     await expect(page.locator('.area-items a[href="/admin/audit"]')).toHaveCount(0);
     await expect(page.locator('.area-items a[href="/admin/pages"]')).toHaveCount(0);

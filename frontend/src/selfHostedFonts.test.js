@@ -3,9 +3,9 @@ import { existsSync, readFileSync, readdirSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 
-// DSGVO: Schriften werden selbst gehostet (npm-Pakete @fontsource/*, vom Build
-// ausgeliefert), es gibt keine Verweise auf Google Fonts (die IP der Besucher
-// ginge sonst an Google). Lizenz: SIL Open Font License 1.1, Hinweise in THIRD_PARTY_NOTICES.
+// GDPR: fonts are self-hosted (npm packages @fontsource/*, served by the
+// build); there are no references to Google Fonts (otherwise visitors' IPs
+// would go to Google). License: SIL Open Font License 1.1, notices in THIRD_PARTY_NOTICES.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p) => readFileSync(resolve(root, p), 'utf-8')
 

@@ -1,9 +1,9 @@
-// Vite ersetzt beim Build das Entry-Script-Tag komplett und
-// verwirft dabei unbekannte Attribute wie data-cfasync - das Attribut aus
-// index.html landet also nicht in dist/index.html. Dieses Plugin fügt es dem
-// gebündelten Script-Tag nachträglich wieder hinzu, damit Cloudflare Rocket
-// Loader es in Produktion tatsächlich unverändert lässt (sonst verletzt der
-// von Rocket Loader inline eingefügte Code-Ersatz die CSP).
+// At build time Vite replaces the entry script tag completely and
+// drops unknown attributes like data-cfasync - so the attribute from
+// index.html does not end up in dist/index.html. This plugin adds it back to
+// the bundled script tag afterwards so that Cloudflare Rocket Loader really
+// leaves it unchanged in production (otherwise the code replacement that
+// Rocket Loader inserts inline violates the CSP).
 export function cloudflareRocketLoaderExclude() {
   return {
     name: 'cloudflare-rocket-loader-exclude',

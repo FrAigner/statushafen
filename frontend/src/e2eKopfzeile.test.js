@@ -3,11 +3,11 @@ import { readFileSync, readdirSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, join } from 'path'
 
-// Die SSO-Specs adressierten den Anmelden-Knopf der Kopfzeile mit
-// `.app-header .onyx-button`. Seit dem Redesign ist es ein eigener <button>
-// ohne Onyx-Klasse; der Nachtlauf schlug erst spät fehl. Dieser schnelle Test
-// liest alle E2E-Specs und verlangt, dass jede Klasse in einem
-// `.app-header …`-Selektor im Template von PublicLayout.vue vorkommt.
+// The SSO specs targeted the header's sign-in button with
+// `.app-header .onyx-button`. Since the redesign it is a plain <button>
+// without an Onyx class; the nightly run only failed late. This fast test
+// reads all E2E specs and requires every class in an `.app-header …`
+// selector to appear in the template of PublicLayout.vue.
 const src = resolve(dirname(fileURLToPath(import.meta.url)))
 const e2eDir = resolve(src, '../e2e')
 const layout = readFileSync(join(src, 'layouts/PublicLayout.vue'), 'utf8')

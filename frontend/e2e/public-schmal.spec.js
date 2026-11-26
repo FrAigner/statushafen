@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test'
 
-// Regressionstest für die öffentlichen Seiten in echtem
-// Chromium (happy-dom rechnet kein Layout). Die API ist vollständig gemockt, kein Backend
-// und keine Zugangsdaten nötig:
+// Regression test for the public pages in real Chromium
+// (happy-dom computes no layout). The API is fully mocked, no backend
+// and no credentials needed:
 //   cd frontend && E2E_PORT=5219 npx playwright test public-schmal --reporter=list
-// Geprüft wird bei 320 bis 430 px, hell und dunkel,
-//  - kein horizontaler Überlauf (Startseite, Statusseite beider Layouts, Login),
-//  - der Slug einer Verzeichniskarte bleibt in einer Zeile (kein Umbruch im Wort) und trägt den vollen Text als title,
-//  - ohne Messwerte steht „Keine Daten“ statt „0,00 % verfügbar“,
-//  - die Anmeldeseite hat keinen zusätzlichen Anmelden-Knopf in der Kopfzeile.
+// Checked at 320 to 430 px, light and dark:
+//  - no horizontal overflow (landing page, status page in both layouts, login),
+//  - the slug of a directory card stays on one line (no break inside the word) and carries the full text as title,
+//  - without measurements "Keine Daten" is shown instead of "0,00 % verfügbar",
+//  - the login page has no additional sign-in button in the header.
 const PORT = process.env.E2E_PORT || '5173';
 const BASE = `http://localhost:${PORT}`;
 
@@ -30,7 +30,7 @@ function dashboard(layout) {
   };
 }
 
-// 90 Tage, nur heute mit Beobachtung: Gesamtwert null.
+// 90 days, only today with an observation: overall value null.
 function availabilityNoData() {
   const days = [];
   for (let i = 89; i >= 0; i--) {
@@ -68,7 +68,7 @@ for (const scheme of ['light', 'dark']) {
         await page.waitForLoadState('networkidle');
         expect(await overflow(page)).toBeLessThanOrEqual(0);
 
-        // Der Slug darf nicht mitten im Wort umbrechen: eine Zeile, voller Text im title.
+        // The slug must not break mid-word: one line, full text in the title.
         const slugs = await page.locator('.page-slug').evaluateAll(els => els.map(e => ({
           title: e.getAttribute('title'),
           text: e.textContent,
@@ -91,7 +91,7 @@ for (const scheme of ['light', 'dark']) {
           const section = page.locator('section[aria-labelledby="sp-availability-heading"]');
           await expect(section).toBeVisible();
           await expect(section.locator('.avail__nodata').first()).toHaveText('Keine Daten');
-          // Die Gesamtzeile darf keine Prozentzahl tragen (der Tooltip des heutigen Tages nennt seinen eigenen Wert).
+          // The overall row must not carry a percentage (today's tooltip states its own value).
           await expect(section.locator('.avail__percent')).toHaveCount(0);
         });
       }
@@ -102,7 +102,7 @@ for (const scheme of ['light', 'dark']) {
         await expect(page.locator('input[type=email]')).toBeVisible();
         await page.waitForLoadState('networkidle');
         expect(await overflow(page)).toBeLessThanOrEqual(0);
-        // nur der Absende-Knopf im Formular heißt „Anmelden“.
+        // only the submit button in the form is called "Anmelden".
         await expect(page.locator('header .login-button')).toHaveCount(0);
       });
     });

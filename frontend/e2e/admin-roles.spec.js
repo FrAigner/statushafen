@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { clickRowMenuItem } from './rowMenu';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Zeilenaktionen stehen im Zeilenmenü („…“), Eintrag per Rolle wählen.
+// Row actions live in the row menu ("…"); pick the entry by role.
 async function rowAction(page, row, name) {
   await clickRowMenuItem(page, row.getByRole('button', { name: /^Aktionen für/ }), name);
 }
@@ -23,8 +23,8 @@ test.describe('Admin Roles & Permissions', () => {
     await page.goto(`http://techstart.localhost:${PORT}/admin/roles`);
   });
 
-  // Die Berechtigungs-Matrix ist eine Tabelle (Bereich x Lesen/Schreiben/Alles), die Kästchen
-  // tragen die Berechtigung als value.
+  // The permission matrix is a table (area x read/write/all); the checkboxes
+  // carry the permission as value.
   test('should create a role with a permission matrix, edit, and delete it', async ({ page }) => {
     // 1. Create
     await page.locator('button', { hasText: '+ Neue Rolle' }).click();
@@ -39,12 +39,12 @@ test.describe('Admin Roles & Permissions', () => {
     await expect(page.locator('tr', { hasText: roleName })).toContainText('Vorfälle: Lesen');
     await expect(page.locator('tr', { hasText: roleName })).toContainText('Komponenten: Lesen');
 
-    // 2. Edit: zusätzliche Berechtigung hinzufügen
+    // 2. Edit: add an additional permission
     await rowAction(page, page.locator('tr', { hasText: roleName }), 'Bearbeiten');
     await page.locator('input[type=checkbox][value=\"incidents:update\"]').check();
     await page.locator('button', { hasText: 'Speichern' }).click();
 
-    // Die Liste zeigt kompakte Zusammenfassungen; „Ändern“ schließt Lesen ein.
+    // The list shows compact summaries; "Ändern" (update) includes read.
     await expect(page.locator('tr', { hasText: roleName })).toContainText('Vorfälle: Lesen, Ändern');
 
     // 3. Delete
@@ -52,7 +52,7 @@ test.describe('Admin Roles & Permissions', () => {
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await rowAction(page, page.locator('tr', { hasText: roleName }), 'Löschen');
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);

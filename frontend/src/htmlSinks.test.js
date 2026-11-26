@@ -3,14 +3,14 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
 
-// Wächter für HTML-Senken: v-html, innerHTML & Co. sind nur an den bekannten
-// Stellen erlaubt, und jede davon bekommt ihren Wert aus einem Bereiniger. Eine
-// neue Senke (oder ein bisher bereinigter Wert, der ungefiltert durchgereicht
-// wird) fällt hier auf und braucht eine bewusste Entscheidung samt Eintrag.
-// Kommentare und Tests zählen nicht.
+// Guard for HTML sinks: v-html, innerHTML & co. are only allowed at the known
+// places, and each of them gets its value from a sanitizer. A new sink (or a
+// previously sanitized value that is passed through unfiltered) shows up here
+// and needs a deliberate decision plus an entry.
+// Comments and tests do not count.
 const root = resolve(dirname(fileURLToPath(import.meta.url)))
 
-// Datei -> { Bindung der Senke, Quelltext-Fragment, das den Bereiniger belegt }
+// File -> { sink binding, source fragment that proves the sanitizer }
 const ALLOWED_SINKS = {
   'components/RichText.vue': { binding: 'html', sanitizer: 'renderRichText(' },
   'views/admin/AdminNotificationTemplates.vue': { binding: 'sanitizedPreviewBody', sanitizer: 'sanitizeMailPreview(previewBody.value)' },
@@ -27,8 +27,8 @@ function sourceFiles(dir = root) {
   return files
 }
 
-// Nur HTML-Kommentare und reine Zeilenkommentare: Ein "/*" in einem Template- oder
-// Stilabschnitt dürfte sonst bis zum nächsten "*/" alles verschlucken, auch eine Senke.
+// Only HTML comments and pure line comments: otherwise a "/*" in a template or
+// style section could swallow everything up to the next "*/", including a sink.
 export function stripComments(src) {
   return src.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*\/\/.*$/gm, '')
 }
@@ -42,7 +42,7 @@ const SINK_PATTERNS = [
   /\bdomProps\s*:\s*\{\s*innerHTML/g,
 ]
 
-// Liefert die Senken eines Quelltexts als { kind, binding }.
+// Returns the sinks of a source as { kind, binding }.
 export function findHtmlSinks(src) {
   const code = stripComments(src)
   const sinks = []

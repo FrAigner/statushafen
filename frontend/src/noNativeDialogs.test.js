@@ -3,17 +3,17 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve, relative, join } from 'path'
 
-// Ratsche gegen natives confirm()/alert()/prompt(). Rückfragen laufen über
-// composables/useConfirm.js (confirmDialog) und components/ConfirmDialog.vue.
-// Kommentare und Tests zählen nicht.
+// Ratchet against native confirm()/alert()/prompt(). Confirmations go through
+// composables/useConfirm.js (confirmDialog) and components/ConfirmDialog.vue.
+// Comments and tests do not count.
 const root = resolve(dirname(fileURLToPath(import.meta.url)))
 const GLOBALS = '(?:window|globalThis|self|top|parent)'
 const NAMES = '(?:confirm|alert|prompt)'
 const NATIVE_PATTERNS = [
-  // confirm(...), auch window.confirm(...), window?.confirm(...); Methoden anderer Objekte (api.confirm) und
-  // Funktionsdefinitionen (function confirm()) zählen nicht
+  // confirm(...), also window.confirm(...), window?.confirm(...); methods of other objects (api.confirm) and
+  // function definitions (function confirm()) do not count
   new RegExp(`(?<![\\w$.])(?<!function\\s)${NAMES}\\s*\\(`),
-  // window.confirm / globalThis?.alert auch ohne Aufruf (Zuweisung, Weitergabe)
+  // window.confirm / globalThis?.alert even without a call (assignment, passing on)
   new RegExp(`${GLOBALS}\\s*(?:\\?\\.|\\.)\\s*${NAMES}\\b`),
   // window["confirm"](...)
   new RegExp(`${GLOBALS}\\s*(?:\\?\\.)?\\s*\\[\\s*['"\`]${NAMES}['"\`]\\s*\\]`),

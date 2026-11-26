@@ -4,9 +4,9 @@ import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
 import { cloudflareRocketLoaderExclude } from '../vite-plugins/cloudflareRocketLoaderExclude.js'
 
-// Cloudflare Rocket Loader ersetzt Skripte inline, was die strikte
-// CSP (script-src 'self') verletzt. data-cfasync="false" weist Rocket Loader
-// an, das Skript unverändert zu laden statt es per Inline-Ersatz einzubinden.
+// Cloudflare Rocket Loader replaces scripts inline, which violates the strict
+// CSP (script-src 'self'). data-cfasync="false" tells Rocket Loader to load
+// the script unchanged instead of embedding it via inline replacement.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const indexHtml = readFileSync(resolve(root, 'index.html'), 'utf-8')
 

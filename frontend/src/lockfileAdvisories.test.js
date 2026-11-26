@@ -3,15 +3,15 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Bekannte Sicherheitsmeldungen zu Paketen, die nur über Entwicklungswerkzeuge
-// (ESLint, Test-Utils, Mutationstest) in die Lock-Datei kommen. Dependabot kann
-// sie nicht von selbst beheben, weil die übergeordneten Pakete ältere Versionen
-// verlangen; `overrides` in package.json hebt sie an. Dieser Test hält fest,
-// dass keine Version aus dem verwundbaren Bereich in der Lock-Datei steht.
-// Beim Eintrag neuer Meldungen die Grenze hier nachtragen.
+// Known security advisories for packages that only enter the lock file via
+// development tools (ESLint, test utils, mutation testing). Dependabot cannot
+// fix them on its own because the parent packages require older versions;
+// `overrides` in package.json bumps them. This test ensures that no version
+// from the vulnerable range is in the lock file.
+// When adding new advisories, add the bound here.
 const MINIMUM_SAFE = {
-  glob: '14.0.2', // verwundbar: 9.0.0 bis 14.0.1
-  minimatch: '11.0.1', // verwundbar: 7.0.0 bis 11.0.0
+  glob: '14.0.2', // vulnerable: 9.0.0 to 14.0.1
+  minimatch: '11.0.1', // vulnerable: 7.0.0 to 11.0.0
 }
 
 const toParts = (v) => v.split('-')[0].split('.').map(Number)

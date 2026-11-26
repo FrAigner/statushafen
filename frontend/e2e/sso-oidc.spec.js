@@ -1,32 +1,32 @@
 import { test, expect } from '@playwright/test';
 import { ssoMockRequired, ssoMockSkipReason } from '../src/test-support/ssoMockGate';
 
-// OIDC-Anmeldung je Statusseite gegen den
-// Mock-OIDC-Dienst aus docker-compose.yml (Profil "sso"). Voraussetzungen,
-// siehe README "Lokale SSO-Tests mit Mock-OIDC":
+// OIDC sign-in per status page against the
+// mock OIDC service from docker-compose.yml (profile "sso"). Prerequisites,
+// see README "Lokale SSO-Tests mit Mock-OIDC":
 //   docker compose --profile sso up -d mock-oidc
-//   Backend mit SEED_DB=true, APP_ENV=development und
+//   backend with SEED_DB=true, APP_ENV=development and
 //   OIDC_DEV_INSECURE_ISSUERS=http://localhost:8090/statushafen
-// Ist der Mock nicht erreichbar, überspringt sich der Spec, damit normale
-// E2E-Läufe ohne den Dienst nicht rot werden – außer mit E2E_REQUIRE_SSO_MOCK=1
-// (Nachtjob .github/workflows/e2e-sso-nachts.yml), dann schlägt er fehl.
+// If the mock is unreachable, the spec skips itself so normal E2E runs
+// without the service do not turn red – except with E2E_REQUIRE_SSO_MOCK=1
+// (nightly job .github/workflows/e2e-sso-nachts.yml), where it fails.
 //
-// Ablauf: Der Spec legt eine eigene Statusseite und ein eigenes Konto an
-// (nicht die Seed-Seiten: Global Admins und Konten mit Rolle auf einer anderen
-// Seite dürfen das Seiten-SSO nicht nutzen), verknüpft das Konto mit einer
-// Mock-Identität und meldet sich danach allein über den Mock an.
+// Flow: the spec creates its own status page and its own account
+// (not the seed pages: global admins and accounts with a role on another
+// page may not use the page SSO), links the account to a mock identity
+// and then signs in through the mock alone.
 //
-// Beides läuft über die Oberfläche: Verknüpfen im Profil
-// („Mit SSO verknüpfen“), Anmelden über den Login-Knopf der Statusseite und
-// „Mit SSO anmelden“ auf der Login-Seite.
+// Both go through the UI: linking in the profile
+// ("Mit SSO verknüpfen"), signing in via the status page's login button and
+// "Mit SSO anmelden" on the login page.
 
 const BACKEND = process.env.E2E_BACKEND_URL || 'http://localhost:8080';
 const MOCK_OIDC = process.env.MOCK_OIDC_URL || 'http://localhost:8090';
 const ISSUER = `${MOCK_OIDC}/statushafen`;
 const ADMIN = { email: 'admin@statushafen.local', password: 'admin123' };
 
-// Prüfung per fetch statt über eine Fixture: So entscheidet beforeAll über das
-// Überspringen, bevor überhaupt ein Browser startet.
+// Check via fetch instead of a fixture: this way beforeAll decides on
+// skipping before a browser even starts.
 async function mockReachable() {
   try {
     const res = await fetch(`${ISSUER}/.well-known/openid-configuration`, { signal: AbortSignal.timeout(3000) });
@@ -50,8 +50,8 @@ function jwtClaims(token) {
   return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
 }
 
-// Füllt das Anmeldeformular des Mocks aus: "username" wird zum sub-Claim,
-// das Textfeld nimmt zusätzliche Claims als JSON.
+// Fills in the mock's sign-in form: "username" becomes the sub claim,
+// the text field takes additional claims as JSON.
 async function signInAtMock(page, subject, claims) {
   await expect(page).toHaveURL(new RegExp(`^${ISSUER}/authorize`));
   await page.locator('input[name="username"]').fill(subject);
@@ -59,8 +59,8 @@ async function signInAtMock(page, subject, claims) {
   await page.locator('input[type="submit"]').click();
 }
 
-// Wartet, bis SSOCallback.vue den Einmal-Code eingelöst hat, und liefert das
-// JWT der Sitzung aus dem localStorage.
+// Waits until SSOCallback.vue has redeemed the one-time code and returns the
+// session JWT from localStorage.
 async function sessionToken(page) {
   await page.waitForURL((url) => !url.pathname.startsWith('/auth/sso-callback'));
   expect(page.url()).not.toContain('error=sso_failed');
@@ -76,7 +76,7 @@ test.describe('SSO: OIDC-Login gegen Mock-IdP', () => {
   const cleanup = { adminToken: '', pageId: 0, userId: 0 };
 
   test.beforeAll(async () => {
-    // Mit E2E_REQUIRE_SSO_MOCK=1 (Nachtjob e2e-sso-nachts.yml) wirft das statt zu überspringen.
+    // With E2E_REQUIRE_SSO_MOCK=1 (nightly job e2e-sso-nachts.yml) this throws instead of skipping.
     const reason = ssoMockSkipReason({ reachable: await mockReachable(), required: ssoMockRequired(process.env), issuer: ISSUER });
     test.skip(reason !== null, reason ?? '');
   });
@@ -117,8 +117,8 @@ test.describe('SSO: OIDC-Login gegen Mock-IdP', () => {
     cleanup.userId = (await userRes.json()).ID;
     const claims = { email: user.email, name: 'Erika SSO' };
 
-    // 1. Verknüpfen im Profil: mit Passwort anmelden, „Mit SSO verknüpfen“
-    // für die eigene Seite wählen. Der Callback führt zurück ins Profil.
+    // 1. Link in the profile: sign in with password, choose "Mit SSO verknüpfen"
+    // for our own page. The callback leads back to the profile.
     await page.goto('/login');
     await page.locator('#login-email').fill(user.email);
     await page.locator('#login-password').fill(user.password);
@@ -131,11 +131,11 @@ test.describe('SSO: OIDC-Login gegen Mock-IdP', () => {
     const linkedToken = await sessionToken(page);
     expect(jwtClaims(linkedToken)).toMatchObject({ user_id: cleanup.userId, sso: 'oidc' });
     await expect(page).toHaveURL(/\/admin\/profile$/);
-    // Der konfigurierte E-Mail-Claim erscheint an der Verknüpfung.
+    // The configured email claim appears on the link.
     await expect(page.locator('[data-test="sso-linked"]', { hasText: pageName })).toContainText(user.email);
 
-    // 2. Abmelden und über die Statusseite allein über den Mock anmelden:
-    // Login-Knopf im Kopf -> Login-Seite mit ?page= -> „Mit SSO anmelden“.
+    // 2. Sign out and sign in via the status page through the mock alone:
+    // login button in the header -> login page with ?page= -> "Mit SSO anmelden".
     await page.evaluate(() => localStorage.clear());
     await page.goto(`/status/sso-e2e-${run}`);
     await page.locator('.app-header').getByRole('button', { name: 'Anmelden' }).click();
@@ -152,8 +152,8 @@ test.describe('SSO: OIDC-Login gegen Mock-IdP', () => {
     expect(await me.json()).toMatchObject({ email: user.email });
   });
 
-  // Fehler im Callback erscheinen übersetzt auf der Login-Seite
-  // statt als JSON. Eine nicht verknüpfte Mock-Identität ergibt not_linked.
+  // Errors in the callback appear translated on the login page
+  // instead of as JSON. An unlinked mock identity yields not_linked.
   test('nicht verknüpfte Identität landet mit Fehlermeldung auf der Login-Seite', async ({ page, request }) => {
     cleanup.adminToken = await apiLogin(request, ADMIN.email, ADMIN.password);
     const admin = bearer(cleanup.adminToken);

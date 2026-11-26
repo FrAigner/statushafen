@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe visual.spec.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see visual.spec.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Admin Incidents Management', () => {
@@ -23,10 +23,10 @@ test.describe('Admin Incidents Management', () => {
     await page.locator('input[placeholder*="API-Ausfall"]').fill(incidentTitle);
     await page.locator('textarea').fill('E2E Test-Beschreibung des Vorfalls.');
 
-    // Status-Select bleibt auf dem Default "Investigating", Komponente muss gewählt werden.
-    // Über aria-controls mit der konkret geöffneten Listbox verknüpft, da mehrere
-    // OnyxSelect-Listboxen (Status, Komponente) gleichzeitig - nur per popover
-    // versteckt - im DOM existieren.
+    // The status select stays on the default "Investigating"; a component must be chosen.
+    // Linked to the listbox actually opened via aria-controls, because several
+    // OnyxSelect listboxes (status, component) exist in the DOM at the same time,
+    // only hidden via popover.
     const componentCombo = page.getByRole('combobox', { name: 'Betroffene Komponente(n)' });
     await componentCombo.click();
     const listboxId = await componentCombo.getAttribute('aria-controls');
@@ -37,8 +37,8 @@ test.describe('Admin Incidents Management', () => {
     await expect(page.locator('.data-table-wrapper')).toContainText(incidentTitle);
     await expect(page.locator('tr', { hasText: incidentTitle })).toContainText('Untersuchung');
 
-    // 2. Edit: Titel ändern
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // 2. Edit: change the title
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await page.locator('tr', { hasText: incidentTitle }).locator('.row-menu__button').click();
     await page.locator('tr', { hasText: incidentTitle }).getByRole('menuitem', { name: 'Bearbeiten' }).click();
     const editedTitle = `${incidentTitle} - Edited`;
@@ -47,21 +47,21 @@ test.describe('Admin Incidents Management', () => {
 
     await expect(page.locator('.data-table-wrapper')).toContainText(editedTitle);
 
-    // 3. Navigation zum Incident-Detail funktioniert
+    // 3. Navigation to the incident detail works
     await page.locator('a', { hasText: editedTitle }).click();
     await expect(page).toHaveURL(/\/admin\/incidents\/\d+\/\d+/);
     await expect(page.getByRole('heading', { name: editedTitle })).toBeVisible();
 
-    // Zurück zur Liste zum Löschen
+    // Back to the list to delete
     await page.goto(`http://techstart.localhost:${PORT}/admin/incidents`);
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await page.locator('tr', { hasText: editedTitle }).locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await page.locator('tr', { hasText: editedTitle }).getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
@@ -88,29 +88,29 @@ test.describe('Admin Incidents Management', () => {
 
     const row = page.locator('tr', { hasText: multiTitle });
     await expect(row).toBeVisible();
-    // Beide Komponentennamen kommagetrennt in der Tabelle
+    // Both component names comma-separated in the table
     const componentCell = await row.locator('td').nth(1).innerText();
     expect(componentCell.split(',').map(s => s.trim()).length).toBeGreaterThanOrEqual(2);
 
-    // Aufräumen
-    // Zeilenmenü öffnen, dann den Eintrag wählen
-    await page.waitForLoadState('networkidle'); // Nachladen schließt ein offenes Zeilenmenü
+    // Clean up
+    // Open the row menu, then pick the entry
+    await page.waitForLoadState('networkidle'); // Reloading closes an open row menu
     await row.locator('.row-menu__button').click();
     await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/api/') && resp.request().method() === 'DELETE'),
       (async () => {
         await row.getByRole('menuitem', { name: 'Löschen' }).click();
-        // eigener Bestätigungsdialog statt natives confirm()
+        // own confirmation dialog instead of native confirm()
         await page.getByRole('alertdialog').getByRole('button', { name: 'Löschen' }).click();
       })(),
     ]);
     await expect(page.locator('tr', { hasText: multiTitle })).toHaveCount(0);
   });
 
-  // Regression test für eine unlayered CSS-Regel (.form-group input)
-  // stretchte die interne Checkbox jeder Komponenten-Option auf width:100%, wodurch
-  // das Label daneben auf width:0 gequetscht wurde und unsichtbar (aber im DOM
-  // vorhanden) war - das Dropdown wirkte "leer", obwohl die Daten korrekt geladen wurden.
+  // Regression test: an unlayered CSS rule (.form-group input)
+  // stretched the internal checkbox of every component option to width:100%, which
+  // squeezed the label next to it to width:0 and made it invisible (but present in
+  // the DOM) - the dropdown looked "empty" although the data loaded correctly.
   test('component dropdown options are actually visible with readable labels', async ({ page }) => {
     await page.locator('button', { hasText: '+ Neuer Vorfall' }).click();
 

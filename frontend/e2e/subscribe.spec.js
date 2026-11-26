@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
 test.describe('Public Subscribe Wizard', () => {
@@ -50,8 +50,8 @@ test.describe('Public Subscribe Wizard', () => {
     // Submit
     await submitBtn.click();
 
-    // Wizard Step 3 should appear. anonyme E-Mail-Abos müssen
-    // erst per Link bestätigt werden (Double-Opt-in).
+    // Wizard Step 3 should appear. Anonymous email subscriptions must
+    // first be confirmed via link (double opt-in).
     await expect(wizardModal).toContainText('Bitte bestätige deine E-Mail-Adresse');
     await expect(wizardModal).toContainText(testEmail);
 

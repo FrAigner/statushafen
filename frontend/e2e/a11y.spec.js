@@ -1,29 +1,29 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-// Port des Vite-Dev-Servers (E2E_PORT, Standard 5173), siehe playwright.config.js.
+// Port of the Vite dev server (E2E_PORT, default 5173), see playwright.config.js.
 const PORT = process.env.E2E_PORT || '5173';
 
-// Barrierefreiheit im echten Browser.
+// Accessibility in a real browser.
 //
-// Die axe-Prüfung in vitest (src/test-support/axe.js) läuft in happy-dom ohne
-// Layout und CSS und lässt deshalb Kontrast, Zielgrößen und Seitenregeln
-// (Landmarks, eine h1, Seitentitel, lang) bewusst aus. Dieser Spec holt das im
-// echten Chromium nach: die wichtigsten Seiten je einmal hell und dunkel, mit
-// allen Regeln für WCAG 2.1 A/AA (inkl. color-contrast), dazu target-size
-// (WCAG 2.2 AA) und die best-practice-Seitenregeln (region, landmark-*,
+// The axe check in vitest (src/test-support/axe.js) runs in happy-dom without
+// layout and CSS and therefore deliberately skips contrast, target sizes and
+// page rules (landmarks, one h1, page title, lang). This spec covers that in
+// real Chromium: the most important pages once each in light and dark, with
+// all rules for WCAG 2.1 A/AA (incl. color-contrast), plus target-size
+// (WCAG 2.2 AA) and the best-practice page rules (region, landmark-*,
 // page-has-heading-one).
 //
-// Voraussetzung wie bei den übrigen Specs: Backend mit SEED_DB=true und APP_ENV=development auf :8080,
-// den Vite-Dev-Server startet Playwright selbst (playwright.config.js).
+// Prerequisite as for the other specs: backend with SEED_DB=true and APP_ENV=development on :8080;
+// Playwright starts the Vite dev server itself (playwright.config.js).
 test.use({ locale: 'de-DE' });
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
-// Ausnahmen nur für Markup, das sit-onyx selbst rendert und das wir nicht
-// beeinflussen können. Jede Ausnahme braucht eine Begründung. Aktuell
-// ist keine nötig: Die einzigen Funde in onyx-Komponenten (CTA-Button-Text auf
-// --onyx-color-onyx-500) kamen aus unserer eigenen Farbskala in style.css.
+// Exceptions only for markup that sit-onyx renders itself and that we cannot
+// influence. Every exception needs a justification. Currently none is
+// needed: the only findings in onyx components (CTA button text on
+// --onyx-color-onyx-500) came from our own color scale in style.css.
 const EXCLUDE = [];
 const DISABLED_RULES = [];
 
@@ -41,8 +41,8 @@ function formatViolations(violations) {
 }
 
 async function expectNoViolations(page) {
-  // Übergänge (Theme-Wechsel, Einblendungen) abwarten, sonst misst
-  // color-contrast Zwischenfarben.
+  // Wait for transitions (theme switch, fade-ins), otherwise
+  // color-contrast measures intermediate colors.
   await page.waitForTimeout(400);
   let builder = new AxeBuilder({ page }).withTags(TAGS);
   for (const selector of EXCLUDE) builder = builder.exclude(selector);
@@ -57,12 +57,12 @@ async function apiLogin(request) {
   return (await res.json()).token;
 }
 
-// Eigene Statusseite im Listen-Layout, damit die geseedeten
-// Seiten unverändert bleiben. Fester Slug und "anlegen, falls es sie noch
-// nicht gibt": Playwright startet nach jedem Fehlschlag einen neuen Worker und
-// damit beforeAll erneut; so entsteht trotzdem nur eine Seite, und parallele
-// Worker teilen sie sich (ein Löschen in afterAll würde sie dem anderen Worker
-// unter den Füßen wegziehen). Die Seite lebt in der Wegwerf-Datenbank des Laufs.
+// Own status page in list layout so the seeded pages stay unchanged.
+// Fixed slug and "create if it does not exist yet": Playwright starts a new
+// worker after every failure and thus runs beforeAll again; this still yields
+// only one page, and parallel workers share it (deleting it in afterAll would
+// pull it out from under the other worker). The page lives in the run's
+// throwaway database.
 const LIST_SLUG = 'e2e-a11y-liste';
 let token;
 
@@ -73,9 +73,9 @@ test.beforeAll(async ({ request }) => {
     headers,
     data: { Name: 'E2E Barrierefreiheit', Slug: LIST_SLUG, Description: 'Listen-Layout für den axe-Lauf', PageLayout: 'liste' },
   });
-  if (created.status() === 409) return; // gibt es schon
-  // Legen zwei Worker die Seite gleichzeitig an, antwortet der zweite gelegentlich mit 500
-  // statt 409. Existiert die Seite inzwischen, ist das für diesen Lauf gleichwertig.
+  if (created.status() === 409) return; // already exists
+  // If two workers create the page at the same time, the second occasionally answers 500
+  // instead of 409. If the page exists by now, that is equivalent for this run.
   if (!created.ok() && (await request.get(`http://localhost:${PORT}/api/public/pages/${LIST_SLUG}/dashboard`)).ok()) return;
   expect(created.ok()).toBeTruthy();
   const pageId = (await created.json()).ID;
@@ -96,23 +96,23 @@ const PAGES = [
   { name: 'Admin-Übersicht', url: `${ADMIN_HOST}/admin/overview`, ready: '.kpi-grid', admin: true },
   { name: 'Admin-Vorfälle (Liste)', url: `${ADMIN_HOST}/admin/incidents`, ready: '.data-table tbody tr', admin: true },
   { name: 'Profil', url: `${ADMIN_HOST}/admin/profile`, ready: 'h2', admin: true },
-  // Das Benutzermenü der Kopfzeile (dunkle Leiste, Panel mit Schalter und Links).
+  // The header's user menu (dark bar, panel with toggle and links).
   { name: 'Admin-Benutzermenü (geöffnet)', url: `${ADMIN_HOST}/admin/overview`, ready: '.kpi-grid', admin: true, open: '.user-menu-button', opened: '.user-menu-panel' },
 ];
 
 for (const theme of ['light', 'dark']) {
   test.describe(`axe WCAG 2.1 AA (${theme === 'light' ? 'hell' : 'dunkel'})`, () => {
     test.beforeEach(async ({ page }) => {
-      // Beides setzen: useTheme liest localStorage, sit-onyx und einige
-      // öffentliche Seiten folgen prefers-color-scheme.
+      // Set both: useTheme reads localStorage, sit-onyx and some
+      // public pages follow prefers-color-scheme.
       await page.emulateMedia({ colorScheme: theme });
       await page.addInitScript((t) => localStorage.setItem('theme', t), theme);
     });
 
     for (const p of PAGES) {
       test(p.name, async ({ page }) => {
-        // Anmeldung per Token statt über das Formular: Die Login-Route ist auf
-        // 20 Anfragen je Minute begrenzt, 12 UI-Anmeldungen je Lauf reizen das aus.
+        // Sign in via token instead of the form: the login route is limited to
+        // 20 requests per minute, and 12 UI sign-ins per run push that limit.
         if (p.admin) await page.addInitScript((tok) => localStorage.setItem('jwt_token', tok), token);
         await page.goto(p.url);
         await expect(page.locator(p.ready).first()).toBeVisible();
