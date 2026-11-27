@@ -32,6 +32,7 @@ var routeActionExceptions = map[string]string{
 	"DELETE /api/admin/pages/:page_id/webhook-token":                                    "Token widerrufen ändert die Seite (pages:update)",
 	"DELETE /api/admin/pages/:page_id/custom-domain":                                    "Domain entfernen ändert die Seite (pages:update)",
 	"POST /api/admin/pages/:page_id/custom-domain/verify":                               "Prüfen ändert den Domain-Status der Seite (pages:update)",
+	"POST /api/pages/:page_id/subscribers/:id/test-webhook":                             "Test an gespeicherten Webhook ändert nichts; Leser dürfen testen (subscribers:read)",
 	"POST /api/settings/translation/test":                                               "Verbindungstest nutzt die gespeicherte Konfiguration (system_settings:update)",
 	"POST /api/pages/:page_id/components/:id/archive":                                   "Archivieren ändert die Komponente (components:update)",
 	"POST /api/pages/:page_id/components/:id/restore":                                   "Wiederherstellen ändert die Komponente (components:update)",

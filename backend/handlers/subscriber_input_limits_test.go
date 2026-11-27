@@ -119,18 +119,3 @@ func TestUpdateMySubscription_EingabenBegrenzt(t *testing.T) {
 	status, out := doJSON(t, r, http.MethodPut, url, viewerTok, map[string]string{"component_ids": "1,2", "language": "de"})
 	assert.Equal(t, http.StatusOK, status, "%v", out)
 }
-
-func TestTestWebhook_EingabenBegrenzt(t *testing.T) {
-	_, r, _, viewerTok, _, _ := newCodeEnvRouter(t)
-	for name, tc := range map[string]struct{ url, code string }{
-		"zu lang":  {"https://chat.googleapis.com/v1/spaces/" + strings.Repeat("a", 2100), "input_too_long"},
-		"mit NUL":  {"https://chat.googleapis.com/v1/spaces/A\x00B", "input_invalid_characters"},
-		"mit CRLF": {"https://chat.googleapis.com/v1/spaces/A\r\nB", "input_invalid_characters"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			status, out := doJSON(t, r, http.MethodPost, "/api/subscribe/test-webhook", viewerTok, map[string]string{"webhook_url": tc.url})
-			assert.Equal(t, http.StatusBadRequest, status, "%v", out)
-			assert.Equal(t, tc.code, out["code"])
-		})
-	}
-}

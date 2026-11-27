@@ -36,7 +36,6 @@ var selfServiceWriteRoutes = map[string]bool{
 	"POST /api/auth/sso-exchange":                        true,
 	"POST /api/login":                                    true,
 	"POST /api/subscribe":                                true,
-	"POST /api/subscribe/test-webhook":                   true,
 	"POST /api/webhooks/components/:component_id/status": true,
 	"POST /api/webhooks/component-slugs/:slug/status":    true,
 	"POST /api/public/subscribers/unsubscribe":           true,

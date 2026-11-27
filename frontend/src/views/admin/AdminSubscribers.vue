@@ -50,7 +50,7 @@ const alertMsg      = ref('')
 const alertType     = ref('warning')
 const isSaving      = ref(false)
 const deletingId    = ref<number | null>(null)
-const testingUrl    = ref<string | null | undefined>(null)
+const testingId     = ref<number | null>(null)
 // Test message from the open form: result is shown inline at the form.
 const sendingTestMessage = ref(false)
 const testMessageResult  = ref<{ type: 'success' | 'error', text: string } | null>(null)
@@ -181,19 +181,18 @@ const deleteItem = async (id: number, name: string) => {
   }
 }
 
-const testWebhook = async (url: string | undefined) => {
+// Tests only the webhook stored for this subscriber of the page; the
+// server takes the target from the database (security audit).
+const testWebhook = async (id: number) => {
   clearAlert()
-  testingUrl.value = url
+  testingId.value = id
   try {
-    await apiFetch('/api/subscribe/test-webhook', {
-      method: 'POST',
-      body: JSON.stringify({ webhook_url: url })
-    })
+    await apiFetch(`/api/pages/${activeTenantId.value}/subscribers/${id}/test-webhook`, { method: 'POST' })
     showAlert(t('subscribers.testSuccess'), 'success')
   } catch (err) {
     showAlert(t('subscribers.testError') + (err as Error).message, 'error')
   } finally {
-    testingUrl.value = null
+    testingId.value = null
   }
 }
 
@@ -306,8 +305,8 @@ const componentLabels = (idsCsv: string) => componentLabelsFromCsv(idsCsv, compo
                 <div v-else class="cell-contact">
                   <span class="cell-truncate" :title="s.WebhookURL">{{ s.WebhookURL }}</span>
                   <!-- The test is open to readers too, hence not in the row menu (only with subscribers:update). -->
-                  <button v-help="'subscribers.testWebhook'" class="action-btn" @click="testWebhook(s.WebhookURL)" :disabled="testingUrl === s.WebhookURL">
-                    {{ testingUrl === s.WebhookURL ? t('subscribers.testSending') : t('subscribers.testSend') }}
+                  <button v-help="'subscribers.testWebhook'" class="action-btn" @click="testWebhook(s.ID)" :disabled="testingId === s.ID">
+                    {{ testingId === s.ID ? t('subscribers.testSending') : t('subscribers.testSend') }}
                   </button>
                 </div>
               </td>

@@ -33,7 +33,6 @@ func TestSubscriberMeHandlers(t *testing.T) {
 	r.GET("/api/me/subscription", h.GetMySubscriptionHandler)
 	r.PUT("/api/me/subscription", h.UpdateMySubscriptionHandler)
 	r.DELETE("/api/me/subscription", h.DeleteMySubscriptionHandler)
-	r.POST("/api/subscribe/test-webhook", h.TestWebhookHandler)
 
 	page := models.StatusPage{Name: "Page 1", Slug: "page-1"}
 	db.Create(&page)
@@ -139,18 +138,6 @@ func TestSubscriberMeHandlers(t *testing.T) {
 
 		if w.Code != http.StatusNotFound {
 			t.Fatalf("Expected 404, got %d", w.Code)
-		}
-	})
-
-	t.Run("Test Webhook - Missing URL", func(t *testing.T) {
-		payload := map[string]string{}
-		body, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", "/api/subscribe/test-webhook", bytes.NewBuffer(body))
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("Expected 400, got %d", w.Code)
 		}
 	})
 }
