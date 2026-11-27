@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/fraigner/statushafen/models"
+	"github.com/fraigner/statushafen/testutils"
 )
 
 // The four callers of postWebhook (test endpoint, subscriber
@@ -32,11 +34,16 @@ func useTLSWebhookClient(t *testing.T, srv *httptest.Server) {
 func callTestWebhook(t *testing.T, url string) (int, map[string]any) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
+	db := testutils.SetupTestDB()
+	page := models.StatusPage{Name: "Probe", Slug: "probe"}
+	db.Create(&page)
+	sub := models.Subscriber{StatusPageID: page.ID, Channel: "google_chat", WebhookURL: url}
+	db.Create(&sub)
 	r := gin.New()
-	r.POST("/api/subscribe/test-webhook", (&Handler{}).TestWebhookHandler)
-	body, _ := json.Marshal(map[string]string{"webhook_url": url})
+	r.POST("/api/pages/:page_id/subscribers/:id/test-webhook", NewHandler(db).TestStoredSubscriberWebhookHandler)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/subscribe/test-webhook", bytes.NewReader(body))
+	path := fmt.Sprintf("/api/pages/%d/subscribers/%d/test-webhook", page.ID, sub.ID)
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte("{}")))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	var out map[string]any

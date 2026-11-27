@@ -254,7 +254,6 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.Handler) {
 	// run via the dev simulator, all from the same local IP).
 	r.POST("/api/login", middleware.NewRateLimiter(20, time.Minute), h.LoginHandler)
 	r.POST("/api/subscribe", middleware.NewRateLimiter(10, time.Minute), middleware.OptionalAuthMiddleware(), h.SubscribeHandler)
-	r.POST("/api/subscribe/test-webhook", middleware.AuthMiddleware(), middleware.NewRateLimiter(10, time.Minute), h.TestWebhookHandler)
 	publicGroup := r.Group("/api/public")
 	publicGroup.Use(middleware.OptionalAuthMiddleware())
 	publicGroup.GET("/pages", middleware.NewRateLimiter(120, time.Minute), h.GetPublicPagesHandler)
@@ -565,6 +564,8 @@ func registerAuthRoutes(r *gin.Engine, h *handlers.Handler) {
 	guarded(authGroup, http.MethodPost, "/pages/:page_id/subscribers", need("subscribers", permissions.Create), middleware.NewRateLimiter(20, time.Minute), h.CreateSubscriberAdminHandler)
 	// Test message from the subscriber form (create or edit), before saving.
 	guarded(authGroup, http.MethodPost, "/pages/:page_id/subscribers/test", anyAction("subscribers", permissions.Create, permissions.Update), middleware.NewRateLimiter(5, time.Minute), h.SendSubscriberTestMessageHandler)
+	// Readers may test a stored webhook (only the stored target, never a free URL).
+	guarded(authGroup, http.MethodPost, "/pages/:page_id/subscribers/:id/test-webhook", need("subscribers", permissions.Read), middleware.NewRateLimiter(10, time.Minute), h.TestStoredSubscriberWebhookHandler)
 	guarded(authGroup, http.MethodPut, "/pages/:page_id/subscribers/:id", need("subscribers", permissions.Update), notifyChange, h.UpdateSubscriberHandler)
 	guarded(authGroup, http.MethodDelete, "/pages/:page_id/subscribers/:id", need("subscribers", permissions.Delete), h.DeleteSubscriberHandler)
 

@@ -90,7 +90,7 @@ function makeFetchRouter({
     if (method === 'POST' && /\/subscribers\/test$/.test(url)) {
       return testMessageResponse ?? jsonResponse({ message: 'Test message sent' })
     }
-    if (method === 'POST' && /\/subscribe\/test-webhook$/.test(url)) {
+    if (method === 'POST' && /\/subscribers\/\d+\/test-webhook$/.test(url)) {
       if (testWebhookResponse) return testWebhookResponse
       return testWebhookOk ? jsonResponse({}) : jsonResponse({ error: 'Webhook kaputt' }, 500)
     }
@@ -234,10 +234,13 @@ describe('AdminSubscribers', () => {
     await wrapper.findAll('tbody tr')[1].find('.action-btn').trigger('click')
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/subscribe/test-webhook', expect.objectContaining({
+    // Only the stored subscriber of the page, never a free URL (security audit).
+    expect(fetchMock).toHaveBeenCalledWith('/api/pages/1/subscribers/2/test-webhook', expect.objectContaining({
       method: 'POST',
-      body: JSON.stringify({ webhook_url: 'https://chat.googleapis.com/hook-1' }),
     }))
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/subscribe/test-webhook', expect.anything())
+    const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/test-webhook'))
+    expect(call?.[1]?.body).toBeUndefined()
     expect(wrapper.find('.alert-success').text()).toContain('Test-Nachricht erfolgreich gesendet.')
   })
 

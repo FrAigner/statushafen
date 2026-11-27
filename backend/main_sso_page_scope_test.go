@@ -53,7 +53,6 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"POST /api/auth/provider/:id/link":                   ssoOwnAccountNoPageSession,
 	"POST /api/login":                                    ssoUnchanged,
 	"POST /api/subscribe":                                ssoUnchanged,
-	"POST /api/subscribe/test-webhook":                   ssoUnchanged,
 	"GET /api/public/pages":                              ssoUnchanged,
 	"GET /api/public/ui-overrides":                       ssoUnchanged,
 	"POST /api/webhooks/components/:component_id/status": ssoUnchanged,
@@ -223,6 +222,7 @@ var ssoRouteKinds = map[string]ssoRouteKind{
 	"GET /api/pages/:page_id/subscribers":                                               ssoPageRoute,
 	"POST /api/pages/:page_id/subscribers":                                              ssoPageRoute,
 	"POST /api/pages/:page_id/subscribers/test":                                         ssoPageRoute,
+	"POST /api/pages/:page_id/subscribers/:id/test-webhook":                             ssoPageRoute,
 	"PUT /api/pages/:page_id/subscribers/:id":                                           ssoPageRoute,
 	"DELETE /api/pages/:page_id/subscribers/:id":                                        ssoPageRoute,
 }

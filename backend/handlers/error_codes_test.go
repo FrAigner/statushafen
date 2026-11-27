@@ -30,7 +30,7 @@ func newCodeEnvRouter(t *testing.T) (*handlers.Handler, http.Handler, string, st
 
 	pub := r.Group("/api")
 	pub.POST("/subscribe", middleware.OptionalAuthMiddleware(), h.SubscribeHandler)
-	pub.POST("/subscribe/test-webhook", middleware.AuthMiddleware(), h.TestWebhookHandler)
+	pub.POST("/pages/:page_id/subscribers/:id/test-webhook", middleware.AuthMiddleware(), h.TestStoredSubscriberWebhookHandler)
 	pub.POST("/webhooks/components/:component_id/status", h.ComponentStatusWebhookHandler)
 	pub.POST("/public/orders", h.CreateOrderHandler)
 	pub.POST("/public/orders/confirm", h.ConfirmOrderHandler)
@@ -254,6 +254,9 @@ func TestFehlercodes_AbonnentenUndWebhookUrl(t *testing.T) {
 	sub := models.Subscriber{StatusPageID: page.ID, Email: "s613@example.com", Channel: "email", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}
 	require.NoError(t, db.Create(&sub).Error)
 	sid := strconv.Itoa(int(sub.ID))
+	hook := models.Subscriber{StatusPageID: page.ID, WebhookURL: "http://chat.example.com/x", Channel: "google_chat", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}
+	require.NoError(t, db.Create(&hook).Error)
+	hid := strconv.Itoa(int(hook.ID))
 	base := "/api/pages/" + pid + "/subscribers"
 
 	runCodeCases(t, r, []codeCase{
@@ -263,8 +266,10 @@ func TestFehlercodes_AbonnentenUndWebhookUrl(t *testing.T) {
 		{"Abo: Google Chat per http", "POST", "/api/subscribe", "", map[string]any{"channel": "google_chat", "webhook_url": "http://chat.example.com/x", "component_ids": "all", "slug": "p-613"}, 400, "webhook_url_invalid"},
 		{"Abo: Google Chat auf interne Adresse", "POST", "/api/subscribe", "", map[string]any{"channel": "google_chat", "webhook_url": "https://127.0.0.1/x", "component_ids": "all", "slug": "p-613"}, 400, "webhook_url_invalid"},
 		{"Abo: Slug fehlt", "POST", "/api/subscribe", "", map[string]any{"channel": "email", "email": "ok613@example.com", "component_ids": "all"}, 400, "slug_required"},
-		{"Webhook testen: URL fehlt", "POST", "/api/subscribe/test-webhook", adminTok, map[string]any{}, 400, "webhook_url_required"},
-		{"Webhook testen: http", "POST", "/api/subscribe/test-webhook", adminTok, map[string]any{"webhook_url": "http://chat.example.com/x"}, 400, "webhook_https_only"},
+		{"Webhook testen: E-Mail-Abo", "POST", base + "/" + sid + "/test-webhook", adminTok, map[string]any{}, 400, "channel_invalid"},
+		{"Webhook testen: http", "POST", base + "/" + hid + "/test-webhook", adminTok, map[string]any{}, 400, "webhook_https_only"},
+		{"Webhook testen: Abo einer fremden Seite -> 404", "POST", "/api/pages/" + oid + "/subscribers/" + hid + "/test-webhook", adminTok, map[string]any{}, 404, "subscriber_not_found"},
+		{"Webhook testen: ungültige ID", "POST", base + "/abc/test-webhook", adminTok, map[string]any{}, 400, "invalid_id"},
 		{"Admin anlegen: Google Chat ohne URL", "POST", base, adminTok, map[string]any{"Channel": "google_chat", "SubscribedComponentIDs": "all"}, 400, "webhook_url_required"},
 		{"Admin anlegen: Google Chat intern", "POST", base, adminTok, map[string]any{"Channel": "google_chat", "WebhookURL": "https://127.0.0.1/x", "SubscribedComponentIDs": "all"}, 400, "webhook_internal_address"},
 		{"Admin ändern: Kanalwechsel auf http", "PUT", base + "/" + sid, adminTok, map[string]any{"Channel": "google_chat", "WebhookURL": "http://chat.example.com/x", "SubscribedComponentIDs": "all"}, 400, "webhook_https_only"},

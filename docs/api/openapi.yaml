@@ -103,7 +103,7 @@ info:
     | Endpunkt | Limit |
     |---|---|
     | `POST /api/login`, `GET /api/auth/oidc/login`, `GET /api/auth/oidc/callback`, `POST /api/webhooks/components/{component_id}/status`, `POST /api/webhooks/component-slugs/{slug}/status`, `GET`/`POST /api/public/subscribers/unsubscribe`, `POST /api/public/subscribers/confirm`, `POST /api/public/orders/confirm`, `POST /api/admin/pages/{page_id}/sso/test`, `GET /api/auth/provider/{id}/login`, `GET /api/auth/provider/{id}/callback` | 20/min |
-    | `POST /api/subscribe`, `POST /api/subscribe/test-webhook`, `POST /api/auth/sso-exchange`, `POST /api/public/orders/set-password` | 10/min |
+    | `POST /api/subscribe`, `POST /api/pages/{page_id}/subscribers/{id}/test-webhook`, `POST /api/auth/sso-exchange`, `POST /api/public/orders/set-password` | 10/min |
     | `POST /api/public/orders`, `POST /api/pages/{page_id}/subscribers/test` | 5/min |
     | `GET /api/public/resolve-domain`, `GET /api/public/pages/{slug}/sso`, `GET /api/public/auth-config` | 60/min |
     | `GET /api/public/pages/{slug}/dashboard`, `GET /api/pages/{page_id}/incidents`, `GET /api/pages/{page_id}/incidents/{id}`, `GET /api/pages/slug/{slug}`, `GET /api/pages/{page_id}/components`, `GET /api/pages/{page_id}/notices`, `GET /api/public/pages`, `GET /api/public/ui-overrides`, `GET /api/incidents/{incident_id}/translations`, `GET /api/components/{component_id}/translations`, `GET /api/notices/{notice_id}/translations` | 120/min je Route |
@@ -1639,55 +1639,6 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /api/subscribe/test-webhook:
-    post:
-      tags: [Subscriptions]
-      operationId: testWebhook
-      summary: Test-Nachricht an einen Google-Chat-Webhook senden
-      x-required-permission: authenticated
-      x-rate-limit: 10/min pro IP
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [webhook_url]
-              properties:
-                webhook_url: { type: string, format: uri, description: "https-URL, keine internen Adressen." }
-      responses:
-        "200": { $ref: "#/components/responses/MessageOk" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "429":
-          description: |
-            Entweder das eigene Rate-Limit dieses Endpunkts oder das
-            Webhook-Ziel (z. B. Google Chat) drosselt (HTTP 429 des Ziels
-            bzw. lokaler Limiter von 1 Nachricht/s je URL). Der Endpunkt
-            wartet nie, sondern antwortet sofort. Bei einer Drosselung des
-            Ziels lautet der Code `webhook_rate_limited` und `retry_after`
-            nennt die Wartezeit in Sekunden.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error: { type: string }
-                  code: { type: string, example: webhook_rate_limited }
-                  retry_after: { type: integer, minimum: 1, description: "Sekunden bis zum nächsten Versuch (nur bei `webhook_rate_limited`)." }
-        "502":
-          description: |
-            Das Webhook-Ziel hat die Nachricht nicht angenommen. Code
-            `webhook_rejected`: Ziel antwortete mit 4xx außer 429 (URL oder
-            Schlüssel falsch); Code `webhook_unreachable`: 5xx (z. B. 503
-            bei Überlast), Netzfehler oder Timeout.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error: { type: string }
-                  code: { type: string, enum: [webhook_rejected, webhook_unreachable] }
   /api/public/subscribers/confirm:
     post:
       tags: [Subscriptions]
@@ -4232,7 +4183,7 @@ paths:
         internen Adressen). `Language` ist die Sprache des Admin-Bereichs (`de` oder `en`,
         z. B. auch `en-US`; alles andere ergibt Deutsch), nicht die Mailsprache des Abonnenten.
         Für Webhooks gibt es genau einen Versuch ohne Warten (Antworten wie bei
-        `POST /api/subscribe/test-webhook`).
+        `POST /api/pages/{page_id}/subscribers/{id}/test-webhook`).
       x-required-permission: subscribers:create|subscribers:update
       x-rate-limit: 5/min pro IP
       requestBody:
@@ -4279,6 +4230,68 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  /api/pages/{page_id}/subscribers/{id}/test-webhook:
+    parameters:
+      - $ref: "#/components/parameters/PageId"
+      - $ref: "#/components/parameters/Id"
+    post:
+      tags: [Admin – Subscribers]
+      operationId: testSubscriberWebhook
+      summary: Test-Nachricht an den gespeicherten Webhook eines Abonnenten senden
+      description: |
+        Schickt eine kurze Test-Nachricht an den gespeicherten Google-Chat-Webhook eines
+        Abonnenten dieser Seite. Das Ziel kommt nur aus der Datenbank, nie aus der Anfrage;
+        die URL wird vor dem Senden erneut geprüft (nur https, keine internen Adressen).
+        Ersetzt `POST /api/subscribe/test-webhook`, das eine frei wählbare URL annahm.
+        Genau ein Versuch ohne Warten.
+      x-required-permission: subscribers:read
+      x-rate-limit: 10/min pro IP
+      responses:
+        "200": { $ref: "#/components/responses/MessageOk" }
+        "400":
+          description: |
+            `invalid_id`, `channel_invalid` (E-Mail-Abonnent, kein Webhook) oder die
+            gespeicherte URL besteht die erneute Prüfung nicht (`webhook_https_only`,
+            `webhook_host_unresolvable`, `webhook_internal_address`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: "Kein Abonnent mit dieser ID auf der Seite (`subscriber_not_found`)."
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: |
+            Entweder das eigene Rate-Limit dieses Endpunkts oder das
+            Webhook-Ziel (z. B. Google Chat) drosselt (HTTP 429 des Ziels
+            bzw. lokaler Limiter von 1 Nachricht/s je URL). Der Endpunkt
+            wartet nie, sondern antwortet sofort. Bei einer Drosselung des
+            Ziels lautet der Code `webhook_rate_limited` und `retry_after`
+            nennt die Wartezeit in Sekunden.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  code: { type: string, example: webhook_rate_limited }
+                  retry_after: { type: integer, minimum: 1, description: "Sekunden bis zum nächsten Versuch (nur bei `webhook_rate_limited`)." }
+        "502":
+          description: |
+            Das Webhook-Ziel hat die Nachricht nicht angenommen. Code
+            `webhook_rejected`: Ziel antwortete mit 4xx außer 429 (URL oder
+            Schlüssel falsch); Code `webhook_unreachable`: 5xx (z. B. 503
+            bei Überlast), Netzfehler oder Timeout.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  code: { type: string, enum: [webhook_rejected, webhook_unreachable] }
   /api/pages/{page_id}/subscribers/{id}:
     parameters:
       - $ref: "#/components/parameters/PageId"

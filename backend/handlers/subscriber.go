@@ -702,21 +702,33 @@ func (h *Handler) CreateSubscriberAdminHandler(c *gin.Context) {
 	c.JSON(http.StatusCreated, h.subscriberDTO(sub, getUserID(c)))
 }
 
-func (h *Handler) TestWebhookHandler(c *gin.Context) {
-	type WebhookReq struct {
-		WebhookURL string `json:"webhook_url" binding:"required"`
-	}
-	var req WebhookReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Webhook-URL erforderlich", "code": "webhook_url_required"})
+// TestStoredSubscriberWebhookHandler sends a test message to the webhook of
+// an existing subscriber of the page. The target comes only from the
+// database, never from the request: before, a free URL let every signed-in
+// account have the server send requests anywhere (security audit, finding 2).
+func (h *Handler) TestStoredSubscriberWebhookHandler(c *gin.Context) {
+	pageID, err := strconv.ParseUint(c.Param("page_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": errInvalidPageID, "code": "invalid_id"})
 		return
 	}
-
-	if err := checkInputTexts(textField{req.WebhookURL, maxWebhookURLLength}); err != nil {
-		respondCoded(c, http.StatusBadRequest, err)
+	subID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subscriber ID", "code": "invalid_id"})
 		return
 	}
-	if err := validateWebhookURL(req.WebhookURL); err != nil {
+	var sub models.Subscriber
+	if err := h.DB.Where("id = ? AND status_page_id = ?", subID, pageID).First(&sub).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Subscriber not found", "code": "subscriber_not_found"})
+		return
+	}
+	if sub.Channel != "google_chat" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Abonnent hat keinen Webhook", "code": "channel_invalid"})
+		return
+	}
+	// Re-check: old entries (from before the https rule) or a host whose
+	// DNS answer has since become internal.
+	if err := validateWebhookURL(sub.WebhookURL); err != nil {
 		respondCoded(c, http.StatusBadRequest, err)
 		return
 	}
@@ -725,5 +737,5 @@ func (h *Handler) TestWebhookHandler(c *gin.Context) {
 		"text": "👋 **Test-Benachrichtigung**\nDie Verbindung zu deinem Status-Dashboard funktioniert einwandfrei!",
 	}
 	// one attempt, never wait; the error class determines the response.
-	respondWebhookProbe(c, postWebhook(c.Request.Context(), req.WebhookURL, payload, webhookModeProbe))
+	respondWebhookProbe(c, postWebhook(c.Request.Context(), sub.WebhookURL, payload, webhookModeProbe))
 }

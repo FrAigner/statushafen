@@ -217,6 +217,9 @@ func TestFehlercodes_Serverfehler_AbonnentenUndWebhook(t *testing.T) {
 	sub := models.Subscriber{StatusPageID: page.ID, Email: "a613@example.com", Channel: "email", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}
 	require.NoError(t, db.Create(&sub).Error)
 	sid := strconv.Itoa(int(sub.ID))
+	hook := models.Subscriber{StatusPageID: page.ID, WebhookURL: "https://127.0.0.1:1/hook", Channel: "google_chat", SubscribedComponentIDs: "all", Status: models.SubscriberStatusActive}
+	require.NoError(t, db.Create(&hook).Error)
+	hid := strconv.Itoa(int(hook.ID))
 	base := "/api/pages/" + pid + "/subscribers"
 	adminUpdate := map[string]any{"Channel": "email", "Email": "a613@example.com", "SubscribedComponentIDs": "all"}
 
@@ -231,7 +234,7 @@ func TestFehlercodes_Serverfehler_AbonnentenUndWebhook(t *testing.T) {
 		{name: "Admin löschen: ungültige ID", method: "DELETE", url: base + "/abc", token: adminTok, wantStatus: 400, wantCode: "invalid_id"},
 		{name: "Admin löschen: Löschen scheitert", op: "delete", table: "subscribers", method: "DELETE", url: base + "/" + sid, token: adminTok, wantStatus: 500, wantCode: "server_error"},
 		{name: "Admin anlegen: Speichern scheitert", op: "create", table: "subscribers", method: "POST", url: base, token: adminTok, body: map[string]any{"Channel": "email", "Email": "neu613@example.com", "SubscribedComponentIDs": "all"}, wantStatus: 500, wantCode: "server_error"},
-		{name: "Webhook testen: Senden scheitert", method: "POST", url: "/api/subscribe/test-webhook", token: adminTok, body: map[string]any{"webhook_url": "https://127.0.0.1:1/hook"}, wantStatus: 502, wantCode: "webhook_unreachable"},
+		{name: "Webhook testen: Senden scheitert", method: "POST", url: base + "/" + hid + "/test-webhook", token: adminTok, body: map[string]any{}, wantStatus: 502, wantCode: "webhook_unreachable"},
 	})
 }
 
